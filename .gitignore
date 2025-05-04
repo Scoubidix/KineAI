@@ -52,3 +52,4 @@ ui-debug.log*
 # Turbopack
 .turbo
 
+.env.local.template
