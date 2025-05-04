@@ -52,4 +52,7 @@ ui-debug.log*
 # Turbopack
 .turbo
 
+# Dev environment config (Nix & Firebase Studio)
 .env.local.template
+.idx/
+dev.nix
