@@ -1,57 +1,48 @@
-
 'use client';
+export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'; // Added CardFooter
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Bell, AlertCircle, Users, CheckCircle, XCircle, CalendarDays, Percent, Calendar as CalendarIcon } from 'lucide-react'; // Added CalendarIcon
+import { Bell, AlertCircle, Users, CheckCircle, XCircle, CalendarDays, Percent, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"; // Import Popover components
-import { Calendar } from "@/components/ui/calendar"; // Import Calendar component
-import { cn } from "@/lib/utils"; // Import cn utility
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
-// Simulate some notifications for demonstration
 const getSimulatedNotifications = () => [
   { id: 'notif1', type: 'pain_alert', patientName: 'Alice Martin', painLevel: 8, timestamp: new Date(Date.now() - 3600000), read: false },
-  { id: 'notif2', type: 'message', patientName: 'Bob Dubois', timestamp: new Date(Date.now() - 86400000 * 2), read: true }, // Example message notification
+  { id: 'notif2', type: 'message', patientName: 'Bob Dubois', timestamp: new Date(Date.now() - 86400000 * 2), read: true },
   { id: 'notif3', type: 'pain_alert', patientName: 'Charlie Petit', painLevel: 7, timestamp: new Date(Date.now() - 86400000 * 3), read: false },
 ];
 
-// Simulate patient adherence data based on selected date
 const getSimulatedAdherence = (selectedDate: Date) => {
-    // Simple simulation: Adherence drops slightly for past dates
-    const dateSeed = selectedDate.getDate(); // Use day of month for variety
-    const baseAdherence = 80; // Base adherence %
-    const dailyVariation = (dateSeed % 10) * 2 - 10; // +/- 10% variation
+    const dateSeed = selectedDate.getDate();
+    const baseAdherence = 80;
+    const dailyVariation = (dateSeed % 10) * 2 - 10;
     let simulatedPercentage = baseAdherence + dailyVariation;
-
     const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
     if (!isToday) {
-        simulatedPercentage = Math.max(50, simulatedPercentage - 5); // Slightly lower for past dates
+        simulatedPercentage = Math.max(50, simulatedPercentage - 5);
     }
-
-    const totalPatients = 5 + (dateSeed % 3); // Vary total patients slightly
+    const totalPatients = 5 + (dateSeed % 3);
     const completedCount = Math.round((simulatedPercentage / 100) * totalPatients);
-
-    // Generate sample patient list for the selected date
     const patients = Array.from({ length: totalPatients }, (_, i) => ({
         id: `sim-patient-${dateSeed}-${i + 1}`,
-        name: `Patient ${String.fromCharCode(65 + i)} (${format(selectedDate, 'dd/MM')})`, // Example name based on date
+        name: `Patient ${String.fromCharCode(65 + i)} (${format(selectedDate, 'dd/MM')})`,
         completed: i < completedCount,
     }));
-
     return {
-        patients: patients,
-        // Fix: Use totalPatients instead of totalCount here
+        patients,
         adherencePercentage: totalPatients > 0 ? Math.round((completedCount / totalPatients) * 100) : 0,
-        completedCount: completedCount,
+        completedCount,
         totalCount: totalPatients
     };
 };
@@ -63,24 +54,22 @@ const getInitials = (name?: string): string => {
   return (names[0][0] + names[names.length - 1][0]).toUpperCase();
 };
 
-
 export default function KineHomePage() {
+    console.log('✅ Composant KineHomePage monté');
     const [notifications, setNotifications] = useState<any[]>([]);
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [adherenceData, setAdherenceData] = useState({ patients: [] as any[], adherencePercentage: 0, completedCount: 0, totalCount: 0 });
 
-    // Simulate fetching data based on selected date
     useEffect(() => {
         setNotifications(getSimulatedNotifications());
         setAdherenceData(getSimulatedAdherence(selectedDate));
-    }, [selectedDate]); // Re-run when selectedDate changes
+    }, [selectedDate]);
 
     const unreadNotifications = notifications.filter(n => !n.read);
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* Header with Current Date (remains today's date) */}
         <div className="pb-4 border-b border-border">
           <h1 className="text-2xl md:text-3xl font-bold text-primary">Tableau de Bord</h1>
            <p className="flex items-center gap-2 text-md md:text-lg text-muted-foreground mt-1">
@@ -89,7 +78,6 @@ export default function KineHomePage() {
            </p>
         </div>
 
-        {/* Notification Module (Conditional) */}
          {unreadNotifications.length > 0 && (
             <Card className="shadow-md bg-destructive/10 border-destructive hover:shadow-lg transition-shadow duration-200 ease-in-out">
                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -113,7 +101,6 @@ export default function KineHomePage() {
             </Card>
          )}
 
-        {/* Daily Adherence Module */}
          <Card className="shadow-md hover:shadow-lg transition-shadow duration-200 ease-in-out border-border hover:border-accent">
             <CardHeader className="pb-4 flex flex-row items-center justify-between">
                 <div>
@@ -123,7 +110,6 @@ export default function KineHomePage() {
                     </CardTitle>
                     <CardDescription>Suivi des séances pour le <span className="font-medium">{format(selectedDate, 'd MMMM yyyy', { locale: fr })}</span>.</CardDescription>
                 </div>
-                {/* Date Picker */}
                 <Popover>
                    <PopoverTrigger asChild>
                      <Button
@@ -141,10 +127,10 @@ export default function KineHomePage() {
                      <Calendar
                        mode="single"
                        selected={selectedDate}
-                       onSelect={(date) => date && setSelectedDate(date)} // Update state on selection
+                       onSelect={(date) => date && setSelectedDate(date)}
                        initialFocus
-                       locale={fr} // Use French locale for calendar
-                       disabled={(date) => date > new Date()} // Disable future dates
+                       locale={fr}
+                       disabled={(date) => date > new Date()}
                      />
                    </PopoverContent>
                  </Popover>
@@ -174,7 +160,6 @@ export default function KineHomePage() {
                                 {adherenceData.patients.map((patient) => (
                                     <TableRow key={patient.id} className="hover:bg-muted/30">
                                         <TableCell>
-                                            {/* Link to patient detail remains static for simulation */}
                                             <Link href={`/dashboard/kine/patients/sim-patient-${(Math.abs(patient.id.hashCode()) % 3) + 1}`} className="flex items-center gap-3 group hover:text-primary transition-colors">
                                                 <Avatar className="h-8 w-8 border group-hover:border-primary">
                                                     <AvatarFallback className="text-xs bg-secondary text-secondary-foreground group-hover:bg-primary/10">
@@ -218,15 +203,13 @@ export default function KineHomePage() {
   );
 }
 
-// Simple hashCode function for simulation variety
 String.prototype.hashCode = function() {
   var hash = 0, i, chr;
   if (this.length === 0) return hash;
   for (i = 0; i < this.length; i++) {
     chr   = this.charCodeAt(i);
     hash  = ((hash << 5) - hash) + chr;
-    hash |= 0; // Convert to 32bit integer
+    hash |= 0;
   }
   return hash;
 };
-

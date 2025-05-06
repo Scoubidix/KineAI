@@ -1,5 +1,6 @@
 // src/types/user.ts
 export type UserRole = 'kine' | 'patient';
+export type RoleOrUnknown = UserRole | 'unknown';
 
 export interface UserProfileData {
   id: string;
@@ -7,5 +8,5 @@ export interface UserProfileData {
   email: string;
   role: UserRole;
   linkedPatients?: string[]; // For Kine: Array of patient IDs
-  linkedKine?: string;      // For Patient: ID of their Kine
+  linkedKine?: string;       // For Patient: ID of their Kine
 }
