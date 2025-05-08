@@ -82,7 +82,7 @@ export default function LoginPage() {
             </div>
           </CardContent>
           <CardFooter className="flex justify-between items-center">
-            <Link href="/register" className="text-sm underline">Créer un compte</Link>
+            <Link href="/signup" className="text-sm underline">Créer un compte</Link>
             <Button type="submit" disabled={loading} className="gap-2">
               <LogIn className="h-4 w-4" />
               Se connecter
