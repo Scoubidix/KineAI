@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
 
 const getSimulatedNotifications = () => [
   { id: 'notif1', type: 'pain_alert', patientName: 'Alice Martin', painLevel: 8, timestamp: new Date(Date.now() - 3600000), read: false },
@@ -24,27 +26,27 @@ const getSimulatedNotifications = () => [
 ];
 
 const getSimulatedAdherence = (selectedDate: Date) => {
-    const dateSeed = selectedDate.getDate();
-    const baseAdherence = 80;
-    const dailyVariation = (dateSeed % 10) * 2 - 10;
-    let simulatedPercentage = baseAdherence + dailyVariation;
-    const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-    if (!isToday) {
-        simulatedPercentage = Math.max(50, simulatedPercentage - 5);
-    }
-    const totalPatients = 5 + (dateSeed % 3);
-    const completedCount = Math.round((simulatedPercentage / 100) * totalPatients);
-    const patients = Array.from({ length: totalPatients }, (_, i) => ({
-        id: `sim-patient-${dateSeed}-${i + 1}`,
-        name: `Patient ${String.fromCharCode(65 + i)} (${format(selectedDate, 'dd/MM')})`,
-        completed: i < completedCount,
-    }));
-    return {
-        patients,
-        adherencePercentage: totalPatients > 0 ? Math.round((completedCount / totalPatients) * 100) : 0,
-        completedCount,
-        totalCount: totalPatients
-    };
+  const dateSeed = selectedDate.getDate();
+  const baseAdherence = 80;
+  const dailyVariation = (dateSeed % 10) * 2 - 10;
+  let simulatedPercentage = baseAdherence + dailyVariation;
+  const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+  if (!isToday) {
+    simulatedPercentage = Math.max(50, simulatedPercentage - 5);
+  }
+  const totalPatients = 5 + (dateSeed % 3);
+  const completedCount = Math.round((simulatedPercentage / 100) * totalPatients);
+  const patients = Array.from({ length: totalPatients }, (_, i) => ({
+    id: `sim-patient-${dateSeed}-${i + 1}`,
+    name: `Patient ${String.fromCharCode(65 + i)} (${format(selectedDate, 'dd/MM')})`,
+    completed: i < completedCount,
+  }));
+  return {
+    patients,
+    adherencePercentage: totalPatients > 0 ? Math.round((completedCount / totalPatients) * 100) : 0,
+    completedCount,
+    totalCount: totalPatients
+  };
 };
 
 const getInitials = (name?: string): string => {
@@ -54,28 +56,45 @@ const getInitials = (name?: string): string => {
   return (names[0][0] + names[names.length - 1][0]).toUpperCase();
 };
 
+interface KineData {
+  firstName: string;
+}
+
 export default function KineHomePage() {
-    console.log('✅ Composant KineHomePage monté');
-    const [notifications, setNotifications] = useState<any[]>([]);
-    const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-    const [adherenceData, setAdherenceData] = useState({ patients: [] as any[], adherencePercentage: 0, completedCount: 0, totalCount: 0 });
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [adherenceData, setAdherenceData] = useState({ patients: [] as any[], adherencePercentage: 0, completedCount: 0, totalCount: 0 });
+  const [kine, setKine] = useState<KineData | null>(null);
 
-    useEffect(() => {
-        setNotifications(getSimulatedNotifications());
-        setAdherenceData(getSimulatedAdherence(selectedDate));
-    }, [selectedDate]);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(getAuth(), async (user) => {
+      if (user) {
+        const ref = doc(getFirestore(), 'users', user.uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) setKine(snap.data() as KineData);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
-    const unreadNotifications = notifications.filter(n => !n.read);
+  useEffect(() => {
+    setNotifications(getSimulatedNotifications());
+    setAdherenceData(getSimulatedAdherence(selectedDate));
+  }, [selectedDate]);
+
+  if (!kine) return <div>Chargement...</div>;
+
+  const unreadNotifications = notifications.filter(n => !n.read);
 
   return (
     <AppLayout>
       <div className="space-y-6">
         <div className="pb-4 border-b border-border">
-          <h1 className="text-2xl md:text-3xl font-bold text-primary">Tableau de Bord</h1>
-           <p className="flex items-center gap-2 text-md md:text-lg text-muted-foreground mt-1">
-             <CalendarDays className="h-5 w-5 text-accent" />
-             Aujourd'hui : {format(new Date(), 'EEEE d MMMM yyyy', { locale: fr })}
-           </p>
+          <h1 className="text-2xl md:text-3xl font-bold text-primary">Bienvenue {kine.firstName}</h1>
+          <p className="flex items-center gap-2 text-md md:text-lg text-muted-foreground mt-1">
+            <CalendarDays className="h-5 w-5 text-accent" />
+            Aujourd'hui : {format(new Date(), 'EEEE d MMMM yyyy', { locale: fr })}
+          </p>
         </div>
 
          {unreadNotifications.length > 0 && (
