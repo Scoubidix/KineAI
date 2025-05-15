@@ -11,9 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus, ArrowLeft } from "lucide-react";
-import type { UserRole } from "@/types/user";
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -23,7 +21,8 @@ export default function SignupPage() {
     phone: "",
     email: "",
     password: "",
-    role: "" as UserRole | "",
+    adresseCabinet: "",
+    rpps: ""
   });
 
   const [loading, setLoading] = useState(false);
@@ -34,24 +33,11 @@ export default function SignupPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleRoleChange = (value: string) => {
-    setFormData({ ...formData, role: value as UserRole });
-  };
-
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { email, password, firstName, lastName, birthDate, phone, role } = formData;
 
-    if (!role) {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Veuillez sélectionner votre rôle (Patient ou Kiné).",
-      });
-      setLoading(false);
-      return;
-    }
+    const { email, password, firstName, lastName, birthDate, phone, adresseCabinet, rpps } = formData;
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -64,14 +50,16 @@ export default function SignupPage() {
         birthDate,
         phone,
         email,
-        role,
-        ...(role === "kine" ? { linkedPatients: [] } : { linkedKine: null }),
-        createdAt: new Date(),
+        adresseCabinet,
+        rpps,
+        role: "kine",
+        linkedPatients: [],
+        createdAt: new Date()
       });
 
       toast({
         title: "Inscription réussie !",
-        description: `Votre compte ${role} a été créé.`,
+        description: `Votre compte kiné a bien été créé.`,
       });
 
       router.push("/login");
@@ -100,8 +88,8 @@ export default function SignupPage() {
             <path d="M9 8h6" />
             <path d="M9 6h6" />
           </svg>
-          <CardTitle className="text-2xl font-bold text-primary">Créer un Compte KineAI</CardTitle>
-          <CardDescription>Rejoignez la plateforme pour une rééducation personnalisée.</CardDescription>
+          <CardTitle className="text-2xl font-bold text-primary">Créer un Compte Kiné</CardTitle>
+          <CardDescription>Réservé aux professionnels de santé.</CardDescription>
         </CardHeader>
         <form onSubmit={handleSignup}>
           <CardContent className="space-y-4">
@@ -126,20 +114,16 @@ export default function SignupPage() {
               <Input id="email" name="email" type="email" placeholder="nom@exemple.com" onChange={handleChange} required disabled={loading} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
-              <Input id="password" name="password" type="password" placeholder="********" onChange={handleChange} required disabled={loading} minLength={6} />
+              <Label htmlFor="adresseCabinet">Adresse du cabinet</Label>
+              <Input id="adresseCabinet" name="adresseCabinet" placeholder="123 Rue de la Santé, Paris" onChange={handleChange} required disabled={loading} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="role">Vous êtes</Label>
-              <Select onValueChange={handleRoleChange} value={formData.role} required disabled={loading}>
-                <SelectTrigger id="role" aria-label="Sélectionner votre rôle">
-                  <SelectValue placeholder="Sélectionner votre rôle..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="patient">Patient</SelectItem>
-                  <SelectItem value="kine">Kinésithérapeute</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="rpps">Numéro RPPS</Label>
+              <Input id="rpps" name="rpps" placeholder="12345678901" onChange={handleChange} required disabled={loading} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Mot de passe</Label>
+              <Input id="password" name="password" type="password" placeholder="********" onChange={handleChange} required disabled={loading} minLength={6} />
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
