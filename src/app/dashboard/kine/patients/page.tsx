@@ -1,366 +1,250 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import AppLayout from '@/components/AppLayout';
-import { useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { useEffect, useState } from 'react';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  doc,
+  updateDoc,
+  Timestamp
+} from 'firebase/firestore';
+import { Plus, Trash2, Pencil, Loader2, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { Loader2, UserPlus, Eye, Wand2, AlertCircle } from 'lucide-react';
-import type { UserProfileData } from '@/types/user';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
-import { generateExerciseProgram } from '@/ai/flows/generate-exercise-program';
-import type { GenerateProgramInput, ExerciseInProgram, Program } from '@/types/program';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import AppLayout from '@/components/AppLayout';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import Link from 'next/link';
 
-// Simulate patient data
-const simulatedPatients: UserProfileData[] = [
-    { id: 'sim-patient-1', name: 'Alice Martin', email: 'alice.m@email.com', role: 'patient', linkedKine: 'sim-kine-id', photoURL: 'https://picsum.photos/seed/alice/100' },
-    { id: 'sim-patient-2', name: 'Bob Dubois', email: 'bob.d@email.com', role: 'patient', linkedKine: 'sim-kine-id', photoURL: 'https://picsum.photos/seed/bob/100' },
-    { id: 'sim-patient-3', name: 'Charlie Petit', email: 'charlie.p@email.com', role: 'patient', linkedKine: 'sim-kine-id', photoURL: 'https://picsum.photos/seed/charlie/100' },
-];
-const simulatedPatientsMap: { [key: string]: UserProfileData } = simulatedPatients.reduce((acc, p) => {
-    acc[p.id] = p;
-    return acc;
-}, {} as { [key: string]: UserProfileData });
+interface UserProfileData {
+  id: string;
+  firstName: string;
+  lastName: string;
+  birthDate: string;
+  phone: string;
+  email: string;
+  objectifs: string;
+  createdAt?: Timestamp;
+}
 
-
-const getInitials = (name?: string): string => {
-  if (!name) return '??';
-  const names = name.split(' ');
-  if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
-  return (names[0][0] + names[names.length - 1][0]).toUpperCase();
-};
-
-type ProgramCreationInput = Omit<GenerateProgramInput, 'patientId'>;
-
-export default function KinePatientsPage() {
-  const router = useRouter();
+export default function PatientsPage() {
   const [patients, setPatients] = useState<UserProfileData[]>([]);
-  const [patientsLoading, setPatientsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
-
-  // State for program generation form
-  const [formData, setFormData] = useState<ProgramCreationInput>({
-    objective: '',
-    difficultyLevel: 'beginner',
-    availableEquipment: '',
-    duration: '',
+  const [filteredPatients, setFilteredPatients] = useState<UserProfileData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState({
+    firstName: '',
+    lastName: '',
+    birthDate: '',
+    phone: '',
+    email: '',
+    objectifs: '',
+    id: ''
   });
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
-  const [generating, setGenerating] = useState(false);
-  const [generationError, setGenerationError] = useState<string | null>(null);
 
-  // Simulate fetching patients
+  const fetchPatients = async (uid: string) => {
+    setLoading(true);
+    try {
+      const q = query(
+        collection(getFirestore(), 'users'),
+        where('role', '==', 'patient'),
+        where('linkedKine', '==', uid)
+      );
+      const snap = await getDocs(q);
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as UserProfileData[];
+      setPatients(data);
+      setFilteredPatients(data);
+    } catch (err) {
+      setError('Erreur de chargement des patients.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setPatientsLoading(true);
-    setError(null);
-    const timer = setTimeout(() => {
-      try {
-        setPatients(simulatedPatients);
-        setPatientsLoading(false);
-      } catch (err) {
-        console.error("Erreur simulation patients:", err);
-        setError("Impossible de charger la liste des patients simulée.");
-        setPatientsLoading(false);
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        fetchPatients(user.uid);
+      } else {
+        setError("Utilisateur non authentifié");
+        setLoading(false);
       }
-    }, 800);
-
-    return () => clearTimeout(timer);
+    });
+    return () => unsubscribe();
   }, []);
 
-   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-     const { name, value } = e.target;
-     setFormData(prev => ({ ...prev, [name]: value }));
-   };
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
-    const handleSelectChange = (name: keyof ProgramCreationInput, value: string) => {
-       if (name === 'difficultyLevel' && !['beginner', 'intermediate', 'advanced'].includes(value)) {
-           console.error("Invalid difficulty level selected:", value);
-           return;
-       }
-       setFormData(prev => ({ ...prev, [name]: value as 'beginner' | 'intermediate' | 'advanced' }));
-    };
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toLowerCase();
+    setSearch(value);
+    setFilteredPatients(patients.filter(p =>
+      `${p.firstName} ${p.lastName}`.toLowerCase().includes(value)
+    ));
+  };
 
-     const handlePatientSelectChange = (value: string) => {
-         setSelectedPatientId(value);
-     };
+  const handleAddOrUpdatePatient = async () => {
+    const user = getAuth().currentUser;
+    if (!user) return;
 
-  const handleGenerateProgram = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setGenerationError(null);
-
-    if (!selectedPatientId) {
-        setGenerationError("Veuillez sélectionner un patient.");
-        toast({ variant: "destructive", title: "Erreur", description: "La sélection du patient est requise."});
-        return;
-    }
-    if (!formData.objective || !formData.availableEquipment || !formData.duration) {
-         setGenerationError("Veuillez remplir tous les champs obligatoires du formulaire de programme.");
-         toast({ variant: "destructive", title: "Erreur", description: "Objectif, équipement et durée sont requis."});
-         return;
-     }
-
-    setGenerating(true);
-
-    const inputData: GenerateProgramInput = {
-        patientId: selectedPatientId,
-        objective: formData.objective,
-        difficultyLevel: formData.difficultyLevel,
-        availableEquipment: formData.availableEquipment,
-        duration: formData.duration,
+    const patientData = {
+      firstName: form.firstName,
+      lastName: form.lastName,
+      birthDate: form.birthDate,
+      phone: form.phone,
+      email: form.email,
+      objectifs: form.objectifs,
+      role: 'patient',
+      linkedKine: user.uid,
+      createdAt: Timestamp.now()
     };
 
     try {
-      const result = await generateExerciseProgram(inputData);
+      if (form.id) {
+        await updateDoc(doc(getFirestore(), 'users', form.id), patientData);
+        fetchPatients(user.uid);
+      } else {
+        const docRef = await addDoc(collection(getFirestore(), 'users'), patientData);
+        const newPatient = { id: docRef.id, ...patientData };
+        setPatients(prev => [...prev, newPatient]);
+        setFilteredPatients(prev => [...prev, newPatient]);
+      }
+      setForm({ firstName: '', lastName: '', birthDate: '', phone: '', email: '', objectifs: '', id: '' });
+      setDialogOpen(false);
+    } catch (error) {
+      console.error("Erreur ajout ou modification patient :", error);
+    }
+  };
 
-       if (!result || !result.program || result.program.length === 0) {
-            throw new Error("L'IA n'a pas pu générer de programme. Veuillez ajuster les entrées ou réessayer.");
-        }
+  const handleEdit = (patient: UserProfileData) => {
+    setForm(patient);
+    setDialogOpen(true);
+  };
 
-       const programData: Omit<Program, 'id' | 'createdAt' | 'updatedAt'> & {createdAt: Date} = {
-         id_kine: 'sim-kine-id',
-         id_patient: selectedPatientId,
-         objective: formData.objective,
-         difficultyLevel: formData.difficultyLevel,
-         availableEquipment: formData.availableEquipment,
-         duration: formData.duration,
-         content: result.program as ExerciseInProgram[],
-         createdAt: new Date(),
-       };
-
-       console.log("Simulating program save:", programData);
-       const selectedPatientName = simulatedPatientsMap[selectedPatientId]?.name || 'le patient';
-
-      toast({
-        title: "Programme généré (Simulé) !",
-        description: `Un programme de ${result.program.length} exercices a été créé pour ${selectedPatientName}. Vérifiez la console pour les données.`,
-      });
-
-      // Optionally clear form or navigate
-      setFormData({ objective: '', difficultyLevel: 'beginner', availableEquipment: '', duration: '' });
-      setSelectedPatientId('');
-      router.push(`/dashboard/kine/patients/${selectedPatientId}`); // Go to patient detail page after generation
-
-    } catch (err: any) {
-      console.error("Erreur génération programme (simulé):", err);
-      const errorMessage = err.message || "Une erreur inattendue s'est produite.";
-      setGenerationError(`Échec: ${errorMessage}`);
-      toast({
-        variant: "destructive",
-        title: "Échec de la Génération (Simulée)",
-        description: errorMessage,
-      });
-    } finally {
-      setGenerating(false);
+  const handleDelete = async (id: string) => {
+    const user = getAuth().currentUser;
+    if (!user) return;
+    try {
+      await deleteDoc(doc(getFirestore(), 'users', id));
+      fetchPatients(user.uid);
+    } catch (error) {
+      console.error("Erreur suppression patient :", error);
     }
   };
 
   return (
     <AppLayout>
-      <div className="space-y-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h1 className="text-3xl font-bold text-primary">Mes Patients</h1>
-            <Button disabled className="opacity-50 cursor-not-allowed"> {/* TODO: Implement Add Patient */}
-                <UserPlus className="mr-2 h-4 w-4" /> Ajouter un Patient (Bientôt)
-            </Button>
+      <div className="p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold">Liste des patients</h2>
+            <Input className="mt-2" placeholder="Rechercher un patient..." value={search} onChange={handleSearchChange} />
+          </div>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Plus className="h-4 w-4 mr-2" /> Créer un patient
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{form.id ? "Modifier le patient" : "Créer un nouveau patient"}</DialogTitle>
+              </DialogHeader>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <Label>Prénom</Label>
+                  <Input name="firstName" value={form.firstName} onChange={handleInputChange} />
+                </div>
+                <div>
+                  <Label>Nom</Label>
+                  <Input name="lastName" value={form.lastName} onChange={handleInputChange} />
+                </div>
+                <div>
+                  <Label>Date de naissance</Label>
+                  <Input type="date" name="birthDate" value={form.birthDate} onChange={handleInputChange} />
+                </div>
+                <div>
+                  <Label>Téléphone</Label>
+                  <Input name="phone" value={form.phone} onChange={handleInputChange} />
+                </div>
+                <div className="md:col-span-2">
+                  <Label>Email</Label>
+                  <Input name="email" value={form.email} onChange={handleInputChange} />
+                </div>
+                <div className="md:col-span-2">
+                  <Label>Objectifs de la rééducation</Label>
+                  <Input name="objectifs" value={form.objectifs} onChange={handleInputChange} />
+                </div>
+                <Button className="md:col-span-2" onClick={handleAddOrUpdatePatient}>
+                  Valider
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        {/* Patient List */}
-        {patientsLoading && (
-          <div className="flex items-center justify-center p-10">
-            <Loader2 className="h-8 w-8 animate-spin text-accent" />
-            <p className="ml-3 text-muted-foreground">Chargement des patients...</p>
-          </div>
-        )}
-
-         {error && (
-           <p className="text-destructive">{error}</p>
-         )}
-
-         {!patientsLoading && !error && (
-           <Card className="shadow-md">
-              <CardHeader>
-                <CardTitle>Liste des Patients</CardTitle>
-                <CardDescription>
-                    {patients.length > 0
-                     ? `Vous gérez actuellement ${patients.length} patient${patients.length > 1 ? 's' : ''}. Sélectionnez un patient pour voir les détails ou générer un programme.`
-                     : "Vous n'avez pas encore ajouté de patients."}
-                 </CardDescription>
-              </CardHeader>
-             <CardContent>
-                {patients.length > 0 ? (
-                 <Table>
-                   <TableHeader>
-                     <TableRow>
-                       <TableHead>Nom</TableHead>
-                       <TableHead>Email</TableHead>
-                       <TableHead className="text-right">Actions</TableHead>
-                     </TableRow>
-                   </TableHeader>
-                   <TableBody>
-                     {patients.map((patient) => (
-                       <TableRow key={patient.id}>
-                         <TableCell>
-                            <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8">
-                                     {/* Conditional rendering based on photoURL presence */}
-                                     {patient.photoURL ? (
-                                        <img src={patient.photoURL} alt={`${patient.name} avatar`} className="aspect-square h-full w-full object-cover rounded-full" data-ai-hint="user profile picture" />
-                                     ) : (
-                                         <AvatarFallback className="text-xs bg-secondary text-secondary-foreground">
-                                             {getInitials(patient.name)}
-                                         </AvatarFallback>
-                                     )}
-                                </Avatar>
-                                <span className="font-medium">{patient.name}</span>
-                            </div>
-                         </TableCell>
-                         <TableCell className="text-muted-foreground">{patient.email}</TableCell>
-                         <TableCell className="text-right space-x-2">
-                            {/* Link to the specific patient detail page */}
-                            <Button asChild variant="outline" size="sm">
-                                <Link href={`/dashboard/kine/patients/${patient.id}`}>
-                                    <Eye className="mr-1 h-3 w-3" /> Voir Détails
-                                </Link>
-                            </Button>
-                         </TableCell>
-                       </TableRow>
-                     ))}
-                   </TableBody>
-                 </Table>
-                ) : (
-                    <p className="text-center text-muted-foreground py-6">Aucun patient trouvé. Cliquez sur "Ajouter un Patient" pour commencer.</p>
-                )}
-             </CardContent>
-           </Card>
-         )}
-
-         {/* Program Generation Form */}
-         {!patientsLoading && patients.length > 0 && (
-             <Card className="shadow-lg border-border mt-8">
-               <CardHeader className="bg-card">
-                 <CardTitle className="text-xl md:text-2xl font-semibold flex items-center gap-3 text-primary">
-                     <Wand2 className="text-accent h-6 w-6"/> Générer un Programme IA
-                 </CardTitle>
-                 <CardDescription>
-                     Sélectionnez un patient ci-dessous et définissez les paramètres pour créer un programme personnalisé via IA.
-                 </CardDescription>
-               </CardHeader>
-               <form onSubmit={handleGenerateProgram}>
-                  <CardContent className="space-y-6 pt-6">
-                      {/* Patient Selection */}
-                      <div className="space-y-1.5">
-                         <Label htmlFor="selectedPatientId" className="font-medium">Sélectionner un Patient*</Label>
-                          <Select onValueChange={handlePatientSelectChange} value={selectedPatientId} required disabled={patientsLoading}>
-                              <SelectTrigger id="selectedPatientId" disabled={patientsLoading} aria-label="Sélectionner un patient" className="bg-background focus:ring-accent">
-                                  <SelectValue placeholder={patientsLoading ? "Chargement..." : "Choisir un patient pour le programme..."} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                  {patients.map(p => (
-                                      <SelectItem key={p.id} value={p.id}>{p.name} ({p.email})</SelectItem>
-                                  ))}
-                              </SelectContent>
-                          </Select>
-                          {patientsLoading && <Loader2 className="h-4 w-4 animate-spin mt-2 text-muted-foreground" />}
-                      </div>
-
-                     {/* Objective Input */}
-                     <div className="space-y-1.5">
-                       <Label htmlFor="objective" className="font-medium">Objectif Clinique*</Label>
-                       <Input
-                         id="objective"
-                         name="objective"
-                         value={formData.objective}
-                         onChange={handleInputChange}
-                         placeholder="Ex : Renforcement quadriceps post-LCA"
-                         required
-                         aria-required="true"
-                         className="bg-background focus:ring-accent"
-                       />
-                        <p className="text-xs text-muted-foreground">Quel est le but principal de ce programme ?</p>
-                     </div>
-
-                     {/* Difficulty Level Select */}
-                     <div className="space-y-1.5">
-                         <Label htmlFor="difficultyLevel" className="font-medium">Niveau de Difficulté*</Label>
-                         <Select name="difficultyLevel" value={formData.difficultyLevel} onValueChange={(value) => handleSelectChange('difficultyLevel', value)} required>
-                             <SelectTrigger id="difficultyLevel" aria-label="Niveau de difficulté" className="bg-background focus:ring-accent">
-                                 <SelectValue placeholder="Choisir la difficulté" />
-                             </SelectTrigger>
-                             <SelectContent>
-                                 <SelectItem value="beginner">Débutant</SelectItem>
-                                 <SelectItem value="intermediate">Intermédiaire</SelectItem>
-                                 <SelectItem value="advanced">Avancé</SelectItem>
-                             </SelectContent>
-                         </Select>
-                     </div>
-
-                     {/* Available Equipment Textarea */}
-                      <div className="space-y-1.5">
-                         <Label htmlFor="availableEquipment" className="font-medium">Matériel Disponible*</Label>
-                         <Textarea
-                            id="availableEquipment"
-                            name="availableEquipment"
-                            value={formData.availableEquipment}
-                            onChange={handleInputChange}
-                            placeholder="Ex : Haltères, bandes élastiques, ballon de stabilité, poids du corps uniquement"
-                            required
-                            aria-required="true"
-                            rows={3}
-                            className="bg-background focus:ring-accent"
-                         />
-                         <p className="text-xs text-muted-foreground">Listez le matériel auquel le patient a accès (séparé par des virgules).</p>
-                      </div>
-
-                      {/* Duration Input */}
-                      <div className="space-y-1.5">
-                         <Label htmlFor="duration" className="font-medium">Durée du Programme Souhaitée*</Label>
-                         <Input
-                             id="duration"
-                             name="duration"
-                             value={formData.duration}
-                             onChange={handleInputChange}
-                             placeholder="Ex : 4 semaines, 6 séances, jusqu'à prochaine évaluation"
-                             required
-                             aria-required="true"
-                             className="bg-background focus:ring-accent"
-                          />
-                          <p className="text-xs text-muted-foreground">Combien de temps cette phase du programme doit-elle durer ?</p>
-                      </div>
-
-                       {/* Error Message */}
-                       {generationError && (
-                           <div className="flex items-center gap-2 text-destructive bg-destructive/10 border border-destructive p-3 rounded-md">
-                               <AlertCircle size={18}/>
-                               <p className="text-sm">{generationError}</p>
-                           </div>
-                       )}
-
-                  </CardContent>
-                  <CardFooter className="border-t border-border pt-4">
-                     <Button type="submit" className="w-full md:w-auto ml-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={generating || patientsLoading || !selectedPatientId}>
-                       {generating ? (
-                         <>
-                           <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Génération en cours...
-                         </>
-                       ) : (
-                          <>
-                           <Wand2 className="mr-2 h-4 w-4" /> Générer le Programme
-                          </>
-                       )}
-                     </Button>
-                  </CardFooter>
-               </form>
-             </Card>
-         )}
-
+        <Card>
+          <CardContent>
+            {loading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="animate-spin w-6 h-6 text-gray-500" />
+              </div>
+            ) : error ? (
+              <p className="text-red-500">{error}</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead></TableHead>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Prénom</TableHead>
+                    <TableHead>Date de naissance</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Téléphone</TableHead>
+                    <TableHead>Objectifs</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPatients.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell>
+                        <Link href={`/dashboard/kine/patients/${p.id}`}>
+                          <FolderOpen className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                        </Link>
+                      </TableCell>
+                      <TableCell>{p.lastName}</TableCell>
+                      <TableCell>{p.firstName}</TableCell>
+                      <TableCell>{p.birthDate}</TableCell>
+                      <TableCell>{p.email}</TableCell>
+                      <TableCell>{p.phone}</TableCell>
+                      <TableCell>{p.objectifs}</TableCell>
+                      <TableCell className="flex gap-2">
+                        <Button size="icon" variant="outline" onClick={() => handleEdit(p)}><Pencil className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="destructive" onClick={() => handleDelete(p.id)}><Trash2 className="w-4 h-4" /></Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AppLayout>
   );
