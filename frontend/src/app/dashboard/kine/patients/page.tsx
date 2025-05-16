@@ -1,13 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, getIdToken } from 'firebase/auth';
 import {
   getFirestore,
   collection,
-  query,
-  where,
-  getDocs,
   addDoc,
   deleteDoc,
   doc,
@@ -20,8 +17,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
 import AppLayout from '@/components/AppLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import Link from 'next/link';
@@ -54,19 +49,28 @@ export default function PatientsPage() {
     id: ''
   });
 
-  const fetchPatients = async (uid: string) => {
+  const fetchPatients = async () => {
     setLoading(true);
     try {
-      const q = query(
-        collection(getFirestore(), 'users'),
-        where('role', '==', 'patient'),
-        where('linkedKine', '==', uid)
-      );
-      const snap = await getDocs(q);
-      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as UserProfileData[];
+      const user = getAuth().currentUser;
+      if (!user) throw new Error("Utilisateur non authentifié");
+
+      const token = await getIdToken(user);
+      const res = await fetch("https://us-central1-kineia-37482.cloudfunctions.net/getPatientsByKine", {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!res.ok) throw new Error("Erreur d'appel à la fonction");
+
+      const data = await res.json();
       setPatients(data);
       setFilteredPatients(data);
     } catch (err) {
+      console.error('Erreur Firebase Functions:', err);
       setError('Erreur de chargement des patients.');
     } finally {
       setLoading(false);
@@ -77,7 +81,7 @@ export default function PatientsPage() {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        fetchPatients(user.uid);
+        fetchPatients();
       } else {
         setError("Utilisateur non authentifié");
         setLoading(false);
@@ -115,15 +119,12 @@ export default function PatientsPage() {
     };
 
     try {
-      if (form.id) {
+      if (form.id && form.id.trim() !== '') {
         await updateDoc(doc(getFirestore(), 'users', form.id), patientData);
-        fetchPatients(user.uid);
       } else {
-        const docRef = await addDoc(collection(getFirestore(), 'users'), patientData);
-        const newPatient = { id: docRef.id, ...patientData };
-        setPatients(prev => [...prev, newPatient]);
-        setFilteredPatients(prev => [...prev, newPatient]);
+        await addDoc(collection(getFirestore(), 'users'), patientData);
       }
+      fetchPatients();
       setForm({ firstName: '', lastName: '', birthDate: '', phone: '', email: '', objectifs: '', id: '' });
       setDialogOpen(false);
     } catch (error) {
@@ -138,10 +139,10 @@ export default function PatientsPage() {
 
   const handleDelete = async (id: string) => {
     const user = getAuth().currentUser;
-    if (!user) return;
+    if (!user || !id) return;
     try {
       await deleteDoc(doc(getFirestore(), 'users', id));
-      fetchPatients(user.uid);
+      fetchPatients();
     } catch (error) {
       console.error("Erreur suppression patient :", error);
     }
