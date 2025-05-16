@@ -1,0 +1,22 @@
+# 👉 Node modules (ne jamais versionner)
+node_modules/
+
+# 👉 Build output de TypeScript
+lib/
+dist/
+
+# 👉 Fichiers de log ou debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+firebase-debug.log*
+
+# 👉 Émulateur local Firebase
+firebase.local.*
+
+# 👉 Config perso d’environnement
+.env
+.env.*.local
+
+# 👉 Fichiers temporaires ou systèmes
+.DS_Store
