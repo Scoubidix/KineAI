@@ -1,29 +1,74 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Wand2 } from 'lucide-react'; // Use Wand2 icon for AI Assistant
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Wand2 } from 'lucide-react';
+import { getAuth } from 'firebase/auth';
+import { app } from '@/lib/firebase/config';
 
 export default function KineChatbotPage() {
+  const [message, setMessage] = useState('');
+  const [response, setResponse] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleAsk = async () => {
+    if (!message.trim()) return;
+    setLoading(true);
+    setResponse('');
+
+    try {
+      const auth = getAuth(app);
+      const token = await auth.currentUser?.getIdToken();
+
+      const res = await fetch('/api/chat/assistant', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ message })
+      });
+
+      const data = await res.json();
+      setResponse(data.reply || 'Aucune réponse reçue.');
+    } catch (err) {
+      setResponse("Erreur lors de l'appel à l'assistant.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <Card className="w-full max-w-lg text-center shadow-md">
+        <Card className="w-full max-w-lg shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center justify-center gap-2 text-primary">
               <Wand2 className="text-accent" /> Assistant IA Kiné
             </CardTitle>
-            <CardDescription>Interaction avec l'IA pour la pratique professionnelle.</CardDescription>
+            <CardDescription>Posez une question à l'IA sur vos patients.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">
-              Posez vos questions à l'IA pour obtenir de l'aide sur la recherche métier, la génération de contenu (emails, descriptions d'exercices...) ou l'aide à la décision clinique.
-            </p>
-            {/* TODO: Implement the actual chat interface here */}
-             <div className="mt-6 p-6 border rounded-md bg-muted/50">
-                <p className="text-muted-foreground italic">Interface de chat bientôt disponible ici.</p>
-             </div>
+            <div className="flex gap-2 mb-4">
+              <Input
+                placeholder="Votre question..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                disabled={loading}
+              />
+              <Button onClick={handleAsk} disabled={loading}>
+                {loading ? '...' : 'Envoyer'}
+              </Button>
+            </div>
+            {response && (
+              <div className="p-4 bg-muted/50 rounded-md border text-sm whitespace-pre-wrap">
+                {response}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
