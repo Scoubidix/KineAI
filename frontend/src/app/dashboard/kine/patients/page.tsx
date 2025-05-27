@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getAuth, onAuthStateChanged, getIdToken } from 'firebase/auth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { Plus, Trash2, Pencil, Loader2, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,11 +40,27 @@ export default function PatientsPage() {
     goals: '',
   });
 
-  const fetchPatients = async () => {
-    // Tu remplacerais ceci plus tard par un appel à ta route /patients
-    setPatients([]);
-    setFilteredPatients([]);
-  };
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          setLoading(true);
+          const res = await fetch(`${apiUrl}/patients/${user.uid}`);
+          if (!res.ok) throw new Error("Erreur récupération patients");
+          const data = await res.json();
+          setPatients(data);
+          setFilteredPatients(data);
+        } catch (err) {
+          console.error(err);
+          setError("Erreur lors de la récupération des patients.");
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -55,12 +71,7 @@ export default function PatientsPage() {
     if (!user) return;
 
     const patientData = {
-      firstName: form.firstName,
-      lastName: form.lastName,
-      birthDate: form.birthDate,
-      phone: form.phone,
-      email: form.email,
-      goals: form.goals,
+      ...form,
       kineId: user.uid,
     };
 
@@ -75,7 +86,10 @@ export default function PatientsPage() {
 
       if (!res.ok) throw new Error("Erreur création patient");
 
-      await fetchPatients();
+      const newPatient = await res.json();
+      const updatedPatients = [...patients, newPatient];
+      setPatients(updatedPatients);
+      setFilteredPatients(updatedPatients);
       setForm({ firstName: '', lastName: '', birthDate: '', phone: '', email: '', goals: '' });
       setDialogOpen(false);
     } catch (err) {

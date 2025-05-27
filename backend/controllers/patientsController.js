@@ -3,14 +3,19 @@ const prisma = new PrismaClient()
 
 // GET /patients
 exports.getPatients = async (req, res) => {
+  const { kineId } = req.params;
+
   try {
-    const patients = await prisma.patient.findMany()
-    res.json(patients)
+    const patients = await prisma.patient.findMany({
+      where: { kineId }
+    });
+    res.json(patients);
   } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: "Erreur récupération patients" })
+    console.error(err);
+    res.status(500).json({ error: "Erreur récupération patients" });
   }
-}
+};
+
 
 // POST /patients
 exports.createPatient = async (req, res) => {
