@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Kine {
+  id       String    @id       // UID Firebase
+  patients Patient[]
+}
+
+model Patient {
+  id         String     @id @default(uuid())
+  firstName  String
+  lastName   String
+  birthDate  DateTime
+  email      String
+  phone      String
+  goals      String
+  kineId     String
+  kine       Kine       @relation(fields: [kineId], references: [id])
+  programs   Program[]
+}
+
+model Program {
+  id         String     @id @default(uuid())
+  title      String
+  startDate  DateTime
+  endDate    DateTime?
+  notes      String?
+  patientId  String
+  patient    Patient    @relation(fields: [patientId], references: [id])
+}

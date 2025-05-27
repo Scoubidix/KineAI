@@ -2,15 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { getAuth, onAuthStateChanged, getIdToken } from 'firebase/auth';
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  deleteDoc,
-  doc,
-  updateDoc,
-  Timestamp
-} from 'firebase/firestore';
 import { Plus, Trash2, Pencil, Loader2, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,15 +12,16 @@ import AppLayout from '@/components/AppLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import Link from 'next/link';
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
 interface UserProfileData {
-  id: string;
+  id?: string;
   firstName: string;
   lastName: string;
   birthDate: string;
   phone: string;
   email: string;
-  objectifs: string;
-  createdAt?: Timestamp;
+  goals: string;
 }
 
 export default function PatientsPage() {
@@ -39,67 +31,23 @@ export default function PatientsPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<UserProfileData>({
     firstName: '',
     lastName: '',
     birthDate: '',
     phone: '',
     email: '',
-    objectifs: '',
-    id: ''
+    goals: '',
   });
 
   const fetchPatients = async () => {
-    setLoading(true);
-    try {
-      const user = getAuth().currentUser;
-      if (!user) throw new Error("Utilisateur non authentifié");
-
-      const token = await getIdToken(user);
-      const res = await fetch("https://us-central1-kineia-37482.cloudfunctions.net/getPatientsByKine", {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!res.ok) throw new Error("Erreur d'appel à la fonction");
-
-      const data = await res.json();
-      setPatients(data);
-      setFilteredPatients(data);
-    } catch (err) {
-      console.error('Erreur Firebase Functions:', err);
-      setError('Erreur de chargement des patients.');
-    } finally {
-      setLoading(false);
-    }
+    // Tu remplacerais ceci plus tard par un appel à ta route /patients
+    setPatients([]);
+    setFilteredPatients([]);
   };
-
-  useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        fetchPatients();
-      } else {
-        setError("Utilisateur non authentifié");
-        setLoading(false);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.toLowerCase();
-    setSearch(value);
-    setFilteredPatients(patients.filter(p =>
-      `${p.firstName} ${p.lastName}`.toLowerCase().includes(value)
-    ));
   };
 
   const handleAddOrUpdatePatient = async () => {
@@ -112,40 +60,35 @@ export default function PatientsPage() {
       birthDate: form.birthDate,
       phone: form.phone,
       email: form.email,
-      objectifs: form.objectifs,
-      role: 'patient',
-      linkedKine: user.uid,
-      createdAt: Timestamp.now()
+      goals: form.goals,
+      kineId: user.uid,
     };
 
     try {
-      if (form.id && form.id.trim() !== '') {
-        await updateDoc(doc(getFirestore(), 'users', form.id), patientData);
-      } else {
-        await addDoc(collection(getFirestore(), 'users'), patientData);
-      }
-      fetchPatients();
-      setForm({ firstName: '', lastName: '', birthDate: '', phone: '', email: '', objectifs: '', id: '' });
+      const res = await fetch(`${apiUrl}/patients`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(patientData),
+      });
+
+      if (!res.ok) throw new Error("Erreur création patient");
+
+      await fetchPatients();
+      setForm({ firstName: '', lastName: '', birthDate: '', phone: '', email: '', goals: '' });
       setDialogOpen(false);
-    } catch (error) {
-      console.error("Erreur ajout ou modification patient :", error);
+    } catch (err) {
+      console.error('Erreur création patient SQL :', err);
     }
   };
 
-  const handleEdit = (patient: UserProfileData) => {
-    setForm(patient);
-    setDialogOpen(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    const user = getAuth().currentUser;
-    if (!user || !id) return;
-    try {
-      await deleteDoc(doc(getFirestore(), 'users', id));
-      fetchPatients();
-    } catch (error) {
-      console.error("Erreur suppression patient :", error);
-    }
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toLowerCase();
+    setSearch(value);
+    setFilteredPatients(patients.filter(p =>
+      `${p.firstName} ${p.lastName}`.toLowerCase().includes(value)
+    ));
   };
 
   return (
@@ -154,7 +97,7 @@ export default function PatientsPage() {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold">Liste des patients</h2>
-            <Input className="mt-2" placeholder="Rechercher un patient..." value={search} onChange={handleSearchChange} />
+            <Input className="mt-2" placeholder="Rechercher un patient." value={search} onChange={handleSearchChange} />
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -164,36 +107,16 @@ export default function PatientsPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{form.id ? "Modifier le patient" : "Créer un nouveau patient"}</DialogTitle>
+                <DialogTitle>Créer un nouveau patient</DialogTitle>
               </DialogHeader>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div>
-                  <Label>Prénom</Label>
-                  <Input name="firstName" value={form.firstName} onChange={handleInputChange} />
-                </div>
-                <div>
-                  <Label>Nom</Label>
-                  <Input name="lastName" value={form.lastName} onChange={handleInputChange} />
-                </div>
-                <div>
-                  <Label>Date de naissance</Label>
-                  <Input type="date" name="birthDate" value={form.birthDate} onChange={handleInputChange} />
-                </div>
-                <div>
-                  <Label>Téléphone</Label>
-                  <Input name="phone" value={form.phone} onChange={handleInputChange} />
-                </div>
-                <div className="md:col-span-2">
-                  <Label>Email</Label>
-                  <Input name="email" value={form.email} onChange={handleInputChange} />
-                </div>
-                <div className="md:col-span-2">
-                  <Label>Objectifs de la rééducation</Label>
-                  <Input name="objectifs" value={form.objectifs} onChange={handleInputChange} />
-                </div>
-                <Button className="md:col-span-2" onClick={handleAddOrUpdatePatient}>
-                  Valider
-                </Button>
+                <div><Label>Prénom</Label><Input name="firstName" value={form.firstName} onChange={handleInputChange} /></div>
+                <div><Label>Nom</Label><Input name="lastName" value={form.lastName} onChange={handleInputChange} /></div>
+                <div><Label>Date de naissance</Label><Input type="date" name="birthDate" value={form.birthDate} onChange={handleInputChange} /></div>
+                <div><Label>Téléphone</Label><Input name="phone" value={form.phone} onChange={handleInputChange} /></div>
+                <div className="md:col-span-2"><Label>Email</Label><Input name="email" value={form.email} onChange={handleInputChange} /></div>
+                <div className="md:col-span-2"><Label>Objectifs</Label><Input name="goals" value={form.goals} onChange={handleInputChange} /></div>
+                <Button className="md:col-span-2" onClick={handleAddOrUpdatePatient}>Valider</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -234,10 +157,10 @@ export default function PatientsPage() {
                       <TableCell>{p.birthDate}</TableCell>
                       <TableCell>{p.email}</TableCell>
                       <TableCell>{p.phone}</TableCell>
-                      <TableCell>{p.objectifs}</TableCell>
+                      <TableCell>{p.goals}</TableCell>
                       <TableCell className="flex gap-2">
-                        <Button size="icon" variant="outline" onClick={() => handleEdit(p)}><Pencil className="w-4 h-4" /></Button>
-                        <Button size="icon" variant="destructive" onClick={() => handleDelete(p.id)}><Trash2 className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="outline"><Pencil className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="destructive"><Trash2 className="w-4 h-4" /></Button>
                       </TableCell>
                     </TableRow>
                   ))}
