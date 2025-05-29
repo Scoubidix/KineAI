@@ -49,31 +49,14 @@ exports.createPatient = async (req, res) => {
 }
 
 //PUT / Patients
-// PUT /patients
 exports.updatePatient = async (req, res) => {
   const { id } = req.params;
-  const {
-    firstName,
-    lastName,
-    birthDate,
-    email,
-    phone,
-    goals,
-    kineId
-  } = req.body;
+  const updatedData = req.body;
 
   try {
     const patient = await prisma.patient.update({
       where: { id },
-      data: {
-        firstName,
-        lastName,
-        birthDate: new Date(birthDate),
-        email,
-        phone,
-        goals,
-        kineId
-      }
+      data: updatedData,
     });
     res.json(patient);
   } catch (err) {
@@ -81,7 +64,6 @@ exports.updatePatient = async (req, res) => {
     res.status(500).json({ error: "Erreur modification patient" });
   }
 };
-
 
 //DELETE /Patients
 exports.deletePatient = async (req, res) => {

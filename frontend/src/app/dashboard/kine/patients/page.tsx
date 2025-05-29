@@ -32,6 +32,8 @@ export default function PatientsPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [patientToDelete, setPatientToDelete] = useState<UserProfileData | null>(null);
   const [form, setForm] = useState<UserProfileData>({
     firstName: '',
     lastName: '',
@@ -107,14 +109,16 @@ export default function PatientsPage() {
     setDialogOpen(true);
   };
 
-  const handleDeletePatient = async (id?: string) => {
-    if (!id) return;
+  const handleDeletePatient = async () => {
+    if (!patientToDelete) return;
     try {
-      const res = await fetchWithAuth(`${apiUrl}/patients/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error("Erreur suppression patient");
-      const newList = patients.filter(p => p.id !== id);
-      setPatients(newList);
-      setFilteredPatients(newList);
+      const res = await fetchWithAuth(`${apiUrl}/patients/${patientToDelete.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Erreur suppression patient');
+      const updated = patients.filter(p => p.id !== patientToDelete.id);
+      setPatients(updated);
+      setFilteredPatients(updated);
+      setDeleteDialogOpen(false);
+      setPatientToDelete(null);
     } catch (err) {
       console.error('Erreur suppression patient :', err);
     }
@@ -131,41 +135,33 @@ export default function PatientsPage() {
   return (
     <AppLayout>
       <div className="p-6 space-y-6">
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-              <Plus className="h-4 w-4 mr-2" /> {form.id ? 'Modifier' : 'Créer'} un patient
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{form.id ? 'Modifier' : 'Créer'} un patient</DialogTitle>
-            </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div><Label>Prénom</Label><Input name="firstName" value={form.firstName} onChange={handleInputChange} /></div>
-              <div><Label>Nom</Label><Input name="lastName" value={form.lastName} onChange={handleInputChange} /></div>
-              <div>
-                <Label>Date de naissance</Label>
-                <Input type="date" name="birthDate" value={form.birthDate} onChange={handleInputChange} />
-                {form.birthDate && new Date(form.birthDate) > new Date() && (
-                  <p className="text-red-500 text-sm mt-1">Veuillez saisir une date correcte</p>
-                )}
-              </div>
-              <div><Label>Téléphone</Label><Input name="phone" value={form.phone} onChange={handleInputChange} /></div>
-              <div className="md:col-span-2"><Label>Email</Label><Input name="email" value={form.email} onChange={handleInputChange} /></div>
-              <div className="md:col-span-2"><Label>Objectifs</Label><Input name="goals" value={form.goals} onChange={handleInputChange} /></div>
-              <Button
-                className="md:col-span-2"
-                onClick={handleAddOrUpdatePatient}
-                disabled={!!form.birthDate && new Date(form.birthDate) > new Date()}
-              >
-                Valider
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold">Liste des patients</h2>
+            <Input className="mt-2" placeholder="Rechercher un patient." value={search} onChange={handleSearchChange} />
+          </div>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Plus className="h-4 w-4 mr-2" /> {form.id ? 'Modifier' : 'Créer'} un patient
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Input className="mt-2" placeholder="Rechercher un patient." value={search} onChange={handleSearchChange} />
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{form.id ? 'Modifier' : 'Créer'} un patient</DialogTitle>
+              </DialogHeader>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div><Label>Prénom</Label><Input name="firstName" value={form.firstName} onChange={handleInputChange} /></div>
+                <div><Label>Nom</Label><Input name="lastName" value={form.lastName} onChange={handleInputChange} /></div>
+                <div><Label>Date de naissance</Label><Input type="date" name="birthDate" value={form.birthDate} onChange={handleInputChange} /></div>
+                <div><Label>Téléphone</Label><Input name="phone" value={form.phone} onChange={handleInputChange} /></div>
+                <div className="md:col-span-2"><Label>Email</Label><Input name="email" value={form.email} onChange={handleInputChange} /></div>
+                <div className="md:col-span-2"><Label>Objectifs</Label><Input name="goals" value={form.goals} onChange={handleInputChange} /></div>
+                <Button className="md:col-span-2" onClick={handleAddOrUpdatePatient}>Valider</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
 
         <Card>
           <CardContent>
@@ -197,26 +193,25 @@ export default function PatientsPage() {
                           <FolderOpen className="w-4 h-4 text-muted-foreground hover:text-primary" />
                         </Link>
                       </TableCell>
-                      <TableCell>{p.lastName.toUpperCase()}</TableCell>
+                      <TableCell>{p.lastName}</TableCell>
                       <TableCell>{p.firstName}</TableCell>
-                      <TableCell>{new Date(p.birthDate).toLocaleDateString('fr-FR')}</TableCell>
+                      <TableCell>{p.birthDate}</TableCell>
                       <TableCell>{p.email}</TableCell>
                       <TableCell>{p.phone}</TableCell>
                       <TableCell>{p.goals}</TableCell>
                       <TableCell className="flex gap-2">
                         <Button size="icon" variant="outline" onClick={() => handleEditPatient(p)}><Pencil className="w-4 h-4" /></Button>
-                        <Dialog>
+                        <Dialog open={deleteDialogOpen && patientToDelete?.id === p.id} onOpenChange={setDeleteDialogOpen}>
                           <DialogTrigger asChild>
-                            <Button size="icon" variant="destructive"><Trash2 className="w-4 h-4" /></Button>
+                            <Button size="icon" variant="destructive" onClick={() => { setDeleteDialogOpen(true); setPatientToDelete(p); }}><Trash2 className="w-4 h-4" /></Button>
                           </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
                               <DialogTitle>Confirmer la suppression</DialogTitle>
                             </DialogHeader>
-                            <p>Voulez-vous vraiment supprimer ce patient ?</p>
-                            <div className="flex justify-end gap-2 mt-4">
-                              <Button variant="outline">Annuler</Button>
-                              <Button variant="destructive" onClick={() => handleDeletePatient(p.id)}>Oui</Button>
+                            <div className="flex justify-end gap-4 mt-4">
+                              <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Annuler</Button>
+                              <Button variant="destructive" onClick={handleDeletePatient}>Oui, supprimer</Button>
                             </div>
                           </DialogContent>
                         </Dialog>
