@@ -47,3 +47,20 @@ exports.createPatient = async (req, res) => {
     res.status(500).json({ error: "Erreur création patient" })
   }
 }
+
+//PUT / Patients
+exports.updatePatient = async (req, res) => {
+  const { id } = req.params;
+  const updatedData = req.body;
+
+  try {
+    const patient = await prisma.patient.update({
+      where: { id },
+      data: updatedData,
+    });
+    res.json(patient);
+  } catch (err) {
+    console.error("Erreur update patient :", err);
+    res.status(500).json({ error: "Erreur modification patient" });
+  }
+};

@@ -77,22 +77,34 @@ export default function PatientsPage() {
     };
 
     try {
-      const res = await fetchWithAuth(`${apiUrl}/patients`, {
-        method: 'POST',
+      const method = form.id ? 'PUT' : 'POST';
+      const url = form.id ? `${apiUrl}/patients/${form.id}` : `${apiUrl}/patients`;
+      const res = await fetchWithAuth(url, {
+        method,
         body: JSON.stringify(patientData),
       });
 
-      if (!res.ok) throw new Error("Erreur création patient");
+      if (!res.ok) throw new Error("Erreur enregistrement patient");
 
-      const newPatient = await res.json();
-      const updatedPatients = [...patients, newPatient];
-      setPatients(updatedPatients);
-      setFilteredPatients(updatedPatients);
+      const updatedPatient = await res.json();
+      let updatedList;
+      if (form.id) {
+        updatedList = patients.map(p => (p.id === form.id ? updatedPatient : p));
+      } else {
+        updatedList = [...patients, updatedPatient];
+      }
+      setPatients(updatedList);
+      setFilteredPatients(updatedList);
       setForm({ firstName: '', lastName: '', birthDate: '', phone: '', email: '', goals: '' });
       setDialogOpen(false);
     } catch (err) {
-      console.error('Erreur création patient SQL :', err);
+      console.error('Erreur enregistrement patient SQL :', err);
     }
+  };
+
+  const handleEditPatient = (patient: UserProfileData) => {
+    setForm(patient);
+    setDialogOpen(true);
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,12 +126,12 @@ export default function PatientsPage() {
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Plus className="h-4 w-4 mr-2" /> Créer un patient
+                <Plus className="h-4 w-4 mr-2" /> {form.id ? 'Modifier' : 'Créer'} un patient
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Créer un nouveau patient</DialogTitle>
+                <DialogTitle>{form.id ? 'Modifier' : 'Créer'} un patient</DialogTitle>
               </DialogHeader>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div><Label>Prénom</Label><Input name="firstName" value={form.firstName} onChange={handleInputChange} /></div>
@@ -171,7 +183,7 @@ export default function PatientsPage() {
                       <TableCell>{p.phone}</TableCell>
                       <TableCell>{p.goals}</TableCell>
                       <TableCell className="flex gap-2">
-                        <Button size="icon" variant="outline"><Pencil className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="outline" onClick={() => handleEditPatient(p)}><Pencil className="w-4 h-4" /></Button>
                         <Button size="icon" variant="destructive"><Trash2 className="w-4 h-4" /></Button>
                       </TableCell>
                     </TableRow>
