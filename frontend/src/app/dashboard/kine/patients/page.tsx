@@ -32,6 +32,8 @@ export default function PatientsPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [patientToDelete, setPatientToDelete] = useState<UserProfileData | null>(null);
   const [form, setForm] = useState<UserProfileData>({
     firstName: '',
     lastName: '',
@@ -105,6 +107,21 @@ export default function PatientsPage() {
   const handleEditPatient = (patient: UserProfileData) => {
     setForm(patient);
     setDialogOpen(true);
+  };
+
+  const handleDeletePatient = async () => {
+    if (!patientToDelete) return;
+    try {
+      const res = await fetchWithAuth(`${apiUrl}/patients/${patientToDelete.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Erreur suppression patient');
+      const updated = patients.filter(p => p.id !== patientToDelete.id);
+      setPatients(updated);
+      setFilteredPatients(updated);
+      setDeleteDialogOpen(false);
+      setPatientToDelete(null);
+    } catch (err) {
+      console.error('Erreur suppression patient :', err);
+    }
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,7 +201,20 @@ export default function PatientsPage() {
                       <TableCell>{p.goals}</TableCell>
                       <TableCell className="flex gap-2">
                         <Button size="icon" variant="outline" onClick={() => handleEditPatient(p)}><Pencil className="w-4 h-4" /></Button>
-                        <Button size="icon" variant="destructive"><Trash2 className="w-4 h-4" /></Button>
+                        <Dialog open={deleteDialogOpen && patientToDelete?.id === p.id} onOpenChange={setDeleteDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button size="icon" variant="destructive" onClick={() => { setDeleteDialogOpen(true); setPatientToDelete(p); }}><Trash2 className="w-4 h-4" /></Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Confirmer la suppression</DialogTitle>
+                            </DialogHeader>
+                            <div className="flex justify-end gap-4 mt-4">
+                              <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Annuler</Button>
+                              <Button variant="destructive" onClick={handleDeletePatient}>Oui, supprimer</Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
                       </TableCell>
                     </TableRow>
                   ))}

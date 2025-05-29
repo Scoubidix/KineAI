@@ -64,3 +64,18 @@ exports.updatePatient = async (req, res) => {
     res.status(500).json({ error: "Erreur modification patient" });
   }
 };
+
+//DELETE /Patients
+exports.deletePatient = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await prisma.patient.delete({
+      where: { id },
+    });
+    res.status(200).json({ message: 'Patient supprimé' });
+  } catch (error) {
+    console.error('Erreur suppression patient :', error);
+    res.status(500).json({ error: 'Erreur suppression patient' });
+  }
+};
