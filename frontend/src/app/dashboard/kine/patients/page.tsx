@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/components/AppLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import Link from 'next/link';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -46,7 +47,7 @@ export default function PatientsPage() {
       if (user) {
         try {
           setLoading(true);
-          const res = await fetch(`${apiUrl}/patients/${user.uid}`);
+          const res = await fetchWithAuth(`${apiUrl}/patients/${user.uid}`);
           if (!res.ok) throw new Error("Erreur récupération patients");
           const data = await res.json();
           setPatients(data);
@@ -76,11 +77,8 @@ export default function PatientsPage() {
     };
 
     try {
-      const res = await fetch(`${apiUrl}/patients`, {
+      const res = await fetchWithAuth(`${apiUrl}/patients`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(patientData),
       });
 
