@@ -16,6 +16,14 @@ app.get('/', (req, res) => {
 const patientsRoutes = require('./routes/patients')
 app.use('/patients', patientsRoutes)
 
+app.get('/env-check', (req, res) => {
+  res.json({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+  });
+});
+
+
 app.listen(port, () => {
   console.log(`✅ API listening at http://localhost:${port}`)
 })
