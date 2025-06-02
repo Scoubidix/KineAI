@@ -8,29 +8,45 @@ datasource db {
 }
 
 model Kine {
-  id       String    @id       // UID Firebase
-  patients Patient[]
+  id        Int      @id @default(autoincrement())
+  uid       String   @unique
+  email     String
+  firstName String
+  lastName  String
+  phone     String?
+  rpps      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  patients  Patient[]
 }
 
 model Patient {
-  id         String     @id @default(uuid())
-  firstName  String
-  lastName   String
-  birthDate  DateTime
-  email      String
-  phone      String
-  goals      String
-  kineId     String
-  kine       Kine       @relation(fields: [kineId], references: [id])
-  programs   Program[]
+  id        Int      @id @default(autoincrement())
+  name      String
+  birthDate DateTime
+  pathology String?
+  notes     String?
+
+  kineId    Int
+  kine      Kine     @relation(fields: [kineId], references: [id])
+
+  programs  Program[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Program {
-  id         String     @id @default(uuid())
+  id         Int      @id @default(autoincrement())
   title      String
-  startDate  DateTime
-  endDate    DateTime?
-  notes      String?
-  patientId  String
-  patient    Patient    @relation(fields: [patientId], references: [id])
+  exercises  String   // JSON.stringify or format structuré
+  difficulty String?
+
+  patientId  Int
+  patient    Patient  @relation(fields: [patientId], references: [id])
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
