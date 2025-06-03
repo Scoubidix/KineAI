@@ -8,45 +8,49 @@ datasource db {
 }
 
 model Kine {
-  id        Int      @id @default(autoincrement())
-  uid       String   @unique
-  email     String
-  firstName String
-  lastName  String
-  phone     String?
-  rpps      String?
+  id             Int       @id @default(autoincrement())
+  uid            String    @unique        // UID Firebase
+  email          String    @unique
+  firstName      String
+  lastName       String
+  birthDate      DateTime
+  phone          String
+  rpps           String    @unique
+  adresseCabinet String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  patients  Patient[]
+  patients       Patient[] // Relation 1-n
+  programmes     Programme[]
 }
 
 model Patient {
-  id        Int      @id @default(autoincrement())
-  name      String
-  birthDate DateTime
-  pathology String?
-  notes     String?
+  id         Int       @id @default(autoincrement())
+  firstName  String
+  lastName   String
+  birthDate  DateTime
+  phone      String
+  email      String
+  goals      String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  kineId    Int
-  kine      Kine     @relation(fields: [kineId], references: [id])
+  kineId     Int
+  kine       Kine      @relation(fields: [kineId], references: [id])
 
-  programs  Program[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  programmes Programme[]
 }
 
-model Program {
-  id         Int      @id @default(autoincrement())
-  title      String
-  exercises  String   // JSON.stringify or format structuré
-  difficulty String?
+model Programme {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  patientId  Int
-  patient    Patient  @relation(fields: [patientId], references: [id])
+  kineId      Int
+  patientId   Int
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  kine        Kine      @relation(fields: [kineId], references: [id])
+  patient     Patient   @relation(fields: [patientId], references: [id])
 }

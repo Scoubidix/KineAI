@@ -1,36 +1,52 @@
-const { PrismaClient } = require('@prisma/client')
-const prisma = new PrismaClient()
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+
+// 🔐 Toutes les routes supposent que req.uid est défini par le middleware authenticate
 
 // GET /patients
 exports.getPatients = async (req, res) => {
-  const { kineId } = req.params;
-  console.log("kineId reçu :", kineId); // Ajout temporaire
-
   try {
-    const patients = await prisma.patient.findMany({
-      where: { kineId }
+    const firebaseUid = req.uid;
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
     });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    const patients = await prisma.patient.findMany({
+      where: { kineId: kine.id },
+    });
+
     res.json(patients);
   } catch (err) {
-    console.error("Erreur récupération patient :", err);
+    console.error("Erreur récupération patients :", err);
     res.status(500).json({ error: "Erreur récupération patients" });
   }
 };
 
-
 // POST /patients
 exports.createPatient = async (req, res) => {
-  const {
-    firstName,
-    lastName,
-    birthDate,
-    email,
-    phone,
-    goals,
-    kineId
-  } = req.body
-
   try {
+    const firebaseUid = req.uid;
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    const {
+      firstName,
+      lastName,
+      birthDate,
+      email,
+      phone,
+      goals
+    } = req.body;
+
     const newPatient = await prisma.patient.create({
       data: {
         firstName,
@@ -39,44 +55,61 @@ exports.createPatient = async (req, res) => {
         email,
         phone,
         goals,
-        kineId
-      }
-    })
-    res.status(201).json(newPatient)
-  } catch (err) {
-    console.error("Erreur création patient :", err)
-    res.status(500).json({ error: "Erreur création patient" })
-  }
-}
+        kineId: kine.id,
+      },
+    });
 
-//PUT / Patients
+    res.status(201).json(newPatient);
+  } catch (err) {
+    console.error("Erreur création patient :", err);
+    res.status(500).json({ error: "Erreur création patient" });
+  }
+};
+
+// PUT /patients/:id
 exports.updatePatient = async (req, res) => {
   const { id } = req.params;
-  const updatedData = req.body;
+  const {
+    firstName,
+    lastName,
+    birthDate,
+    email,
+    phone,
+    goals
+  } = req.body;
 
   try {
-    const patient = await prisma.patient.update({
-      where: { id },
-      data: updatedData,
+    const updatedPatient = await prisma.patient.update({
+      where: { id: parseInt(id) },
+      data: {
+        firstName,
+        lastName,
+        birthDate: new Date(birthDate),
+        email,
+        phone,
+        goals,
+      },
     });
-    res.json(patient);
+
+    res.json(updatedPatient);
   } catch (err) {
     console.error("Erreur update patient :", err);
     res.status(500).json({ error: "Erreur modification patient" });
   }
 };
 
-//DELETE /Patients
+// DELETE /patients/:id
 exports.deletePatient = async (req, res) => {
   const { id } = req.params;
 
   try {
     await prisma.patient.delete({
-      where: { id },
+      where: { id: parseInt(id) },
     });
-    res.status(200).json({ message: 'Patient supprimé' });
-  } catch (error) {
-    console.error('Erreur suppression patient :', error);
-    res.status(500).json({ error: 'Erreur suppression patient' });
+
+    res.status(200).json({ message: "Patient supprimé" });
+  } catch (err) {
+    console.error("Erreur suppression patient :", err);
+    res.status(500).json({ error: "Erreur suppression patient" });
   }
 };

@@ -9,7 +9,14 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { UserPlus, ArrowLeft } from "lucide-react";
 
@@ -37,7 +44,16 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
 
-    const { email, password, firstName, lastName, birthDate, phone, adresseCabinet, rpps } = formData;
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      birthDate,
+      phone,
+      adresseCabinet,
+      rpps,
+    } = formData;
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -54,7 +70,25 @@ export default function SignupPage() {
         rpps,
         role: "kine",
         linkedPatients: [],
-        createdAt: new Date()
+        createdAt: new Date(),
+      });
+
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${await user.getIdToken()}`,
+        },
+        body: JSON.stringify({
+          uid: user.uid,
+          firstName,
+          lastName,
+          birthDate,
+          phone,
+          email,
+          adresseCabinet,
+          rpps,
+        }),
       });
 
       toast({

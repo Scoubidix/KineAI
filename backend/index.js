@@ -1,29 +1,30 @@
 require('dotenv').config()
-const express = require('express')
-const cors = require('cors')
-
-const app = express()
-const port = process.env.PORT || 3000
-
-app.use(cors())
-app.use(express.json())
-
-app.get('/', (req, res) => {
-  res.send('Bienvenue sur l’API KinéAI 🧠')
-})
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
 
 // Import des routes
-const patientsRoutes = require('./routes/patients')
-app.use('/patients', patientsRoutes)
+const kinesRoutes = require('./routes/kines');
+const patientsRoutes = require('./routes/patients');
 
-app.get('/env-check', (req, res) => {
-  res.json({
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
-  });
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+
+// Routes
+app.use('/kine', kinesRoutes);      // Route pour les kinés
+app.use('/patients', patientsRoutes); // Route pour les patients
+
+// Test route
+app.get('/', (req, res) => {
+  res.send('Bienvenue sur l’API KinéAI 🧠');
 });
 
+// Démarrage du serveur
+app.listen(PORT, () => {
+  console.log(`✅ Serveur lancé sur le port ${PORT}`);
+});
 
-app.listen(port, () => {
-  console.log(`✅ API listening at http://localhost:${port}`)
-})
