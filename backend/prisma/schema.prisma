@@ -8,49 +8,81 @@ datasource db {
 }
 
 model Kine {
-  id             Int       @id @default(autoincrement())
-  uid            String    @unique        // UID Firebase
-  email          String    @unique
+  id             Int              @id @default(autoincrement())
+  uid            String           @unique
+  email          String           @unique
   firstName      String
   lastName       String
-  birthDate      DateTime
   phone          String
-  rpps           String    @unique
+  rpps           String           @unique
+  birthDate      DateTime
   adresseCabinet String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
-  patients       Patient[] // Relation 1-n
-  programmes     Programme[]
+  patients       Patient[]
+  exercicesModeles ExerciceModele[]
 }
 
 model Patient {
-  id         Int       @id @default(autoincrement())
+  id         Int         @id @default(autoincrement())
   firstName  String
   lastName   String
   birthDate  DateTime
   phone      String
   email      String
   goals      String
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 
   kineId     Int
-  kine       Kine      @relation(fields: [kineId], references: [id])
+  kine       Kine         @relation(fields: [kineId], references: [id])
 
   programmes Programme[]
 }
 
+model ExerciceModele {
+  id          Int      @id @default(autoincrement())
+  kine        Kine     @relation(fields: [kineId], references: [id])
+  kineId      Int
+  nom         String
+  description String
+  isPublic    Boolean          @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  exercicesProgramme ExerciceProgramme[]
+}
+
 model Programme {
   id          Int       @id @default(autoincrement())
-  title       String
+  titre       String
   description String
+  duree       Int       // en jours
+  dateDebut   DateTime  @default(now())
+  dateFin     DateTime
+  isArchived  Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  kineId      Int
   patientId   Int
-
-  kine        Kine      @relation(fields: [kineId], references: [id])
   patient     Patient   @relation(fields: [patientId], references: [id])
+
+  exercices   ExerciceProgramme[]
+}
+
+model ExerciceProgramme {
+  id               Int             @id @default(autoincrement())
+  programme        Programme       @relation(fields: [programmeId], references: [id])
+  programmeId      Int
+  exerciceModele   ExerciceModele @relation(fields: [exerciceModeleId], references: [id])
+  exerciceModeleId Int
+
+  series           Int
+  repetitions      Int
+  pause            Int         // en secondes
+  consigne         String
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 }
