@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { generateChatUrl } = require('../services/patientTokenService');
 const prisma = new PrismaClient();
 
 // 🔽 GET programmes actifs (pas archivés)
@@ -57,6 +58,94 @@ exports.createProgramme = async (req, res) => {
   } catch (error) {
     console.error("Erreur création programme :", error);
     res.status(500).json({ error: "Erreur création programme" });
+  }
+};
+
+// 🔽 POST génération du lien de chat pour un programme
+exports.generateProgrammeLink = async (req, res) => {
+  const programmeId = parseInt(req.params.programmeId);
+  
+  console.log("Génération lien pour programme ID:", programmeId);
+
+  try {
+    // Récupérer le programme avec les infos patient
+    const programme = await prisma.programme.findUnique({
+      where: { id: programmeId },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true
+          }
+        }
+      }
+    });
+
+    console.log("Programme trouvé:", programme ? "Oui" : "Non");
+
+    if (!programme) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "Programme non trouvé" 
+      });
+    }
+
+    if (programme.isArchived) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Impossible de générer un lien pour un programme archivé" 
+      });
+    }
+
+    // Générer le lien de chat
+    console.log("Génération du token pour:", {
+      patientId: programme.patientId,
+      programmeId: programme.id,
+      dateFin: programme.dateFin
+    });
+
+    const linkResult = generateChatUrl(
+      programme.patientId, 
+      programme.id, 
+      programme.dateFin
+    );
+
+    console.log("Résultat génération lien:", linkResult);
+
+    if (!linkResult.success) {
+      return res.status(500).json({
+        success: false,
+        error: "Erreur lors de la génération du lien",
+        details: linkResult.error
+      });
+    }
+
+    res.json({
+      success: true,
+      programme: {
+        id: programme.id,
+        titre: programme.titre,
+        patient: {
+          id: programme.patient.id,
+          nom: `${programme.patient.firstName} ${programme.patient.lastName}`,
+          phone: programme.patient.phone
+        }
+      },
+      chatLink: linkResult.chatUrl,
+      token: linkResult.token,
+      expiresAt: linkResult.expiresAt,
+      message: `Lien généré avec succès pour ${programme.patient.firstName} ${programme.patient.lastName}`
+    });
+
+  } catch (error) {
+    console.error("Erreur génération lien programme :", error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Erreur serveur lors de la génération du lien",
+      details: error.message 
+    });
   }
 };
 

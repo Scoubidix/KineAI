@@ -8,6 +8,8 @@ const kinesRoutes = require('./routes/kines');
 const patientsRoutes = require('./routes/patients');
 const programmeRoutes = require('./routes/programmes');
 const exerciceRoutes = require('./routes/exercices');
+const testOpenAIRoutes = require('./routes/testOpenAI');
+
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -21,7 +23,7 @@ app.use('/kine', kinesRoutes);      // Route pour les kinés
 app.use('/patients', patientsRoutes); // Route pour les patients
 app.use('/programmes', programmeRoutes);
 app.use('/exercices', exerciceRoutes);
-
+app.use('/api/test', testOpenAIRoutes);
 
 // Test route
 app.get('/', (req, res) => {

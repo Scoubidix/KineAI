@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
-import { Loader2, X, Edit, Trash2 } from 'lucide-react';
+import { Loader2, X, Edit, Trash2, Send, Copy } from 'lucide-react';
 import Image from 'next/image';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
@@ -44,7 +44,7 @@ interface Programme {
   description: string;
   duree: number;
   dateFin: string;
-  exercices: any[]; // Changé de 'exercises' à 'exercices'
+  exercices: any[];
 }
 
 function calculateAge(birthDateStr: string) {
@@ -84,6 +84,11 @@ export default function PatientDetailPage() {
   const [allExercises, setAllExercises] = useState<ExerciseOption[]>([]);
   const [filteredExercises, setFilteredExercises] = useState<ExerciseOption[]>([]);
   const [selectedExercises, setSelectedExercises] = useState<ProgrammeExercise[]>([]);
+  
+  // États pour génération de lien
+  const [generatingLink, setGeneratingLink] = useState<number | null>(null);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
+  const [showLinkModal, setShowLinkModal] = useState(false);
 
   useEffect(() => {
     const fetchPatient = async () => {
@@ -225,8 +230,6 @@ export default function PatientDetailPage() {
     setEditDescription(programme.description);
     setEditDuration(programme.duree);
     
-    // Convertir les exercices du programme en format ProgrammeExercise
-    // Vérifier si exercices existe et est un tableau
     const exercises = (programme.exercices || []).map(ex => ({
       exerciseId: ex.exerciceModele?.id || ex.exerciceId,
       nom: ex.exerciceModele?.nom || ex.nom,
@@ -276,7 +279,7 @@ export default function PatientDetailPage() {
   const handleDeleteProgramme = async (programmeId: number) => {
     try {
       const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/programmes/${programmeId}`, {
-        method: "DELETE" // Utilise l'archivage au lieu de la suppression définitive
+        method: "DELETE"
       });
       
       if (!res.ok) throw new Error("Erreur suppression programme");
@@ -284,6 +287,37 @@ export default function PatientDetailPage() {
       await refreshProgrammes();
     } catch (err) {
       console.error("Erreur suppression programme :", err);
+    }
+  };
+
+  const handleGenerateLink = async (programmeId: number) => {
+    setGeneratingLink(programmeId);
+    try {
+      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/programmes/${programmeId}/generate-link`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+      
+      if (!res.ok) throw new Error("Erreur génération lien");
+      
+      const data = await res.json();
+      setGeneratedLink(data.chatLink);
+      setShowLinkModal(true);
+      
+    } catch (err) {
+      console.error("Erreur génération lien :", err);
+      alert("Erreur lors de la génération du lien");
+    } finally {
+      setGeneratingLink(null);
+    }
+  };
+
+  const copyLinkToClipboard = () => {
+    if (generatedLink) {
+      navigator.clipboard.writeText(generatedLink);
+      alert("Lien copié dans le presse-papiers !");
     }
   };
 
@@ -441,7 +475,7 @@ export default function PatientDetailPage() {
               <div className="space-y-4">
                 {programmesData.map((programme: any, index: number) => (
                   <div key={programme.id || index} className="p-4 border rounded-lg bg-gray-50">
-                    <div className="flex justify-between items-start mb-2">
+                    <div className="flex justify-between items-start mb-4">
                       <h3 className="font-semibold text-lg">{programme.titre}</h3>
                       <div className="flex gap-2">
                         <Dialog open={openEditModal && editingProgramme?.id === programme.id} onOpenChange={(open) => {
@@ -488,7 +522,7 @@ export default function PatientDetailPage() {
                     </div>
                     
                     <p className="text-gray-700 mb-2">{programme.description}</p>
-                    <div className="text-sm text-gray-600 mb-3">
+                    <div className="text-sm text-gray-600 mb-4">
                       <p>Durée : {programme.duree} jours</p>
                       {programme.dateFin && (
                         <p>Date de fin : {new Date(programme.dateFin).toLocaleDateString('fr-FR')}</p>
@@ -496,7 +530,7 @@ export default function PatientDetailPage() {
                     </div>
                     
                     {programme.exercices && programme.exercices.length > 0 && (
-                      <div>
+                      <div className="mb-4">
                         <h4 className="font-medium mb-2">Exercices :</h4>
                         <div className="space-y-2">
                           {programme.exercices.map((exercise: any, exIndex: number) => (
@@ -514,12 +548,67 @@ export default function PatientDetailPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Section centrée pour envoyer le programme */}
+                    <div className="border-t pt-4">
+                      <div className="flex items-center justify-center gap-3">
+                        <Button
+                          variant="outline"
+                          className="text-green-600 hover:text-green-700 border-green-600 hover:border-green-700"
+                          onClick={() => handleGenerateLink(programme.id)}
+                          disabled={generatingLink === programme.id}
+                        >
+                          {generatingLink === programme.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <Send className="w-4 h-4 mr-2" />
+                          )}
+                          Envoyer le programme à mon patient
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </CardContent>
         </Card>
+
+        {/* Modal pour afficher le lien généré */}
+        <Dialog open={showLinkModal} onOpenChange={setShowLinkModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Lien de chat généré</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Lien sécurisé pour que le patient accède à son chat personnalisé :
+              </p>
+              <div className="p-3 bg-gray-100 rounded border text-sm break-all">
+                {generatedLink}
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={copyLinkToClipboard}
+                  className="flex-1"
+                  variant="outline"
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copier le lien
+                </Button>
+                <Button 
+                  onClick={() => setShowLinkModal(false)}
+                  className="flex-1"
+                >
+                  Fermer
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Ce lien expire automatiquement à la fin du programme.
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
