@@ -3,16 +3,17 @@ const prisma = new PrismaClient();
 
 // 🔽 GET programmes actifs (pas archivés)
 exports.getProgrammesByPatient = async (req, res) => {
-  const patientId = parseInt(req.params.id);
+  const patientId = parseInt(req.params.patientId);
+  console.log("patientId reçu :", req.params.patientId);
   try {
     const programmes = await prisma.programme.findMany({
       where: {
         patientId,
-        archived: false
+        isArchived: false
       },
       include: {
-        exercises: {
-          include: { exercice: true }
+        exercices: {
+          include: { exerciceModele: true }
         }
       }
     });
@@ -25,7 +26,8 @@ exports.getProgrammesByPatient = async (req, res) => {
 
 // 🔽 POST création programme
 exports.createProgramme = async (req, res) => {
-  const { titre, description, duree, patientId, exercises } = req.body;
+  const { titre, description, duree, patientId, dateFin, exercises } = req.body;
+
   try {
     const newProgramme = await prisma.programme.create({
       data: {
@@ -33,17 +35,24 @@ exports.createProgramme = async (req, res) => {
         description,
         duree,
         patientId,
-        exercises: {
+        dateFin,
+        exercices: {
           create: exercises.map(ex => ({
-            exerciceId: ex.exerciceId,
+            exerciceModele: { connect: { id: ex.exerciceId } },
             series: ex.series,
             repetitions: ex.repetitions,
-            tempsRepos: ex.tempsRepos
+            pause: ex.tempsRepos,
+            consigne: ex.instructions || '',
           }))
         }
       },
-      include: { exercises: { include: { exercice: true } } }
+      include: {
+        exercices: {
+          include: { exerciceModele: true }
+        }
+      }
     });
+
     res.json(newProgramme);
   } catch (error) {
     console.error("Erreur création programme :", error);
@@ -57,26 +66,33 @@ exports.updateProgramme = async (req, res) => {
   const { titre, description, duree, exercises } = req.body;
 
   try {
-    // Supprimer les anciens exercices liés
-    await prisma.exerciceProgramme.deleteMany({ where: { programmeId } });
+    // Supprimer les anciens exercices du programme
+    await prisma.exerciceProgramme.deleteMany({ 
+      where: { programmeId } 
+    });
 
-    // Mettre à jour le programme
+    // Mettre à jour le programme avec les nouveaux exercices
     const updatedProgramme = await prisma.programme.update({
       where: { id: programmeId },
       data: {
         titre,
         description,
         duree,
-        exercises: {
+        exercices: {
           create: exercises.map(ex => ({
-            exerciceId: ex.exerciceId,
+            exerciceModele: { connect: { id: ex.exerciceId } },
             series: ex.series,
             repetitions: ex.repetitions,
-            tempsRepos: ex.tempsRepos
+            pause: ex.tempsRepos,
+            consigne: ex.instructions || '',
           }))
         }
       },
-      include: { exercises: { include: { exercice: true } } }
+      include: { 
+        exercices: { 
+          include: { exerciceModele: true } 
+        } 
+      }
     });
 
     res.json(updatedProgramme);
@@ -86,16 +102,20 @@ exports.updateProgramme = async (req, res) => {
   }
 };
 
-// 🔽 DELETE programme
+// 🔽 DELETE programme (suppression définitive)
 exports.deleteProgramme = async (req, res) => {
   const programmeId = parseInt(req.params.id);
 
   try {
     // Supprimer d'abord les exercices liés
-    await prisma.exerciceProgramme.deleteMany({ where: { programmeId } });
-
-    // Supprimer le programme
-    await prisma.programme.delete({ where: { id: programmeId } });
+    await prisma.exerciceProgramme.deleteMany({ 
+      where: { programmeId } 
+    });
+    
+    // Puis supprimer le programme
+    await prisma.programme.delete({ 
+      where: { id: programmeId } 
+    });
 
     res.json({ message: "Programme supprimé avec succès" });
   } catch (error) {
@@ -104,3 +124,24 @@ exports.deleteProgramme = async (req, res) => {
   }
 };
 
+// 🔽 PATCH archiver programme (alternative plus douce à DELETE)
+exports.archiveProgramme = async (req, res) => {
+  const programmeId = parseInt(req.params.id);
+
+  try {
+    const archivedProgramme = await prisma.programme.update({
+      where: { id: programmeId },
+      data: { isArchived: true },
+      include: {
+        exercices: {
+          include: { exerciceModele: true }
+        }
+      }
+    });
+
+    res.json(archivedProgramme);
+  } catch (error) {
+    console.error("Erreur archivage programme :", error);
+    res.status(500).json({ error: "Erreur archivage programme" });
+  }
+};

@@ -26,6 +26,38 @@ exports.getPatients = async (req, res) => {
   }
 };
 
+// GET /patients/:id (pour un seul patient)
+exports.getPatientById = async (req, res) => {
+  const { id } = req.params;
+  const firebaseUid = req.uid;
+
+  try {
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    const patient = await prisma.patient.findFirst({
+      where: {
+        id: parseInt(id),
+        kineId: kine.id, // Assure que le kiné a bien accès à ce patient
+      },
+    });
+
+    if (!patient) {
+      return res.status(404).json({ error: "Patient introuvable pour ce kiné." });
+    }
+
+    res.json(patient);
+  } catch (err) {
+    console.error("Erreur récupération patient :", err);
+    res.status(500).json({ error: "Erreur récupération patient" });
+  }
+};
+
 // POST /patients
 exports.createPatient = async (req, res) => {
   try {

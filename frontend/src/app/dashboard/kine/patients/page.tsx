@@ -49,7 +49,7 @@ export default function PatientsPage() {
       if (user) {
         try {
           setLoading(true);
-          const res = await fetchWithAuth(`${apiUrl}/patients/${user.uid}`);
+          const res = await fetchWithAuth(`${apiUrl}/patients/kine/${user.uid}`);
           if (!res.ok) throw new Error("Erreur récupération patients");
           const data = await res.json();
           setPatients(data);
