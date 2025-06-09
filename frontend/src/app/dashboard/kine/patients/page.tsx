@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { Plus, Trash2, Pencil, Loader2, FolderOpen } from 'lucide-react';
+import { Plus, Trash2, Pencil, Loader2, UserCheck, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -23,6 +23,7 @@ interface UserProfileData {
   phone: string;
   email: string;
   goals: string;
+  hasActiveProgram?: boolean; // Nouveau champ pour indiquer si le patient a un programme actif
 }
 
 export default function PatientsPage() {
@@ -43,17 +44,64 @@ export default function PatientsPage() {
     goals: '',
   });
 
+  // Fonction pour formater la date au format JJ/MM/AAAA
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  // Fonction pour trier les patients : ceux avec programme en cours d'abord, puis ordre alphabétique
+  const sortPatients = (patientsList: UserProfileData[]) => {
+    return patientsList.sort((a, b) => {
+      // Priorité aux patients avec programme actif
+      if (a.hasActiveProgram && !b.hasActiveProgram) return -1;
+      if (!a.hasActiveProgram && b.hasActiveProgram) return 1;
+      
+      // Ensuite tri alphabétique par nom de famille puis prénom
+      const lastNameComparison = a.lastName.localeCompare(b.lastName);
+      if (lastNameComparison !== 0) return lastNameComparison;
+      return a.firstName.localeCompare(b.firstName);
+    });
+  };
+
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
           setLoading(true);
+          // Récupérer les patients
           const res = await fetchWithAuth(`${apiUrl}/patients/kine/${user.uid}`);
           if (!res.ok) throw new Error("Erreur récupération patients");
-          const data = await res.json();
-          setPatients(data);
-          setFilteredPatients(data);
+          const patientsData = await res.json();
+          
+          // Pour chaque patient, vérifier s'il a un programme actif
+          const patientsWithProgramStatus = await Promise.all(
+            patientsData.map(async (patient: UserProfileData) => {
+              try {
+                const programRes = await fetchWithAuth(`${apiUrl}/programmes/${patient.id}`);
+                if (programRes.ok) {
+                  const programs = await programRes.json();
+                  return {
+                    ...patient,
+                    hasActiveProgram: programs && programs.length > 0
+                  };
+                }
+                return { ...patient, hasActiveProgram: false };
+              } catch (err) {
+                console.error(`Erreur vérification programme pour patient ${patient.id}:`, err);
+                return { ...patient, hasActiveProgram: false };
+              }
+            })
+          );
+
+          const sortedPatients = sortPatients(patientsWithProgramStatus);
+          setPatients(sortedPatients);
+          setFilteredPatients(sortedPatients);
         } catch (err) {
           console.error(err);
           setError("Erreur lors de la récupération des patients.");
@@ -91,12 +139,14 @@ export default function PatientsPage() {
       const updatedPatient = await res.json();
       let updatedList;
       if (form.id) {
-        updatedList = patients.map(p => (p.id === form.id ? updatedPatient : p));
+        updatedList = patients.map(p => (p.id === form.id ? { ...updatedPatient, hasActiveProgram: p.hasActiveProgram } : p));
       } else {
-        updatedList = [...patients, updatedPatient];
+        updatedList = [...patients, { ...updatedPatient, hasActiveProgram: false }];
       }
-      setPatients(updatedList);
-      setFilteredPatients(updatedList);
+      
+      const sortedList = sortPatients(updatedList);
+      setPatients(sortedList);
+      setFilteredPatients(sortedList);
       setForm({ firstName: '', lastName: '', birthDate: '', phone: '', email: '', goals: '' });
       setDialogOpen(false);
     } catch (err) {
@@ -127,9 +177,12 @@ export default function PatientsPage() {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.toLowerCase();
     setSearch(value);
-    setFilteredPatients(patients.filter(p =>
-      `${p.firstName} ${p.lastName}`.toLowerCase().includes(value)
-    ));
+    const filtered = patients.filter(p =>
+      `${p.firstName} ${p.lastName}`.toLowerCase().includes(value) ||
+      p.email.toLowerCase().includes(value) ||
+      p.phone.includes(value)
+    );
+    setFilteredPatients(sortPatients(filtered));
   };
 
   return (
@@ -138,26 +191,171 @@ export default function PatientsPage() {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold">Liste des patients</h2>
-            <Input className="mt-2" placeholder="Rechercher un patient." value={search} onChange={handleSearchChange} />
+            <Input 
+              className="mt-2" 
+              placeholder="Rechercher un patient (nom, email, téléphone)..." 
+              value={search} 
+              onChange={handleSearchChange} 
+            />
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            // Réinitialiser le formulaire quand le modal se ferme
+            if (!open) {
+              setForm({ firstName: '', lastName: '', birthDate: '', phone: '', email: '', goals: '' });
+            }
+          }}>
             <DialogTrigger asChild>
               <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                 <Plus className="h-4 w-4 mr-2" /> {form.id ? 'Modifier' : 'Créer'} un patient
               </Button>
             </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{form.id ? 'Modifier' : 'Créer'} un patient</DialogTitle>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader className="space-y-3">
+                <DialogTitle className="text-xl font-semibold">
+                  {form.id ? 'Modifier le patient' : 'Créer un nouveau patient'}
+                </DialogTitle>
+                <div className="h-px bg-gradient-to-r from-blue-500 to-purple-500"></div>
               </DialogHeader>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div><Label>Prénom</Label><Input name="firstName" value={form.firstName} onChange={handleInputChange} /></div>
-                <div><Label>Nom</Label><Input name="lastName" value={form.lastName} onChange={handleInputChange} /></div>
-                <div><Label>Date de naissance</Label><Input type="date" name="birthDate" value={form.birthDate} onChange={handleInputChange} /></div>
-                <div><Label>Téléphone</Label><Input name="phone" value={form.phone} onChange={handleInputChange} /></div>
-                <div className="md:col-span-2"><Label>Email</Label><Input name="email" value={form.email} onChange={handleInputChange} /></div>
-                <div className="md:col-span-2"><Label>Objectifs</Label><Input name="goals" value={form.goals} onChange={handleInputChange} /></div>
-                <Button className="md:col-span-2" onClick={handleAddOrUpdatePatient}>Valider</Button>
+              
+              <div className="space-y-6 py-4">
+                {/* Section Informations personnelles */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <div className="w-1 h-6 bg-blue-500 rounded-full"></div>
+                    Informations personnelles
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Prénom *
+                      </Label>
+                      <Input 
+                        id="firstName"
+                        name="firstName" 
+                        value={form.firstName} 
+                        onChange={handleInputChange}
+                        placeholder="Entrez le prénom"
+                        className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Nom de famille *
+                      </Label>
+                      <Input 
+                        id="lastName"
+                        name="lastName" 
+                        value={form.lastName} 
+                        onChange={handleInputChange}
+                        placeholder="Entrez le nom de famille"
+                        className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="birthDate" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Date de naissance *
+                      </Label>
+                      <Input 
+                        id="birthDate"
+                        type="date" 
+                        name="birthDate" 
+                        value={form.birthDate} 
+                        onChange={handleInputChange}
+                        className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Téléphone *
+                      </Label>
+                      <Input 
+                        id="phone"
+                        name="phone" 
+                        value={form.phone} 
+                        onChange={handleInputChange}
+                        placeholder="Ex: 06 12 34 56 78"
+                        className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Adresse email *
+                    </Label>
+                    <Input 
+                      id="email"
+                      type="email"
+                      name="email" 
+                      value={form.email} 
+                      onChange={handleInputChange}
+                      placeholder="exemple@email.com"
+                      className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Section Informations médicales */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <div className="w-1 h-6 bg-green-500 rounded-full"></div>
+                    Informations médicales
+                  </h3>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="goals" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Objectifs de traitement
+                    </Label>
+                    <textarea
+                      id="goals"
+                      name="goals"
+                      value={form.goals}
+                      onChange={(e) => setForm({ ...form, goals: e.target.value })}
+                      placeholder="Décrivez les objectifs thérapeutiques, pathologies, zones à traiter..."
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100 transition-all duration-200 resize-none"
+                      rows={4}
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Ces informations aideront à personnaliser les programmes d'exercices
+                    </p>
+                  </div>
+                </div>
+
+                {/* Section validation */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    onClick={() => {
+                      setDialogOpen(false);
+                      // Le formulaire sera automatiquement réinitialisé par onOpenChange
+                    }}
+                    className="flex-1 sm:flex-none"
+                  >
+                    Annuler
+                  </Button>
+                  <Button 
+                    onClick={handleAddOrUpdatePatient}
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+                    disabled={!form.firstName || !form.lastName || !form.birthDate || !form.phone || !form.email}
+                  >
+                    {form.id ? 'Mettre à jour le patient' : 'Créer le patient'}
+                  </Button>
+                </div>
+                
+                <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                  * Champs obligatoires
+                </p>
               </div>
             </DialogContent>
           </Dialog>
@@ -175,40 +373,67 @@ export default function PatientsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead></TableHead>
+                    <TableHead className="w-12"></TableHead>
                     <TableHead>Nom</TableHead>
                     <TableHead>Prénom</TableHead>
                     <TableHead>Date de naissance</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Téléphone</TableHead>
                     <TableHead>Objectifs</TableHead>
-                    <TableHead></TableHead>
+                    <TableHead className="text-center">Programme en cours</TableHead>
+                    <TableHead className="w-24"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredPatients.map((p) => (
-                    <TableRow key={p.id}>
+                    <TableRow key={p.id} className={p.hasActiveProgram ? 'bg-green-50 dark:bg-green-900/20' : ''}>
                       <TableCell>
                         <Link href={`/dashboard/kine/patients/${p.id}`}>
-                          <FolderOpen className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                          <Button size="icon" variant="ghost" className="hover:bg-blue-100 dark:hover:bg-blue-900/30">
+                            <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300" />
+                          </Button>
                         </Link>
                       </TableCell>
-                      <TableCell>{p.lastName}</TableCell>
+                      <TableCell className="font-medium">{p.lastName.toUpperCase()}</TableCell>
                       <TableCell>{p.firstName}</TableCell>
-                      <TableCell>{p.birthDate}</TableCell>
+                      <TableCell>{formatDate(p.birthDate)}</TableCell>
                       <TableCell>{p.email}</TableCell>
                       <TableCell>{p.phone}</TableCell>
-                      <TableCell>{p.goals}</TableCell>
+                      <TableCell className="max-w-xs truncate" title={p.goals}>{p.goals}</TableCell>
+                      <TableCell className="text-center">
+                        {p.hasActiveProgram ? (
+                          <div className="flex items-center justify-center">
+                            <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center">
+                            <X className="w-5 h-5 text-red-500 dark:text-red-400" />
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className="flex gap-2">
-                        <Button size="icon" variant="outline" onClick={() => handleEditPatient(p)}><Pencil className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="outline" onClick={() => handleEditPatient(p)}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
                         <Dialog open={deleteDialogOpen && patientToDelete?.id === p.id} onOpenChange={setDeleteDialogOpen}>
                           <DialogTrigger asChild>
-                            <Button size="icon" variant="destructive" onClick={() => { setDeleteDialogOpen(true); setPatientToDelete(p); }}><Trash2 className="w-4 h-4" /></Button>
+                            <Button 
+                              size="icon" 
+                              variant="destructive" 
+                              onClick={() => { setDeleteDialogOpen(true); setPatientToDelete(p); }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
                               <DialogTitle>Confirmer la suppression</DialogTitle>
                             </DialogHeader>
+                            <p className="py-4">
+                              Êtes-vous sûr de vouloir supprimer le patient{' '}
+                              <strong>{p.firstName} {p.lastName.toUpperCase()}</strong> ?
+                              Cette action est irréversible.
+                            </p>
                             <div className="flex justify-end gap-4 mt-4">
                               <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Annuler</Button>
                               <Button variant="destructive" onClick={handleDeletePatient}>Oui, supprimer</Button>
