@@ -276,7 +276,7 @@ export default function PatientDetailPage() {
   const handleDeleteProgramme = async (programmeId: number) => {
     try {
       const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/programmes/${programmeId}`, {
-        method: "PATCH" // Utilise l'archivage au lieu de la suppression définitive
+        method: "DELETE" // Utilise l'archivage au lieu de la suppression définitive
       });
       
       if (!res.ok) throw new Error("Erreur suppression programme");
