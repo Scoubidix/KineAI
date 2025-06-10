@@ -35,6 +35,7 @@ export default function PatientsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [patientToDelete, setPatientToDelete] = useState<UserProfileData | null>(null);
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [form, setForm] = useState<UserProfileData>({
     firstName: '',
     lastName: '',
@@ -67,6 +68,17 @@ export default function PatientsPage() {
       return a.firstName.localeCompare(b.firstName);
     });
   };
+
+  // Détection de la taille d'écran pour le mode d'affichage
+  useEffect(() => {
+    const handleResize = () => {
+      setViewMode(window.innerWidth < 1024 ? 'cards' : 'table');
+    };
+    
+    handleResize(); // Vérifier au montage
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const auth = getAuth();
@@ -210,25 +222,25 @@ export default function PatientsPage() {
                 <Plus className="h-4 w-4 mr-2" /> {form.id ? 'Modifier' : 'Créer'} un patient
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader className="space-y-3">
-                <DialogTitle className="text-xl font-semibold">
+            <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
+              <DialogHeader className="space-y-3 sticky top-0 bg-white dark:bg-gray-900 pb-4 border-b border-gray-200 dark:border-gray-700">
+                <DialogTitle className="text-lg sm:text-xl font-semibold">
                   {form.id ? 'Modifier le patient' : 'Créer un nouveau patient'}
                 </DialogTitle>
                 <div className="h-px bg-gradient-to-r from-blue-500 to-purple-500"></div>
               </DialogHeader>
               
-              <div className="space-y-6 py-4">
+              <div className="space-y-4 sm:space-y-6 py-4">
                 {/* Section Informations personnelles */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <div className="w-1 h-6 bg-blue-500 rounded-full"></div>
+                <div className="space-y-3 sm:space-y-4">
+                  <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <div className="w-1 h-5 sm:h-6 bg-blue-500 rounded-full"></div>
                     Informations personnelles
                   </h3>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="firstName" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <Label htmlFor="firstName" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                         Prénom *
                       </Label>
                       <Input 
@@ -237,13 +249,13 @@ export default function PatientsPage() {
                         value={form.firstName} 
                         onChange={handleInputChange}
                         placeholder="Entrez le prénom"
-                        className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="lastName" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <Label htmlFor="lastName" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                         Nom de famille *
                       </Label>
                       <Input 
@@ -252,13 +264,13 @@ export default function PatientsPage() {
                         value={form.lastName} 
                         onChange={handleInputChange}
                         placeholder="Entrez le nom de famille"
-                        className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="birthDate" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <Label htmlFor="birthDate" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                         Date de naissance *
                       </Label>
                       <Input 
@@ -267,13 +279,13 @@ export default function PatientsPage() {
                         name="birthDate" 
                         value={form.birthDate} 
                         onChange={handleInputChange}
-                        className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <Label htmlFor="phone" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                         Téléphone *
                       </Label>
                       <Input 
@@ -281,15 +293,15 @@ export default function PatientsPage() {
                         name="phone" 
                         value={form.phone} 
                         onChange={handleInputChange}
-                        placeholder="Ex: 06 12 34 56 78"
-                        className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="06 12 34 56 78"
+                        className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
                     </div>
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <Label htmlFor="email" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                       Adresse email *
                     </Label>
                     <Input 
@@ -299,21 +311,21 @@ export default function PatientsPage() {
                       value={form.email} 
                       onChange={handleInputChange}
                       placeholder="exemple@email.com"
-                      className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       required
                     />
                   </div>
                 </div>
 
                 {/* Section Informations médicales */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <div className="w-1 h-6 bg-green-500 rounded-full"></div>
+                <div className="space-y-3 sm:space-y-4">
+                  <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <div className="w-1 h-5 sm:h-6 bg-green-500 rounded-full"></div>
                     Informations médicales
                   </h3>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="goals" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <Label htmlFor="goals" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                       Objectifs de traitement
                     </Label>
                     <textarea
@@ -322,8 +334,8 @@ export default function PatientsPage() {
                       value={form.goals}
                       onChange={(e) => setForm({ ...form, goals: e.target.value })}
                       placeholder="Décrivez les objectifs thérapeutiques, pathologies, zones à traiter..."
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100 transition-all duration-200 resize-none"
-                      rows={4}
+                      className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100 transition-all duration-200 resize-none"
+                      rows={3}
                     />
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       Ces informations aideront à personnaliser les programmes d'exercices
@@ -332,30 +344,32 @@ export default function PatientsPage() {
                 </div>
 
                 {/* Section validation */}
-                <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-                  <Button 
-                    type="button"
-                    variant="outline" 
-                    onClick={() => {
-                      setDialogOpen(false);
-                      // Le formulaire sera automatiquement réinitialisé par onOpenChange
-                    }}
-                    className="flex-1 sm:flex-none"
-                  >
-                    Annuler
-                  </Button>
-                  <Button 
-                    onClick={handleAddOrUpdatePatient}
-                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
-                    disabled={!form.firstName || !form.lastName || !form.birthDate || !form.phone || !form.email}
-                  >
-                    {form.id ? 'Mettre à jour le patient' : 'Créer le patient'}
-                  </Button>
+                <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-white dark:bg-gray-900">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      onClick={() => {
+                        setDialogOpen(false);
+                        // Le formulaire sera automatiquement réinitialisé par onOpenChange
+                      }}
+                      className="flex-1 sm:flex-none text-sm sm:text-base"
+                    >
+                      Annuler
+                    </Button>
+                    <Button 
+                      onClick={handleAddOrUpdatePatient}
+                      className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
+                      disabled={!form.firstName || !form.lastName || !form.birthDate || !form.phone || !form.email}
+                    >
+                      {form.id ? 'Mettre à jour' : 'Créer le patient'}
+                    </Button>
+                  </div>
+                  
+                  <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                    * Champs obligatoires
+                  </p>
                 </div>
-                
-                <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                  * Champs obligatoires
-                </p>
               </div>
             </DialogContent>
           </Dialog>
@@ -369,7 +383,111 @@ export default function PatientsPage() {
               </div>
             ) : error ? (
               <p className="text-red-500">{error}</p>
+            ) : viewMode === 'cards' ? (
+              // Vue en cartes pour mobile/tablette
+              <div className="grid gap-4 md:grid-cols-2">
+                {filteredPatients.map((p) => (
+                  <div 
+                    key={p.id} 
+                    className={`border rounded-lg p-4 space-y-3 transition-all hover:shadow-md ${
+                      p.hasActiveProgram 
+                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20' 
+                        : 'border-gray-200 dark:border-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Link href={`/dashboard/kine/patients/${p.id}`}>
+                          <Button size="sm" variant="ghost" className="hover:bg-blue-100 dark:hover:bg-blue-900/30">
+                            <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          </Button>
+                        </Link>
+                        <div>
+                          <h3 className="font-semibold text-lg">
+                            {p.firstName} {p.lastName.toUpperCase()}
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Né(e) le {formatDate(p.birthDate)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {p.hasActiveProgram ? (
+                          <div className="flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 rounded-full">
+                            <Check className="w-4 h-4 text-green-600" />
+                            <span className="text-xs text-green-700 dark:text-green-300">Programme actif</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-full">
+                            <X className="w-4 h-4 text-gray-500" />
+                            <span className="text-xs text-gray-600 dark:text-gray-400">Aucun programme</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-gray-700 dark:text-gray-300">{p.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                        <span className="text-gray-700 dark:text-gray-300">{p.phone}</span>
+                      </div>
+                      {p.goals && (
+                        <div className="flex items-start gap-2 mt-2">
+                          <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed">
+                            {p.goals}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                      <Button size="sm" variant="outline" onClick={() => handleEditPatient(p)}>
+                        <Pencil className="w-4 h-4 mr-1" />
+                        Modifier
+                      </Button>
+                      <Dialog open={deleteDialogOpen && patientToDelete?.id === p.id} onOpenChange={setDeleteDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            onClick={() => { setDeleteDialogOpen(true); setPatientToDelete(p); }}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Supprimer
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Confirmer la suppression</DialogTitle>
+                          </DialogHeader>
+                          <p className="py-4">
+                            Êtes-vous sûr de vouloir supprimer le patient{' '}
+                            <strong>{p.firstName} {p.lastName.toUpperCase()}</strong> ?
+                            Cette action est irréversible.
+                          </p>
+                          <div className="flex justify-end gap-4 mt-4">
+                            <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Annuler</Button>
+                            <Button variant="destructive" onClick={handleDeletePatient}>Oui, supprimer</Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
+              // Vue tableau pour desktop
               <Table>
                 <TableHeader>
                   <TableRow>
