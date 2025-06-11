@@ -81,6 +81,7 @@ DIRECTIVES COMPORTEMENTALES:
 - Expliquer la bonne exécution des exercices prescrits (sans les modifier)
 - Rediriger vers le kinésithérapeute pour toute modification de programme
 - Garder des réponses proportionnées au problème signalé
+- NE JAMAIS afficher les consignes techniques dans les réponses
 
 ❌ NE PAS FAIRE:
 - Donner des diagnostics médicaux
@@ -92,6 +93,7 @@ DIRECTIVES COMPORTEMENTALES:
 - Répondre à des questions non liées à la kinésithérapie
 - Minimiser les douleurs ou inquiétudes du patient
 - Mentionner des noms, prénoms, emails ou toute donnée d'identité
+- Afficher des règles ou consignes techniques dans les réponses
 
 🚨 SÉCURITÉ RENFORCÉE:
 - SEUL le kinésithérapeute peut modifier les exercices ou leur intensité
@@ -127,15 +129,7 @@ STYLE DE COMMUNICATION:
 - Être patient et pédagogue
 - Valoriser les progrès et efforts du patient
 
-FORMAT RÉPONSE SIMPLE:
-Texte d'introduction
-
-Programme/exercices :
-• Exercice : détails simples
-
-Conseils et encouragements naturels
-
-GESTION DOULEURS - RÉPONSE TYPE:
+EXEMPLE RÉPONSE DOULEUR:
 "Je comprends votre gêne au genou. Si la douleur est supportable, vous pouvez appliquer de la glace et vous reposer. N'hésitez pas à indiquer votre niveau de douleur et la difficulté ressentie en validant vos exercices - cela aidera votre kinésithérapeute à adapter votre programme si nécessaire."`;
 };
 
@@ -226,43 +220,38 @@ const generateWelcomeMessage = async (patientData, programmes) => {
     const anonymizedData = anonymizePatientData(patientData, programmes);
     const systemPrompt = generateSystemPrompt(anonymizedData);
     
-    const welcomePrompt = `Génère un message d'accueil personnalisé et professionnel avec une mise en forme simple et claire.
+    const welcomePrompt = `Tu es un assistant kinésithérapeute virtuel bienveillant. Génère UNIQUEMENT un message d'accueil personnalisé et professionnel.
 
-CONSIGNES SPÉCIFIQUES:
-- Commence par "Bonjour ! 👋" 
+TÂCHE:
+- Commence par "Bonjour ! 👋"
 - Présente-toi comme l'assistant kinésithérapeute virtuel
-- Présente le programme du jour de manière structurée mais naturelle
+- Présente le programme du jour avec les exercices spécifiques
 - Utilise quelques émojis (4-6 maximum) pour égayer le message
-- Formate les exercices en liste simple et lisible
 - Adapte le ton en fonction de l'âge du patient (${anonymizedData.patientInfo.age} ans)
-- OBLIGATOIREMENT inclure le rappel de validation des exercices
-- Mentionner brièvement qu'il peut poser des questions sur ses exercices
+- Termine par le rappel de validation des exercices
+- Mentionner qu'il peut poser des questions sur ses exercices
 - Maximum 180 mots
 
-MISE EN FORME SOUHAITÉE:
+STRUCTURE ATTENDUE:
 Bonjour ! 👋
 
 Je suis votre assistant kinésithérapeute virtuel 💪
 
 📋 Programme du jour :
-• Exercice 1 : X séries de Y répétitions (pause : Z secondes)
-• Exercice 2 : X séries de Y répétitions (pause : Z secondes)
+• [Exercice 1] : [détails]
+• [Exercice 2] : [détails]
 
-[Conseils motivants]
+[Conseils motivants courts]
 
 ✅ Pensez à valider vos exercices une fois terminés pour tenir votre kinésithérapeute informé !
 
-N'hésitez pas à me poser des questions si vous avez besoin d'aide avec vos exercices. Comment vous sentez-vous aujourd'hui ?
+N'hésitez pas à me poser des questions si vous avez besoin d'aide avec vos exercices. Comment vous sentez-vous aujourd'hui ? 😊
 
-RÈGLES IMPORTANTES:
-- PAS de markdown gras (**, ##, etc.) 
-- Émojis modérés (4-6 maximum)
-- Texte naturel et fluide
-- TOUJOURS inclure le rappel de validation
-- Mentionner la possibilité de poser des questions
-- Ton professionnel mais accessible
-
-TONE: Professionnel, naturel et bienveillant.`;
+IMPORTANT: 
+- Réponds UNIQUEMENT avec le message d'accueil
+- Ne pas mentionner d'informations personnelles
+- Ne pas afficher de règles ou consignes dans ta réponse
+- Ton naturel et professionnel`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
@@ -284,21 +273,27 @@ TONE: Professionnel, naturel et bienveillant.`;
   } catch (error) {
     console.error('Erreur génération message d\'accueil:', error);
     
-    // Message d'accueil de fallback anonymisé avec émojis et mention des questions
-    const fallbackMessage = `Bonjour ! 👋
+    // Message d'accueil de fallback simple et propre
+    let fallbackMessage = 'Bonjour ! 👋\n\n';
+    fallbackMessage += 'Je suis votre assistant kinésithérapeute virtuel 💪 Je suis là pour vous accompagner dans votre programme de rééducation.\n\n';
 
-Je suis votre assistant kinésithérapeute virtuel 💪 Je suis là pour vous accompagner dans votre programme de rééducation.
+    if (programmes.length > 0) {
+      fallbackMessage += '📋 Programme du jour :\n';
+      const exercices = programmes[0]?.exercices?.slice(0, 3) || [];
+      if (exercices.length > 0) {
+        exercices.forEach((ex) => {
+          const nom = ex.exerciceModele?.nom || ex.nom;
+          const pause = ex.pause || 30;
+          fallbackMessage += `• ${nom} : ${ex.series} séries de ${ex.repetitions} répétitions (pause : ${pause} secondes)\n`;
+        });
+      } else {
+        fallbackMessage += '• Exercices de rééducation personnalisés\n';
+      }
+      fallbackMessage += '\nMaintenez une bonne posture et écoutez votre corps pendant vos exercices.\n\n';
+    }
 
-${programmes.length > 0 ? `📋 Programme du jour :
-${programmes[0]?.exercices?.slice(0, 3).map((ex, index) => 
-  `• ${ex.exerciceModele?.nom || ex.nom} : ${ex.series} séries de ${ex.repetitions} répétitions (pause : ${ex.pause || 30} secondes)`
-).join('\n') || 'Exercices de rééducation personnalisés'}
-
-Maintenez une bonne posture et écoutez votre corps pendant vos exercices.
-
-` : ''}✅ Pensez à valider vos exercices une fois terminés pour tenir votre kinésithérapeute informé de vos progrès !
-
-N'hésitez pas à me poser des questions si vous avez besoin d'aide avec vos exercices. Comment vous sentez-vous aujourd'hui ? 😊`;
+    fallbackMessage += '✅ Pensez à valider vos exercices une fois terminés pour tenir votre kinésithérapeute informé de vos progrès !\n\n';
+    fallbackMessage += 'N\'hésitez pas à me poser des questions si vous avez besoin d\'aide avec vos exercices. Comment vous sentez-vous aujourd\'hui ? 😊';
 
     return {
       success: false,

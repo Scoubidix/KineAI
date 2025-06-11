@@ -35,12 +35,26 @@ interface ValidationResponse {
   };
 }
 
+interface WelcomeResponse {
+  success: boolean;
+  hasHistory: boolean;
+  welcomeMessage?: string;
+  chatHistory?: ChatMessage[];
+  patient: PatientData;
+  programme: ProgrammeData;
+  timestamp: string;
+  warning?: {
+    message: string;
+    hoursRemaining: number;
+  };
+}
+
 interface ChatResponse {
   success: boolean;
   message: string;
   patient: PatientData;
   programme: ProgrammeData;
-  timestamp: string; // ← Ajouté
+  timestamp: string;
   warning?: {
     message: string;
     hoursRemaining: number;
@@ -59,7 +73,8 @@ export default function PatientChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
+  const [isLoadingChat, setIsLoadingChat] = useState(false);
+  const [chatInitialized, setChatInitialized] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
   
   // Référence pour le scroll automatique
@@ -73,12 +88,12 @@ export default function PatientChatPage() {
     validateToken();
   }, [token]);
 
-  // Récupération du message d'accueil après validation
+  // Initialisation du chat après validation
   useEffect(() => {
-    if (isValid && !welcomeMessage) {
-      fetchWelcomeMessage();
+    if (isValid && !chatInitialized) {
+      initializeChat();
     }
-  }, [isValid]);
+  }, [isValid, chatInitialized]);
 
   // Scroll automatique vers le bas
   useEffect(() => {
@@ -116,20 +131,32 @@ export default function PatientChatPage() {
     }
   };
 
-  const fetchWelcomeMessage = async () => {
+  const initializeChat = async () => {
+    setIsLoadingChat(true);
     try {
       const response = await fetch(`${API_URL}/api/patient/welcome/${token}`);
       
-      if (response.ok) {
-        const data = await response.json();
-        setWelcomeMessage(data.welcomeMessage);
-        
-        // Ajouter le message d'accueil comme premier message
-        setMessages([{
-          role: 'assistant',
-          content: data.welcomeMessage,
-          timestamp: new Date().toISOString()
-        }]);
+      if (!response.ok) {
+        throw new Error('Erreur lors de l\'initialisation du chat');
+      }
+
+      const data: WelcomeResponse = await response.json();
+      
+      if (data.success) {
+        if (data.hasHistory && data.chatHistory) {
+          // Charger l'historique existant
+          setMessages(data.chatHistory);
+          console.log(`📝 Historique restauré: ${data.chatHistory.length} messages`);
+        } else if (data.welcomeMessage) {
+          // Nouveau chat avec message d'accueil
+          const welcomeMsg: ChatMessage = {
+            role: 'assistant',
+            content: data.welcomeMessage,
+            timestamp: data.timestamp
+          };
+          setMessages([welcomeMsg]);
+          console.log('👋 Nouveau chat initialisé avec message d\'accueil');
+        }
 
         // Gérer les warnings d'expiration
         if (data.warning) {
@@ -137,7 +164,17 @@ export default function PatientChatPage() {
         }
       }
     } catch (err) {
-      console.error('Erreur récupération message d\'accueil:', err);
+      console.error('Erreur initialisation chat:', err);
+      // Message d'accueil de fallback
+      const fallbackMessage: ChatMessage = {
+        role: 'assistant',
+        content: 'Bonjour ! Je suis votre assistant kinésithérapeute virtuel. Comment puis-je vous aider aujourd\'hui ?',
+        timestamp: new Date().toISOString()
+      };
+      setMessages([fallbackMessage]);
+    } finally {
+      setIsLoadingChat(false);
+      setChatInitialized(true);
     }
   };
 
@@ -150,7 +187,7 @@ export default function PatientChatPage() {
       timestamp: new Date().toISOString()
     };
 
-    // Ajouter le message utilisateur
+    // Ajouter le message utilisateur immédiatement
     setMessages(prev => [...prev, userMessage]);
     setCurrentMessage('');
     setIsSending(true);
@@ -162,8 +199,8 @@ export default function PatientChatPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: userMessage.content,
-          chatHistory: messages.slice(-8) // Envoyer les 8 derniers messages
+          message: userMessage.content
+          // Plus besoin d'envoyer chatHistory - géré automatiquement côté serveur
         }),
       });
 
@@ -174,18 +211,22 @@ export default function PatientChatPage() {
 
       const data: ChatResponse = await response.json();
       
-      // Ajouter la réponse de l'assistant
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: data.message,
-        timestamp: data.timestamp || new Date().toISOString()
-      };
+      if (data.success) {
+        // Ajouter la réponse de l'assistant
+        const assistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: data.message,
+          timestamp: data.timestamp
+        };
 
-      setMessages(prev => [...prev, assistantMessage]);
+        setMessages(prev => [...prev, assistantMessage]);
 
-      // Gérer les warnings d'expiration
-      if (data.warning) {
-        setWarning(data.warning.message);
+        // Gérer les warnings d'expiration
+        if (data.warning) {
+          setWarning(data.warning.message);
+        }
+      } else {
+        throw new Error(data.message || 'Erreur lors de la génération de la réponse');
       }
 
     } catch (err) {
@@ -218,7 +259,7 @@ export default function PatientChatPage() {
     });
   };
 
-  // Écran de chargement
+  // Écran de chargement initial
   if (isValidating) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -289,41 +330,51 @@ export default function PatientChatPage() {
           
           {/* Messages */}
           <div className="flex-1 p-6 overflow-y-auto">
-            <div className="space-y-4">
-              {messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[80%] p-4 rounded-2xl ${
-                      message.role === 'user'
-                        ? 'bg-blue-500 text-white rounded-br-md'
-                        : 'bg-gray-100 text-gray-800 rounded-bl-md'
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap">{message.content}</p>
-                    <p className={`text-xs mt-2 ${
-                      message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
-                    }`}>
-                      {formatTime(message.timestamp)}
-                    </p>
-                  </div>
+            {isLoadingChat ? (
+              // Chargement de l'historique
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-3" />
+                  <p className="text-gray-600">Chargement de votre conversation...</p>
                 </div>
-              ))}
-              
-              {/* Indicateur de frappe */}
-              {isSending && (
-                <div className="flex justify-start">
-                  <div className="bg-gray-100 p-4 rounded-2xl rounded-bl-md">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-gray-600">Assistant en train d'écrire...</span>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {messages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[80%] p-4 rounded-2xl ${
+                        message.role === 'user'
+                          ? 'bg-blue-500 text-white rounded-br-md'
+                          : 'bg-gray-100 text-gray-800 rounded-bl-md'
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className={`text-xs mt-2 ${
+                        message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
+                      }`}>
+                        {formatTime(message.timestamp)}
+                      </p>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
+                ))}
+                
+                {/* Indicateur de frappe */}
+                {isSending && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-100 p-4 rounded-2xl rounded-bl-md">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-gray-600">Assistant en train d'écrire...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -339,12 +390,13 @@ export default function PatientChatPage() {
                   className="w-full p-3 border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   rows={1}
                   style={{ minHeight: '44px', maxHeight: '120px' }}
-                  disabled={isSending}
+                  disabled={isSending || isLoadingChat}
+                  maxLength={1000}
                 />
               </div>
               <button
                 onClick={sendMessage}
-                disabled={!currentMessage.trim() || isSending}
+                disabled={!currentMessage.trim() || isSending || isLoadingChat}
                 className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-colors"
               >
                 {isSending ? (
@@ -355,9 +407,16 @@ export default function PatientChatPage() {
               </button>
             </div>
             
-            <p className="text-xs text-gray-500 mt-2 text-center">
-              Appuyez sur Entrée pour envoyer • Votre conversation est sécurisée
-            </p>
+            <div className="flex justify-between items-center mt-2">
+              <p className="text-xs text-gray-500">
+                Appuyez sur Entrée pour envoyer • Votre conversation est sécurisée
+              </p>
+              {messages.length > 1 && (
+                <p className="text-xs text-gray-400">
+                  {messages.length - 1} messages échangés aujourd'hui
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>

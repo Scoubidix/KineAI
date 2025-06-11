@@ -38,7 +38,8 @@ model Patient {
   kineId     Int
   kine       Kine         @relation(fields: [kineId], references: [id])
 
-  programmes Programme[]
+  programmes   Programme[]
+  chatSessions ChatSession[]
 }
 
 model ExerciceModele {
@@ -85,4 +86,29 @@ model ExerciceProgramme {
 
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
+}
+
+model ChatSession {
+  id          Int      @id @default(autoincrement())
+  message     String   // Le contenu du message
+  role        ChatRole // Qui a envoyé le message
+  createdAt   DateTime @default(now())
+  sessionDate DateTime @default(now()) @db.Date // Date de la session (sans heure)
+  
+  // Relation avec le patient
+  patientId   Int
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  // Index pour optimiser les requêtes
+  @@index([patientId, sessionDate])
+  @@index([sessionDate]) // Pour le nettoyage automatique
+  @@map("chat_sessions")
+}
+
+enum ChatRole {
+  USER      // Message du patient
+  ASSISTANT // Réponse de l'IA
+  SYSTEM    // Messages système (bienvenue, etc.)
+  
+  @@map("chat_role")
 }
