@@ -9,19 +9,24 @@ const anonymizePatientData = (patient, programmes) => {
   return {
     patientInfo: {
       age: calculateAge(patient.birthDate),
-      genre: patient.genre || 'Non spécifié', // Si vous avez ce champ
-      identifier: `Patient ${patient.id.toString().slice(-3)}` // Ex: "Patient 123"
+      genre: patient.genre || 'Non spécifié',
+      goals: patient.goals || 'Objectifs non spécifiés'
+      // Aucune donnée d'identité (nom, prénom, email, téléphone, etc.)
     },
     programmes: programmes.map(prog => ({
       titre: prog.titre,
       description: prog.description,
       duree: prog.duree,
+      dateDebut: prog.dateDebut,
+      statut: prog.statut || 'actif',
       exercices: prog.exercices?.map(ex => ({
         nom: ex.exerciceModele?.nom || ex.nom,
         series: ex.series,
         repetitions: ex.repetitions,
         pause: ex.pause || ex.tempsRepos,
-        consigne: ex.consigne || ex.instructions
+        consigne: ex.consigne || ex.instructions,
+        difficulte: ex.difficulte || 'modérée',
+        materiel: ex.materiel || 'aucun'
       })) || []
     }))
   };
@@ -38,121 +43,306 @@ const calculateAge = (birthDateStr) => {
 const generateSystemPrompt = (anonymizedData) => {
   const { patientInfo, programmes } = anonymizedData;
   
-  return `Tu es un assistant kinésithérapeute virtuel bienveillant et professionnel. 
+  return `Tu es un assistant kinésithérapeute virtuel expert, bienveillant et professionnel spécialisé dans l'accompagnement des patients.
 
-CONTEXTE PATIENT:
-- Identifiant: ${patientInfo.identifier}
+PROFIL PATIENT ANONYMISÉ:
 - Âge: ${patientInfo.age} ans
 - Genre: ${patientInfo.genre}
+- Objectifs thérapeutiques: ${patientInfo.goals}
 
-PROGRAMME(S) ACTUEL(S):
+PROGRAMME(S) THÉRAPEUTIQUE(S):
 ${programmes.map(prog => `
-📋 ${prog.titre}
-Description: ${prog.description}
-Durée: ${prog.duree} jours
+📋 PROGRAMME: ${prog.titre}
+🎯 Objectif: ${prog.description}
+⏰ Durée: ${prog.duree} jours
+📅 Début: ${prog.dateDebut ? new Date(prog.dateDebut).toLocaleDateString('fr-FR') : 'Non spécifié'}
+📊 Statut: ${prog.statut}
 
-Exercices:
-${prog.exercices.map(ex => `
-• ${ex.nom}
-  - ${ex.series} séries de ${ex.repetitions} répétitions
-  - Pause: ${ex.pause}s entre les séries
-  ${ex.consigne ? `- Consignes: ${ex.consigne}` : ''}
+EXERCICES PRESCRITS:
+${prog.exercices.map((ex, index) => `
+${index + 1}. 💪 ${ex.nom}
+   • ${ex.series} séries × ${ex.repetitions} répétitions
+   • ⏱️ Pause: ${ex.pause}s entre séries
+   • 🔧 Matériel: ${ex.materiel}
+   • 📈 Difficulté: ${ex.difficulte}
+   ${ex.consigne ? `• 📝 Instructions: ${ex.consigne}` : ''}
 `).join('')}
 `).join('\n')}
 
-INSTRUCTIONS:
-1. Réponds uniquement aux questions liées à la kinésithérapie et au programme du patient
-2. Sois bienveillant, rassurant et encourageant
-3. Utilise un langage simple et accessible
-4. Si on te pose des questions médicales complexes, redirige vers le kinésithérapeute
-5. Rappelle régulièrement l'importance de suivre le programme
-6. Ne donne jamais d'informations personnelles du patient
-7. En cas de douleur intense, conseille d'arrêter et de consulter
+DIRECTIVES COMPORTEMENTALES:
+✅ FAIRE:
+- Répondre uniquement aux questions liées à la kinésithérapie et au programme
+- Être bienveillant, rassurant et encourageant
+- Utiliser un langage simple et accessible au patient
+- Donner des conseils généraux sur la posture et la respiration
+- Pour les douleurs légères : conseils simples (repos, glace) sans dramatiser
+- Rappeler l'importance de signaler les douleurs lors de la validation des exercices
+- Encourager le patient dans ses efforts selon le programme établi
+- Expliquer la bonne exécution des exercices prescrits (sans les modifier)
+- Rediriger vers le kinésithérapeute pour toute modification de programme
+- Garder des réponses proportionnées au problème signalé
 
-TONE: Professionnel mais chaleureux, comme un kinésithérapeute expérimenté et bienveillant.`;
+❌ NE PAS FAIRE:
+- Donner des diagnostics médicaux
+- Prescrire de nouveaux exercices non autorisés
+- Modifier les paramètres d'exercices (séries, répétitions, durée, intensité)
+- Conseiller d'augmenter ou diminuer la difficulté des exercices
+- Suggérer d'adapter les exercices sans avis du kinésithérapeute
+- Révéler ou utiliser des informations personnelles d'identité
+- Répondre à des questions non liées à la kinésithérapie
+- Minimiser les douleurs ou inquiétudes du patient
+- Mentionner des noms, prénoms, emails ou toute donnée d'identité
+
+🚨 SÉCURITÉ RENFORCÉE:
+- SEUL le kinésithérapeute peut modifier les exercices ou leur intensité
+- En cas de douleur, conseiller d'arrêter et de consulter le kinésithérapeute
+- Pour toute question sur l'adaptation des exercices → rediriger vers le professionnel
+- Ne jamais donner de conseils sur la progression ou les modifications d'exercices
+
+🚨 SÉCURITÉ:
+Si le patient signale:
+- Douleur INTENSE ou INHABITUELLE → Arrêter immédiatement et consulter le kinésithérapeute
+- Douleur légère/modérée → Conseils généraux (repos, glace) + rappel de signaler dans la validation
+- Malaise, vertiges → Cesser l'activité et se reposer
+- Questions sur la modification des exercices → Rediriger vers le kinésithérapeute UNIQUEMENT
+- Demande d'adaptation de la difficulté → "Seul votre kinésithérapeute peut ajuster votre programme"
+- Questions médicales complexes → Rediriger vers le professionnel de santé
+
+GESTION DES DOULEURS:
+- Douleur légère (1-3/10) : Conseils généraux + signalement dans validation
+- Douleur modérée (4-6/10) : Repos + conseils + signalement obligatoire
+- Douleur forte (7-10/10) : Arrêt immédiat + consultation urgente
+
+RAPPEL: Toujours inviter le patient à signaler son niveau de douleur lors de la validation des exercices.
+
+STYLE DE COMMUNICATION:
+- Ton professionnel mais chaleureux
+- Utiliser très peu d'émojis (2-3 maximum par message)
+- Éviter le sur-formatage (pas de markdown excessif)
+- Structurer simplement avec des listes à puces
+- Texte naturel et fluide
+- Réponses PROPORTIONNÉES au problème signalé (pas de dramatisation)
+- Pour les douleurs : réponse courte, rassurante, avec rappel de signalement
+- Personnaliser les réponses en fonction du programme
+- Être patient et pédagogue
+- Valoriser les progrès et efforts du patient
+
+FORMAT RÉPONSE SIMPLE:
+Texte d'introduction
+
+Programme/exercices :
+• Exercice : détails simples
+
+Conseils et encouragements naturels
+
+GESTION DOULEURS - RÉPONSE TYPE:
+"Je comprends votre gêne au genou. Si la douleur est supportable, vous pouvez appliquer de la glace et vous reposer. N'hésitez pas à indiquer votre niveau de douleur et la difficulté ressentie en validant vos exercices - cela aidera votre kinésithérapeute à adapter votre programme si nécessaire."`;
 };
 
 // Fonction principale pour le chat
 const generateChatResponse = async (patientData, programmes, userMessage, chatHistory = []) => {
   try {
+    // Validation des données d'entrée
+    if (!patientData || !programmes || !userMessage) {
+      throw new Error('Données manquantes pour générer la réponse');
+    }
+
     // Anonymiser les données
     const anonymizedData = anonymizePatientData(patientData, programmes);
     
     // Générer le prompt système
     const systemPrompt = generateSystemPrompt(anonymizedData);
     
+    // Limiter l'historique pour éviter de dépasser les tokens
+    const limitedHistory = chatHistory.slice(-10); // Garder les 10 derniers messages
+    
     // Préparer les messages pour OpenAI
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...chatHistory.map(msg => ({
-        role: msg.role,
+      ...limitedHistory.map(msg => ({
+        role: msg.role === 'patient' ? 'user' : 'assistant',
         content: msg.content
       })),
       { role: 'user', content: userMessage }
     ];
 
-    // Appel à OpenAI
+    // Appel à OpenAI avec GPT-3.5-turbo
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-3.5-turbo',
       messages: messages,
-      max_tokens: 500,
+      max_tokens: 400,
       temperature: 0.7,
-      presence_penalty: 0.1,
-      frequency_penalty: 0.1
+      presence_penalty: 0.2,
+      frequency_penalty: 0.1,
+      top_p: 0.9
     });
 
     return {
       success: true,
-      message: response.choices[0].message.content,
-      usage: response.usage
+      message: response.choices[0].message.content.trim(),
+      usage: {
+        prompt_tokens: response.usage.prompt_tokens,
+        completion_tokens: response.usage.completion_tokens,
+        total_tokens: response.usage.total_tokens
+      },
+      model: 'gpt-3.5-turbo'
     };
 
   } catch (error) {
-    console.error('Erreur OpenAI:', error);
+    console.error('Erreur OpenAI Chat:', error);
+    
+    // Messages d'erreur contextualisés
+    let errorMessage = "Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.";
+    
+    if (error.code === 'insufficient_quota') {
+      errorMessage = "Le service de chat est temporairement indisponible. Veuillez contacter votre kinésithérapeute.";
+    } else if (error.code === 'rate_limit_exceeded') {
+      errorMessage = "Trop de demandes en cours. Veuillez patienter quelques secondes avant de réécrire.";
+    } else if (error.message.includes('API key')) {
+      errorMessage = "Problème de configuration du service. Veuillez contacter le support technique.";
+    }
+
     return {
       success: false,
-      error: 'Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.',
-      details: error.message
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      model: 'gpt-3.5-turbo'
     };
   }
 };
 
-// Fonction pour générer un message d'accueil personnalisé
+// Fonction pour générer un message d'accueil personnalisé mais anonymisé
 const generateWelcomeMessage = async (patientData, programmes) => {
   try {
+    // Validation des données
+    if (!patientData || !programmes) {
+      return {
+        success: false,
+        message: "👋 Bonjour ! Je suis votre assistant kinésithérapeute virtuel. Je suis là pour vous accompagner dans votre programme de rééducation. Comment vous sentez-vous aujourd'hui ?"
+      };
+    }
+
+    // IMPORTANT: Anonymisation complète - aucune donnée d'identité transmise à OpenAI
     const anonymizedData = anonymizePatientData(patientData, programmes);
     const systemPrompt = generateSystemPrompt(anonymizedData);
     
-    const welcomePrompt = `Génère un message d'accueil personnalisé pour ce patient. 
-    Présente-toi, résume son programme du jour de manière encourageante, et invite-le à poser des questions.
-    Sois chaleureux et motivant. Maximum 150 mots.`;
+    const welcomePrompt = `Génère un message d'accueil personnalisé et professionnel avec une mise en forme simple et claire.
+
+CONSIGNES SPÉCIFIQUES:
+- Commence par "Bonjour ! 👋" 
+- Présente-toi comme l'assistant kinésithérapeute virtuel
+- Présente le programme du jour de manière structurée mais naturelle
+- Utilise quelques émojis (4-6 maximum) pour égayer le message
+- Formate les exercices en liste simple et lisible
+- Adapte le ton en fonction de l'âge du patient (${anonymizedData.patientInfo.age} ans)
+- OBLIGATOIREMENT inclure le rappel de validation des exercices
+- Mentionner brièvement qu'il peut poser des questions sur ses exercices
+- Maximum 180 mots
+
+MISE EN FORME SOUHAITÉE:
+Bonjour ! 👋
+
+Je suis votre assistant kinésithérapeute virtuel 💪
+
+📋 Programme du jour :
+• Exercice 1 : X séries de Y répétitions (pause : Z secondes)
+• Exercice 2 : X séries de Y répétitions (pause : Z secondes)
+
+[Conseils motivants]
+
+✅ Pensez à valider vos exercices une fois terminés pour tenir votre kinésithérapeute informé !
+
+N'hésitez pas à me poser des questions si vous avez besoin d'aide avec vos exercices. Comment vous sentez-vous aujourd'hui ?
+
+RÈGLES IMPORTANTES:
+- PAS de markdown gras (**, ##, etc.) 
+- Émojis modérés (4-6 maximum)
+- Texte naturel et fluide
+- TOUJOURS inclure le rappel de validation
+- Mentionner la possibilité de poser des questions
+- Ton professionnel mais accessible
+
+TONE: Professionnel, naturel et bienveillant.`;
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-3.5-turbo',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: welcomePrompt }
       ],
-      max_tokens: 200,
-      temperature: 0.8
+      max_tokens: 180,
+      temperature: 0.8,
+      top_p: 0.9
     });
 
     return {
       success: true,
-      message: response.choices[0].message.content
+      message: response.choices[0].message.content.trim(),
+      model: 'gpt-3.5-turbo'
     };
 
   } catch (error) {
     console.error('Erreur génération message d\'accueil:', error);
+    
+    // Message d'accueil de fallback anonymisé avec émojis et mention des questions
+    const fallbackMessage = `Bonjour ! 👋
+
+Je suis votre assistant kinésithérapeute virtuel 💪 Je suis là pour vous accompagner dans votre programme de rééducation.
+
+${programmes.length > 0 ? `📋 Programme du jour :
+${programmes[0]?.exercices?.slice(0, 3).map((ex, index) => 
+  `• ${ex.exerciceModele?.nom || ex.nom} : ${ex.series} séries de ${ex.repetitions} répétitions (pause : ${ex.pause || 30} secondes)`
+).join('\n') || 'Exercices de rééducation personnalisés'}
+
+Maintenez une bonne posture et écoutez votre corps pendant vos exercices.
+
+` : ''}✅ Pensez à valider vos exercices une fois terminés pour tenir votre kinésithérapeute informé de vos progrès !
+
+N'hésitez pas à me poser des questions si vous avez besoin d'aide avec vos exercices. Comment vous sentez-vous aujourd'hui ? 😊`;
+
     return {
       success: false,
-      message: "Bonjour ! Je suis votre assistant kinésithérapeute virtuel. Je suis là pour vous accompagner dans votre programme d'exercices et répondre à vos questions. Comment puis-je vous aider aujourd'hui ?"
+      message: fallbackMessage,
+      model: 'fallback'
     };
   }
+};
+
+// Fonction pour valider un message avant envoi
+const validateMessage = (message) => {
+  if (!message || typeof message !== 'string') {
+    return { valid: false, error: 'Message invalide' };
+  }
+  
+  if (message.trim().length === 0) {
+    return { valid: false, error: 'Message vide' };
+  }
+  
+  if (message.length > 1000) {
+    return { valid: false, error: 'Message trop long (maximum 1000 caractères)' };
+  }
+  
+  return { valid: true };
+};
+
+// Fonction pour nettoyer l'historique de chat
+const cleanChatHistory = (history, maxMessages = 20) => {
+  if (!Array.isArray(history)) return [];
+  
+  return history
+    .slice(-maxMessages) // Garder les derniers messages
+    .filter(msg => msg && msg.content && msg.role) // Filtrer les messages valides
+    .map(msg => ({
+      role: msg.role,
+      content: msg.content.substring(0, 500), // Limiter la taille de chaque message
+      timestamp: msg.timestamp || new Date().toISOString()
+    }));
 };
 
 module.exports = {
   generateChatResponse,
   generateWelcomeMessage,
-  anonymizePatientData
+  anonymizePatientData,
+  validateMessage,
+  cleanChatHistory
 };
