@@ -26,6 +26,8 @@ const authenticatePatient = async (req, res, next) => {
     }
 
     if (!token) {
+      const ip = req.ip || req.connection.remoteAddress;
+      console.warn(`🚨 PATIENT_AUTH: Token manquant - IP: ${ip} - Route: ${req.path}`);
       return res.status(401).json({
         success: false,
         error: 'Token d\'authentification requis',
@@ -37,6 +39,8 @@ const authenticatePatient = async (req, res, next) => {
     const tokenValidation = validatePatientToken(token);
     
     if (!tokenValidation.success) {
+      const ip = req.ip || req.connection.remoteAddress;
+      console.warn(`🚨 PATIENT_AUTH: Token invalide - IP: ${ip} - Code: ${tokenValidation.code}`);
       return res.status(401).json({
         success: false,
         error: tokenValidation.error,
@@ -58,6 +62,7 @@ const authenticatePatient = async (req, res, next) => {
     });
 
     if (!patient) {
+      console.error(`❌ PATIENT_AUTH: Patient inexistant - ID: ${tokenValidation.patientId}`);
       return res.status(404).json({
         success: false,
         error: 'Patient non trouvé',
@@ -76,6 +81,7 @@ const authenticatePatient = async (req, res, next) => {
     });
 
     if (!programme) {
+      console.error(`❌ PATIENT_AUTH: Programme inexistant - ID: ${tokenValidation.programmeId}`);
       return res.status(404).json({
         success: false,
         error: 'Programme non trouvé',
@@ -85,6 +91,7 @@ const authenticatePatient = async (req, res, next) => {
 
     // 5. Vérifier que le programme appartient bien au patient
     if (programme.patientId !== patient.id) {
+      console.warn(`🚨 PATIENT_AUTH: Tentative accès programme non autorisé - Patient: ${patient.id} - Programme: ${programme.id}`);
       return res.status(403).json({
         success: false,
         error: 'Accès non autorisé à ce programme',
@@ -94,6 +101,7 @@ const authenticatePatient = async (req, res, next) => {
 
     // 6. Vérifier que le programme n'est pas archivé
     if (programme.isArchived) {
+      console.warn(`⚠️ PATIENT_AUTH: Tentative accès programme archivé - ID: ${programme.id}`);
       return res.status(410).json({
         success: false,
         error: 'Programme archivé, chat non disponible',
@@ -107,19 +115,22 @@ const authenticatePatient = async (req, res, next) => {
     req.tokenData = tokenValidation;
     req.originalToken = token;
 
-    // 8. Logger l'accès (optionnel)
-    console.log(`Patient authentifié: ${patient.firstName} ${patient.lastName} (ID: ${patient.id}) - Programme: ${programme.titre}`);
+    // ✅ Log uniquement les NOUVELLES sessions (première connexion du jour)
+    // Détection : si c'est la route d'initialisation du chat
+    if (req.path.includes('/init') || req.method === 'GET') {
+      console.log(`💬 PATIENT_CHAT: Session démarrée - Patient: ${patient.id} - Programme: ${programme.titre}`);
+    }
 
     // 9. Continuer vers la route suivante
     next();
 
   } catch (error) {
-    console.error('Erreur middleware patient auth:', error);
+    console.error(`❌ PATIENT_AUTH: Erreur serveur - ${error.message}`);
     res.status(500).json({
       success: false,
       error: 'Erreur serveur lors de l\'authentification',
       code: 'AUTH_SERVER_ERROR',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -140,6 +151,11 @@ const checkTokenExpiry = (hoursBeforeWarning = 24) => {
       const hoursUntilExpiry = (expiresAt - now) / (1000 * 60 * 60);
 
       if (hoursUntilExpiry <= hoursBeforeWarning && hoursUntilExpiry > 0) {
+        // ✅ Log uniquement les expirations imminentes (< 6h)
+        if (hoursUntilExpiry <= 6) {
+          console.warn(`⚠️ PATIENT_EXPIRY: Token expire bientôt - Patient: ${req.patient?.id} - ${Math.round(hoursUntilExpiry)}h restantes`);
+        }
+        
         // Ajouter un warning dans la réponse
         req.expiryWarning = {
           message: `Votre accès au chat expire dans ${Math.round(hoursUntilExpiry)} heures`,
@@ -150,21 +166,28 @@ const checkTokenExpiry = (hoursBeforeWarning = 24) => {
 
       next();
     } catch (error) {
-      console.error('Erreur vérification expiration:', error);
+      console.error(`❌ PATIENT_EXPIRY: Erreur vérification - ${error.message}`);
       next(); // Continuer même en cas d'erreur
     }
   };
 };
 
 /**
- * Middleware pour logger les accès des patients (optionnel)
+ * Middleware pour logger les accès des patients (À UTILISER AVEC PARCIMONIE)
+ * ⚠️ Recommandé uniquement pour debug ou monitoring spécifique
  */
 const logPatientAccess = (req, res, next) => {
-  const timestamp = new Date().toISOString();
-  const ip = req.ip || req.connection.remoteAddress;
-  const userAgent = req.get('User-Agent');
+  // ✅ Log uniquement en cas de problème ou pour audit sécurité
+  const suspicious = req.get('User-Agent')?.includes('bot') || 
+                    req.ip?.includes('suspicious_pattern');
   
-  console.log(`[${timestamp}] Patient Access - ID: ${req.patient?.id}, IP: ${ip}, Programme: ${req.programme?.id}, UserAgent: ${userAgent}`);
+  if (suspicious || process.env.LOG_PATIENT_ACCESS === 'true') {
+    const timestamp = new Date().toISOString();
+    const ip = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get('User-Agent');
+    
+    console.log(`🔍 PATIENT_ACCESS: ID:${req.patient?.id} IP:${ip} Programme:${req.programme?.id} UA:${userAgent?.substring(0, 50)}`);
+  }
   
   next();
 };
