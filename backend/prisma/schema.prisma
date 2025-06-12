@@ -63,18 +63,20 @@ model Programme {
   dateDebut   DateTime  @default(now())
   dateFin     DateTime
   isArchived  Boolean   @default(false)
+  archivedAt  DateTime? // Date d'archivage (pour suppression après 6 mois)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   patientId   Int
   patient     Patient   @relation(fields: [patientId], references: [id])
 
-  exercices   ExerciceProgramme[]
+  exercices    ExerciceProgramme[]
+  chatSessions ChatSession[]
 }
 
 model ExerciceProgramme {
   id               Int             @id @default(autoincrement())
-  programme        Programme       @relation(fields: [programmeId], references: [id])
+  programme        Programme       @relation(fields: [programmeId], references: [id], onDelete: Cascade)
   programmeId      Int
   exerciceModele   ExerciceModele @relation(fields: [exerciceModeleId], references: [id])
   exerciceModeleId Int
@@ -93,15 +95,17 @@ model ChatSession {
   message     String   // Le contenu du message
   role        ChatRole // Qui a envoyé le message
   createdAt   DateTime @default(now())
-  sessionDate DateTime @default(now()) @db.Date // Date de la session (sans heure)
   
-  // Relation avec le patient
+  // Relations avec le patient ET le programme
   patientId   Int
   patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   
+  programmeId Int
+  programme   Programme @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  
   // Index pour optimiser les requêtes
-  @@index([patientId, sessionDate])
-  @@index([sessionDate]) // Pour le nettoyage automatique
+  @@index([patientId, programmeId])
+  @@index([programmeId])
   @@map("chat_sessions")
 }
 

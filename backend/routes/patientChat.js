@@ -6,16 +6,13 @@ const { generateChatResponse, generateWelcomeMessage } = require('../services/op
 
 const prisma = new PrismaClient();
 
-// Fonctions utilitaires pour l'historique
-const getTodayChatHistory = async (patientId) => {
+// Fonctions utilitaires pour l'historique lié aux programmes
+const getProgramChatHistory = async (patientId, programmeId) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     const history = await prisma.chatSession.findMany({
       where: {
         patientId: parseInt(patientId),
-        sessionDate: today
+        programmeId: parseInt(programmeId)
       },
       orderBy: {
         createdAt: 'asc'
@@ -38,17 +35,14 @@ const getTodayChatHistory = async (patientId) => {
   }
 };
 
-const saveChatMessage = async (patientId, message, role) => {
+const saveChatMessage = async (patientId, programmeId, message, role) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     return await prisma.chatSession.create({
       data: {
         message,
         role: role.toUpperCase(),
         patientId: parseInt(patientId),
-        sessionDate: today
+        programmeId: parseInt(programmeId)
       }
     });
   } catch (error) {
@@ -85,14 +79,23 @@ router.post('/chat/:token',
       }
 
       const patientId = req.patient.id;
+      const programmeId = req.programme.id;
 
-      // 1. Récupérer l'historique du jour depuis la base de données
-      const chatHistory = await getTodayChatHistory(patientId);
+      // Vérifier que le programme n'est pas archivé
+      if (req.programme.isArchived) {
+        return res.status(400).json({
+          success: false,
+          error: 'Ce programme est archivé. Vous ne pouvez plus envoyer de messages.'
+        });
+      }
+
+      // 1. Récupérer l'historique du programme
+      const chatHistory = await getProgramChatHistory(patientId, programmeId);
 
       // 2. Sauvegarder le message utilisateur
-      await saveChatMessage(patientId, message.trim(), 'USER');
+      await saveChatMessage(patientId, programmeId, message.trim(), 'USER');
 
-      // 3. Appel au service OpenAI avec l'historique récupéré
+      // 3. Appel au service OpenAI avec l'historique du programme
       const chatResponse = await generateChatResponse(
         req.patient,
         [req.programme],
@@ -109,7 +112,7 @@ router.post('/chat/:token',
       }
 
       // 4. Sauvegarder la réponse de l'IA
-      await saveChatMessage(patientId, chatResponse.message, 'ASSISTANT');
+      await saveChatMessage(patientId, programmeId, chatResponse.message, 'ASSISTANT');
 
       // 5. Construire la réponse
       const response = {
@@ -124,7 +127,8 @@ router.post('/chat/:token',
         programme: {
           id: req.programme.id,
           titre: req.programme.titre,
-          duree: req.programme.duree
+          duree: req.programme.duree,
+          isArchived: req.programme.isArchived
         },
         timestamp: new Date().toISOString()
       };
@@ -149,7 +153,7 @@ router.post('/chat/:token',
 
 /**
  * GET /api/patient/welcome/:token
- * Récupérer le message d'accueil personnalisé OU l'historique existant
+ * Récupérer le message d'accueil personnalisé OU l'historique existant du programme
  */
 router.get('/welcome/:token',
   authenticatePatient,
@@ -157,12 +161,41 @@ router.get('/welcome/:token',
   async (req, res) => {
     try {
       const patientId = req.patient.id;
+      const programmeId = req.programme.id;
 
-      // Vérifier s'il y a déjà un historique aujourd'hui
-      const existingHistory = await getTodayChatHistory(patientId);
+      // Vérifier si le programme est archivé
+      if (req.programme.isArchived) {
+        const response = {
+          success: true,
+          hasHistory: false,
+          isArchived: true,
+          welcomeMessage: `Ce programme "${req.programme.titre}" est archivé. Vous ne pouvez plus interagir avec le chat. Contactez votre kinésithérapeute pour un nouveau programme.`,
+          patient: {
+            id: req.patient.id,
+            nom: `${req.patient.firstName} ${req.patient.lastName}`,
+            age: calculateAge(req.patient.birthDate)
+          },
+          programme: {
+            id: req.programme.id,
+            titre: req.programme.titre,
+            description: req.programme.description,
+            duree: req.programme.duree,
+            dateFin: req.programme.dateFin,
+            isArchived: true,
+            archivedAt: req.programme.archivedAt,
+            exerciceCount: req.programme.exercices?.length || 0
+          },
+          timestamp: new Date().toISOString()
+        };
+
+        return res.json(response);
+      }
+
+      // Vérifier s'il y a déjà un historique pour ce programme
+      const existingHistory = await getProgramChatHistory(patientId, programmeId);
 
       if (existingHistory.length > 0) {
-        // Retourner l'historique existant
+        // Retourner l'historique existant du programme
         const response = {
           success: true,
           hasHistory: true,
@@ -178,6 +211,7 @@ router.get('/welcome/:token',
             description: req.programme.description,
             duree: req.programme.duree,
             dateFin: req.programme.dateFin,
+            isArchived: req.programme.isArchived,
             exerciceCount: req.programme.exercices?.length || 0
           },
           timestamp: new Date().toISOString()
@@ -190,7 +224,7 @@ router.get('/welcome/:token',
         return res.json(response);
       }
 
-      // Sinon, générer un nouveau message d'accueil
+      // Sinon, générer un nouveau message d'accueil pour ce programme
       const welcomeResponse = await generateWelcomeMessage(
         req.patient,
         [req.programme]
@@ -198,7 +232,7 @@ router.get('/welcome/:token',
 
       // Sauvegarder le message d'accueil
       if (welcomeResponse.success) {
-        await saveChatMessage(patientId, welcomeResponse.message, 'ASSISTANT');
+        await saveChatMessage(patientId, programmeId, welcomeResponse.message, 'ASSISTANT');
       }
 
       const response = {
@@ -217,6 +251,7 @@ router.get('/welcome/:token',
           description: req.programme.description,
           duree: req.programme.duree,
           dateFin: req.programme.dateFin,
+          isArchived: req.programme.isArchived,
           exerciceCount: req.programme.exercices?.length || 0
         },
         timestamp: new Date().toISOString()
@@ -242,14 +277,15 @@ router.get('/welcome/:token',
 
 /**
  * GET /api/patient/chat-history/:token
- * Récupérer l'historique du chat du jour (nouvelle route)
+ * Récupérer l'historique du chat du programme
  */
 router.get('/chat-history/:token',
   authenticatePatient,
   async (req, res) => {
     try {
       const patientId = req.patient.id;
-      const history = await getTodayChatHistory(patientId);
+      const programmeId = req.programme.id;
+      const history = await getProgramChatHistory(patientId, programmeId);
 
       res.json({
         success: true,
@@ -258,6 +294,11 @@ router.get('/chat-history/:token',
         patient: {
           id: req.patient.id,
           nom: `${req.patient.firstName} ${req.patient.lastName}`
+        },
+        programme: {
+          id: req.programme.id,
+          titre: req.programme.titre,
+          isArchived: req.programme.isArchived
         }
       });
 
@@ -288,6 +329,8 @@ router.get('/programme/:token',
           description: req.programme.description,
           duree: req.programme.duree,
           dateFin: req.programme.dateFin,
+          isArchived: req.programme.isArchived,
+          archivedAt: req.programme.archivedAt,
           exercices: req.programme.exercices.map(ex => ({
             id: ex.id,
             nom: ex.exerciceModele?.nom,
@@ -336,7 +379,8 @@ router.post('/validate/:token',
       },
       programme: {
         id: req.programme.id,
-        titre: req.programme.titre
+        titre: req.programme.titre,
+        isArchived: req.programme.isArchived
       },
       tokenInfo: {
         expiresAt: req.tokenData.expiresAt,

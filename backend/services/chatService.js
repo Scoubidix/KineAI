@@ -4,16 +4,13 @@ const { generateChatResponse, generateWelcomeMessage } = require('./openaiServic
 
 const prisma = new PrismaClient();
 
-// Récupérer l'historique de chat du jour pour un patient
-const getTodayChatHistory = async (patientId) => {
+// Récupérer l'historique de chat pour un programme spécifique
+const getProgramChatHistory = async (patientId, programmeId) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     const history = await prisma.chatSession.findMany({
       where: {
         patientId: parseInt(patientId),
-        sessionDate: today
+        programmeId: parseInt(programmeId)
       },
       orderBy: {
         createdAt: 'asc'
@@ -38,18 +35,15 @@ const getTodayChatHistory = async (patientId) => {
   }
 };
 
-// Sauvegarder un message de chat
-const saveChatMessage = async (patientId, message, role) => {
+// Sauvegarder un message de chat lié au programme
+const saveChatMessage = async (patientId, programmeId, message, role) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     return await prisma.chatSession.create({
       data: {
         message,
         role: role.toUpperCase(), // USER, ASSISTANT, SYSTEM
         patientId: parseInt(patientId),
-        sessionDate: today
+        programmeId: parseInt(programmeId)
       }
     });
   } catch (error) {
@@ -62,12 +56,20 @@ const saveChatMessage = async (patientId, message, role) => {
 const processChatMessage = async (patientData, programmes, userMessage) => {
   try {
     const patientId = patientData.id;
+    const programmeId = programmes[0]?.id; // Un seul programme par patient
 
-    // 1. Récupérer l'historique du jour
-    const chatHistory = await getTodayChatHistory(patientId);
+    if (!programmeId) {
+      return {
+        success: false,
+        error: 'Aucun programme actif trouvé pour ce patient.'
+      };
+    }
+
+    // 1. Récupérer l'historique du programme
+    const chatHistory = await getProgramChatHistory(patientId, programmeId);
 
     // 2. Sauvegarder le message utilisateur
-    await saveChatMessage(patientId, userMessage, 'USER');
+    await saveChatMessage(patientId, programmeId, userMessage, 'USER');
 
     // 3. Générer la réponse IA
     const aiResponse = await generateChatResponse(
@@ -79,7 +81,7 @@ const processChatMessage = async (patientData, programmes, userMessage) => {
 
     // 4. Sauvegarder la réponse IA si succès
     if (aiResponse.success) {
-      await saveChatMessage(patientId, aiResponse.message, 'ASSISTANT');
+      await saveChatMessage(patientId, programmeId, aiResponse.message, 'ASSISTANT');
     }
 
     return aiResponse;
@@ -98,26 +100,34 @@ const processChatMessage = async (patientData, programmes, userMessage) => {
 const initializeChatSession = async (patientData, programmes) => {
   try {
     const patientId = patientData.id;
+    const programmeId = programmes[0]?.id;
 
-    // Vérifier s'il y a déjà des messages aujourd'hui
-    const existingHistory = await getTodayChatHistory(patientId);
+    if (!programmeId) {
+      return {
+        success: false,
+        error: 'Aucun programme actif trouvé pour ce patient.'
+      };
+    }
+
+    // Vérifier s'il y a déjà des messages pour ce programme
+    const existingHistory = await getProgramChatHistory(patientId, programmeId);
     
     if (existingHistory.length > 0) {
-      // Retourner l'historique existant
+      // Retourner l'historique existant du programme
       return {
         success: true,
         hasHistory: true,
         history: existingHistory,
-        message: "Session de chat restaurée"
+        message: "Session de chat restaurée pour ce programme"
       };
     }
 
-    // Générer message de bienvenue
+    // Générer message de bienvenue pour le nouveau programme
     const welcomeResponse = await generateWelcomeMessage(patientData, programmes);
     
     if (welcomeResponse.success) {
       // Sauvegarder le message de bienvenue
-      await saveChatMessage(patientId, welcomeResponse.message, 'ASSISTANT');
+      await saveChatMessage(patientId, programmeId, welcomeResponse.message, 'ASSISTANT');
     }
 
     return {
@@ -137,40 +147,161 @@ const initializeChatSession = async (patientData, programmes) => {
   }
 };
 
-// Nettoyer les anciennes sessions (à exécuter quotidiennement)
-const cleanupOldChatSessions = async () => {
+// Archiver un programme et marquer la date d'archivage
+const archiveProgram = async (programmeId) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const result = await prisma.chatSession.deleteMany({
-      where: {
-        sessionDate: {
-          lt: today
-        }
+    const result = await prisma.programme.update({
+      where: { id: parseInt(programmeId) },
+      data: {
+        isArchived: true,
+        archivedAt: new Date()
       }
     });
 
-    console.log(`Nettoyage chat: ${result.count} messages supprimés`);
-    return result.count;
-
+    console.log(`📦 Programme ${programmeId} archivé avec ses conversations`);
+    return result;
   } catch (error) {
-    console.error('Erreur nettoyage chat sessions:', error);
+    console.error('Erreur archivage programme:', error);
     throw error;
   }
 };
 
-// Obtenir les statistiques de chat pour un patient
-const getChatStats = async (patientId) => {
+// Nettoyer les programmes et conversations archivés depuis plus de 6 mois
+const cleanupArchivedPrograms = async () => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
+    // Trouver les programmes archivés depuis plus de 6 mois
+    const oldArchivedPrograms = await prisma.programme.findMany({
+      where: {
+        isArchived: true,
+        archivedAt: {
+          lt: sixMonthsAgo
+        }
+      },
+      select: { id: true, titre: true, archivedAt: true }
+    });
+
+    if (oldArchivedPrograms.length === 0) {
+      console.log('🧹 Aucun programme archivé à supprimer (< 6 mois)');
+      return { programs: 0, messages: 0 };
+    }
+
+    // Compter les messages à supprimer
+    const messageCount = await prisma.chatSession.count({
+      where: {
+        programmeId: {
+          in: oldArchivedPrograms.map(p => p.id)
+        }
+      }
+    });
+
+    // Supprimer un par un pour gérer les contraintes (pas de deleteMany)
+    let deletedPrograms = 0;
+    const deletedDetails = [];
+
+    for (const program of oldArchivedPrograms) {
+      try {
+        // Supprimer le programme individuellement (cascade fonctionnera)
+        await prisma.programme.delete({
+          where: { id: program.id }
+        });
+        
+        deletedPrograms++;
+        deletedDetails.push({
+          id: program.id,
+          titre: program.titre,
+          archivedAt: program.archivedAt
+        });
+        
+        console.log(`🗑️ Programme supprimé: "${program.titre}" (ID: ${program.id})`);
+      } catch (deleteError) {
+        console.error(`❌ Erreur suppression programme ${program.id}:`, deleteError.message);
+      }
+    }
+
+    console.log(`🗑️ Suppression définitive: ${deletedPrograms} programmes et ${messageCount} messages (archivés > 6 mois)`);
+    
+    return {
+      programs: deletedPrograms,
+      messages: messageCount,
+      details: deletedDetails
+    };
+
+  } catch (error) {
+    console.error('❌ Erreur nettoyage programmes archivés:', error);
+    throw error;
+  }
+};
+
+// Nettoyer les programmes terminés (les archiver)
+const archiveFinishedPrograms = async () => {
+  try {
+    const now = new Date();
+    
+    // Trouver tous les programmes terminés non archivés
+    const finishedPrograms = await prisma.programme.findMany({
+      where: {
+        dateFin: {
+          lt: now
+        },
+        isArchived: false
+      },
+      select: { id: true, titre: true, dateFin: true }
+    });
+
+    if (finishedPrograms.length === 0) {
+      console.log('📋 Aucun programme terminé à archiver');
+      return 0;
+    }
+
+    // Archiver tous les programmes terminés
+    const result = await prisma.programme.updateMany({
+      where: {
+        id: {
+          in: finishedPrograms.map(p => p.id)
+        }
+      },
+      data: {
+        isArchived: true,
+        archivedAt: now
+      }
+    });
+
+    console.log(`📦 ${result.count} programmes terminés archivés avec leurs conversations`);
+    
+    // Compter les messages associés
+    const messageCount = await prisma.chatSession.count({
+      where: {
+        programmeId: {
+          in: finishedPrograms.map(p => p.id)
+        }
+      }
+    });
+
+    console.log(`💬 ${messageCount} messages de chat archivés avec les programmes`);
+
+    return {
+      programs: result.count,
+      messages: messageCount,
+      details: finishedPrograms
+    };
+
+  } catch (error) {
+    console.error('❌ Erreur archivage programmes terminés:', error);
+    throw error;
+  }
+};
+
+// Obtenir les statistiques de chat pour un patient/programme
+const getChatStats = async (patientId, programmeId) => {
+  try {
     const stats = await prisma.chatSession.groupBy({
       by: ['role'],
       where: {
         patientId: parseInt(patientId),
-        sessionDate: today
+        programmeId: parseInt(programmeId)
       },
       _count: {
         id: true
@@ -188,11 +319,40 @@ const getChatStats = async (patientId) => {
   }
 };
 
+// Supprimer manuellement un programme et ses conversations
+const deleteProgramAndChats = async (programmeId) => {
+  try {
+    // Compter les messages avant suppression
+    const messageCount = await prisma.chatSession.count({
+      where: { programmeId: parseInt(programmeId) }
+    });
+
+    // Supprimer le programme (cascade supprimera les chats automatiquement)
+    const result = await prisma.programme.delete({
+      where: { id: parseInt(programmeId) }
+    });
+
+    console.log(`🗑️ Programme ${programmeId} supprimé avec ${messageCount} messages de chat`);
+    
+    return {
+      program: result,
+      messagesDeleted: messageCount
+    };
+
+  } catch (error) {
+    console.error('❌ Erreur suppression programme et chats:', error);
+    throw error;
+  }
+};
+
 module.exports = {
-  getTodayChatHistory,
+  getProgramChatHistory,
   saveChatMessage,
   processChatMessage,
   initializeChatSession,
-  cleanupOldChatSessions,
-  getChatStats
+  archiveProgram,
+  cleanupArchivedPrograms,
+  archiveFinishedPrograms,
+  getChatStats,
+  deleteProgramAndChats
 };
