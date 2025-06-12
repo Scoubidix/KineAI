@@ -52,12 +52,6 @@ const cleanupOldArchivedProgramsTask = async () => {
 const startProgramCleanupCron = () => {
   console.log(`🚀 [${new Date().toISOString()}] Initialisation du système d'archivage des programmes...`);
   
-  // Test immédiat pour debug (peut être commenté en production)
-  console.log('🧪 Test archivage immédiat...');
-  archiveFinishedProgramsTask().catch(err => {
-    console.error('❌ Erreur test archivage:', err);
-  });
-
   // Tâche quotidienne à 2h du matin : archiver les programmes terminés
   cron.schedule('0 2 * * *', async () => {
     try {
@@ -82,12 +76,6 @@ const startProgramCleanupCron = () => {
   }, {
     timezone: "Europe/Paris",
     scheduled: true
-  });
-
-  // Cron de test toutes les minutes (à supprimer en production)
-  cron.schedule('* * * * *', () => {
-    const now = new Date();
-    console.log(`⏰ Test cron archivage: ${now.toLocaleString('fr-FR')}`);
   });
 
   console.log('📅 Système d\'archivage programmé:');
