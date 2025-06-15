@@ -15,6 +15,7 @@ const programmeAdminRoutes = require('./routes/programmeAdmin'); // NOUVEAU
 const exerciceRoutes = require('./routes/exercices');
 const testOpenAIRoutes = require('./routes/testOpenAI');
 const patientChatRoutes = require('./routes/patientChat');
+const chatKineRoutes = require('./routes/chatKine'); // NOUVEAU - Chat Kiné
 
 const app = express();
 const prisma = new PrismaClient();
@@ -112,6 +113,7 @@ app.use('/admin/programmes', programmeAdminRoutes); // NOUVEAU - Routes admin
 app.use('/exercices', exerciceRoutes);
 app.use('/api/test', testOpenAIRoutes);
 app.use('/api/patient', patientChatRoutes);
+app.use('/api/chat/kine', chatKineRoutes); // NOUVEAU - Chat Kiné Personnel
 
 // Routes de test pour le système d'archivage (à supprimer en production)
 app.get('/test-archive-finished', async (req, res) => {
@@ -137,10 +139,16 @@ app.get('/test-cleanup-archived', async (req, res) => {
 // Route racine
 app.get('/', (req, res) => {
   res.json({
-    message: 'Bienvenue sur l API KineAI - Système d\'archivage des programmes activé',
+    message: 'Bienvenue sur l API KineAI - Système d\'archivage des programmes activé + Chat Kiné Personnel',
     timestamp: new Date().toISOString(),
-    version: '2.0',
-    status: 'running'
+    version: '2.1',
+    status: 'running',
+    features: [
+      'Patient Chat',
+      'Programme Management', 
+      'Auto Archive System',
+      'Kiné Personal AI Assistant' // NOUVEAU
+    ]
   });
 });
 
@@ -159,4 +167,5 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 KineAI Backend running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+  console.log(`🤖 Chat Kiné available at: /api/chat/kine`);
 });

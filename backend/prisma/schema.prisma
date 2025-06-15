@@ -20,8 +20,9 @@ model Kine {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  patients       Patient[]
+  patients         Patient[]
   exercicesModeles ExerciceModele[]
+  chatKine         ChatKine[]        // Nouvelle relation pour le chat kiné
 }
 
 model Patient {
@@ -107,6 +108,22 @@ model ChatSession {
   @@index([patientId, programmeId])
   @@index([programmeId])
   @@map("chat_sessions")
+}
+
+// NOUVELLE TABLE pour les conversations kiné
+model ChatKine {
+  id          Int      @id @default(autoincrement())
+  message     String   // Question du kiné
+  response    String   // Réponse de l'IA
+  createdAt   DateTime @default(now())
+  
+  // Relation avec le kiné
+  kineId      Int
+  kine        Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  
+  // Index pour optimiser les requêtes par kiné et date
+  @@index([kineId, createdAt])
+  @@map("chat_kine")
 }
 
 enum ChatRole {
