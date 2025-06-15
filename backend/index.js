@@ -75,6 +75,34 @@ app.get('/api/test-env', (req, res) => {
   });
 });
 
+// Debug base de données - Comparaison local vs Cloud Run
+app.get('/api/debug-db', async (req, res) => {
+  try {
+    // Vérifier la connexion
+    const dbInfo = await prisma.$queryRaw`SELECT current_database(), current_schema(), version()`;
+    
+    // Lister toutes les tables
+    const tables = await prisma.$queryRaw`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+    `;
+    
+    res.json({
+      database: dbInfo,
+      tables: tables,
+      tableCount: tables.length,
+      databaseUrl: process.env.DATABASE_URL?.replace(/:[^:@]*@/, ':***@'), // Masque le mot de passe
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // ========== ROUTES PRINCIPALES ==========
 
 app.use('/kine', kinesRoutes);
