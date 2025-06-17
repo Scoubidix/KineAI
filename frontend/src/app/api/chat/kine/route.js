@@ -58,8 +58,10 @@ export async function GET(request) {
 }
 
 export async function DELETE(request) {
+  console.log('🗑️ DELETE appelé !'); // ← Debug log
   try {
     const authHeader = request.headers.get('authorization');
+    console.log('Auth header:', authHeader); // ← Debug log
     
     const response = await fetch(`${BACKEND_URL}/api/chat/kine/history`, {
       method: 'DELETE',
@@ -68,6 +70,8 @@ export async function DELETE(request) {
       }
     });
 
+    console.log('Backend response status:', response.status); // ← Debug log
+
     if (!response.ok) {
       const error = await response.text();
       console.error('❌ Erreur backend suppression:', error);
@@ -75,6 +79,7 @@ export async function DELETE(request) {
     }
 
     const data = await response.json();
+    console.log('✅ Suppression réussie:', data); // ← Debug log
     return NextResponse.json(data);
   } catch (error) {
     console.error('❌ Erreur API Route DELETE:', error);
