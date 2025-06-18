@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Wand2, History, Trash2, Send, Loader2, CheckCircle, Database } from 'lucide-react';
+import { Wand2, History, Trash2, Send, Loader2, CheckCircle, Target, BookOpen } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 
@@ -17,16 +17,23 @@ interface ChatMessage {
   createdAt: string;
 }
 
+interface Source {
+  title: string;
+  category: string;
+  similarity: string;
+  confidence: number;
+  relevanceLevel: string;
+  rank: number;
+  preview?: string;
+}
+
 interface HistoryMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  sources?: Array<{
-    title: string;
-    category: string;
-    similarity: string;
-  }>;
+  sources?: Source[];
   enhanced?: boolean;
+  confidence?: number;
 }
 
 export default function KineChatbotPage() {
@@ -36,35 +43,28 @@ export default function KineChatbotPage() {
   const [chatMessages, setChatMessages] = useState<HistoryMessage[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   
-  // Base URL de l'API - URL relative pour utiliser automatiquement le même serveur
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
   
-  // Référence pour le conteneur de messages et le scroll automatique
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastBotMessageRef = useRef<HTMLDivElement>(null);
 
-  // Charger l'historique au montage du composant
   useEffect(() => {
     loadHistory();
   }, []);
 
-  // Scroll automatique vers le bas SEULEMENT dans la zone de chat
   useEffect(() => {
     scrollToBottom();
   }, [chatMessages]);
 
-  // Scroll spécifique quand l'indicateur de frappe change
   useEffect(() => {
     if (isSending) {
-      // Quand on commence à taper, scroll vers la fin
       scrollToBottom();
     }
   }, [isSending]);
 
   const scrollToBottom = () => {
     if (messagesContainerRef.current && messagesEndRef.current) {
-      // Scroll uniquement dans le conteneur des messages, pas toute la page
       messagesEndRef.current.scrollIntoView({ 
         behavior: 'smooth',
         block: 'end',
@@ -75,7 +75,6 @@ export default function KineChatbotPage() {
 
   const scrollToBotMessage = () => {
     if (messagesContainerRef.current && lastBotMessageRef.current) {
-      // Scroll vers le début de la réponse du bot
       lastBotMessageRef.current.scrollIntoView({ 
         behavior: 'smooth',
         block: 'start',
@@ -87,6 +86,63 @@ export default function KineChatbotPage() {
   const getAuthToken = async () => {
     const auth = getAuth(app);
     return await auth.currentUser?.getIdToken();
+  };
+
+  const areSourcesRelevant = (sources: Source[], userQuestion: string) => {
+    if (!sources || sources.length === 0) return false;
+    
+    const questionLower = userQuestion.toLowerCase();
+    
+    const anatomicalKeywords = [
+      'épaule', 'epaule', 'shoulder',
+      'genou', 'knee', 
+      'cheville', 'ankle', 
+      'dos', 'back', 'lombalgie', 'lombaire',
+      'cervical', 'cou', 'neck',
+      'coude', 'elbow',
+      'poignet', 'wrist',
+      'hanche', 'hip',
+      'achille', 'tendon',
+      'main', 'hand',
+      'pied', 'foot'
+    ];
+    
+    const questionAnatomy = anatomicalKeywords.filter(keyword => 
+      questionLower.includes(keyword)
+    );
+    
+    if (questionAnatomy.length === 0) {
+      const MIN_CONFIDENCE_THRESHOLD = 85;
+      return sources.some(source => source.confidence >= MIN_CONFIDENCE_THRESHOLD);
+    }
+    
+    const relevantSources = sources.filter(source => {
+      const sourceText = (source.title + ' ' + source.category).toLowerCase();
+      
+      const hasAnatomicalMatch = questionAnatomy.some(anatomy => 
+        sourceText.includes(anatomy)
+      );
+      
+      const hasDecentScore = source.confidence >= 70;
+      
+      return hasAnatomicalMatch && hasDecentScore;
+    });
+    
+    return relevantSources.length > 0;
+  };
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 90) return 'text-green-600 bg-green-50';
+    if (confidence >= 80) return 'text-blue-600 bg-blue-50';
+    if (confidence >= 70) return 'text-yellow-600 bg-yellow-50';
+    return 'text-gray-600 bg-gray-50';
+  };
+
+  const getConfidenceIcon = (confidence: number) => {
+    if (confidence >= 90) return <Target className="w-3 h-3" />;
+    if (confidence >= 80) return <CheckCircle className="w-3 h-3" />;
+    if (confidence >= 70) return <BookOpen className="w-3 h-3" />;
+    return <Wand2 className="w-3 h-3" />;
   };
 
   const loadHistory = async () => {
@@ -103,7 +159,6 @@ export default function KineChatbotPage() {
       if (data.success) {
         setHistory(data.history);
         
-        // Convertir l'historique en format chat SEULEMENT au chargement initial
         if (chatMessages.length === 0) {
           const chatHistory: HistoryMessage[] = [];
           data.history.reverse().forEach((chat: ChatMessage) => {
@@ -137,16 +192,14 @@ export default function KineChatbotPage() {
       timestamp: new Date().toISOString()
     };
     
-    // Ajouter le message utilisateur immédiatement
     setChatMessages(prev => [...prev, userMessage]);
     const currentMessage = message;
-    setMessage(''); // Vider le champ
+    setMessage('');
     setIsSending(true);
 
     try {
       const token = await getAuthToken();
       
-      // 🔥 CHANGEMENT : Utilise l'endpoint enhanced
       const res = await fetch(`${API_BASE}/api/chat/kine/message-enhanced`, {
         method: 'POST',
         headers: {
@@ -165,25 +218,22 @@ export default function KineChatbotPage() {
       const data = await res.json();
       
       if (data.success) {
-        // Masquer immédiatement l'indicateur de frappe
         setIsSending(false);
         
-        // Ajouter la réponse de l'assistant avec sources
         const assistantMessage: HistoryMessage = {
           role: 'assistant',
-          content: data.message, // Note: "message" pour enhanced au lieu de "response"
+          content: data.message,
           timestamp: new Date().toISOString(),
-          sources: data.sources || undefined,
-          enhanced: data.metadata?.enhanced
+          sources: data.sources && areSourcesRelevant(data.sources, currentMessage) ? data.sources : [],
+          enhanced: data.metadata?.enhanced,
+          confidence: data.confidence
         };
         setChatMessages(prev => [...prev, assistantMessage]);
         
-        // Scroll vers le début de la réponse du bot après un court délai
         setTimeout(() => {
           scrollToBotMessage();
         }, 100);
         
-        // Mettre à jour uniquement les statistiques d'historique en arrière-plan
         const token = await getAuthToken();
         const res = await fetch(`${API_BASE}/api/chat/kine?days=5`, {
           headers: {
@@ -192,13 +242,11 @@ export default function KineChatbotPage() {
         });
         const historyData = await res.json();
         if (historyData.success) {
-          setHistory(historyData.history); // Juste pour les stats, pas pour l'affichage
+          setHistory(historyData.history);
         }
       } else {
-        // Masquer l'indicateur même en cas d'erreur
         setIsSending(false);
         
-        // Message d'erreur
         const errorMessage: HistoryMessage = {
           role: 'assistant',
           content: data.error || 'Erreur lors de la génération de la réponse',
@@ -206,15 +254,12 @@ export default function KineChatbotPage() {
         };
         setChatMessages(prev => [...prev, errorMessage]);
         
-        // Scroll vers le début du message d'erreur
         setTimeout(() => {
           scrollToBotMessage();
         }, 100);
       }
     } catch (error) {
       console.error('Erreur envoi message:', error);
-      
-      // Masquer l'indicateur en cas d'erreur
       setIsSending(false);
       
       const errorMessage: HistoryMessage = {
@@ -224,7 +269,6 @@ export default function KineChatbotPage() {
       };
       setChatMessages(prev => [...prev, errorMessage]);
       
-      // Scroll vers le début du message d'erreur
       setTimeout(() => {
         scrollToBotMessage();
       }, 100);
@@ -239,7 +283,6 @@ export default function KineChatbotPage() {
     try {
       const token = await getAuthToken();
       
-      // Appel vers la route Next.js (proxy) au lieu du backend direct
       const res = await fetch('/api/chat/kine?action=delete', {
         method: 'DELETE',
         headers: {
@@ -252,7 +295,6 @@ export default function KineChatbotPage() {
         return;
       }
       
-      // Vider immédiatement l'affichage
       setHistory([]);
       setChatMessages([]);
     } catch (error) {
@@ -286,10 +328,6 @@ export default function KineChatbotPage() {
                 <div className="flex items-center gap-2">
                   <Wand2 className="text-accent h-6 w-6" />
                   Assistant IA Personnel
-                  <Badge variant="secondary" className="ml-2">
-                    <Database className="w-3 h-3 mr-1" />
-                    Enhanced
-                  </Badge>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-green-500" />
@@ -310,13 +348,12 @@ export default function KineChatbotPage() {
           <div className="lg:col-span-3">
             <Card className="shadow-md min-h-[60vh] max-h-[75vh] flex flex-col">
               
-              {/* Messages - Conteneur avec scroll isolé */}
               <CardContent 
                 ref={messagesContainerRef}
                 className="flex-1 p-6 overflow-y-auto scroll-smooth"
                 style={{ 
                   scrollBehavior: 'smooth',
-                  overflowAnchor: 'none' // Évite le scroll automatique involontaire
+                  overflowAnchor: 'none'
                 }}
               >
                 {isLoadingHistory ? (
@@ -357,24 +394,93 @@ export default function KineChatbotPage() {
                                 : 'bg-muted text-foreground rounded-bl-md'
                             }`}
                           >
-                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                            <div className="prose prose-sm max-w-none">
+                              <div 
+                                className="whitespace-pre-wrap"
+                                dangerouslySetInnerHTML={{
+                                  __html: msg.content
+                                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // **texte** -> gras
+                                    .replace(/\*(.*?)\*/g, '<em>$1</em>') // *texte* -> italique
+                                    .replace(/^- (.*$)/gim, '• $1') // - -> •
+                                    .replace(/^\d+\.\s+(.*$)/gim, '<strong>$1</strong>') // 1. -> gras
+                                    .replace(/\n/g, '<br>') // retours à la ligne
+                                }}
+                              />
+                            </div>
                             
-                            {/* 🆕 Affichage des sources pour les réponses enhanced */}
                             {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
-                              <div className="mt-3 pt-3 border-t border-muted-foreground/20">
-                                <p className="text-xs text-muted-foreground mb-2 font-medium">
-                                  📚 Sources utilisées :
-                                </p>
-                                <div className="space-y-1">
-                                  {msg.sources.map((source, i) => (
-                                    <div key={i} className="text-xs text-muted-foreground">
-                                      <Badge variant="outline" className="text-xs mr-2">
-                                        {source.similarity}
-                                      </Badge>
-                                      <span className="font-medium">{source.title}</span>
-                                      <span className="text-muted-foreground/70"> • {source.category}</span>
-                                    </div>
-                                  ))}
+                              <div className="mt-4 pt-3 border-t border-muted-foreground/20">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <BookOpen className="w-4 h-4 text-muted-foreground" />
+                                  <span className="text-sm font-medium text-muted-foreground">
+                                    Sources consultées ({(() => {
+                                      const grouped = msg.sources.reduce((acc, source) => {
+                                        const baseTitle = source.title.replace(/ - Partie \d+\/\d+$/, '');
+                                        if (!acc[baseTitle]) {
+                                          acc[baseTitle] = [];
+                                        }
+                                        acc[baseTitle].push(source);
+                                        return acc;
+                                      }, {} as Record<string, Source[]>);
+                                      return Object.keys(grouped).length;
+                                    })()} documents) :
+                                  </span>
+                                  {msg.confidence && (
+                                    <Badge variant="outline" className="text-xs">
+                                      Confiance: {Math.round(msg.confidence * 100)}%
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="space-y-2">
+                                  {(() => {
+                                    const grouped = msg.sources.reduce((acc, source) => {
+                                      const baseTitle = source.title.replace(/ - Partie \d+\/\d+$/, '');
+                                      if (!acc[baseTitle]) {
+                                        acc[baseTitle] = [];
+                                      }
+                                      acc[baseTitle].push(source);
+                                      return acc;
+                                    }, {} as Record<string, Source[]>);
+
+                                    const sortedGroups = Object.entries(grouped)
+                                      .map(([baseTitle, sources]) => ({
+                                        baseTitle,
+                                        sources,
+                                        bestConfidence: Math.max(...sources.map(s => s.confidence))
+                                      }))
+                                      .sort((a, b) => b.bestConfidence - a.bestConfidence)
+                                      .slice(0, 3);
+
+                                    return sortedGroups.map(({ baseTitle, sources }, i) => {
+                                      const bestSource = sources.reduce((best, current) => 
+                                        current.confidence > best.confidence ? current : best
+                                      );
+                                      
+                                      return (
+                                        <div key={i} className="text-sm bg-background/50 rounded-lg p-3 border">
+                                          <div className="flex items-center justify-between mb-1">
+                                            <div className="flex items-center gap-2">
+                                              <Badge 
+                                                variant="outline" 
+                                                className={`text-xs ${getConfidenceColor(bestSource.confidence)}`}
+                                              >
+                                                {getConfidenceIcon(bestSource.confidence)}
+                                                {bestSource.similarity}
+                                              </Badge>
+                                              <span className="font-medium text-foreground">{baseTitle}</span>
+                                            </div>
+                                            <Badge variant="secondary" className="text-xs">
+                                              #{i + 1}
+                                            </Badge>
+                                          </div>
+                                          <div className="flex items-center justify-between text-xs">
+                                            <span className="text-muted-foreground">• {bestSource.category}</span>
+                                            <span className="text-muted-foreground">{bestSource.relevanceLevel}</span>
+                                          </div>
+                                        </div>
+                                      );
+                                    });
+                                  })()}
                                 </div>
                               </div>
                             )}
@@ -385,19 +491,12 @@ export default function KineChatbotPage() {
                               }`}>
                                 {formatTime(msg.timestamp)}
                               </p>
-                              {msg.role === 'assistant' && msg.enhanced && (
-                                <Badge variant="secondary" className="text-xs">
-                                  <Database className="w-2 h-2 mr-1" />
-                                  Enhanced
-                                </Badge>
-                              )}
                             </div>
                           </div>
                         </div>
                       );
                     })}
                     
-                    {/* Indicateur de frappe */}
                     {isSending && (
                       <div className="flex justify-start">
                         <div className="bg-muted p-4 rounded-2xl rounded-bl-md">
@@ -409,13 +508,11 @@ export default function KineChatbotPage() {
                       </div>
                     )}
                     
-                    {/* Élément invisible pour le scroll automatique */}
                     <div ref={messagesEndRef} className="h-1" />
                   </div>
                 )}
               </CardContent>
 
-              {/* Zone de saisie - Fixe en bas */}
               <div className="border-t p-4 bg-background">
                 <div className="flex items-end gap-3">
                   <div className="flex-1">
@@ -456,7 +553,7 @@ export default function KineChatbotPage() {
             </Card>
           </div>
 
-          {/* Sidebar avec historique et conseils */}
+          {/* Sidebar */}
           <div className="lg:col-span-1 space-y-4">
             
             {/* Actions rapides */}
@@ -492,7 +589,7 @@ export default function KineChatbotPage() {
             {/* Conseils d'utilisation */}
             <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle className="text-base">💡 Conseils d'utilisation Enhanced</CardTitle>
+                <CardTitle className="text-base">💡 Conseils d'utilisation</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-xs text-muted-foreground space-y-2">
@@ -518,32 +615,6 @@ export default function KineChatbotPage() {
               </CardContent>
             </Card>
 
-            {/* Statut */}
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">🔋 Statut système</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">IA Assistant</span>
-                    <span className="text-green-600 font-medium">✓ Enhanced</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Historique</span>
-                    <span className="text-green-600 font-medium">✓ Synchronisé</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Base docs</span>
-                    <span className="text-green-600 font-medium">✓ Connectée</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Sécurité</span>
-                    <span className="text-green-600 font-medium">✓ Chiffré</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
