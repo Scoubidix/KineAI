@@ -96,12 +96,9 @@ const cleanKineChatTask = async () => {
 
 // Démarrer les tâches automatiques
 const startProgramCleanupCron = () => {
-  console.log(`🚀 [${new Date().toISOString()}] Initialisation du système d'archivage des programmes + chat kiné...`);
-  
-  // Tâche quotidienne à 2h du matin : archiver les programmes terminés
+  // Archivage quotidien - 2h00
   cron.schedule('0 2 * * *', async () => {
     try {
-      console.log('🕐 Tâche quotidienne d\'archivage déclenchée (2h00)');
       await archiveFinishedProgramsTask();
     } catch (error) {
       console.error('❌ Erreur tâche archivage quotidienne:', error);
@@ -111,10 +108,9 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  // NOUVEAU: Tâche quotidienne à 2h30 du matin : nettoyer le chat kiné
+  // Nettoyage chat kiné - 2h30
   cron.schedule('30 2 * * *', async () => {
     try {
-      console.log('💬 Tâche quotidienne de nettoyage chat kiné déclenchée (2h30)');
       await cleanKineChatTask();
     } catch (error) {
       console.error('❌ Erreur tâche nettoyage chat kiné:', error);
@@ -124,10 +120,9 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  // Tâche hebdomadaire le dimanche à 3h : supprimer les programmes archivés > 6 mois
+  // Nettoyage hebdomadaire - 3h00 dimanche
   cron.schedule('0 3 * * 0', async () => {
     try {
-      console.log('🗑️ Tâche hebdomadaire de nettoyage déclenchée (dimanche 3h00)');
       await cleanupOldArchivedProgramsTask();
     } catch (error) {
       console.error('❌ Erreur tâche nettoyage hebdomadaire:', error);
@@ -136,11 +131,6 @@ const startProgramCleanupCron = () => {
     timezone: "Europe/Paris",
     scheduled: true
   });
-
-  console.log('📅 Système d\'archivage programmé:');
-  console.log('   - Archivage quotidien à 2h00 (programmes terminés)');
-  console.log('   - Nettoyage chat kiné à 2h30 (messages > 5 jours)');
-  console.log('   - Nettoyage hebdomadaire dimanche 3h00 (archives > 6 mois)');
 };
 
 // Fonctions de test manuel (pour développement/debug)
