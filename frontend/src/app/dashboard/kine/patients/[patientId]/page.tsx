@@ -3,15 +3,15 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import AppLayout from '@/components/AppLayout';
-import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
-import { Loader2, X, Edit, Trash2, Send, Copy } from 'lucide-react';
-import Image from 'next/image';
+import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Target, Search, Dumbbell, Clock, Activity } from 'lucide-react';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 interface PatientData {
@@ -21,12 +21,14 @@ interface PatientData {
   birthDate: string;
   email: string;
   phone: string;
+  goals?: string;
 }
 
 interface ExerciseOption {
   id: number;
   nom: string;
   isPublic: boolean;
+  tags?: string;
 }
 
 interface ProgrammeExercise {
@@ -61,6 +63,11 @@ function formatDate(birthDateStr: string): string {
   return `${day}/${month}/${year}`;
 }
 
+function parseTagsFromString(tagsString?: string): string[] {
+  if (!tagsString) return [];
+  return tagsString.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+}
+
 export default function PatientDetailPage() {
   const { patientId } = useParams();
   const [patient, setPatient] = useState<PatientData | null>(null);
@@ -84,6 +91,7 @@ export default function PatientDetailPage() {
   const [allExercises, setAllExercises] = useState<ExerciseOption[]>([]);
   const [filteredExercises, setFilteredExercises] = useState<ExerciseOption[]>([]);
   const [selectedExercises, setSelectedExercises] = useState<ProgrammeExercise[]>([]);
+  const [exerciseSearch, setExerciseSearch] = useState('');
   
   // États pour génération de lien
   const [generatingLink, setGeneratingLink] = useState<number | null>(null);
@@ -135,6 +143,20 @@ export default function PatientDetailPage() {
     if (openCreateModal || openEditModal) fetchExercises();
   }, [openCreateModal, openEditModal]);
 
+  const handleExerciseSearch = (query: string) => {
+    setExerciseSearch(query);
+    if (query === '') {
+      setFilteredExercises([]);
+    } else {
+      setFilteredExercises(
+        allExercises.filter(ex => 
+          ex.nom.toLowerCase().includes(query.toLowerCase()) ||
+          (ex.tags && ex.tags.toLowerCase().includes(query.toLowerCase()))
+        )
+      );
+    }
+  };
+
   const handleAddExercise = (exercise: ExerciseOption) => {
     if (selectedExercises.find(e => e.exerciseId === exercise.id)) return;
     setSelectedExercises([
@@ -148,6 +170,8 @@ export default function PatientDetailPage() {
         instructions: '',
       },
     ]);
+    setExerciseSearch('');
+    setFilteredExercises([]);
   };
 
   const handleInputChange = (index: number, field: keyof ProgrammeExercise, value: string | number) => {
@@ -178,6 +202,7 @@ export default function PatientDetailPage() {
     setCreateDuration(1);
     setSelectedExercises([]);
     setFilteredExercises([]);
+    setExerciseSearch('');
   };
 
   const resetEditForm = () => {
@@ -186,6 +211,7 @@ export default function PatientDetailPage() {
     setEditDuration(1);
     setSelectedExercises([]);
     setFilteredExercises([]);
+    setExerciseSearch('');
     setEditingProgramme(null);
   };
 
@@ -329,106 +355,238 @@ export default function PatientDetailPage() {
     const duration = isEdit ? editDuration : createDuration;
     const setDuration = isEdit ? setEditDuration : setCreateDuration;
     const handleSubmit = isEdit ? handleUpdateProgramme : handleCreateProgramme;
-    const modalTitle = isEdit ? "Modifier le programme" : "Créer un programme";
-    const buttonText = isEdit ? "Mettre à jour" : "Créer mon programme";
+    const modalTitle = isEdit ? "Modifier le programme" : "Créer un nouveau programme";
+    const buttonText = isEdit ? "Mettre à jour le programme" : "Créer le programme";
 
     return (
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto">
-        <DialogHeader>
-          <DialogTitle>{modalTitle}</DialogTitle>
+      <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
+        <DialogHeader className="space-y-3 sticky top-0 bg-white dark:bg-gray-900 pb-4 border-b border-gray-200 dark:border-gray-700">
+          <DialogTitle className="text-lg sm:text-xl font-semibold">
+            {modalTitle}
+          </DialogTitle>
+          <div className="h-px bg-gradient-to-r from-blue-500 to-purple-500"></div>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <Label>Titre du programme</Label>
-          <Input placeholder="Titre du programme" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <Label>Description</Label>
-          <Textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
-          <Label>Durée en jours (max 30)</Label>
-          <Input
-            type="number"
-            min={1}
-            max={30}
-            value={duration}
-            onChange={(e) => setDuration(Number(e.target.value))}
-            placeholder="Durée"
-          />
-
-          <div className="pt-4 border-t">
-            <h3 className="font-semibold mb-2">Ajouter un exercice</h3>
-            <Input
-              placeholder="Rechercher un exercice..."
-              onChange={(e) => {
-                const query = e.target.value.toLowerCase();
-                if (query === '') {
-                  setFilteredExercises([]);
-                } else {
-                  setFilteredExercises(
-                    allExercises.filter(ex => ex.nom.toLowerCase().includes(query))
-                  );
-                }
-              }}
-            />
-
-            {filteredExercises.map(ex => (
-              <div key={ex.id} className="flex items-center justify-between mt-2 p-2 border rounded">
-                <span>{ex.nom} {ex.isPublic ? '(Public)' : '(Privé)'}</span>
-                <Button size="sm" onClick={() => handleAddExercise(ex)}>Ajouter</Button>
+        <div className="space-y-4 sm:space-y-6 py-4">
+          {/* Section Informations du programme */}
+          <div className="space-y-3 sm:space-y-4">
+            <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <div className="w-1 h-5 sm:h-6 bg-blue-500 rounded-full"></div>
+              Informations du programme
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="programme-title" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Titre du programme *
+                </Label>
+                <Input 
+                  id="programme-title"
+                  placeholder="Entrez le titre du programme"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
               </div>
-            ))}
-          </div>
-
-          {selectedExercises.map((ex, index) => (
-            <div key={index} className="mt-4 p-4 border rounded space-y-2 bg-gray-50 relative">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="absolute top-2 right-2 text-gray-500 hover:text-red-600"
-                onClick={() => handleRemoveExercise(index)}
-              >
-                <X className="w-4 h-4" />
-              </Button>
-              <h4 className="font-medium">{ex.nom}</h4>
-              <Label>Nombre de séries</Label>
-              <Input
-                type="number"
-                value={ex.series}
-                onChange={(e) => handleInputChange(index, 'series', Number(e.target.value))}
-                placeholder="Séries"
-              />
-              <Label>Nombre de répétitions</Label>
-              <Input
-                type="number"
-                value={ex.repetitions}
-                onChange={(e) => handleInputChange(index, 'repetitions', Number(e.target.value))}
-                placeholder="Répétitions"
-              />
-              <Label>Temps de pause (secondes)</Label>
-              <Input
-                type="number"
-                value={ex.restTime}
-                onChange={(e) => handleInputChange(index, 'restTime', Number(e.target.value))}
-                placeholder="Pause"
-              />
-              <Label>Consignes spécifiques</Label>
-              <Textarea
-                value={ex.instructions}
-                onChange={(e) => handleInputChange(index, 'instructions', e.target.value)}
-                placeholder="Consignes"
-              />
+              
+              <div className="space-y-2">
+                <Label htmlFor="programme-description" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Description *
+                </Label>
+                <Textarea
+                  id="programme-description"
+                  placeholder="Décrivez les objectifs et le contenu du programme..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  rows={3}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="programme-duration" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Durée (jours) *
+                </Label>
+                <Input
+                  id="programme-duration"
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={duration}
+                  onChange={(e) => setDuration(Number(e.target.value))}
+                  placeholder="Durée en jours (max 30)"
+                  className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Durée recommandée : 7-14 jours
+                </p>
+              </div>
             </div>
-          ))}
-        </div>
-
-        {selectedExercises.length > 0 && (
-          <div className="pt-6 border-t">
-            <Button
-              className="w-full bg-green-600 hover:bg-green-700 text-white"
-              onClick={handleSubmit}
-            >
-              {buttonText}
-            </Button>
           </div>
-        )}
+
+          {/* Section Exercices */}
+          <div className="space-y-3 sm:space-y-4">
+            <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <div className="w-1 h-5 sm:h-6 bg-green-500 rounded-full"></div>
+              Exercices du programme
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Rechercher et ajouter des exercices
+                </Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder="Rechercher par nom ou catégorie..."
+                    value={exerciseSearch}
+                    onChange={(e) => handleExerciseSearch(e.target.value)}
+                    className="pl-10 text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                
+                {filteredExercises.length > 0 && (
+                  <div className="max-h-40 overflow-y-auto border rounded-md bg-white dark:bg-gray-800">
+                    {filteredExercises.map(ex => (
+                      <div key={ex.id} className="flex items-center justify-between p-3 border-b last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{ex.nom}</span>
+                            <Badge variant={ex.isPublic ? "default" : "secondary"} className="text-xs">
+                              {ex.isPublic ? 'Public' : 'Privé'}
+                            </Badge>
+                          </div>
+                          {ex.tags && (
+                            <div className="flex gap-1 mt-1">
+                              {parseTagsFromString(ex.tags).slice(0, 2).map(tag => (
+                                <Badge key={tag} variant="outline" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <Button size="sm" onClick={() => handleAddExercise(ex)}>
+                          <Plus className="w-4 h-4 mr-1" />
+                          Ajouter
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Exercices sélectionnés */}
+              {selectedExercises.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Dumbbell className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium">
+                      Exercices sélectionnés ({selectedExercises.length})
+                    </span>
+                  </div>
+                  {selectedExercises.map((ex, index) => (
+                    <div key={index} className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800 relative">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="absolute top-2 right-2 text-gray-500 hover:text-red-600 h-6 w-6"
+                        onClick={() => handleRemoveExercise(index)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                      
+                      <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3 pr-8">
+                        {ex.nom}
+                      </h4>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs font-medium text-gray-600">Séries</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={ex.series}
+                            onChange={(e) => handleInputChange(index, 'series', Number(e.target.value))}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs font-medium text-gray-600">Répétitions</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={ex.repetitions}
+                            onChange={(e) => handleInputChange(index, 'repetitions', Number(e.target.value))}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs font-medium text-gray-600">Pause (sec)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={ex.restTime}
+                            onChange={(e) => handleInputChange(index, 'restTime', Number(e.target.value))}
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3 space-y-1">
+                        <Label className="text-xs font-medium text-gray-600">Consignes spécifiques</Label>
+                        <Textarea
+                          value={ex.instructions}
+                          onChange={(e) => handleInputChange(index, 'instructions', e.target.value)}
+                          placeholder="Instructions particulières pour cet exercice..."
+                          className="text-sm resize-none"
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Section validation */}
+          <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-white dark:bg-gray-900">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => {
+                  if (isEdit) {
+                    setOpenEditModal(false);
+                    resetEditForm();
+                  } else {
+                    setOpenCreateModal(false);
+                    resetCreateForm();
+                  }
+                }}
+                className="flex-1 sm:flex-none text-sm sm:text-base"
+              >
+                Annuler
+              </Button>
+              <Button 
+                onClick={handleSubmit}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
+                disabled={!title || !description || selectedExercises.length === 0}
+              >
+                {buttonText}
+              </Button>
+            </div>
+            
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+              * Champs obligatoires - Au moins un exercice requis
+            </p>
+          </div>
+        </div>
       </DialogContent>
     );
   };
@@ -436,138 +594,269 @@ export default function PatientDetailPage() {
   return (
     <AppLayout>
       <div className="p-6 space-y-6">
-        <Card className="bg-slate-800 text-white p-4">
-          {loading ? (
-            <Loader2 className="animate-spin mx-auto" />
-          ) : patient && (
-            <div className="flex items-start gap-4">
-              <Image src="/default-avatar.jpg" alt="Avatar" width={64} height={64} className="rounded-full border" />
-              <div>
-                <h2 className="text-xl font-bold">{patient.lastName.toUpperCase()} {patient.firstName}</h2>
-                <p>Date de naissance : {formatDate(patient.birthDate)}</p>
-                <p>Âge : {calculateAge(patient.birthDate)} ans</p>
-                <p>Email : {patient.email}</p>
-                <p>Téléphone : {patient.phone}</p>
-              </div>
+        {/* Section profil patient NOUVELLE VERSION */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg overflow-hidden">
+          <div className="relative">
+            {/* Pattern de fond */}
+            <div className="absolute inset-0 bg-black/10">
+              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
             </div>
-          )}
-        </Card>
+            
+            {loading ? (
+              <div className="relative flex items-center justify-center py-6">
+                <Loader2 className="animate-spin w-6 h-6 text-white" />
+              </div>
+            ) : patient && (
+              <div className="relative p-4">
+                {/* Tout dans un seul bloc ultra-compact */}
+                <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <div className="space-y-2">
+                    {/* Ligne 1 : Avatar + Nom */}
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center ring-2 ring-white/30">
+                          <User className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center ring-1 ring-white/30">
+                          <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex-1">
+                        <h1 className="text-xl font-bold text-white leading-tight">
+                          {patient.firstName} {patient.lastName.toUpperCase()}
+                        </h1>
+                        <div className="flex items-center gap-1 text-blue-100">
+                          <Calendar className="w-3 h-3" />
+                          <span className="text-xs">
+                            {calculateAge(patient.birthDate)} ans • {formatDate(patient.birthDate)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Ligne 2 : Email */}
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-white/20 rounded-md flex items-center justify-center">
+                        <Mail className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white text-sm font-medium">{patient.email}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Ligne 3 : Téléphone */}
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-white/20 rounded-md flex items-center justify-center">
+                        <Phone className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white text-sm font-medium">{patient.phone}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Ligne 4 : Objectifs (si présents) */}
+                    {patient.goals && (
+                      <div className="flex items-start gap-2 pt-1 border-t border-white/20">
+                        <div className="w-8 h-8 bg-white/20 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <Target className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-white text-xs leading-relaxed">{patient.goals}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
-        <Card className="border-blue-500 border-2 bg-white rounded-2xl shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <h2 className="text-xl font-semibold text-gray-800">Programmes</h2>
+        {/* Section programmes */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div className="space-y-1">
+              <CardTitle className="text-xl font-semibold flex items-center gap-2">
+                <Activity className="w-5 h-5 text-blue-600" />
+                Programmes d'exercices
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                Gérez les programmes de rééducation de votre patient
+              </p>
+            </div>
             {programmesData.length === 0 && (
               <Dialog open={openCreateModal} onOpenChange={(open) => {
                 setOpenCreateModal(open);
                 if (!open) resetCreateForm();
               }}>
                 <DialogTrigger asChild>
-                  <Button className="bg-blue-500 text-white hover:bg-blue-600">Créer un programme</Button>
+                  <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nouveau programme
+                  </Button>
                 </DialogTrigger>
                 {renderProgrammeModal(false)}
               </Dialog>
             )}
           </CardHeader>
+          
           <CardContent>
             {programmesData.length === 0 ? (
-              <p className="text-gray-600 italic">Aucun programme attribué</p>
+              <div className="text-center py-12">
+                <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Aucun programme créé
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Commencez par créer un programme d'exercices personnalisé pour ce patient
+                </p>
+              </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {programmesData.map((programme: any, index: number) => (
-                  <div key={programme.id || index} className="p-4 border rounded-lg bg-gray-50">
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="font-semibold text-lg">{programme.titre}</h3>
-                      <div className="flex gap-2">
-                        <Dialog open={openEditModal && editingProgramme?.id === programme.id} onOpenChange={(open) => {
-                          setOpenEditModal(open);
-                          if (!open) resetEditForm();
-                        }}>
-                          <DialogTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditProgramme(programme)}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          </DialogTrigger>
-                          {renderProgrammeModal(true)}
-                        </Dialog>
-                        
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Êtes-vous sûr de vouloir supprimer le programme "{programme.titre}" ? Cette action est irréversible.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Annuler</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDeleteProgramme(programme.id)}
-                                className="bg-red-600 hover:bg-red-700"
-                              >
-                                Supprimer
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                    
-                    <p className="text-gray-700 mb-2">{programme.description}</p>
-                    <div className="text-sm text-gray-600 mb-4">
-                      <p>Durée : {programme.duree} jours</p>
-                      {programme.dateFin && (
-                        <p>Date de fin : {new Date(programme.dateFin).toLocaleDateString('fr-FR')}</p>
-                      )}
-                    </div>
-                    
-                    {programme.exercices && programme.exercices.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="font-medium mb-2">Exercices :</h4>
-                        <div className="space-y-2">
-                          {programme.exercices.map((exercise: any, exIndex: number) => (
-                            <div key={exercise.id || exIndex} className="p-3 bg-white border rounded">
-                              <p className="font-medium">{exercise.exerciceModele?.nom || exercise.nom}</p>
-                              <div className="text-sm text-gray-600 mt-1">
-                                <span>{exercise.series} séries × {exercise.repetitions} répétitions</span>
-                                <span className="ml-4">Repos : {exercise.pause || exercise.tempsRepos || exercise.restTime}s</span>
-                              </div>
-                              {(exercise.consigne || exercise.instructions) && (
-                                <p className="text-sm text-gray-700 mt-1 italic">{exercise.consigne || exercise.instructions}</p>
-                              )}
+                  <Card key={programme.id || index} className="border-l-4 border-l-blue-500">
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1">
+                          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                            {programme.titre}
+                          </h3>
+                          <p className="text-gray-700 mb-3">{programme.description}</p>
+                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              <span>{programme.duree} jours</span>
                             </div>
-                          ))}
+                            {programme.dateFin && (
+                              <div className="flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                <span>Fin : {new Date(programme.dateFin).toLocaleDateString('fr-FR')}</span>
+                              </div>
+                            )}
+                            {programme.exercices && (
+                              <div className="flex items-center gap-1">
+                                <Dumbbell className="w-4 h-4" />
+                                <span>{programme.exercices.length} exercice{programme.exercices.length > 1 ? 's' : ''}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Dialog open={openEditModal && editingProgramme?.id === programme.id} onOpenChange={(open) => {
+                            setOpenEditModal(open);
+                            if (!open) resetEditForm();
+                          }}>
+                            <DialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditProgramme(programme)}
+                                className="hover:bg-blue-50 hover:border-blue-200"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            </DialogTrigger>
+                            {renderProgrammeModal(true)}
+                          </Dialog>
+                          
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200">
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Êtes-vous sûr de vouloir supprimer le programme <strong>"{programme.titre}"</strong> ? 
+                                  Cette action est irréversible et supprimera également l'accès chat du patient.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteProgramme(programme.id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Supprimer
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
-                    )}
+                      
+                      {/* Liste des exercices */}
+                      {programme.exercices && programme.exercices.length > 0 && (
+                        <div className="mb-6">
+                          <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                            <Dumbbell className="w-4 h-4 text-blue-600" />
+                            Exercices du programme
+                          </h4>
+                          <div className="grid gap-3">
+                            {programme.exercices.map((exercise: any, exIndex: number) => (
+                              <div key={exercise.id || exIndex} className="p-4 bg-gray-50 border rounded-lg">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <h5 className="font-medium text-gray-900 mb-2">
+                                      {exercise.exerciceModele?.nom || exercise.nom}
+                                    </h5>
+                                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
+                                      <Badge variant="outline" className="text-xs">
+                                        {exercise.series} série{exercise.series > 1 ? 's' : ''}
+                                      </Badge>
+                                      <Badge variant="outline" className="text-xs">
+                                        {exercise.repetitions} rép.
+                                      </Badge>
+                                      <Badge variant="outline" className="text-xs">
+                                        {exercise.pause || exercise.tempsRepos || exercise.restTime}s repos
+                                      </Badge>
+                                    </div>
+                                    {(exercise.consigne || exercise.instructions) && (
+                                      <p className="text-sm text-gray-700 italic bg-blue-50 p-2 rounded border-l-2 border-blue-200">
+                                        💡 {exercise.consigne || exercise.instructions}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
-                    {/* Section centrée pour envoyer le programme */}
-                    <div className="border-t pt-4">
-                      <div className="flex items-center justify-center gap-3">
-                        <Button
-                          variant="outline"
-                          className="text-green-600 hover:text-green-700 border-green-600 hover:border-green-700"
-                          onClick={() => handleGenerateLink(programme.id)}
-                          disabled={generatingLink === programme.id}
-                        >
-                          {generatingLink === programme.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                          ) : (
-                            <Send className="w-4 h-4 mr-2" />
-                          )}
-                          Envoyer le programme à mon patient
-                        </Button>
+                      {/* Bouton d'envoi du programme */}
+                      <div className="border-t pt-4">
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-medium text-green-800 mb-1">
+                                Partager avec le patient
+                              </h4>
+                              <p className="text-sm text-green-700">
+                                Générez un lien sécurisé pour que votre patient accède à son programme via chat
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              className="text-green-700 hover:text-green-800 border-green-300 hover:border-green-400 bg-white hover:bg-green-50"
+                              onClick={() => handleGenerateLink(programme.id)}
+                              disabled={generatingLink === programme.id}
+                            >
+                              {generatingLink === programme.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                              ) : (
+                                <Send className="w-4 h-4 mr-2" />
+                              )}
+                              Générer le lien
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             )}
@@ -576,36 +865,52 @@ export default function PatientDetailPage() {
 
         {/* Modal pour afficher le lien généré */}
         <Dialog open={showLinkModal} onOpenChange={setShowLinkModal}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>Lien de chat généré</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <Send className="w-5 h-5 text-green-600" />
+                Lien de chat généré
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">
-                Lien sécurisé pour que le patient accède à son chat personnalisé :
-              </p>
-              <div className="p-3 bg-gray-100 rounded border text-sm break-all">
-                {generatedLink}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p className="text-sm text-green-800 mb-3">
+                  ✅ Lien sécurisé généré avec succès !
+                </p>
+                <p className="text-xs text-green-700">
+                  Votre patient pourra accéder à son programme personnalisé et poser ses questions via ce lien.
+                </p>
               </div>
-              <div className="flex gap-2">
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Lien à partager :</Label>
+                <div className="p-3 bg-gray-100 rounded-lg border text-sm break-all font-mono">
+                  {generatedLink}
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
                 <Button 
                   onClick={copyLinkToClipboard}
-                  className="flex-1"
-                  variant="outline"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
                 >
                   <Copy className="w-4 h-4 mr-2" />
                   Copier le lien
                 </Button>
                 <Button 
                   onClick={() => setShowLinkModal(false)}
+                  variant="outline"
                   className="flex-1"
                 >
                   Fermer
                 </Button>
               </div>
-              <p className="text-xs text-gray-500">
-                Ce lien expire automatiquement à la fin du programme.
-              </p>
+              
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p className="text-xs text-amber-800">
+                  🔒 <strong>Sécurité :</strong> Ce lien expire automatiquement à la fin du programme et est unique pour ce patient.
+                </p>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

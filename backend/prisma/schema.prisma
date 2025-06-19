@@ -49,7 +49,8 @@ model ExerciceModele {
   kineId      Int
   nom         String
   description String
-  isPublic    Boolean          @default(false)
+  tags        String?  // NOUVEAU : tags séparés par virgules
+  isPublic    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

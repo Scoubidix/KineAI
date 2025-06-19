@@ -5,8 +5,7 @@ const prisma = new PrismaClient();
 // 🔽 GET programmes actifs (pas archivés)
 exports.getProgrammesByPatient = async (req, res) => {
   const patientId = parseInt(req.params.patientId);
-  console.log("patientId reçu :", req.params.patientId);
-  try {
+    try {
     const programmes = await prisma.programme.findMany({
       where: {
         patientId,
