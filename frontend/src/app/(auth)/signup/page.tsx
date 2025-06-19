@@ -7,6 +7,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,7 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { UserPlus, ArrowLeft } from "lucide-react";
+import { UserPlus, ArrowLeft, User, Building, Phone, Mail, Calendar, MapPin, Hash, Lock } from "lucide-react";
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -109,76 +110,297 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background via-secondary/30 to-background p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-accent mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a10 10 0 1 0 10 10h-1.1" />
-            <path d="M18 18.5V13a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v5.5" />
-            <path d="M14 13.5V12a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v1.5" />
-            <path d="M12 12v10" />
-            <path d="m8 16 1.5-1 1.5 1" />
-            <path d="m13 16 1.5-1 1.5 1" />
-            <path d="M9 8h6" />
-            <path d="M9 6h6" />
-          </svg>
-          <CardTitle className="text-2xl font-bold text-primary">Créer un Compte Kiné</CardTitle>
-          <CardDescription>Réservé aux professionnels de santé.</CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSignup}>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">Prénom</Label>
-              <Input id="firstName" name="firstName" placeholder="Jean" onChange={handleChange} required disabled={loading} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Nom</Label>
-              <Input id="lastName" name="lastName" placeholder="Dupont" onChange={handleChange} required disabled={loading} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="birthDate">Date de naissance</Label>
-              <Input id="birthDate" name="birthDate" type="date" onChange={handleChange} required disabled={loading} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Téléphone</Label>
-              <Input id="phone" name="phone" placeholder="0600000000" onChange={handleChange} required disabled={loading} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" placeholder="nom@exemple.com" onChange={handleChange} required disabled={loading} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="adresseCabinet">Adresse du cabinet</Label>
-              <Input id="adresseCabinet" name="adresseCabinet" placeholder="123 Rue de la Santé, Paris" onChange={handleChange} required disabled={loading} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="rpps">Numéro RPPS</Label>
-              <Input id="rpps" name="rpps" placeholder="12345678901" onChange={handleChange} required disabled={loading} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
-              <Input id="password" name="password" type="password" placeholder="********" onChange={handleChange} required disabled={loading} minLength={6} />
-            </div>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-4">
-            <Button type="submit" className="w-full" disabled={loading}>
-              <UserPlus className="mr-2 h-4 w-4" />
-              {loading ? "Création du compte..." : "S'inscrire"}
-            </Button>
-            <div className="text-center text-sm text-muted-foreground">
-              Déjà un compte ?{" "}
-              <Button asChild variant="link" className="p-0 h-auto text-accent">
-                <Link href="/login">Se connecter</Link>
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl space-y-6">
+        
+        {/* Header avec logo et titre */}
+        <div className="text-center space-y-4">
+          {/* Logo */}
+          <div className="flex justify-center">
+            <Image
+              src="/logo.jpg"
+              alt="Mon Assistant Kiné"
+              width={80}
+              height={80}
+              className="mx-auto rounded-xl bg-white p-2 shadow-sm"
+              priority
+            />
+          </div>
+
+          {/* Titre et sous-titre */}
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Mon Assistant Kiné
+            </h1>
+            <p className="text-muted-foreground">
+              Création de compte professionnel
+            </p>
+          </div>
+        </div>
+
+        {/* Card de création de compte */}
+        <Card className="shadow-lg border">
+          <CardHeader className="text-center pb-6">
+            <CardTitle className="text-2xl font-semibold">Créer un Compte Kiné</CardTitle>
+            <CardDescription>
+              Réservé aux professionnels de kinésithérapie certifiés
+            </CardDescription>
+          </CardHeader>
+          
+          <form onSubmit={handleSignup}>
+            <CardContent className="space-y-6">
+              
+              {/* Section Informations personnelles */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-foreground border-b pb-2">
+                  Informations personnelles
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Prénom */}
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName" className="text-sm font-medium">
+                      Prénom
+                    </Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="firstName" 
+                        name="firstName" 
+                        placeholder="Jean" 
+                        value={formData.firstName}
+                        onChange={handleChange} 
+                        className="pl-10 h-12"
+                        required 
+                        disabled={loading} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Nom */}
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName" className="text-sm font-medium">
+                      Nom
+                    </Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="lastName" 
+                        name="lastName" 
+                        placeholder="Dupont" 
+                        value={formData.lastName}
+                        onChange={handleChange} 
+                        className="pl-10 h-12"
+                        required 
+                        disabled={loading} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Date de naissance */}
+                  <div className="space-y-2">
+                    <Label htmlFor="birthDate" className="text-sm font-medium">
+                      Date de naissance
+                    </Label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="birthDate" 
+                        name="birthDate" 
+                        type="date" 
+                        value={formData.birthDate}
+                        onChange={handleChange} 
+                        className="pl-10 h-12"
+                        required 
+                        disabled={loading} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Téléphone */}
+                  <div className="space-y-2">
+                    <Label htmlFor="phone" className="text-sm font-medium">
+                      Téléphone
+                    </Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="phone" 
+                        name="phone" 
+                        placeholder="06 00 00 00 00" 
+                        value={formData.phone}
+                        onChange={handleChange} 
+                        className="pl-10 h-12"
+                        required 
+                        disabled={loading} 
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section Informations professionnelles */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-foreground border-b pb-2">
+                  Informations professionnelles
+                </h3>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  {/* Adresse du cabinet */}
+                  <div className="space-y-2">
+                    <Label htmlFor="adresseCabinet" className="text-sm font-medium">
+                      Adresse du cabinet
+                    </Label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="adresseCabinet" 
+                        name="adresseCabinet" 
+                        placeholder="123 Rue de la Santé, 75013 Paris" 
+                        value={formData.adresseCabinet}
+                        onChange={handleChange} 
+                        className="pl-10 h-12"
+                        required 
+                        disabled={loading} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* RPPS */}
+                  <div className="space-y-2">
+                    <Label htmlFor="rpps" className="text-sm font-medium">
+                      Numéro RPPS
+                    </Label>
+                    <div className="relative">
+                      <Hash className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="rpps" 
+                        name="rpps" 
+                        placeholder="12345678901" 
+                        value={formData.rpps}
+                        onChange={handleChange} 
+                        className="pl-10 h-12"
+                        required 
+                        disabled={loading} 
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section Connexion */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-foreground border-b pb-2">
+                  Informations de connexion
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Email */}
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-sm font-medium">
+                      Adresse email
+                    </Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="email" 
+                        name="email" 
+                        type="email" 
+                        placeholder="nom@exemple.com" 
+                        value={formData.email}
+                        onChange={handleChange} 
+                        className="pl-10 h-12"
+                        required 
+                        disabled={loading} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Mot de passe */}
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-sm font-medium">
+                      Mot de passe
+                    </Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="password" 
+                        name="password" 
+                        type="password" 
+                        placeholder="••••••••" 
+                        value={formData.password}
+                        onChange={handleChange} 
+                        className="pl-10 h-12"
+                        required 
+                        disabled={loading} 
+                        minLength={6} 
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Minimum 6 caractères
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+            </CardContent>
+
+            <CardFooter className="flex flex-col space-y-4 pt-6">
+              
+              {/* Bouton d'inscription */}
+              <Button 
+                type="submit" 
+                disabled={loading} 
+                className="w-full h-12 text-base font-medium"
+                size="lg"
+              >
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Création du compte...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <UserPlus className="h-4 w-4" />
+                    Créer mon compte professionnel
+                  </div>
+                )}
               </Button>
-            </div>
-            <Button asChild variant="outline" size="sm" className="w-full mt-2">
-              <Link href="/">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Retour à l'accueil
-              </Link>
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
+
+              {/* Séparateur */}
+              <div className="relative w-full">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-muted" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">ou</span>
+                </div>
+              </div>
+
+              {/* Liens de navigation */}
+              <div className="flex flex-col sm:flex-row gap-3 w-full">
+                <Button variant="outline" className="flex-1 h-12" asChild>
+                  <Link href="/login">
+                    Déjà un compte ? Se connecter
+                  </Link>
+                </Button>
+                <Button variant="ghost" className="flex-1 h-12" asChild>
+                  <Link href="/">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Retour à l'accueil
+                  </Link>
+                </Button>
+              </div>
+            </CardFooter>
+          </form>
+        </Card>
+
+        {/* Footer */}
+        <div className="text-center text-xs text-muted-foreground space-y-1">
+          <p>© {new Date().getFullYear()} Mon Assistant Kiné</p>
+          <p>Plateforme sécurisée - Données de santé protégées</p>
+        </div>
+      </div>
     </div>
   );
 }
