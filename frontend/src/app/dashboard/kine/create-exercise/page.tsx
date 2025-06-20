@@ -162,14 +162,25 @@ export default function KineCreateExercisePage() {
         method: 'DELETE',
       });
 
-      if (res.ok) {
+      if (res.status === 204) {
+        // Suppression réussie
         setDeleteDialogOpen(false);
         setExerciceToDelete(null);
         loadExercices();
         loadAllTags();
+      } else if (res.status === 400) {
+        // Exercice utilisé dans des programmes
+        alert("Votre exercice est utilisé dans un programme, impossible de supprimer");
+        setDeleteDialogOpen(false);
+        setExerciceToDelete(null);
+      } else {
+        throw new Error(`Erreur ${res.status}`);
       }
     } catch (error) {
       console.error('Erreur suppression exercice:', error);
+      alert("Erreur lors de la suppression de l'exercice");
+      setDeleteDialogOpen(false);
+      setExerciceToDelete(null);
     }
   };
 
