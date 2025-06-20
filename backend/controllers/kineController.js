@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prismaService = require('../services/prismaService');
 
 const createKine = async (req, res) => {
   const { uid, email, firstName, lastName, phone, rpps, adresseCabinet, birthDate } = req.body;
@@ -7,6 +6,8 @@ const createKine = async (req, res) => {
   console.log("📥 Données reçues pour création kiné :", req.body);
 
   try {
+    const prisma = prismaService.getInstance();
+    
     const existing = await prisma.kine.findUnique({
       where: { uid },
     });

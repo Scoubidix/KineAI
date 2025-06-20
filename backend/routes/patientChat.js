@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prismaService = require('../services/prismaService');
 const { authenticatePatient, checkTokenExpiry, logPatientAccess } = require('../middleware/patientAuth');
 const { generateChatResponse, generateWelcomeMessage } = require('../services/openaiService');
-
-const prisma = new PrismaClient();
 
 // Fonctions utilitaires pour l'historique lié aux programmes
 const getProgramChatHistory = async (patientId, programmeId) => {
   try {
+    const prisma = prismaService.getInstance();
+    
     const history = await prisma.chatSession.findMany({
       where: {
         patientId: parseInt(patientId),
@@ -37,6 +37,8 @@ const getProgramChatHistory = async (patientId, programmeId) => {
 
 const saveChatMessage = async (patientId, programmeId, message, role) => {
   try {
+    const prisma = prismaService.getInstance();
+    
     return await prisma.chatSession.create({
       data: {
         message,

@@ -1,6 +1,5 @@
 const { validatePatientToken } = require('../services/patientTokenService');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prismaService = require('../services/prismaService');
 
 /**
  * Middleware pour valider l'authentification des patients via JWT
@@ -49,6 +48,8 @@ const authenticatePatient = async (req, res, next) => {
     }
 
     // 3. Vérifier que le patient existe en base
+    const prisma = prismaService.getInstance();
+    
     const patient = await prisma.patient.findUnique({
       where: { id: tokenValidation.patientId },
       select: {

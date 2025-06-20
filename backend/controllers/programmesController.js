@@ -1,11 +1,12 @@
-const { PrismaClient } = require('@prisma/client');
+const prismaService = require('../services/prismaService');
 const { generateChatUrl } = require('../services/patientTokenService');
-const prisma = new PrismaClient();
 
 // 🔽 GET programmes actifs (pas archivés)
 exports.getProgrammesByPatient = async (req, res) => {
   const patientId = parseInt(req.params.patientId);
     try {
+    const prisma = prismaService.getInstance();
+    
     const programmes = await prisma.programme.findMany({
       where: {
         patientId,
@@ -29,6 +30,8 @@ exports.createProgramme = async (req, res) => {
   const { titre, description, duree, patientId, dateFin, exercises } = req.body;
 
   try {
+    const prisma = prismaService.getInstance();
+    
     const newProgramme = await prisma.programme.create({
       data: {
         titre,
@@ -67,6 +70,8 @@ exports.generateProgrammeLink = async (req, res) => {
   console.log("Génération lien pour programme ID:", programmeId);
 
   try {
+    const prisma = prismaService.getInstance();
+    
     // Récupérer le programme avec les infos patient
     const programme = await prisma.programme.findUnique({
       where: { id: programmeId },
@@ -154,6 +159,8 @@ exports.updateProgramme = async (req, res) => {
   const { titre, description, duree, exercises } = req.body;
 
   try {
+    const prisma = prismaService.getInstance();
+    
     // Supprimer les anciens exercices du programme
     await prisma.exerciceProgramme.deleteMany({ 
       where: { programmeId } 
@@ -195,6 +202,8 @@ exports.deleteProgramme = async (req, res) => {
   const programmeId = parseInt(req.params.id);
 
   try {
+    const prisma = prismaService.getInstance();
+    
     // Supprimer d'abord les exercices liés
     await prisma.exerciceProgramme.deleteMany({ 
       where: { programmeId } 
@@ -217,6 +226,8 @@ exports.archiveProgramme = async (req, res) => {
   const programmeId = parseInt(req.params.id);
 
   try {
+    const prisma = prismaService.getInstance();
+    
     const archivedProgramme = await prisma.programme.update({
       where: { id: programmeId },
       data: { isArchived: true },

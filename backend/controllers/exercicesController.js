@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prismaService = require('../services/prismaService');
 
 // 🔐 Toutes les routes supposent que req.uid est défini par le middleware authenticate
 
@@ -29,6 +28,7 @@ exports.getPublicExercices = async (req, res) => {
   try {
     const { search, tags } = req.query;
     const selectedTags = tags ? tags.split(',') : [];
+    const prisma = prismaService.getInstance();
 
     const exercices = await prisma.exerciceModele.findMany({
       where: { isPublic: true },
@@ -50,6 +50,7 @@ exports.getPrivateExercices = async (req, res) => {
     const firebaseUid = req.uid;
     const { search, tags } = req.query;
     const selectedTags = tags ? tags.split(',') : [];
+    const prisma = prismaService.getInstance();
 
     const kine = await prisma.kine.findUnique({
       where: { uid: firebaseUid },
@@ -81,6 +82,8 @@ exports.getPrivateExercices = async (req, res) => {
 exports.getAllTags = async (req, res) => {
   try {
     const firebaseUid = req.uid;
+    const prisma = prismaService.getInstance();
+    
     const kine = await prisma.kine.findUnique({
       where: { uid: firebaseUid },
     });
@@ -120,6 +123,8 @@ exports.createExercice = async (req, res) => {
 
   try {
     const firebaseUid = req.uid;
+    const prisma = prismaService.getInstance();
+    
     const kine = await prisma.kine.findUnique({
       where: { uid: firebaseUid },
     });
@@ -151,6 +156,8 @@ exports.updateExercice = async (req, res) => {
 
   try {
     const firebaseUid = req.uid;
+    const prisma = prismaService.getInstance();
+    
     const kine = await prisma.kine.findUnique({
       where: { uid: firebaseUid },
     });
@@ -188,6 +195,8 @@ exports.deleteExercice = async (req, res) => {
 
   try {
     const firebaseUid = req.uid;
+    const prisma = prismaService.getInstance();
+    
     const kine = await prisma.kine.findUnique({
       where: { uid: firebaseUid },
     });
@@ -202,6 +211,27 @@ exports.deleteExercice = async (req, res) => {
 
     if (!exercice || exercice.kineId !== kine.id || exercice.isPublic) {
       return res.status(403).json({ error: "Non autorisé à supprimer cet exercice" });
+    }
+
+    // Vérifier si l'exercice est utilisé dans des programmes
+    const exercicesEnCours = await prisma.exerciceProgramme.findMany({
+      where: { exerciceModeleId: parseInt(id) },
+      include: {
+        programme: {
+          select: { titre: true, patient: { select: { firstName: true, lastName: true } } }
+        }
+      }
+    });
+
+    if (exercicesEnCours.length > 0) {
+      return res.status(400).json({
+        error: "Impossible de supprimer cet exercice",
+        message: "Cet exercice est utilisé dans des programmes actifs",
+        programmes: exercicesEnCours.map(ex => ({
+          programme: ex.programme.titre,
+          patient: `${ex.programme.patient.firstName} ${ex.programme.patient.lastName}`
+        }))
+      });
     }
 
     await prisma.exerciceModele.delete({

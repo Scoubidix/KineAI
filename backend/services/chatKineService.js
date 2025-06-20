@@ -1,16 +1,16 @@
 // services/chatKineService.js
 const { OpenAI } = require('openai');
-const { PrismaClient } = require('@prisma/client');
+const prismaService = require('./prismaService');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const prisma = new PrismaClient();
-
 class ChatKineService {
   async sendMessage(kineId, message) {
     try {
+      const prisma = prismaService.getInstance();
+      
       // Récupérer l'historique des 5 derniers jours
       const fiveDaysAgo = new Date();
       fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
@@ -97,6 +97,8 @@ class ChatKineService {
 
   async getHistory(kineId, days = 5) {
     try {
+      const prisma = prismaService.getInstance();
+      
       const daysAgo = new Date();
       daysAgo.setDate(daysAgo.getDate() - days);
 
@@ -122,6 +124,8 @@ class ChatKineService {
 
   async clearHistory(kineId) {
     try {
+      const prisma = prismaService.getInstance();
+      
       const result = await prisma.chatKine.deleteMany({
         where: {
           kineId: kineId

@@ -1,15 +1,13 @@
 // routes/programmeAdmin.js
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prismaService = require('../services/prismaService');
 const { 
   archiveProgram, 
   deleteProgramAndChats,
   archiveFinishedProgramsTask,
   cleanupOldArchivedProgramsTask 
 } = require('../services/chatService');
-
-const prisma = new PrismaClient();
 
 /**
  * POST /programmes/:id/archive
@@ -18,6 +16,7 @@ const prisma = new PrismaClient();
 router.post('/:id/archive', async (req, res) => {
   try {
     const programmeId = parseInt(req.params.id);
+    const prisma = prismaService.getInstance();
     
     // Vérifier que le programme existe
     const programme = await prisma.programme.findUnique({
@@ -80,6 +79,7 @@ router.post('/:id/archive', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const programmeId = parseInt(req.params.id);
+    const prisma = prismaService.getInstance();
     
     // Vérifier que le programme existe
     const programme = await prisma.programme.findUnique({
@@ -132,6 +132,8 @@ router.delete('/:id', async (req, res) => {
  */
 router.get('/archived', async (req, res) => {
   try {
+    const prisma = prismaService.getInstance();
+    
     const archivedPrograms = await prisma.programme.findMany({
       where: { isArchived: true },
       include: {
@@ -232,6 +234,8 @@ router.post('/cleanup/archived', async (req, res) => {
  */
 router.get('/stats', async (req, res) => {
   try {
+    const prisma = prismaService.getInstance();
+    
     const stats = await prisma.$transaction([
       // Programmes actifs
       prisma.programme.count({ where: { isArchived: false } }),

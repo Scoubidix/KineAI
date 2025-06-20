@@ -1,12 +1,12 @@
 // services/chatService.js
-const { PrismaClient } = require('@prisma/client');
+const prismaService = require('./prismaService');
 const { generateChatResponse, generateWelcomeMessage } = require('./openaiService');
-
-const prisma = new PrismaClient();
 
 // Récupérer l'historique de chat pour un programme spécifique
 const getProgramChatHistory = async (patientId, programmeId) => {
   try {
+    const prisma = prismaService.getInstance();
+    
     const history = await prisma.chatSession.findMany({
       where: {
         patientId: parseInt(patientId),
@@ -38,6 +38,8 @@ const getProgramChatHistory = async (patientId, programmeId) => {
 // Sauvegarder un message de chat lié au programme
 const saveChatMessage = async (patientId, programmeId, message, role) => {
   try {
+    const prisma = prismaService.getInstance();
+    
     return await prisma.chatSession.create({
       data: {
         message,
@@ -150,6 +152,8 @@ const initializeChatSession = async (patientData, programmes) => {
 // Archiver un programme et marquer la date d'archivage
 const archiveProgram = async (programmeId) => {
   try {
+    const prisma = prismaService.getInstance();
+    
     const result = await prisma.programme.update({
       where: { id: parseInt(programmeId) },
       data: {
@@ -169,6 +173,8 @@ const archiveProgram = async (programmeId) => {
 // Nettoyer les programmes et conversations archivés depuis plus de 6 mois
 const cleanupArchivedPrograms = async () => {
   try {
+    const prisma = prismaService.getInstance();
+    
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
@@ -238,6 +244,8 @@ const cleanupArchivedPrograms = async () => {
 // Nettoyer les programmes terminés (les archiver)
 const archiveFinishedPrograms = async () => {
   try {
+    const prisma = prismaService.getInstance();
+    
     const now = new Date();
     
     // Trouver tous les programmes terminés non archivés
@@ -297,6 +305,8 @@ const archiveFinishedPrograms = async () => {
 // Obtenir les statistiques de chat pour un patient/programme
 const getChatStats = async (patientId, programmeId) => {
   try {
+    const prisma = prismaService.getInstance();
+    
     const stats = await prisma.chatSession.groupBy({
       by: ['role'],
       where: {
@@ -322,6 +332,8 @@ const getChatStats = async (patientId, programmeId) => {
 // Supprimer manuellement un programme et ses conversations
 const deleteProgramAndChats = async (programmeId) => {
   try {
+    const prisma = prismaService.getInstance();
+    
     // Compter les messages avant suppression
     const messageCount = await prisma.chatSession.count({
       where: { programmeId: parseInt(programmeId) }

@@ -1,5 +1,6 @@
 // controllers/chatKineController.js
 const chatKineService = require('../services/chatKineService');
+const prismaService = require('../services/prismaService');
 
 class ChatKineController {
   async sendMessage(req, res) {
@@ -14,8 +15,7 @@ class ChatKineController {
       }
 
       // Récupérer le kineId depuis la base de données avec l'UID Firebase
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
+      const prisma = prismaService.getInstance();
       
       const kine = await prisma.kine.findUnique({
         where: { uid: firebaseUid }
@@ -61,8 +61,7 @@ class ChatKineController {
       }
 
       // Récupérer le kineId
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
+      const prisma = prismaService.getInstance();
       
       const kine = await prisma.kine.findUnique({
         where: { uid: firebaseUid }
@@ -208,8 +207,7 @@ class ChatKineController {
       try {
         console.log('🔄 Fallback automatique vers méthode classique...');
         const { message } = req.body;
-        const { PrismaClient } = require('@prisma/client');
-        const prisma = new PrismaClient();
+        const prisma = prismaService.getInstance();
         
         const kine = await prisma.kine.findUnique({
           where: { uid: req.uid }
@@ -256,8 +254,7 @@ class ChatKineController {
       }
 
       // Récupérer le kineId depuis la base de données
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
+      const prisma = prismaService.getInstance();
       
       const kine = await prisma.kine.findUnique({
         where: { uid: firebaseUid }
@@ -298,8 +295,7 @@ class ChatKineController {
       }
 
       // Récupérer le kineId depuis la base de données
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
+      const prisma = prismaService.getInstance();
       
       const kine = await prisma.kine.findUnique({
         where: { uid: firebaseUid }
@@ -480,8 +476,7 @@ function getRelevanceLevel(score) {
 
 // ========== FONCTIONS HELPER EXISTANTES (conservées) ==========
 async function saveEnhancedToSQL(kineId, message, response) {
-  const { PrismaClient } = require('@prisma/client');
-  const prisma = new PrismaClient();
+  const prisma = prismaService.getInstance();
   
   await prisma.chatKine.create({
     data: {

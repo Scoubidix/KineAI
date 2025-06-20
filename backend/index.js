@@ -2,7 +2,7 @@ require('dotenv').config()
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const { PrismaClient } = require('@prisma/client');
+const prismaService = require('./services/prismaService');
 
 // Import du nouveau système d'archivage
 const { startProgramCleanupCron } = require('./utils/chatCleanup');
@@ -21,7 +21,6 @@ const chatKineRoutes = require('./routes/chatKine'); // Route existante amélior
 const documentsRoutes = require('./routes/documents');
 
 const app = express();
-const prisma = new PrismaClient();
 const PORT = process.env.PORT || 8080;
 
 // Middleware - Augmenté pour les PDFs
@@ -51,6 +50,8 @@ app.get('/health', (req, res) => {
 // Test connexion base de données
 app.get('/api/test-db', async (req, res) => {
   try {
+    const prisma = prismaService.getInstance();
+    
     const kineCount = await prisma.kine.count();
     
     res.json({
@@ -132,6 +133,8 @@ app.get('/api/test-vector', async (req, res) => {
 // Debug base de données
 app.get('/api/debug-db', async (req, res) => {
   try {
+    const prisma = prismaService.getInstance();
+    
     const dbInfo = await prisma.$queryRaw`SELECT current_database(), current_schema(), version()`;
     const tables = await prisma.$queryRaw`
       SELECT table_name 
@@ -222,7 +225,7 @@ startProgramCleanupCron();
 // Gestion gracieuse de l'arrêt
 process.on('SIGINT', async () => {
   console.log('🛑 Arrêt du serveur...');
-  await prisma.$disconnect();
+  await prismaService.disconnect();
   process.exit(0);
 });
 

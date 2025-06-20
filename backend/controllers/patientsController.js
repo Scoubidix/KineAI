@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prismaService = require('../services/prismaService');
 
 // 🔐 Toutes les routes supposent que req.uid est défini par le middleware authenticate
 
@@ -7,6 +6,8 @@ const prisma = new PrismaClient();
 exports.getPatients = async (req, res) => {
   try {
     const firebaseUid = req.uid;
+    const prisma = prismaService.getInstance();
+    
     const kine = await prisma.kine.findUnique({
       where: { uid: firebaseUid },
     });
@@ -32,6 +33,8 @@ exports.getPatientById = async (req, res) => {
   const firebaseUid = req.uid;
 
   try {
+    const prisma = prismaService.getInstance();
+    
     const kine = await prisma.kine.findUnique({
       where: { uid: firebaseUid },
     });
@@ -62,6 +65,8 @@ exports.getPatientById = async (req, res) => {
 exports.createPatient = async (req, res) => {
   try {
     const firebaseUid = req.uid;
+    const prisma = prismaService.getInstance();
+    
     const kine = await prisma.kine.findUnique({
       where: { uid: firebaseUid },
     });
@@ -111,6 +116,8 @@ exports.updatePatient = async (req, res) => {
   } = req.body;
 
   try {
+    const prisma = prismaService.getInstance();
+    
     const updatedPatient = await prisma.patient.update({
       where: { id: parseInt(id) },
       data: {
@@ -135,6 +142,8 @@ exports.deletePatient = async (req, res) => {
   const { id } = req.params;
 
   try {
+    const prisma = prismaService.getInstance();
+    
     await prisma.patient.delete({
       where: { id: parseInt(id) },
     });
