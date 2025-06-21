@@ -157,6 +157,113 @@ app.get('/api/debug-db', async (req, res) => {
   }
 });
 
+// ========== NOUVELLES ROUTES DEBUG PRISMA ==========
+
+// Route pour diagnostiquer les imports multiples de Prisma
+app.get('/debug/prisma-imports', (req, res) => {
+  const stats = prismaService.getConnectionStats();
+  
+  // Lister tous les modules chargés qui contiennent "prisma"
+  const prismaModules = Object.keys(require.cache)
+    .filter(path => path.includes('prisma') || path.includes('Prisma'))
+    .map(path => ({
+      path: path.replace(process.cwd(), ''), // Chemin relatif
+      loaded: !!require.cache[path],
+      loadTime: require.cache[path]?.loaded ? 'loaded' : 'loading'
+    }));
+
+  // Compter les services prisma chargés
+  const prismaServiceModules = Object.keys(require.cache)
+    .filter(path => path.includes('prismaService'))
+    .map(path => path.replace(process.cwd(), ''));
+
+  res.json({
+    stats,
+    prismaModules: prismaModules.slice(0, 10), // Limite à 10 pour lisibilité
+    prismaServiceModules,
+    moduleLoadOrder: prismaModules.length,
+    warning: stats.creationCount > 1 ? '⚠️ MULTIPLE INSTANCES DETECTED!' : '✅ OK - Single instance',
+    recommendation: stats.creationCount > 1 ? 
+      'Vérifiez vos imports: utilisez toujours le même chemin relatif' : 
+      'Configuration correcte'
+  });
+});
+
+// Route pour surveiller les connexions DB en temps réel
+app.get('/debug/connections', async (req, res) => {
+  try {
+    const stats = prismaService.getConnectionStats();
+    const health = await prismaService.healthCheck();
+    
+    res.json({
+      prisma: stats,
+      health,
+      server: {
+        uptime: Math.round(process.uptime()) + 's',
+        pid: process.pid,
+        memory: {
+          used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+          total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB'
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Route pour forcer le nettoyage des connexions
+app.post('/debug/cleanup-connections', async (req, res) => {
+  try {
+    console.log('🧹 Nettoyage forcé des connexions demandé via API');
+    await prismaService.forceDisconnect();
+    
+    // Petit délai pour laisser les connexions se fermer
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const newStats = prismaService.getConnectionStats();
+    
+    res.json({ 
+      success: true, 
+      message: 'Connexions nettoyées et réinitialisées',
+      before: 'connexions fermées',
+      after: newStats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Route pour lister tous les imports de votre projet
+app.get('/debug/all-imports', (req, res) => {
+  const allModules = Object.keys(require.cache)
+    .filter(path => path.includes(process.cwd())) // Seulement votre projet
+    .map(path => path.replace(process.cwd(), ''))
+    .sort();
+
+  const prismaRelated = allModules.filter(path => 
+    path.includes('prisma') || 
+    path.includes('database') || 
+    path.includes('db')
+  );
+
+  res.json({
+    totalModules: allModules.length,
+    prismaRelated,
+    warning: prismaRelated.length > 3 ? 
+      '⚠️ Beaucoup de modules Prisma chargés' : 
+      '✅ Imports normaux'
+  });
+});
+
 // ========== ROUTES PRINCIPALES ==========
 
 // Routes existantes
@@ -214,7 +321,11 @@ app.get('/', (req, res) => {
       documents: '/api/documents',
       upload: '/api/documents/upload',
       search: '/api/documents/search',
-      vectorTest: '/api/test-vector'
+      vectorTest: '/api/test-vector',
+      // NOUVEAUX ENDPOINTS DEBUG
+      debugPrisma: '/debug/prisma-imports',
+      debugConnections: '/debug/connections',
+      cleanupConnections: '/debug/cleanup-connections [POST]'
     }
   });
 });
@@ -238,4 +349,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🤖 Chat Enhanced: /api/chat/kine/message-enhanced`);
   console.log(`📄 Documents API: /api/documents`);
   console.log(`📊 Vector Test: /api/test-vector`);
+  console.log(`🔍 Debug Prisma: /debug/prisma-imports`);
+  console.log(`📊 Debug Connections: /debug/connections`);
 });
