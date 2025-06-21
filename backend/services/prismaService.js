@@ -13,7 +13,8 @@ class PrismaService {
         log: ['error', 'warn'],
         datasources: {
           db: {
-            url: process.env.DATABASE_URL + "?connect_timeout=30&pool_timeout=30"
+            url: process.env.DATABASE_URL
+            // SUPPRIMÉ: les paramètres URL qui cassent Cloud SQL
           }
         }
       });
@@ -52,9 +53,8 @@ class PrismaService {
     }
   }
 
-  // SUPPRIMÉ: executeWithTempConnection - utilise getInstance() partout
+  // Utilise l'instance partagée (pas de connexions temporaires)
   async executeWithTempConnection(callback) {
-    // Plus de connexion temporaire, on utilise l'instance partagée
     const prisma = this.getInstance();
     
     try {
