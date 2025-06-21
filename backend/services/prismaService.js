@@ -13,7 +13,7 @@ class PrismaService {
         log: ['error', 'warn'],
         datasources: {
           db: {
-            url: process.env.DATABASE_URL
+            url: process.env.DATABASE_URL + "?connect_timeout=30&pool_timeout=30"
           }
         }
       });
@@ -52,24 +52,17 @@ class PrismaService {
     }
   }
 
-  // Créer une connexion temporaire pour les tâches CRON
+  // SUPPRIMÉ: executeWithTempConnection - utilise getInstance() partout
   async executeWithTempConnection(callback) {
-    const tempPrisma = new PrismaClient({
-      log: ['error'],
-      datasources: {
-        db: {
-          url: process.env.DATABASE_URL
-        }
-      }
-    });
-
+    // Plus de connexion temporaire, on utilise l'instance partagée
+    const prisma = this.getInstance();
+    
     try {
-      return await callback(tempPrisma);
+      console.log('🔄 Utilisation connexion partagée pour tâche CRON');
+      return await callback(prisma);
     } catch (error) {
-      console.error('❌ Erreur connexion temporaire:', error);
+      console.error('❌ Erreur dans executeWithTempConnection:', error);
       throw error;
-    } finally {
-      await tempPrisma.$disconnect();
     }
   }
 }
