@@ -1,20 +1,23 @@
 // services/prismaService.js
+console.log('📦 CHARGEMENT du module prismaService.js');
+
 const { PrismaClient } = require('@prisma/client');
 
 class PrismaService {
   constructor() {
+    console.log('🏗️ CONSTRUCTION nouvelle instance PrismaService');
     this.prisma = null;
   }
 
   // Obtenir l'instance Prisma (singleton)
   getInstance() {
     if (!this.prisma) {
+      console.log('🔧 CREATION nouvelle connexion Prisma');
       this.prisma = new PrismaClient({
         log: ['error', 'warn'],
         datasources: {
           db: {
             url: process.env.DATABASE_URL
-            // SUPPRIMÉ: les paramètres URL qui cassent Cloud SQL
           }
         }
       });
@@ -29,6 +32,8 @@ class PrismaService {
         await this.disconnect();
         process.exit(0);
       });
+    } else {
+      console.log('♻️ REUTILISATION connexion Prisma existante');
     }
     return this.prisma;
   }
@@ -36,6 +41,7 @@ class PrismaService {
   // Fermer la connexion
   async disconnect() {
     if (this.prisma) {
+      console.log('🔌 Fermeture connexion Prisma...');
       await this.prisma.$disconnect();
       this.prisma = null;
       console.log('🔌 Connexion Prisma fermée');
@@ -55,11 +61,14 @@ class PrismaService {
 
   // Utilise l'instance partagée (pas de connexions temporaires)
   async executeWithTempConnection(callback) {
+    console.log('🔄 Début executeWithTempConnection');
     const prisma = this.getInstance();
     
     try {
       console.log('🔄 Utilisation connexion partagée pour tâche CRON');
-      return await callback(prisma);
+      const result = await callback(prisma);
+      console.log('✅ executeWithTempConnection terminé avec succès');
+      return result;
     } catch (error) {
       console.error('❌ Erreur dans executeWithTempConnection:', error);
       throw error;
@@ -68,4 +77,5 @@ class PrismaService {
 }
 
 // Export d'une instance unique (singleton)
+console.log('📤 EXPORT instance unique PrismaService');
 module.exports = new PrismaService();
