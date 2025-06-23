@@ -6,7 +6,8 @@ let prismaInstance = null;
 let isConnected = false;
 let lastActivity = null;
 let cleanupInterval = null;
-let creationCount = 0;
+let totalCreations = 0;  // Total depuis démarrage serveur
+let currentConnectionId = null;  // ID de la connexion actuelle
 
 // Variable d'environnement pour debug
 const DEBUG_LOGS = process.env.NODE_ENV === 'development';
@@ -15,10 +16,11 @@ class PrismaService {
   
   getInstance() {
     if (!prismaInstance) {
-      creationCount++;
+      totalCreations++;
+      currentConnectionId = totalCreations;
       
-      // Log minimal en production
-      console.log(`🔧 Connexion Prisma #${creationCount} créée`);
+      // Log avec vraie info
+      console.log(`🔧 Connexion Prisma (${currentConnectionId}) créée [Total: ${totalCreations}]`);
       
       // Debug détaillé seulement en dev
       if (DEBUG_LOGS) {
@@ -47,7 +49,7 @@ class PrismaService {
       ['SIGINT', 'SIGTERM', 'SIGQUIT', 'beforeExit'].forEach(event => {
         if (!process.listenerCount(event)) {
           process.on(event, async () => {
-            console.log(`🛑 Arrêt ${event} - fermeture Connexion (${creationCount})`);
+            console.log(`🛑 Arrêt ${event} - fermeture Connexion (${currentConnectionId})`);
             await this.forceDisconnect();
             if (event !== 'beforeExit') process.exit(0);
           });
@@ -55,7 +57,7 @@ class PrismaService {
       });
 
     } else if (DEBUG_LOGS) {
-      console.log(`♻️ Réutilisation connexion #${creationCount}`);
+      console.log(`♻️ Réutilisation connexion (${currentConnectionId})`);
     }
     
     this.markActivity();
@@ -83,7 +85,7 @@ class PrismaService {
       }
 
       if (inactiveTime > maxInactiveTime && isConnected) {
-        console.log(`🧹 Fermeture automatique Connexion (${creationCount})`);
+        console.log(`🧹 Fermeture automatique Connexion (${currentConnectionId})`);
         await this.forceDisconnect();
       }
     }, 2 * 60 * 1000); // Check toutes les 2 minutes
@@ -108,7 +110,7 @@ class PrismaService {
     this.stopCleanupTimer();
 
     if (prismaInstance && isConnected) {
-      console.log(`🔌 Fermeture connexion Prisma (${creationCount})...`);
+      console.log(`🔌 Fermeture connexion Prisma (${currentConnectionId})...`);
       try {
         await Promise.race([
           prismaInstance.$disconnect(),
@@ -116,13 +118,14 @@ class PrismaService {
             setTimeout(() => reject(new Error('Timeout disconnect')), 3000)
           )
         ]);
-        console.log(`🔌 Connexion ${creationCount} fermée`);
+        console.log(`🔌 Connexion (${currentConnectionId}) fermée`);
       } catch (error) {
-        console.error(`❌ Erreur fermeture Connexion ${creationCount}:`, error.message);
+        console.error(`❌ Erreur fermeture Connexion (${currentConnectionId}):`, error.message);
       } finally {
         prismaInstance = null;
         isConnected = false;
         lastActivity = null;
+        currentConnectionId = null;  // Reset de l'ID
       }
     }
   }
@@ -205,7 +208,8 @@ class PrismaService {
     return {
       isConnected: this.isConnected(),
       hasInstance: prismaInstance !== null,
-      creationCount: creationCount,
+      totalCreations: totalCreations,
+      currentConnectionId: currentConnectionId,
       lastActivity: lastActivity ? new Date(lastActivity).toISOString() : null,
       inactiveTime: Math.round(inactiveTime / 1000) + 's',
       hasCleanupTimer: cleanupInterval !== null,
