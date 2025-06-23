@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
-import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Target, Search, Dumbbell, Clock, Activity } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Target, Filter, Dumbbell, Clock, Activity } from 'lucide-react';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 interface PatientData {
@@ -91,7 +92,12 @@ export default function PatientDetailPage() {
   const [allExercises, setAllExercises] = useState<ExerciseOption[]>([]);
   const [filteredExercises, setFilteredExercises] = useState<ExerciseOption[]>([]);
   const [selectedExercises, setSelectedExercises] = useState<ProgrammeExercise[]>([]);
-  const [exerciseSearch, setExerciseSearch] = useState('');
+  
+  // Nouveaux états pour les filtres
+  const [typeFilter, setTypeFilter] = useState<string>('all'); // 'all', 'public', 'private'
+  const [tagFilter, setTagFilter] = useState<string>('all');
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string>('');
   
   // États pour génération de lien
   const [generatingLink, setGeneratingLink] = useState<number | null>(null);
@@ -136,6 +142,16 @@ export default function PatientDetailPage() {
         ]);
         const combined = [...priv, ...pub];
         setAllExercises(combined);
+        
+        // Extraire tous les tags uniques
+        const allTags = new Set<string>();
+        combined.forEach(exercise => {
+          if (exercise.tags) {
+            parseTagsFromString(exercise.tags).forEach(tag => allTags.add(tag));
+          }
+        });
+        setAvailableTags(Array.from(allTags).sort());
+        
       } catch (err) {
         console.error('Erreur chargement exercices', err);
       }
@@ -143,22 +159,38 @@ export default function PatientDetailPage() {
     if (openCreateModal || openEditModal) fetchExercises();
   }, [openCreateModal, openEditModal]);
 
-  const handleExerciseSearch = (query: string) => {
-    setExerciseSearch(query);
-    if (query === '') {
-      setFilteredExercises([]);
-    } else {
-      setFilteredExercises(
-        allExercises.filter(ex => 
-          ex.nom.toLowerCase().includes(query.toLowerCase()) ||
-          (ex.tags && ex.tags.toLowerCase().includes(query.toLowerCase()))
-        )
-      );
+  // Effet pour filtrer les exercices selon les filtres sélectionnés
+  useEffect(() => {
+    let filtered = [...allExercises];
+    
+    // Filtre par type (public/privé)
+    if (typeFilter === 'public') {
+      filtered = filtered.filter(ex => ex.isPublic);
+    } else if (typeFilter === 'private') {
+      filtered = filtered.filter(ex => !ex.isPublic);
     }
-  };
+    
+    // Filtre par tag
+    if (tagFilter !== 'all') {
+      filtered = filtered.filter(ex => {
+        if (!ex.tags) return false;
+        const exerciseTags = parseTagsFromString(ex.tags);
+        return exerciseTags.includes(tagFilter);
+      });
+    }
+    
+    // Exclure les exercices déjà sélectionnés
+    filtered = filtered.filter(ex => 
+      !selectedExercises.find(selected => selected.exerciseId === ex.id)
+    );
+    
+    setFilteredExercises(filtered);
+  }, [allExercises, typeFilter, tagFilter, selectedExercises]);
 
-  const handleAddExercise = (exercise: ExerciseOption) => {
-    if (selectedExercises.find(e => e.exerciseId === exercise.id)) return;
+  const handleAddExercise = (exerciseId: string) => {
+    const exercise = allExercises.find(ex => ex.id === parseInt(exerciseId));
+    if (!exercise || selectedExercises.find(e => e.exerciseId === exercise.id)) return;
+    
     setSelectedExercises([
       ...selectedExercises,
       {
@@ -170,8 +202,7 @@ export default function PatientDetailPage() {
         instructions: '',
       },
     ]);
-    setExerciseSearch('');
-    setFilteredExercises([]);
+    setSelectedExerciseId(''); // Reset la sélection
   };
 
   const handleInputChange = (index: number, field: keyof ProgrammeExercise, value: string | number) => {
@@ -201,8 +232,9 @@ export default function PatientDetailPage() {
     setCreateDescription('');
     setCreateDuration(1);
     setSelectedExercises([]);
-    setFilteredExercises([]);
-    setExerciseSearch('');
+    setTypeFilter('all');
+    setTagFilter('all');
+    setSelectedExerciseId('');
   };
 
   const resetEditForm = () => {
@@ -210,8 +242,9 @@ export default function PatientDetailPage() {
     setEditDescription('');
     setEditDuration(1);
     setSelectedExercises([]);
-    setFilteredExercises([]);
-    setExerciseSearch('');
+    setTypeFilter('all');
+    setTagFilter('all');
+    setSelectedExerciseId('');
     setEditingProgramme(null);
   };
 
@@ -427,7 +460,7 @@ export default function PatientDetailPage() {
             </div>
           </div>
 
-          {/* Section Exercices */}
+          {/* Section Exercices avec filtres et sélection */}
           <div className="space-y-3 sm:space-y-4">
             <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
               <div className="w-1 h-5 sm:h-6 bg-green-500 rounded-full"></div>
@@ -435,49 +468,116 @@ export default function PatientDetailPage() {
             </h3>
             
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Rechercher et ajouter des exercices
-                </Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
-                    placeholder="Rechercher par nom ou catégorie..."
-                    value={exerciseSearch}
-                    onChange={(e) => handleExerciseSearch(e.target.value)}
-                    className="pl-10 text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
+              {/* Filtres */}
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border">
+                <div className="flex items-center gap-2 mb-3">
+                  <Filter className="w-4 h-4 text-gray-600" />
+                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Filtres de sélection
+                  </Label>
                 </div>
                 
-                {filteredExercises.length > 0 && (
-                  <div className="max-h-40 overflow-y-auto border rounded-md bg-white dark:bg-gray-800">
-                    {filteredExercises.map(ex => (
-                      <div key={ex.id} className="flex items-center justify-between p-3 border-b last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{ex.nom}</span>
-                            <Badge variant={ex.isPublic ? "default" : "secondary"} className="text-xs">
-                              {ex.isPublic ? 'Public' : 'Privé'}
-                            </Badge>
-                          </div>
-                          {ex.tags && (
-                            <div className="flex gap-1 mt-1">
-                              {parseTagsFromString(ex.tags).slice(0, 2).map(tag => (
-                                <Badge key={tag} variant="outline" className="text-xs">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <Button size="sm" onClick={() => handleAddExercise(ex)}>
-                          <Plus className="w-4 h-4 mr-1" />
-                          Ajouter
-                        </Button>
-                      </div>
-                    ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Filtre par type */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium text-gray-600">Type d'exercice</Label>
+                    <Select value={typeFilter} onValueChange={setTypeFilter}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Sélectionner le type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tous les exercices</SelectItem>
+                        <SelectItem value="public">Exercices publics</SelectItem>
+                        <SelectItem value="private">Mes exercices privés</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
+
+                  {/* Filtre par tag */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium text-gray-600">Catégorie</Label>
+                    <Select value={tagFilter} onValueChange={setTagFilter}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Sélectionner une catégorie" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Toutes les catégories</SelectItem>
+                        {availableTags.map(tag => (
+                          <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                {/* Résumé des filtres */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {typeFilter !== 'all' && (
+                    <Badge variant="secondary" className="text-xs">
+                      {typeFilter === 'public' ? 'Publics' : 'Privés'}
+                    </Badge>
+                  )}
+                  {tagFilter !== 'all' && (
+                    <Badge variant="secondary" className="text-xs">
+                      {tagFilter}
+                    </Badge>
+                  )}
+                  <span className="text-xs text-gray-500">
+                    {filteredExercises.length} exercice{filteredExercises.length > 1 ? 's' : ''} disponible{filteredExercises.length > 1 ? 's' : ''}
+                  </span>
+                </div>
+              </div>
+
+              {/* Sélection d'exercice */}
+              <div className="space-y-2">
+                <Label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Ajouter un exercice
+                </Label>
+                <div className="flex gap-2">
+                  <Select value={selectedExerciseId} onValueChange={setSelectedExerciseId}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Choisissez un exercice à ajouter..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {filteredExercises.length === 0 ? (
+                        <div className="p-3 text-sm text-gray-500">
+                          Aucun exercice disponible avec ces filtres
+                        </div>
+                      ) : (
+                        filteredExercises.map(exercise => (
+                          <SelectItem key={exercise.id} value={exercise.id.toString()}>
+                            <div className="flex items-center gap-2 w-full">
+                              <span className="flex-1">{exercise.nom}</span>
+                              <div className="flex gap-1">
+                                <Badge variant={exercise.isPublic ? "default" : "secondary"} className="text-xs">
+                                  {exercise.isPublic ? 'Public' : 'Privé'}
+                                </Badge>
+                                {exercise.tags && parseTagsFromString(exercise.tags).slice(0, 1).map(tag => (
+                                  <Badge key={tag} variant="outline" className="text-xs">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    type="button"
+                    onClick={() => {
+                      if (selectedExerciseId) {
+                        handleAddExercise(selectedExerciseId);
+                      }
+                    }}
+                    disabled={!selectedExerciseId}
+                    className="shrink-0"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Ajouter
+                  </Button>
+                </div>
               </div>
 
               {/* Exercices sélectionnés */}
