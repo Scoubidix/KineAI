@@ -201,8 +201,8 @@ const cleanOldKineChatHistory = async () => {
 const startProgramCleanupCron = () => {
   console.log('🚀 Démarrage des tâches CRON de nettoyage avec timeout...');
 
-  // Archivage quotidien - 19h00 (TEST ce soir)
-  cron.schedule('0 19 * * *', async () => {
+  // Archivage quotidien - 01h00 (évite les maintenances 2h-6h)
+  cron.schedule('0 1 * * *', async () => {
     await executeWithTimeout(
       'archivage programmes terminés',
       archiveFinishedProgramsTask,
@@ -213,8 +213,8 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  // Nettoyage chat kiné - 2h30 (timeout 1 minute)
-  cron.schedule('30 2 * * *', async () => {
+  // Nettoyage chat kiné - 01h30 (évite les maintenances)
+  cron.schedule('30 1 * * *', async () => {
     await executeWithTimeout(
       'nettoyage chat kiné',
       cleanOldKineChatHistory,
@@ -225,8 +225,8 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  // Nettoyage hebdomadaire - 3h00 dimanche (timeout 5 minutes)
-  cron.schedule('0 3 * * 0', async () => {
+  // Nettoyage hebdomadaire - 23h00 samedi (évite dimanche matin)
+  cron.schedule('0 23 * * 6', async () => {
     await executeWithTimeout(
       'nettoyage programmes archivés',
       cleanupOldArchivedProgramsTask,
