@@ -20,6 +20,9 @@ const chatKineRoutes = require('./routes/chatKine'); // Route existante amélior
 // NOUVELLES ROUTES VECTORIELLES
 const documentsRoutes = require('./routes/documents');
 
+// NOUVEAU : Import du webhook WhatsApp
+const { router: whatsappWebhook } = require('./routes/webhook/whatsapp');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -35,14 +38,15 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    service: 'KineAI Backend with Vector DB',
+    service: 'KineAI Backend with Vector DB + WhatsApp',
     port: PORT,
     features: [
       'Patient Chat',
       'Programme Management', 
       'Auto Archive System',
       'Kiné Personal AI Assistant Enhanced',
-      'PDF Upload & Vector Search'
+      'PDF Upload & Vector Search',
+      'WhatsApp Integration'
     ]
   });
 });
@@ -83,7 +87,10 @@ app.get('/api/test-env', (req, res) => {
       hasJWT: !!process.env.JWT_SECRET_PATIENT,
       hasDatabaseURL: !!process.env.DATABASE_URL,
       frontendURL: process.env.FRONTEND_URL,
-      hasSupabase: !!(process.env.SUPABASE_URL && process.env.SUPABASE_API_KEY)
+      hasSupabase: !!(process.env.SUPABASE_URL && process.env.SUPABASE_API_KEY),
+      // NOUVEAU : Variables WhatsApp
+      hasWhatsApp: !!(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_ID),
+      whatsappConfigured: !!process.env.WHATSAPP_WEBHOOK_TOKEN
     }
   });
 });
@@ -128,6 +135,21 @@ app.get('/api/test-vector', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   }
+});
+
+// NOUVEAU : Test WhatsApp
+app.get('/api/test-whatsapp', (req, res) => {
+  res.json({
+    message: 'WhatsApp configuration check',
+    timestamp: new Date().toISOString(),
+    whatsapp: {
+      hasAccessToken: !!process.env.WHATSAPP_ACCESS_TOKEN,
+      hasPhoneId: !!process.env.WHATSAPP_PHONE_ID,
+      hasWebhookToken: !!process.env.WHATSAPP_WEBHOOK_TOKEN,
+      webhookUrl: '/webhook/whatsapp',
+      configured: !!(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_ID && process.env.WHATSAPP_WEBHOOK_TOKEN)
+    }
+  });
 });
 
 // Debug base de données
@@ -266,6 +288,9 @@ app.get('/debug/all-imports', (req, res) => {
 
 // ========== ROUTES PRINCIPALES ==========
 
+// NOUVEAU : Webhook WhatsApp
+app.use('/webhook/whatsapp', whatsappWebhook);
+
 // Routes existantes
 app.use('/kine', kinesRoutes);
 app.use('/patients', patientsRoutes);
@@ -303,9 +328,9 @@ app.get('/test-cleanup-archived', async (req, res) => {
 // Route racine mise à jour
 app.get('/', (req, res) => {
   res.json({
-    message: 'Bienvenue sur l API KineAI - Base Vectorielle Supabase Intégrée',
+    message: 'Bienvenue sur l API KineAI - Base Vectorielle Supabase + WhatsApp Intégrés',
     timestamp: new Date().toISOString(),
-    version: '2.2',
+    version: '2.3',
     status: 'running',
     features: [
       'Patient Chat',
@@ -313,7 +338,8 @@ app.get('/', (req, res) => {
       'Auto Archive System',
       'Kiné Personal AI Assistant Enhanced', 
       'PDF Upload & Vector Search',
-      'Semantic Knowledge Base'
+      'Semantic Knowledge Base',
+      'WhatsApp Business Integration'
     ],
     endpoints: {
       chat: '/api/chat/kine/message',
@@ -322,6 +348,8 @@ app.get('/', (req, res) => {
       upload: '/api/documents/upload',
       search: '/api/documents/search',
       vectorTest: '/api/test-vector',
+      whatsappTest: '/api/test-whatsapp',
+      whatsappWebhook: '/webhook/whatsapp',
       // NOUVEAUX ENDPOINTS DEBUG
       debugPrisma: '/debug/prisma-imports',
       debugConnections: '/debug/connections',
@@ -349,6 +377,8 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🤖 Chat Enhanced: /api/chat/kine/message-enhanced`);
   console.log(`📄 Documents API: /api/documents`);
   console.log(`📊 Vector Test: /api/test-vector`);
+  console.log(`📱 WhatsApp Test: /api/test-whatsapp`);
+  console.log(`📱 WhatsApp Webhook: /webhook/whatsapp`);
   console.log(`🔍 Debug Prisma: /debug/prisma-imports`);
   console.log(`📊 Debug Connections: /debug/connections`);
 });
