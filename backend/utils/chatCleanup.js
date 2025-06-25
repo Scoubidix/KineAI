@@ -50,10 +50,19 @@ const archiveFinishedProgramsTask = async () => {
   const now = new Date();
   console.log(`📊 Début archivage - tentative connexion DB...`);
   
+  // NOUVEAU: Forcer une connexion fraîche pour les CRON nocturnes
+  try {
+    await prismaService.forceDisconnect();
+    console.log(`🔄 Connexion reset pour archivage nocturne`);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Attendre 1s
+  } catch (error) {
+    console.log(`⚠️ Reset connexion ignoré:`, error.message);
+  }
+  
   const result = await prismaService.executeWithTempConnection(async (prisma) => {
     console.log(`✅ Connexion DB établie - recherche programmes terminés...`);
     
-    // Trouver tous les programmes terminés non archivés
+    // Trouver tous les programmes terminés non archivés (avec limite pour éviter scan complet)
     const finishedPrograms = await prisma.programme.findMany({
       where: {
         dateFin: {
@@ -61,7 +70,9 @@ const archiveFinishedProgramsTask = async () => {
         },
         isArchived: false
       },
-      select: { id: true, titre: true, dateFin: true }
+      select: { id: true, titre: true, dateFin: true },
+      orderBy: { dateFin: 'asc' },  // Optimisation : ordre par date
+      take: 100  // Limite pour éviter scan de table complète
     });
 
     console.log(`📋 ${finishedPrograms.length} programmes terminés trouvés`);
@@ -199,12 +210,16 @@ const cleanOldKineChatHistory = async () => {
 
 // Démarrer les tâches automatiques avec timeout
 const startProgramCleanupCron = () => {
-  console.log('🚀 Démarrage des tâches CRON de nettoyage avec timeout...');
+  console.log('🚀 Démarrage des tâches CRON de nettoyage - TEST TOUTES LES HEURES...');
 
-  // Archivage quotidien - 01h00 (évite les maintenances 2h-6h)
-  cron.schedule('0 1 * * *', async () => {
+  // TEST: Archivage TOUTES LES HEURES pour identifier le pattern
+  cron.schedule('0 * * * *', async () => {
+    const now = new Date();
+    const hour = now.getHours();
+    console.log(`🕐 Test archivage heure ${hour}h00`);
+    
     await executeWithTimeout(
-      'archivage programmes terminés',
+      `archivage programmes terminés (${hour}h00)`,
       archiveFinishedProgramsTask,
       120000 // 2 minutes
     );
@@ -213,7 +228,7 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  // Nettoyage chat kiné - 01h30 (évite les maintenances)
+  // Nettoyage chat kiné - 01h30 (garde normal)
   cron.schedule('30 1 * * *', async () => {
     await executeWithTimeout(
       'nettoyage chat kiné',
@@ -225,7 +240,7 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  // Nettoyage hebdomadaire - 23h00 samedi (évite dimanche matin)
+  // Nettoyage hebdomadaire - 23h00 samedi (garde normal)
   cron.schedule('0 23 * * 6', async () => {
     await executeWithTimeout(
       'nettoyage programmes archivés',
@@ -237,7 +252,8 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  console.log('✅ Tâches CRON configurées avec timeout et retry');
+  console.log('✅ Tâches CRON configurées - TEST TOUTES LES HEURES');
+  console.log('📅 Planning: CHAQUE HEURE archivage, 01h30 chat, samedi 23h00 nettoyage');
 };
 
 // Fonctions de test manuel
