@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
+import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -17,7 +18,6 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
 
 const getSimulatedNotifications = () => [
   { id: 'notif1', type: 'pain_alert', patientName: 'Alice Martin', painLevel: 8, timestamp: new Date(Date.now() - 3600000), read: false },
@@ -57,7 +57,10 @@ const getInitials = (name?: string): string => {
 };
 
 interface KineData {
+  id: number;
   firstName: string;
+  lastName: string;
+  email: string;
 }
 
 export default function KineHomePage() {
@@ -65,14 +68,30 @@ export default function KineHomePage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [adherenceData, setAdherenceData] = useState({ patients: [] as any[], adherencePercentage: 0, completedCount: 0, totalCount: 0 });
   const [kine, setKine] = useState<KineData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(getAuth(), async (user) => {
       if (user) {
-        const ref = doc(getFirestore(), 'users', user.uid);
-        const snap = await getDoc(ref);
-        if (snap.exists()) setKine(snap.data() as KineData);
+        try {
+          // Récupérer les données depuis PostgreSQL
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${await user.getIdToken()}`,
+            },
+          });
+
+          if (response.ok) {
+            const kineData = await response.json();
+            setKine(kineData);
+          }
+        } catch (error) {
+          // Erreur silencieuse, gérée par l'UI
+        }
       }
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -82,15 +101,38 @@ export default function KineHomePage() {
     setAdherenceData(getSimulatedAdherence(selectedDate));
   }, [selectedDate]);
 
-  if (!kine) return <div>Chargement...</div>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Chargement de votre tableau de bord...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!kine) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Erreur de chargement</h2>
+          <p className="text-muted-foreground mb-4">Impossible de charger vos informations.</p>
+          <Button onClick={() => window.location.reload()}>Réessayer</Button>
+        </div>
+      </div>
+    );
+  }
 
   const unreadNotifications = notifications.filter(n => !n.read);
 
   return (
     <AppLayout>
+      <AuthGuard role="kine" />
       <div className="space-y-6">
         <div className="pb-4 border-b border-border">
-          <h1 className="text-2xl md:text-3xl font-bold text-primary">Bienvenue {kine.firstName}</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-primary">Bienvenue Dr. {kine.firstName} {kine.lastName}</h1>
           <p className="flex items-center gap-2 text-md md:text-lg text-muted-foreground mt-1">
             <CalendarDays className="h-5 w-5 text-accent" />
             Aujourd'hui : {format(new Date(), 'EEEE d MMMM yyyy', { locale: fr })}

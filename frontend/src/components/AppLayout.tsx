@@ -29,25 +29,25 @@ interface AppLayoutProps {
 
 const getRoleFromPath = (path: string): RoleOrUnknown => {
   if (path.startsWith('/dashboard/kine')) {
-    return 'kine';
+    return 'kine' as const;
   }
   if (path.startsWith('/dashboard/patient')) {
-    return 'patient';
+    return 'patient' as const;
   }
   if (path === '/') {
-    return 'unknown';
+    return 'unknown' as const;
   }
   if (process.env.NODE_ENV === 'development') {
-    if (path.includes('/kine')) return 'kine';
-    if (path.includes('/patient')) return 'patient';
+    if (path.includes('/kine')) return 'kine' as const;
+    if (path.includes('/patient')) return 'patient' as const;
   }
-  return 'unknown';
+  return 'unknown' as const;
 };
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const currentPathname = usePathname();
   const router = useRouter();
-  const role: RoleOrUnknown = getRoleFromPath(currentPathname);
+  const role = getRoleFromPath(currentPathname);
   const [loading, setLoading] = React.useState(false);
 
   const getNavigationItems = () => {
@@ -89,7 +89,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
     try {
       const auth = getAuth(app);
       await signOut(auth);
-      console.log('✅ Utilisateur déconnecté.');
       router.replace('/login');
     } catch (error) {
       console.error('❌ Erreur de déconnexion Firebase :', error);
@@ -104,7 +103,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     );
   }
 
-  if (role === 'unknown') {
+  if (role !== 'kine' && role !== 'patient') {
     return <>{children}</>;
   }
 
@@ -125,41 +124,43 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <span className="text-lg font-semibold text-primary group-data-[state=collapsed]:hidden">
             KineAI <span className="text-xs text-muted-foreground ml-1">(Dev)</span>
           </span>
-          <SidebarTrigger className="ml-auto md:hidden" tooltip="Ouvrir/Fermer le menu"/>
+          <SidebarTrigger className="ml-auto" />
         </SidebarHeader>
         <SidebarContent className="p-2">
           <SidebarMenu>
             {navigationItems.map((item) => (
               <SidebarMenuItem key={item.href}>
-                <Link href={item.href} passHref legacyBehavior>
-                  <SidebarMenuButton
-                    tooltip={item.label}
-                    isActive={
-                      currentPathname === item.href ||
-                      (item.href !== '/' && !item.href.endsWith('/home') && currentPathname.startsWith(item.href)) ||
-                      (item.href.endsWith('/home') && currentPathname === item.href)
-                    }
-                    disabled={item.disabled && item.label.includes('(Bientôt)')}
-                    aria-disabled={item.disabled && !item.label.includes('(Bientôt)')}
-                    className={item.disabled && !item.label.includes('(Bientôt)') ? "text-muted-foreground cursor-not-allowed opacity-60" : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"}
-                  >
+                <SidebarMenuButton
+                  asChild
+                  tooltip={item.label}
+                  isActive={
+                    currentPathname === item.href ||
+                    (item.href !== '/' && !item.href.endsWith('/home') && currentPathname.startsWith(item.href)) ||
+                    (item.href.endsWith('/home') && currentPathname === item.href)
+                  }
+                  disabled={item.disabled && item.label.includes('(Bientôt)')}
+                  aria-disabled={item.disabled && !item.label.includes('(Bientôt)')}
+                  className={item.disabled && !item.label.includes('(Bientôt)') ? "text-muted-foreground cursor-not-allowed opacity-60" : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"}
+                >
+                  <Link href={item.href}>
                     <item.icon className="h-4 w-4 shrink-0" />
                     <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </Link>
+                  </Link>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
             {role !== 'unknown' && (
               <SidebarMenuItem>
-                <Link href={role === 'kine' ? '/dashboard/patient/home' : '/dashboard/kine/home'} passHref legacyBehavior>
-                  <SidebarMenuButton
-                    tooltip={role === 'kine' ? 'Vue Patient (Dev)' : 'Vue Kiné (Dev)'}
-                    className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  >
+                <SidebarMenuButton
+                  asChild
+                  tooltip={role === 'kine' ? 'Vue Patient (Dev)' : 'Vue Kiné (Dev)'}
+                  className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                >
+                  <Link href={role === 'kine' ? '/dashboard/patient/home' : '/dashboard/kine/home'}>
                     {role === 'kine' ? <ClipboardList className="h-4 w-4 shrink-0"/> : <Users className="h-4 w-4 shrink-0"/>}
                     <span>{role === 'kine' ? 'Vue Patient (Dev)' : 'Vue Kiné (Dev)'}</span>
-                  </SidebarMenuButton>
-                </Link>
+                  </Link>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             )}
           </SidebarMenu>
@@ -193,8 +194,33 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </Sidebar>
 
       <SidebarInset>
+        {/* Barre de navigation mobile TOUJOURS visible */}
+        <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border lg:hidden">
+          <div className="flex h-14 items-center px-4">
+            <SidebarTrigger className="mr-2" />
+            <div className="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a10 10 0 1 0 10 10h-1.1"/>
+                <path d="M18 18.5V13a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v5.5"/>
+                <path d="M14 13.5V12a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v1.5"/>
+                <path d="M12 12v10"/>
+                <path d="m8 16 1.5-1 1.5 1"/>
+                <path d="m13 16 1.5-1 1.5 1"/>
+                <path d="M9 8h6"/>
+                <path d="M9 6h6"/>
+              </svg>
+              <span className="font-semibold text-primary">KineAI</span>
+            </div>
+            <div className="ml-auto">
+              <ThemeToggle />
+            </div>
+          </div>
+        </div>
+
+        {/* Contenu principal */}
         <div className="relative p-4 md:p-6 lg:p-8 bg-background text-foreground min-h-screen">
-          <div className="absolute top-4 right-4 md:top-6 md:right-6 z-50">
+          {/* ThemeToggle pour desktop uniquement */}
+          <div className="absolute top-4 right-4 md:top-6 md:right-6 z-40 hidden lg:block">
             <ThemeToggle />
           </div>
           {children}

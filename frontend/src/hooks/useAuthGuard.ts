@@ -3,7 +3,6 @@
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { app } from '@/lib/firebase/config';
 
 export function useAuthGuard(requiredRole?: 'kine' | 'patient') {
@@ -12,33 +11,42 @@ export function useAuthGuard(requiredRole?: 'kine' | 'patient') {
 
   useEffect(() => {
     const auth = getAuth(app);
-    const db = getFirestore(app);
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        console.warn('[AuthGuard] Pas connecté → redirect /login');
         router.replace('/login');
         return;
       }
 
-      const userRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userRef);
+      try {
+        // Récupérer les données utilisateur depuis PostgreSQL
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${await user.getIdToken()}`,
+          },
+        });
 
-      if (!userSnap.exists()) {
-        console.warn('[AuthGuard] Utilisateur introuvable dans Firestore → redirect /unauthorized');
-        router.replace('/unauthorized');
-        return;
+        if (!response.ok) {
+          if (response.status === 404) {
+            router.replace('/unauthorized');
+            return;
+          }
+          throw new Error('Erreur lors de la vérification du profil');
+        }
+
+        const userData = await response.json();
+        const role = 'kine'; // Pour l'instant, tous les utilisateurs sont des kinés
+
+        if (requiredRole && role !== requiredRole) {
+          router.replace('/unauthorized');
+          return;
+        }
+        
+      } catch (error) {
+        router.replace('/login');
       }
-
-      const role = userSnap.data().role;
-
-      if (requiredRole && role !== requiredRole) {
-        console.warn(`[AuthGuard] Rôle "${role}" interdit pour "${pathname}" → redirect /unauthorized`);
-        router.replace('/unauthorized');
-        return;
-      }
-
-      // ✅ OK : connecté et rôle correct
     });
 
     return () => unsubscribe();

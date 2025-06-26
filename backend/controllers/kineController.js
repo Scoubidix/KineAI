@@ -38,4 +38,50 @@ const createKine = async (req, res) => {
   }
 };
 
-module.exports = { createKine };
+const getKineProfile = async (req, res) => {
+  const uid = req.uid; // Récupéré depuis le middleware authenticate
+
+  console.log("📥 Récupération profil kiné pour UID :", uid);
+
+  try {
+    const prisma = prismaService.getInstance();
+    
+    const kine = await prisma.kine.findUnique({
+      where: { uid },
+      include: {
+        patients: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          }
+        },
+        _count: {
+          select: {
+            patients: true,
+            exercicesModeles: true,
+          }
+        }
+      }
+    });
+
+    if (!kine) {
+      console.log("❌ Kiné non trouvé pour UID :", uid);
+      return res.status(404).json({ error: 'Kiné non trouvé dans la base de données.' });
+    }
+
+    console.log("✅ Profil kiné récupéré :", {
+      id: kine.id,
+      email: kine.email,
+      firstName: kine.firstName,
+      lastName: kine.lastName
+    });
+
+    return res.status(200).json(kine);
+  } catch (err) {
+    console.error("❌ Erreur récupération profil kiné :", err);
+    return res.status(500).json({ error: 'Erreur serveur lors de la récupération du profil.' });
+  }
+};
+
+module.exports = { createKine, getKineProfile };

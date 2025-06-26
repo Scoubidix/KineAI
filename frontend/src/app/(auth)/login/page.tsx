@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { auth, db } from "@/lib/firebase/config";
+import { auth } from "@/lib/firebase/config";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -27,38 +26,60 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // 1. Authentification Firebase
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const uid = userCredential.user.uid;
+      const user = userCredential.user;
 
-      const docRef = doc(db, "users", uid);
-      const userSnap = await getDoc(docRef);
-
-      if (!userSnap.exists()) {
-        throw new Error("Utilisateur non trouvé dans la base.");
-      }
-
-      const userData = userSnap.data();
-      const role = userData.role;
-
-      toast({
-        title: "Connexion réussie",
-        description: "Redirection vers votre tableau de bord...",
+      // 2. Récupérer les données depuis PostgreSQL
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${await user.getIdToken()}`,
+        },
       });
 
-      if (role === "kine") {
-        router.push("/dashboard/kine/home");
-      } else if (role === "patient") {
-        router.push("/dashboard/patient/home");
-      } else {
-        throw new Error("Rôle utilisateur inconnu.");
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error("Utilisateur non trouvé dans la base de données.");
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de la récupération du profil");
       }
+
+      const kineData = await response.json();
+
+      // 3. Toast de succès personnalisé
+      toast({
+        title: "Connexion réussie",
+        description: `Bienvenue Dr. ${kineData.firstName} ${kineData.lastName}`,
+      });
+
+      // 4. Redirection vers le dashboard kiné
+      // Note: Pour l'instant, on assume que tous les utilisateurs sont des kinés
+      // Plus tard, vous pourrez ajouter une logique pour détecter les patients
+      router.push("/dashboard/kine/home");
 
     } catch (error) {
       const err = error as Error;
+      
+      // Messages d'erreur spécifiques
+      let errorMessage = "Vérifiez vos identifiants.";
+      
+      if (err.message.includes("user-not-found")) {
+        errorMessage = "Aucun compte trouvé avec cette adresse email.";
+      } else if (err.message.includes("wrong-password")) {
+        errorMessage = "Mot de passe incorrect.";
+      } else if (err.message.includes("invalid-email")) {
+        errorMessage = "Adresse email invalide.";
+      } else if (err.message.includes("non trouvé dans la base")) {
+        errorMessage = "Votre compte n'est pas encore synchronisé. Contactez le support.";
+      }
+
       toast({
         variant: "destructive",
         title: "Erreur de connexion",
-        description: err.message || "Vérifiez vos identifiants.",
+        description: errorMessage,
       });
     } finally {
       setLoading(false);
@@ -69,8 +90,6 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
         
-
-
         {/* Header avec logo et titre */}
         <div className="text-center space-y-6">
           {/* Logo */}
@@ -123,6 +142,7 @@ export default function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)} 
                     className="pl-10 h-12"
                     required 
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -142,11 +162,13 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)} 
                     className="pl-10 pr-10 h-12"
                     required 
+                    disabled={loading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                    disabled={loading}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>

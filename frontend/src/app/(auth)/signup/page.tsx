@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { auth, db } from "@/lib/firebase/config";
+import { auth } from "@/lib/firebase/config";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -57,24 +56,12 @@ export default function SignupPage() {
     } = formData;
 
     try {
+      // 1. Créer le compte Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      await setDoc(doc(db, "users", user.uid), {
-        id: user.uid,
-        firstName,
-        lastName,
-        birthDate,
-        phone,
-        email,
-        adresseCabinet,
-        rpps,
-        role: "kine",
-        linkedPatients: [],
-        createdAt: new Date(),
-      });
-
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine`, {
+      // 2. Créer l'entrée dans PostgreSQL (source unique de vérité)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -92,19 +79,30 @@ export default function SignupPage() {
         }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de la création du profil");
+      }
+
+      const kineData = await response.json();
+      console.log("✅ Kiné créé dans PostgreSQL:", kineData);
+
       toast({
         title: "Inscription réussie !",
-        description: `Votre compte kiné a bien été créé.`,
+        description: `Bienvenue Dr. ${firstName} ${lastName}`,
       });
 
       router.push("/login");
     } catch (error) {
       const err = error as Error;
+      console.error("❌ Erreur inscription:", err);
+      
       toast({
         variant: "destructive",
         title: "Erreur d'inscription",
-        description: err.message || "Une erreur est survenue.",
+        description: err.message || "Une erreur est survenue lors de la création du compte.",
       });
+    } finally {
       setLoading(false);
     }
   };
@@ -284,6 +282,9 @@ export default function SignupPage() {
                         disabled={loading} 
                       />
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Numéro d'identification au Répertoire Partagé des Professionnels de Santé
+                    </p>
                   </div>
                 </div>
               </div>
