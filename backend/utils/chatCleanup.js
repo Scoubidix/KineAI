@@ -212,16 +212,16 @@ const cleanOldKineChatHistory = async () => {
 const startProgramCleanupCron = () => {
   console.log('🚀 Démarrage des tâches CRON de nettoyage - TEST RESET FORCÉ TOUTES LES HEURES...');
 
-  // TEST: Archivage TOUTES LES HEURES avec reset forcé pour valider le fix
+  // TEST: Archivage TOUTES LES HEURES avec connexion dédiée
   cron.schedule('0 * * * *', async () => {
     const now = new Date();
     const hour = now.getHours();
-    console.log(`🕐 Test archivage avec RESET FORCÉ - heure ${hour}h00`);
+    console.log(`🕐 Test archivage CONNEXION DÉDIÉE - heure ${hour}h00`);
     
     await executeWithTimeout(
-      `archivage programmes terminés RESET (${hour}h00)`,
+      `archivage programmes terminés DÉDIÉ (${hour}h00)`,
       archiveFinishedProgramsTask,
-      60000 // 1 minute avec reset forcé
+      90000 // 90 secondes pour être sûr
     );
   }, {
     timezone: "Europe/Paris",
