@@ -212,16 +212,16 @@ const cleanOldKineChatHistory = async () => {
 const startProgramCleanupCron = () => {
   console.log('🚀 Démarrage des tâches CRON de nettoyage - TEST TOUTES LES HEURES...');
 
-  // TEST: Archivage TOUTES LES HEURES pour identifier le pattern
+  // TEST: Archivage TOUTES LES HEURES - VERSION RAPIDE
   cron.schedule('0 * * * *', async () => {
     const now = new Date();
     const hour = now.getHours();
-    console.log(`🕐 Test archivage heure ${hour}h00`);
+    console.log(`🕐 Test archivage EXPRESS heure ${hour}h00`);
     
     await executeWithTimeout(
-      `archivage programmes terminés (${hour}h00)`,
+      `archivage programmes terminés EXPRESS (${hour}h00)`,
       archiveFinishedProgramsTask,
-      120000 // 2 minutes
+      60000 // 1 minute seulement (plus rapide)
     );
   }, {
     timezone: "Europe/Paris",
