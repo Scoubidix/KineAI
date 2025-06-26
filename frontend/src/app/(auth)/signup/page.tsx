@@ -37,7 +37,25 @@ export default function SignupPage() {
   const { toast } = useToast();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    
+    // Reset des erreurs de validation personnalisées
+    const input = e.target as HTMLInputElement;
+    input.setCustomValidity('');
+    
+    // Validation spéciale pour le RPPS : seulement des chiffres
+    if (name === 'rpps') {
+      const numericValue = value.replace(/\D/g, ''); // Supprime tout ce qui n'est pas un chiffre
+      setFormData({ ...formData, [name]: numericValue });
+    } 
+    // Validation spéciale pour le téléphone : seulement des chiffres et espaces
+    else if (name === 'phone') {
+      const phoneValue = value.replace(/[^\d\s]/g, ''); // Garde seulement chiffres et espaces
+      setFormData({ ...formData, [name]: phoneValue });
+    } 
+    else {
+      setFormData({ ...formData, [name]: value });
+    }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -54,6 +72,37 @@ export default function SignupPage() {
       adresseCabinet,
       rpps,
     } = formData;
+
+    // Validation du RPPS
+    if (rpps.length !== 11) {
+      // Déclenche la validation HTML5 native
+      const rppsInput = document.getElementById('rpps') as HTMLInputElement;
+      if (rppsInput) {
+        rppsInput.setCustomValidity('Le numéro RPPS doit contenir exactement 11 chiffres');
+        rppsInput.reportValidity();
+      }
+      setLoading(false);
+      return;
+    }
+
+    // Validation du téléphone  
+    const phoneDigits = phone.replace(/\s/g, ''); // Supprime les espaces
+    if (phoneDigits.length !== 10 || !phoneDigits.match(/^[0-9]{10}$/)) {
+      // Déclenche la validation HTML5 native
+      const phoneInput = document.getElementById('phone') as HTMLInputElement;
+      if (phoneInput) {
+        phoneInput.setCustomValidity('Le numéro de téléphone doit contenir exactement 10 chiffres');
+        phoneInput.reportValidity();
+      }
+      setLoading(false);
+      return;
+    }
+
+    // Reset des erreurs de validation personnalisées
+    const rppsInput = document.getElementById('rpps') as HTMLInputElement;
+    const phoneInput = document.getElementById('phone') as HTMLInputElement;
+    if (rppsInput) rppsInput.setCustomValidity('');
+    if (phoneInput) phoneInput.setCustomValidity('');
 
     try {
       // 1. Créer le compte Firebase Auth
@@ -85,17 +134,15 @@ export default function SignupPage() {
       }
 
       const kineData = await response.json();
-      console.log("✅ Kiné créé dans PostgreSQL:", kineData);
 
       toast({
         title: "Inscription réussie !",
-        description: `Bienvenue Dr. ${firstName} ${lastName}`,
+        description: `Bienvenue ${firstName} ${lastName}`,
       });
 
       router.push("/login");
     } catch (error) {
       const err = error as Error;
-      console.error("❌ Erreur inscription:", err);
       
       toast({
         variant: "destructive",
@@ -225,12 +272,14 @@ export default function SignupPage() {
                       <Input 
                         id="phone" 
                         name="phone" 
-                        placeholder="06 00 00 00 00" 
+                        placeholder="06 12 34 56 78" 
                         value={formData.phone}
                         onChange={handleChange} 
                         className="pl-10 h-12"
                         required 
                         disabled={loading} 
+                        maxLength={13}
+                        onInvalid={(e) => e.preventDefault()}
                       />
                     </div>
                   </div>
@@ -280,10 +329,13 @@ export default function SignupPage() {
                         className="pl-10 h-12"
                         required 
                         disabled={loading} 
+                        maxLength={11}
+                        pattern="[0-9]{11}"
+                        title="Le numéro RPPS doit contenir exactement 11 chiffres"
                       />
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Numéro d'identification au Répertoire Partagé des Professionnels de Santé
+                      Numéro RPPS à 11 chiffres (ex: 12345678901)
                     </p>
                   </div>
                 </div>

@@ -132,7 +132,7 @@ export default function KineHomePage() {
       <AuthGuard role="kine" />
       <div className="space-y-6">
         <div className="pb-4 border-b border-border">
-          <h1 className="text-2xl md:text-3xl font-bold text-primary">Bienvenue Dr. {kine.firstName} {kine.lastName}</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-primary">Bienvenue {kine.firstName}</h1>
           <p className="flex items-center gap-2 text-md md:text-lg text-muted-foreground mt-1">
             <CalendarDays className="h-5 w-5 text-accent" />
             Aujourd'hui : {format(new Date(), 'EEEE d MMMM yyyy', { locale: fr })}

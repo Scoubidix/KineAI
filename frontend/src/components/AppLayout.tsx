@@ -111,18 +111,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
     <SidebarProvider defaultOpen={true}>
       <Sidebar collapsible="icon" side="left" variant="sidebar" className="bg-sidebar text-sidebar-foreground">
         <SidebarHeader className="items-center gap-2 border-b border-sidebar-border">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-accent group-data-[state=collapsed]:h-7 group-data-[state=collapsed]:w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a10 10 0 1 0 10 10h-1.1"/>
-            <path d="M18 18.5V13a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v5.5"/>
-            <path d="M14 13.5V12a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v1.5"/>
-            <path d="M12 12v10"/>
-            <path d="m8 16 1.5-1 1.5 1"/>
-            <path d="m13 16 1.5-1 1.5 1"/>
-            <path d="M9 8h6"/>
-            <path d="M9 6h6"/>
-          </svg>
+          <img 
+            src="/logo.jpg" 
+            alt="Mon Assistant Kiné" 
+            className="h-7 w-7 rounded-md object-contain group-data-[state=collapsed]:h-7 group-data-[state=collapsed]:w-7" 
+          />
           <span className="text-lg font-semibold text-primary group-data-[state=collapsed]:hidden">
-            KineAI <span className="text-xs text-muted-foreground ml-1">(Dev)</span>
+            Mon Assistant Kiné
           </span>
           <SidebarTrigger className="ml-auto" />
         </SidebarHeader>
@@ -149,20 +144,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
-            {role !== 'unknown' && (
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  tooltip={role === 'kine' ? 'Vue Patient (Dev)' : 'Vue Kiné (Dev)'}
-                  className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                >
-                  <Link href={role === 'kine' ? '/dashboard/patient/home' : '/dashboard/kine/home'}>
-                    {role === 'kine' ? <ClipboardList className="h-4 w-4 shrink-0"/> : <Users className="h-4 w-4 shrink-0"/>}
-                    <span>{role === 'kine' ? 'Vue Patient (Dev)' : 'Vue Kiné (Dev)'}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="border-t border-sidebar-border p-2">
@@ -171,16 +152,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <SidebarMenuButton tooltip="Paramètres (Bientôt)" disabled className="text-muted-foreground cursor-not-allowed opacity-60">
                 <Settings className="h-4 w-4 shrink-0" />
                 <span>Paramètres</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Compte (Dev)" className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-                <Avatar className="h-6 w-6 group-data-[state=collapsed]:h-6 group-data-[state=collapsed]:w-6">
-                  <AvatarFallback className="text-xs bg-secondary text-secondary-foreground">
-                    {displayInitials}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="truncate max-w-[100px]">{displayName}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
@@ -199,17 +170,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <div className="flex h-14 items-center px-4">
             <SidebarTrigger className="mr-2" />
             <div className="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a10 10 0 1 0 10 10h-1.1"/>
-                <path d="M18 18.5V13a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v5.5"/>
-                <path d="M14 13.5V12a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v1.5"/>
-                <path d="M12 12v10"/>
-                <path d="m8 16 1.5-1 1.5 1"/>
-                <path d="m13 16 1.5-1 1.5 1"/>
-                <path d="M9 8h6"/>
-                <path d="M9 6h6"/>
-              </svg>
-              <span className="font-semibold text-primary">KineAI</span>
+              <img 
+                src="/logo.jpg" 
+                alt="Mon Assistant Kiné" 
+                className="h-6 w-6 rounded-md object-contain" 
+              />
+              <span className="font-semibold text-primary">Mon Assistant Kiné</span>
             </div>
             <div className="ml-auto">
               <ThemeToggle />
