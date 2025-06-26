@@ -208,28 +208,28 @@ const cleanOldKineChatHistory = async () => {
   });
 };
 
-// Démarrer les tâches automatiques avec timeout
+// Démarrer les tâches automatiques avec timeout - TEST RESET FORCÉ
 const startProgramCleanupCron = () => {
-  console.log('🚀 Démarrage des tâches CRON de nettoyage - TEST TOUTES LES HEURES...');
+  console.log('🚀 Démarrage des tâches CRON de nettoyage - TEST RESET FORCÉ TOUTES LES HEURES...');
 
-  // TEST: Archivage TOUTES LES HEURES - VERSION RAPIDE
+  // TEST: Archivage TOUTES LES HEURES avec reset forcé pour valider le fix
   cron.schedule('0 * * * *', async () => {
     const now = new Date();
     const hour = now.getHours();
-    console.log(`🕐 Test archivage EXPRESS heure ${hour}h00`);
+    console.log(`🕐 Test archivage avec RESET FORCÉ - heure ${hour}h00`);
     
     await executeWithTimeout(
-      `archivage programmes terminés EXPRESS (${hour}h00)`,
+      `archivage programmes terminés RESET (${hour}h00)`,
       archiveFinishedProgramsTask,
-      60000 // 1 minute seulement (plus rapide)
+      60000 // 1 minute avec reset forcé
     );
   }, {
     timezone: "Europe/Paris",
     scheduled: true
   });
 
-  // Nettoyage chat kiné - 01h30 (garde normal)
-  cron.schedule('30 1 * * *', async () => {
+  // Nettoyage chat kiné - 00h15 (garde normal)
+  cron.schedule('15 0 * * *', async () => {
     await executeWithTimeout(
       'nettoyage chat kiné',
       cleanOldKineChatHistory,
@@ -240,8 +240,8 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  // Nettoyage hebdomadaire - 23h00 samedi (garde normal)
-  cron.schedule('0 23 * * 6', async () => {
+  // Nettoyage hebdomadaire - Mercredi 01h00 (garde normal)
+  cron.schedule('0 1 * * 3', async () => {
     await executeWithTimeout(
       'nettoyage programmes archivés',
       cleanupOldArchivedProgramsTask,
@@ -252,8 +252,8 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  console.log('✅ Tâches CRON configurées - TEST TOUTES LES HEURES');
-  console.log('📅 Planning: CHAQUE HEURE archivage, 01h30 chat, samedi 23h00 nettoyage');
+  console.log('✅ Tâches CRON configurées - TEST RESET FORCÉ');
+  console.log('📅 Planning: CHAQUE HEURE archivage (avec reset), 00h15 chat, mercredi 01h00 nettoyage');
 };
 
 // Fonctions de test manuel
