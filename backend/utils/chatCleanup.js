@@ -142,81 +142,135 @@ const archiveFinishedProgramsTask = async () => {
   }
 };
 
-// Supprimer définitivement les programmes archivés depuis plus de 6 mois
+// Supprimer définitivement les programmes archivés - VERSION CONNEXION DÉDIÉE
 const cleanupOldArchivedProgramsTask = async () => {
-  // Pour l'instant, on garde l'ancien système pour les autres tâches
-  const prismaService = require('../services/prismaService');
   const now = new Date();
+  console.log(`🗑️ Début nettoyage programmes archivés CONNEXION DÉDIÉE...`);
   
-  const result = await prismaService.executeWithTempConnection(async (prisma) => {
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-    const oldArchivedPrograms = await prisma.programme.findMany({
-      where: {
-        isArchived: true,
-        archivedAt: {
-          lt: sixMonthsAgo
-        }
-      },
-      select: { id: true, titre: true, archivedAt: true }
-    });
-
-    if (oldArchivedPrograms.length === 0) {
-      console.log('🧹 Aucun programme archivé à supprimer (< 6 mois)');
-      return { programs: 0, messages: 0 };
-    }
-
-    const messageCount = await prisma.chatSession.count({
-      where: {
-        programmeId: {
-          in: oldArchivedPrograms.map(p => p.id)
-        }
-      }
-    });
-
-    let deletedPrograms = 0;
-    const deletedDetails = [];
-
-    for (const program of oldArchivedPrograms) {
-      try {
-        await prisma.programme.delete({
-          where: { id: program.id }
-        });
-        
-        deletedPrograms++;
-        deletedDetails.push({
-          id: program.id,
-          titre: program.titre,
-          archivedAt: program.archivedAt
-        });
-        
-        console.log(`🗑️ Programme supprimé: "${program.titre}" (ID: ${program.id})`);
-      } catch (deleteError) {
-        console.error(`❌ Erreur suppression programme ${program.id}:`, deleteError.message);
-      }
-    }
-
-    console.log(`🗑️ Suppression définitive: ${deletedPrograms} programmes et ${messageCount} messages`);
+  // Créer une connexion Prisma dédiée pour cette tâche
+  let dedicatedPrisma = null;
+  
+  try {
+    console.log(`🔧 Création connexion DÉDIÉE pour nettoyage programmes...`);
     
-    return {
-      programs: deletedPrograms,
-      messages: messageCount,
-      details: deletedDetails
-    };
-  });
-  
-  return result;
+    const cronDbUrl = new URL(process.env.DATABASE_URL);
+    cronDbUrl.searchParams.set('connection_limit', '1');
+    cronDbUrl.searchParams.set('pool_timeout', '60');
+    cronDbUrl.searchParams.set('connect_timeout', '30');
+    cronDbUrl.searchParams.set('application_name', 'kine_cleanup_programs');
+    
+    dedicatedPrisma = new PrismaClient({
+      log: ['error', 'warn'],
+      datasources: {
+        db: {
+          url: cronDbUrl.toString()
+        }
+      }
+    });
+
+    const result = await dedicatedPrisma.$transaction(async (tx) => {
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+      const oldArchivedPrograms = await tx.programme.findMany({
+        where: {
+          isArchived: true,
+          archivedAt: {
+            lt: sixMonthsAgo
+          }
+        },
+        select: { id: true, titre: true, archivedAt: true }
+      });
+
+      if (oldArchivedPrograms.length === 0) {
+        console.log('🧹 Aucun programme archivé à supprimer (< 6 mois)');
+        return { programs: 0, messages: 0 };
+      }
+
+      const messageCount = await tx.chatSession.count({
+        where: {
+          programmeId: {
+            in: oldArchivedPrograms.map(p => p.id)
+          }
+        }
+      });
+
+      let deletedPrograms = 0;
+      const deletedDetails = [];
+
+      for (const program of oldArchivedPrograms) {
+        try {
+          await tx.programme.delete({
+            where: { id: program.id }
+          });
+          
+          deletedPrograms++;
+          deletedDetails.push({
+            id: program.id,
+            titre: program.titre,
+            archivedAt: program.archivedAt
+          });
+        } catch (deleteError) {
+          console.error(`❌ Erreur suppression programme ${program.id}:`, deleteError.message);
+        }
+      }
+
+      console.log(`🗑️ Suppression: ${deletedPrograms} programmes et ${messageCount} messages`);
+      
+      return {
+        programs: deletedPrograms,
+        messages: messageCount,
+        details: deletedDetails
+      };
+    }, {
+      timeout: 60000 // 60 secondes
+    });
+
+    return result;
+    
+  } catch (error) {
+    console.error(`❌ Erreur nettoyage programmes:`, error.message);
+    throw error;
+  } finally {
+    if (dedicatedPrisma) {
+      console.log(`🔌 Fermeture connexion DÉDIÉE nettoyage programmes`);
+      try {
+        await dedicatedPrisma.$disconnect();
+      } catch (error) {
+        console.error(`⚠️ Erreur fermeture:`, error.message);
+      }
+    }
+  }
 };
 
-// Nettoyer l'historique des chats kinés > 5 jours
+// Nettoyer l'historique des chats kinés - VERSION CONNEXION DÉDIÉE
 const cleanOldKineChatHistory = async () => {
-  const prismaService = require('../services/prismaService');
-  return await prismaService.executeWithTempConnection(async (prisma) => {
+  console.log(`💬 Début nettoyage chat kiné CONNEXION DÉDIÉE...`);
+  
+  let dedicatedPrisma = null;
+  
+  try {
+    console.log(`🔧 Création connexion DÉDIÉE pour nettoyage chat...`);
+    
+    const cronDbUrl = new URL(process.env.DATABASE_URL);
+    cronDbUrl.searchParams.set('connection_limit', '1');
+    cronDbUrl.searchParams.set('pool_timeout', '60');
+    cronDbUrl.searchParams.set('connect_timeout', '30');
+    cronDbUrl.searchParams.set('application_name', 'kine_cleanup_chat');
+    
+    dedicatedPrisma = new PrismaClient({
+      log: ['error', 'warn'],
+      datasources: {
+        db: {
+          url: cronDbUrl.toString()
+        }
+      }
+    });
+    
     const fiveDaysAgo = new Date();
     fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
     
-    const result = await prisma.chatKine.deleteMany({
+    const result = await dedicatedPrisma.chatKine.deleteMany({
       where: {
         createdAt: {
           lt: fiveDaysAgo
@@ -226,33 +280,50 @@ const cleanOldKineChatHistory = async () => {
     
     console.log(`🗑️ Chat kiné: ${result.count} messages supprimés (> 5 jours)`);
     return result;
-  });
+    
+  } catch (error) {
+    console.error(`❌ Erreur nettoyage chat:`, error.message);
+    throw error;
+  } finally {
+    if (dedicatedPrisma) {
+      console.log(`🔌 Fermeture connexion DÉDIÉE nettoyage chat`);
+      try {
+        await dedicatedPrisma.$disconnect();
+      } catch (error) {
+        console.error(`⚠️ Erreur fermeture:`, error.message);
+      }
+    }
+  }
 };
 
-// Démarrer les tâches automatiques avec timeout
+// Démarrer les tâches automatiques - TEST COMPLET 24h
 const startProgramCleanupCron = () => {
-  console.log('🚀 Démarrage des tâches CRON - TEST CONNEXION DÉDIÉE...');
+  console.log('🚀 Démarrage TEST COMPLET 24h - Toutes tâches CONNEXION DÉDIÉE...');
 
-  // TEST: Archivage TOUTES LES HEURES avec connexion dédiée
+  // TEST: Archivage TOUTES LES HEURES (XX:00)
   cron.schedule('0 * * * *', async () => {
     const now = new Date();
     const hour = now.getHours();
-    console.log(`🕐 Test archivage CONNEXION DÉDIÉE - heure ${hour}h00`);
+    console.log(`📅 [${hour}h00] Test archivage programmes`);
     
     await executeWithTimeout(
-      `archivage programmes terminés DÉDIÉ (${hour}h00)`,
+      `archivage programmes (${hour}h00)`,
       archiveFinishedProgramsTask,
-      90000 // 90 secondes
+      90000
     );
   }, {
     timezone: "Europe/Paris",
     scheduled: true
   });
 
-  // Nettoyage chat kiné - 00h15
-  cron.schedule('15 0 * * *', async () => {
+  // TEST: Nettoyage chat TOUTES LES XX:30
+  cron.schedule('30 * * * *', async () => {
+    const now = new Date();
+    const hour = now.getHours();
+    console.log(`💬 [${hour}h30] Test nettoyage chat kiné`);
+    
     await executeWithTimeout(
-      'nettoyage chat kiné',
+      `nettoyage chat kiné (${hour}h30)`,
       cleanOldKineChatHistory,
       60000
     );
@@ -261,20 +332,25 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  // Nettoyage hebdomadaire - Mercredi 01h00
-  cron.schedule('0 1 * * 3', async () => {
+  // TEST: Nettoyage programmes archivés TOUTES LES XX:45
+  cron.schedule('45 * * * *', async () => {
+    const now = new Date();
+    const hour = now.getHours();
+    console.log(`🗑️ [${hour}h45] Test nettoyage programmes archivés`);
+    
     await executeWithTimeout(
-      'nettoyage programmes archivés',
+      `nettoyage programmes archivés (${hour}h45)`,
       cleanupOldArchivedProgramsTask,
-      300000
+      120000
     );
   }, {
     timezone: "Europe/Paris",
     scheduled: true
   });
 
-  console.log('✅ Tâches CRON configurées - CONNEXION DÉDIÉE');
-  console.log('📅 Planning: CHAQUE HEURE archivage (connexion dédiée), 00h15 chat, mercredi 01h00 nettoyage');
+  console.log('✅ TEST COMPLET configuré - 3 tâches toutes les heures');
+  console.log('📅 Planning: XX:00 archivage, XX:30 chat, XX:45 nettoyage');
+  console.log('🔍 Toutes les tâches utilisent des connexions dédiées');
 };
 
 // Fonctions de test manuel
