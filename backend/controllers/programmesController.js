@@ -1,6 +1,59 @@
 const prismaService = require('../services/prismaService');
 const { generateChatUrl } = require('../services/patientTokenService');
 
+// 🔽 GET tous les programmes actifs du kiné connecté
+exports.getAllProgrammesByKine = async (req, res) => {
+  try {
+    const prisma = prismaService.getInstance();
+    
+    // Récupérer l'UID Firebase depuis le middleware d'authentification
+    const kineUid = req.uid; // Défini par votre middleware authenticate.js
+    
+    if (!kineUid) {
+      console.error('❌ UID Firebase manquant dans req.uid');
+      return res.status(401).json({ 
+        error: "Authentification invalide - UID manquant"
+      });
+    }
+    
+    console.log('✅ UID Firebase utilisé:', kineUid);
+    
+    const programmes = await prisma.programme.findMany({
+      where: {
+        isArchived: false,
+        patient: {
+          kine: {
+            uid: kineUid // Filtrer par le kiné connecté via son UID Firebase
+          }
+        }
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true
+          }
+        },
+        _count: {
+          select: { 
+            exercices: true,
+            chatSessions: true
+          }
+        }
+      },
+      orderBy: { dateDebut: 'desc' }
+    });
+    
+    console.log(`✅ Trouvé ${programmes.length} programmes pour le kiné ${kineUid}`);
+    res.json(programmes);
+  } catch (error) {
+    console.error("Erreur récupération programmes kiné :", error);
+    res.status(500).json({ error: "Erreur récupération programmes" });
+  }
+};
+
 // 🔽 GET programmes actifs (pas archivés)
 exports.getProgrammesByPatient = async (req, res) => {
   const patientId = parseInt(req.params.patientId);

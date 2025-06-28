@@ -14,7 +14,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Settings, BarChart2, Home, Users, DollarSign, Bell, ClipboardList, LogOut, Library, Dumbbell, Briefcase, Share2, Wand2, Gift, Newspaper, ClipboardCheck, FileText, ShoppingBag } from 'lucide-react';
+import { Settings, BarChart2, Home, Users, DollarSign, Bell, ClipboardList, LogOut, Library, Dumbbell, Briefcase, Share2, Wand2, Gift, Newspaper, ClipboardCheck, FileText, ShoppingBag, Calendar } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { RoleOrUnknown } from '@/types/user';
@@ -55,10 +55,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
       return [
         { href: '/dashboard/kine/home', label: 'Accueil Kiné', icon: Home, disabled: false },
         { href: '/dashboard/kine/notifications', label: 'Notifications', icon: Bell, disabled: false },
-        { href: '/dashboard/kine/patients', label: 'Patients & Programmes', icon: Users, disabled: false },
+        { href: '/dashboard/kine/patients', label: 'Patients', icon: Users, disabled: false },
+        { href: '/dashboard/kine/create-exercise', label: 'Mes Exercices', icon: Dumbbell, disabled: false },
+        { href: '/dashboard/kine/programmes', label: 'Programmes', icon: Calendar, disabled: false },
         { href: '/dashboard/kine/chatbot', label: 'Assistant IA Kiné', icon: Wand2, disabled: false },
         { href: '/dashboard/kine/analytics', label: 'Statistiques', icon: BarChart2, disabled: false },
-        { href: '/dashboard/kine/create-exercise', label: 'Créer Exercice (Bientôt)', icon: Dumbbell, disabled: false },
         { href: '/dashboard/kine/public-programs', label: 'Programmes Publics (Bientôt)', icon: Share2, disabled: false },
         { href: '/dashboard/kine/blog', label: 'Blog Pro (Bientôt)', icon: Library, disabled: false },
         { href: '/dashboard/kine/jobs', label: 'Annonces Emploi (Bientôt)', icon: Briefcase, disabled: false },

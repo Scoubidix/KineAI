@@ -5,6 +5,124 @@ const programmesController = require('../controllers/programmesController');
 const { authenticate } = require('../middleware/authenticate');
 
 // ROUTES SPÉCIFIQUES EN PREMIER (avant les routes avec paramètres)
+
+// NOUVELLE ROUTE : Récupérer tous les programmes actifs du kiné
+router.get('/kine/all', authenticate, programmesController.getAllProgrammesByKine);
+
+// Route pour les stats (doit être avant /:patientId)
+router.get('/stats', authenticate, async (req, res) => {
+  try {
+    const prismaService = require('../services/prismaService');
+    const prisma = prismaService.getInstance();
+    const kineUid = req.uid; // UID Firebase du kiné connecté
+    
+    if (!kineUid) {
+      return res.status(401).json({ 
+        error: "Authentification invalide - UID manquant"
+      });
+    }
+
+    const stats = await prisma.$transaction([
+      // Programmes actifs du kiné connecté
+      prisma.programme.count({ 
+        where: { 
+          isArchived: false,
+          patient: {
+            kine: {
+              uid: kineUid
+            }
+          }
+        } 
+      }),
+      // Programmes archivés du kiné connecté
+      prisma.programme.count({ 
+        where: { 
+          isArchived: true,
+          patient: {
+            kine: {
+              uid: kineUid
+            }
+          }
+        } 
+      }),
+      // Total messages de chat du kiné connecté
+      prisma.chatSession.count({
+        where: {
+          programme: {
+            patient: {
+              kine: {
+                uid: kineUid
+              }
+            }
+          }
+        }
+      }),
+      // Messages par programmes actifs du kiné connecté
+      prisma.chatSession.count({
+        where: { 
+          programme: { 
+            isArchived: false,
+            patient: {
+              kine: {
+                uid: kineUid
+              }
+            }
+          } 
+        }
+      }),
+      // Messages par programmes archivés du kiné connecté
+      prisma.chatSession.count({
+        where: { 
+          programme: { 
+            isArchived: true,
+            patient: {
+              kine: {
+                uid: kineUid
+              }
+            }
+          } 
+        }
+      }),
+    ]);
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const oldArchived = await prisma.programme.count({
+      where: {
+        isArchived: true,
+        archivedAt: { lt: sixMonthsAgo },
+        patient: {
+          kine: {
+            uid: kineUid
+          }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      stats: {
+        activePrograms: stats[0],
+        archivedPrograms: stats[1],
+        totalChatMessages: stats[2],
+        activeProgramMessages: stats[3],
+        archivedProgramMessages: stats[4],
+        oldArchivedPrograms: oldArchived,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Erreur récupération statistiques:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération des statistiques',
+      details: error.message
+    });
+  }
+});
+
 // Route pour générer le lien de chat
 router.post('/:programmeId/generate-link', authenticate, programmesController.generateProgrammeLink);
 
