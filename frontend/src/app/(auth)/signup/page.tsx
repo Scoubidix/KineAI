@@ -18,7 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { UserPlus, ArrowLeft, User, Building, Phone, Mail, Calendar, MapPin, Hash, Lock } from "lucide-react";
+import { UserPlus, ArrowLeft, User, Building, Phone, Mail, Calendar, MapPin, Hash, Lock, Eye, EyeOff, Check, X } from "lucide-react";
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -33,8 +33,29 @@ export default function SignupPage() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+
+  // Validation du mot de passe
+  const validatePassword = (password: string) => {
+    const minLength = password.length >= 8;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    
+    return {
+      minLength,
+      hasUpperCase,
+      hasLowerCase,
+      hasNumbers,
+      hasSpecialChar,
+      isValid: minLength && hasUpperCase && hasLowerCase && hasNumbers && hasSpecialChar
+    };
+  };
+
+  const passwordValidation = validatePassword(formData.password);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -98,11 +119,24 @@ export default function SignupPage() {
       return;
     }
 
+    // Validation du mot de passe
+    if (!passwordValidation.isValid) {
+      const passwordInput = document.getElementById('password') as HTMLInputElement;
+      if (passwordInput) {
+        passwordInput.setCustomValidity('Le mot de passe ne respecte pas tous les critères de sécurité');
+        passwordInput.reportValidity();
+      }
+      setLoading(false);
+      return;
+    }
+
     // Reset des erreurs de validation personnalisées
     const rppsInput = document.getElementById('rpps') as HTMLInputElement;
     const phoneInput = document.getElementById('phone') as HTMLInputElement;
+    const passwordInput = document.getElementById('password') as HTMLInputElement;
     if (rppsInput) rppsInput.setCustomValidity('');
     if (phoneInput) phoneInput.setCustomValidity('');
+    if (passwordInput) passwordInput.setCustomValidity('');
 
     try {
       // 1. Créer le compte Firebase Auth
@@ -347,7 +381,7 @@ export default function SignupPage() {
                   Informations de connexion
                 </h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   {/* Email */}
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-sm font-medium">
@@ -379,19 +413,74 @@ export default function SignupPage() {
                       <Input 
                         id="password" 
                         name="password" 
-                        type="password" 
+                        type={showPassword ? "text" : "password"}
                         placeholder="••••••••" 
                         value={formData.password}
                         onChange={handleChange} 
-                        className="pl-10 h-12"
+                        className="pl-10 pr-10 h-12"
                         required 
-                        disabled={loading} 
-                        minLength={6} 
+                        disabled={loading}
+                        onInvalid={(e) => e.preventDefault()}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 h-4 w-4 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Minimum 6 caractères
-                    </p>
+                    
+                    {/* Indicateurs de validation du mot de passe */}
+                    {formData.password && (
+                      <div className="mt-3 p-3 bg-muted/50 rounded-md space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">
+                          Critères de sécurité :
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
+                          <div className={`flex items-center gap-2 ${passwordValidation.minLength ? 'text-green-600' : 'text-red-500'}`}>
+                            {passwordValidation.minLength ? (
+                              <Check className="h-3 w-3" />
+                            ) : (
+                              <X className="h-3 w-3" />
+                            )}
+                            <span>Au moins 8 caractères</span>
+                          </div>
+                          <div className={`flex items-center gap-2 ${passwordValidation.hasUpperCase ? 'text-green-600' : 'text-red-500'}`}>
+                            {passwordValidation.hasUpperCase ? (
+                              <Check className="h-3 w-3" />
+                            ) : (
+                              <X className="h-3 w-3" />
+                            )}
+                            <span>Une majuscule (A-Z)</span>
+                          </div>
+                          <div className={`flex items-center gap-2 ${passwordValidation.hasLowerCase ? 'text-green-600' : 'text-red-500'}`}>
+                            {passwordValidation.hasLowerCase ? (
+                              <Check className="h-3 w-3" />
+                            ) : (
+                              <X className="h-3 w-3" />
+                            )}
+                            <span>Une minuscule (a-z)</span>
+                          </div>
+                          <div className={`flex items-center gap-2 ${passwordValidation.hasNumbers ? 'text-green-600' : 'text-red-500'}`}>
+                            {passwordValidation.hasNumbers ? (
+                              <Check className="h-3 w-3" />
+                            ) : (
+                              <X className="h-3 w-3" />
+                            )}
+                            <span>Un chiffre (0-9)</span>
+                          </div>
+                          <div className={`flex items-center gap-2 ${passwordValidation.hasSpecialChar ? 'text-green-600' : 'text-red-500'} sm:col-span-2`}>
+                            {passwordValidation.hasSpecialChar ? (
+                              <Check className="h-3 w-3" />
+                            ) : (
+                              <X className="h-3 w-3" />
+                            )}
+                            <span>Un caractère spécial (!@#$%^&*(),.?":{}|&lt;&gt;)</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -403,7 +492,7 @@ export default function SignupPage() {
               {/* Bouton d'inscription */}
               <Button 
                 type="submit" 
-                disabled={loading} 
+                disabled={loading || !passwordValidation.isValid} 
                 className="w-full h-12 text-base font-medium"
                 size="lg"
               >
