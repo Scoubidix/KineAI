@@ -114,42 +114,12 @@ export default function PatientChatPage() {
   const [isSubmittingValidation, setIsSubmittingValidation] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [validationDetails, setValidationDetails] = useState<any>(null);
-
-  // État pour le header qui se cache
-  const [headerVisible, setHeaderVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
   
   // Référence pour le scroll automatique
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // URL de l'API
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-
-  // Gestion du scroll pour cacher/montrer le header
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!chatContainerRef.current) return;
-      
-      const currentScrollY = chatContainerRef.current.scrollTop;
-      
-      if (currentScrollY > lastScrollY && currentScrollY > 50) {
-        // Scroll vers le bas - cacher le header
-        setHeaderVisible(false);
-      } else if (currentScrollY < lastScrollY) {
-        // Scroll vers le haut - montrer le header immédiatement
-        setHeaderVisible(true);
-      }
-      
-      setLastScrollY(currentScrollY);
-    };
-
-    const chatContainer = chatContainerRef.current;
-    if (chatContainer) {
-      chatContainer.addEventListener('scroll', handleScroll, { passive: true });
-      return () => chatContainer.removeEventListener('scroll', handleScroll);
-    }
-  }, [lastScrollY]);
 
   // Validation du token au chargement
   useEffect(() => {
@@ -536,11 +506,8 @@ export default function PatientChatPage() {
         </div>
       )}
 
-      {/* Header - style WhatsApp qui se cache au scroll */}
-      <div className={`
-        bg-white text-gray-800 shadow-lg border-b transition-all duration-300 ease-in-out z-30
-        ${headerVisible ? 'translate-y-0' : '-translate-y-full'}
-      `}>
+      {/* Header - toujours visible */}
+      <div className="bg-white text-gray-800 shadow-lg border-b z-30">
         <div className="px-4 py-3">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-center relative">
@@ -586,20 +553,10 @@ export default function PatientChatPage() {
       </div>
 
       {/* Indicateur pour montrer que le header peut revenir */}
-      {!headerVisible && (
-        <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-20">
-          <button
-            onClick={() => setHeaderVisible(true)}
-            className="bg-gray-800/70 text-white rounded-full p-1 shadow-lg hover:bg-gray-800/90 transition-colors"
-          >
-            <ChevronDown className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      {/* Header maintenant toujours visible */}
 
       {/* Zone de chat */}
       <div 
-        ref={chatContainerRef}
         className="flex-1 overflow-y-auto"
         style={{
           backgroundColor: '#f0f4f8',
@@ -607,8 +564,7 @@ export default function PatientChatPage() {
             url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%233b82f6' fill-opacity='0.05'%3E%3Cpath d='M20 20h8v8h-8zM32 32h4v4h-4zM48 16h6v6h-6zM64 44h5v5h-5zM12 52h7v7h-7zM60 8h3v3h-3zM40 60h4v4h-4zM8 36h6v6h-6zM56 72h8v8h-8zM24 64h5v5h-5zM72 20h4v4h-4zM16 8h5v5h-5z'/%3E%3C/g%3E%3C/svg%3E"),
             url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%233b82f6' fill-opacity='0.03'%3E%3Ccircle cx='20' cy='20' r='2'/%3E%3Ccircle cx='80' cy='40' r='1.5'/%3E%3Ccircle cx='40' cy='80' r='3'/%3E%3Ccircle cx='100' cy='100' r='2'/%3E%3Ccircle cx='60' cy='20' r='1'/%3E%3Ccircle cx='20' cy='100' r='2.5'/%3E%3Ccircle cx='100' cy='60' r='1.5'/%3E%3Ccircle cx='40' cy='40' r='1'/%3E%3C/g%3E%3C/svg%3E"),
             url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%233b82f6' fill-opacity='0.04'%3E%3Cpath d='M25 15l5 8h-10zM70 20l4 6h-8zM45 70l6 10h-12zM80 80l3 5h-6zM15 60l7 12h-14zM90 40l4 7h-8z'/%3E%3C/g%3E%3C/svg%3E")
-          `,
-          paddingTop: headerVisible ? '0' : '20px'
+          `
         }}
       >
         {isLoadingChat ? (
@@ -630,7 +586,7 @@ export default function PatientChatPage() {
                   className={`
                     max-w-[80%] px-4 py-2 rounded-2xl shadow-sm relative
                     ${message.role === 'user'
-                      ? 'bg-blue-500 text-white rounded-br-md ml-12'
+                      ? 'bg-blue-600 text-white rounded-br-md ml-12'
                       : 'bg-white text-gray-800 rounded-bl-md mr-12 border'
                     }
                   `}
@@ -647,7 +603,7 @@ export default function PatientChatPage() {
                   <div className={`
                     absolute top-0 w-0 h-0
                     ${message.role === 'user'
-                      ? 'right-0 border-l-[8px] border-l-blue-500 border-t-[8px] border-t-transparent'
+                      ? 'right-0 border-l-[8px] border-l-blue-600 border-t-[8px] border-t-transparent'
                       : 'left-0 border-r-[8px] border-r-white border-t-[8px] border-t-transparent'
                     }
                   `} />
