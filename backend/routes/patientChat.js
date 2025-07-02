@@ -392,6 +392,251 @@ router.post('/validate/:token',
   }
 );
 
+// ==========================================
+// NOUVELLES ROUTES POUR VALIDATION SÉANCES
+// ==========================================
+
+/**
+ * GET /api/patient/session-status/:token
+ * Vérifier le statut de validation de la séance du jour
+ */
+router.get('/session-status/:token',
+  authenticatePatient,
+  checkTokenExpiry(24),
+  async (req, res) => {
+    try {
+      const patientId = req.patient.id;
+      const programmeId = req.programme.id;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Début de journée
+
+      // Vérifier si le programme est archivé
+      if (req.programme.isArchived) {
+        return res.status(410).json({
+          success: false,
+          error: 'Programme archivé, validation non disponible',
+          code: 'PROGRAMME_ARCHIVED'
+        });
+      }
+
+      // Vérifier si le programme est expiré
+      const now = new Date();
+      if (new Date(req.programme.dateFin) < now) {
+        return res.status(410).json({
+          success: false,
+          error: 'Programme expiré, validation non disponible',
+          code: 'PROGRAMME_EXPIRED'
+        });
+      }
+
+      const prisma = prismaService.getInstance();
+
+      // Chercher une validation existante pour aujourd'hui
+      const existingValidation = await prisma.sessionValidation.findUnique({
+        where: {
+          patientId_programmeId_date: {
+            patientId: patientId,
+            programmeId: programmeId,
+            date: today
+          }
+        }
+      });
+
+      const response = {
+        success: true,
+        isValidatedToday: !!existingValidation?.isValidated,
+        validation: existingValidation ? {
+          date: existingValidation.date,
+          painLevel: existingValidation.painLevel,
+          difficultyLevel: existingValidation.difficultyLevel,
+          validatedAt: existingValidation.validatedAt
+        } : null,
+        patient: {
+          id: req.patient.id,
+          nom: `${req.patient.firstName} ${req.patient.lastName}`,
+          age: calculateAge(req.patient.birthDate)
+        },
+        programme: {
+          id: req.programme.id,
+          titre: req.programme.titre,
+          duree: req.programme.duree,
+          dateFin: req.programme.dateFin,
+          isArchived: req.programme.isArchived
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      // Ajouter warning d'expiration si présent
+      if (req.expiryWarning) {
+        response.warning = req.expiryWarning;
+      }
+
+      res.json(response);
+
+    } catch (error) {
+      console.error('Erreur route session-status patient:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Erreur serveur lors de la vérification du statut',
+        details: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/patient/validate-session/:token
+ * Valider la séance du jour avec métriques douleur/difficulté
+ */
+router.post('/validate-session/:token',
+  authenticatePatient,
+  checkTokenExpiry(24),
+  logPatientAccess,
+  async (req, res) => {
+    try {
+      const { painLevel, difficultyLevel } = req.body;
+      const patientId = req.patient.id;
+      const programmeId = req.programme.id;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Début de journée
+
+      // Validation des données d'entrée
+      if (typeof painLevel !== 'number' || painLevel < 0 || painLevel > 10) {
+        return res.status(400).json({
+          success: false,
+          error: 'Niveau de douleur requis (0-10)',
+          code: 'INVALID_PAIN_LEVEL'
+        });
+      }
+
+      if (typeof difficultyLevel !== 'number' || difficultyLevel < 0 || difficultyLevel > 10) {
+        return res.status(400).json({
+          success: false,
+          error: 'Niveau de difficulté requis (0-10)',
+          code: 'INVALID_DIFFICULTY_LEVEL'
+        });
+      }
+
+      // Vérifier que le programme n'est pas archivé
+      if (req.programme.isArchived) {
+        return res.status(410).json({
+          success: false,
+          error: 'Programme archivé, validation impossible',
+          code: 'PROGRAMME_ARCHIVED'
+        });
+      }
+
+      // Vérifier que le programme n'est pas expiré
+      const now = new Date();
+      if (new Date(req.programme.dateFin) < now) {
+        return res.status(410).json({
+          success: false,
+          error: 'Programme expiré, validation impossible',
+          code: 'PROGRAMME_EXPIRED'
+        });
+      }
+
+      const prisma = prismaService.getInstance();
+
+      // Vérifier s'il y a déjà une validation pour aujourd'hui
+      const existingValidation = await prisma.sessionValidation.findUnique({
+        where: {
+          patientId_programmeId_date: {
+            patientId: patientId,
+            programmeId: programmeId,
+            date: today
+          }
+        }
+      });
+
+      if (existingValidation?.isValidated) {
+        return res.status(409).json({
+          success: false,
+          error: 'Séance déjà validée pour aujourd\'hui',
+          code: 'ALREADY_VALIDATED',
+          validation: {
+            date: existingValidation.date,
+            painLevel: existingValidation.painLevel,
+            difficultyLevel: existingValidation.difficultyLevel,
+            validatedAt: existingValidation.validatedAt
+          }
+        });
+      }
+
+      // Créer ou mettre à jour la validation
+      const validationData = {
+        patientId: patientId,
+        programmeId: programmeId,
+        date: today,
+        isValidated: true,
+        painLevel: Math.round(painLevel), // S'assurer que c'est un entier
+        difficultyLevel: Math.round(difficultyLevel),
+        validatedAt: new Date()
+      };
+
+      const validation = await prisma.sessionValidation.upsert({
+        where: {
+          patientId_programmeId_date: {
+            patientId: patientId,
+            programmeId: programmeId,
+            date: today
+          }
+        },
+        update: {
+          isValidated: true,
+          painLevel: validationData.painLevel,
+          difficultyLevel: validationData.difficultyLevel,
+          validatedAt: validationData.validatedAt
+        },
+        create: validationData
+      });
+
+      // Log de l'activité (pour monitoring)
+      console.log(`✅ VALIDATION: Patient ${patientId} - Programme ${programmeId} - Douleur: ${painLevel}/10 - Difficulté: ${difficultyLevel}/10`);
+
+      const response = {
+        success: true,
+        message: 'Séance validée avec succès ! Merci pour votre retour.',
+        validation: {
+          id: validation.id,
+          date: validation.date,
+          painLevel: validation.painLevel,
+          difficultyLevel: validation.difficultyLevel,
+          validatedAt: validation.validatedAt
+        },
+        patient: {
+          id: req.patient.id,
+          nom: `${req.patient.firstName} ${req.patient.lastName}`,
+          age: calculateAge(req.patient.birthDate)
+        },
+        programme: {
+          id: req.programme.id,
+          titre: req.programme.titre,
+          duree: req.programme.duree,
+          dateFin: req.programme.dateFin,
+          isArchived: req.programme.isArchived
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      // Ajouter warning d'expiration si présent
+      if (req.expiryWarning) {
+        response.warning = req.expiryWarning;
+      }
+
+      res.status(201).json(response);
+
+    } catch (error) {
+      console.error('Erreur route validate-session patient:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Erreur serveur lors de la validation',
+        details: error.message
+      });
+    }
+  }
+);
+
 // Fonction utilitaire pour calculer l'âge
 function calculateAge(birthDateStr) {
   const birthDate = new Date(birthDateStr);

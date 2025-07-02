@@ -1,5 +1,5 @@
 // ==========================================
-// FICHIER: kineController.js (MODIFIÉ)
+// FICHIER: kineController.js (VERSION FINALE AVEC LOGIQUE CONDITIONNELLE)
 // ==========================================
 
 const prismaService = require('../services/prismaService');
@@ -88,10 +88,6 @@ const getKineProfile = async (req, res) => {
   }
 };
 
-// ==========================================
-// NOUVELLE FONCTION AJOUTÉE
-// ==========================================
-
 const updateKineProfile = async (req, res) => {
   const uid = req.uid; // Récupéré depuis le middleware authenticate
   const { email, phone, adresseCabinet } = req.body;
@@ -158,4 +154,334 @@ const updateKineProfile = async (req, res) => {
   }
 };
 
-module.exports = { createKine, getKineProfile, updateKineProfile };
+// ==========================================
+// NOUVELLES FONCTIONS POUR LE SUIVI D'ADHÉRENCE
+// AVEC LOGIQUE CONDITIONNELLE POUR L'ARCHIVAGE
+// ==========================================
+
+/**
+ * GET /kine/adherence/:date
+ * Calculer l'adhérence globale pour une date donnée
+ * LOGIQUE: Aujourd'hui = programmes actifs seulement, Passé = tous programmes
+ */
+const getAdherenceByDate = async (req, res) => {
+  const uid = req.uid; // UID du kiné authentifié
+  const { date } = req.params; // Format: YYYY-MM-DD
+
+  console.log("📊 Calcul adhérence pour UID:", uid, "Date:", date);
+
+  try {
+    // Validation du format de date
+    const targetDate = new Date(date);
+    if (isNaN(targetDate.getTime())) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Format de date invalide. Utilisez YYYY-MM-DD.' 
+      });
+    }
+
+    // Normaliser la date (début de journée)
+    targetDate.setHours(0, 0, 0, 0);
+
+    // 🔧 LOGIQUE CONDITIONNELLE POUR L'ARCHIVAGE
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isToday = targetDate.getTime() === today.getTime();
+
+    const prisma = prismaService.getInstance();
+
+    // 1. Récupérer le kiné et vérifier son existence
+    const kine = await prisma.kine.findUnique({
+      where: { uid },
+      select: { id: true, firstName: true, lastName: true }
+    });
+
+    if (!kine) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Kiné non trouvé.' 
+      });
+    }
+
+    // 2. Construire la requête avec logique conditionnelle
+    const whereClause = {
+      patient: {
+        kineId: kine.id
+      },
+      dateDebut: {
+        lte: targetDate
+      },
+      dateFin: {
+        gte: targetDate
+      }
+    };
+
+    // ✅ SEULEMENT pour aujourd'hui, exclure les programmes archivés
+    if (isToday) {
+      whereClause.isArchived = false;
+    }
+    // Pour les dates passées, inclure TOUS les programmes (archivés ou non)
+
+    // 3. Trouver tous les programmes pertinents pour cette date
+    const activeProgrammes = await prisma.programme.findMany({
+      where: whereClause,
+      include: {
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        },
+        sessionValidations: {
+          where: {
+            date: targetDate
+          }
+        }
+      }
+    });
+
+    // 4. Calculer les statistiques
+    const totalPatients = activeProgrammes.length;
+    const validatedPatients = activeProgrammes.filter(
+      programme => programme.sessionValidations.some(validation => validation.isValidated)
+    ).length;
+
+    const adherencePercentage = totalPatients > 0 
+      ? Math.round((validatedPatients / totalPatients) * 100)
+      : 0;
+
+    // 5. Calculer les moyennes de douleur et difficulté
+    const validations = activeProgrammes
+      .flatMap(p => p.sessionValidations)
+      .filter(v => v.isValidated && v.painLevel !== null && v.difficultyLevel !== null);
+
+    const avgPainLevel = validations.length > 0
+      ? Math.round((validations.reduce((sum, v) => sum + v.painLevel, 0) / validations.length) * 10) / 10
+      : null;
+
+    const avgDifficultyLevel = validations.length > 0
+      ? Math.round((validations.reduce((sum, v) => sum + v.difficultyLevel, 0) / validations.length) * 10) / 10
+      : null;
+
+    // 6. Construire la réponse
+    const response = {
+      success: true,
+      date: targetDate.toISOString().split('T')[0], // Format YYYY-MM-DD
+      isToday: isToday,                               // 🆕 Nouveau flag
+      isHistorical: !isToday,                         // 🆕 Pour l'UI
+      dataScope: isToday ? 'active_only' : 'all_programmes', // 🆕 Type de données
+      adherence: {
+        totalPatients,
+        validatedPatients,
+        percentage: adherencePercentage
+      },
+      metrics: {
+        avgPainLevel,
+        avgDifficultyLevel,
+        validationsCount: validations.length
+      },
+      kine: {
+        id: kine.id,
+        nom: `${kine.firstName} ${kine.lastName}`
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    console.log("✅ Adhérence calculée:", {
+      date: targetDate.toISOString().split('T')[0],
+      scope: response.dataScope,
+      adherence: `${validatedPatients}/${totalPatients} (${adherencePercentage}%)`,
+      avgPain: avgPainLevel,
+      avgDifficulty: avgDifficultyLevel
+    });
+
+    res.json(response);
+
+  } catch (err) {
+    console.error("❌ Erreur calcul adhérence:", err);
+    res.status(500).json({ 
+      success: false,
+      error: 'Erreur serveur lors du calcul de l\'adhérence.',
+      details: err.message
+    });
+  }
+};
+
+/**
+ * GET /kine/patients-sessions/:date
+ * Récupérer la liste détaillée des patients et leur statut de validation pour une date
+ * LOGIQUE: Aujourd'hui = programmes actifs seulement, Passé = tous programmes
+ */
+const getPatientSessionsByDate = async (req, res) => {
+  const uid = req.uid; // UID du kiné authentifié
+  const { date } = req.params; // Format: YYYY-MM-DD
+
+  console.log("📋 Liste patients-sessions pour UID:", uid, "Date:", date);
+
+  try {
+    // Validation du format de date
+    const targetDate = new Date(date);
+    if (isNaN(targetDate.getTime())) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Format de date invalide. Utilisez YYYY-MM-DD.' 
+      });
+    }
+
+    // Normaliser la date (début de journée)
+    targetDate.setHours(0, 0, 0, 0);
+
+    // 🔧 LOGIQUE CONDITIONNELLE POUR L'ARCHIVAGE
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isToday = targetDate.getTime() === today.getTime();
+
+    const prisma = prismaService.getInstance();
+
+    // 1. Récupérer le kiné et vérifier son existence
+    const kine = await prisma.kine.findUnique({
+      where: { uid },
+      select: { id: true, firstName: true, lastName: true }
+    });
+
+    if (!kine) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Kiné non trouvé.' 
+      });
+    }
+
+    // 2. Construire la requête avec logique conditionnelle
+    const whereClause = {
+      patient: {
+        kineId: kine.id
+      },
+      dateDebut: {
+        lte: targetDate
+      },
+      dateFin: {
+        gte: targetDate
+      }
+    };
+
+    // ✅ SEULEMENT pour aujourd'hui, exclure les programmes archivés
+    if (isToday) {
+      whereClause.isArchived = false;
+    }
+    // Pour les dates passées, inclure TOUS les programmes (archivés ou non)
+
+    // 3. Récupérer tous les patients avec programmes pertinents pour cette date
+    const patientsWithSessions = await prisma.programme.findMany({
+      where: whereClause,
+      include: {
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            birthDate: true
+          }
+        },
+        sessionValidations: {
+          where: {
+            date: targetDate
+          }
+        }
+      },
+      orderBy: {
+        patient: {
+          lastName: 'asc'
+        }
+      }
+    });
+
+    // 4. Formatter les données pour la réponse
+    const patients = patientsWithSessions.map(programme => {
+      const validation = programme.sessionValidations[0]; // Il ne peut y en avoir qu'une par date
+      
+      return {
+        patient: {
+          id: programme.patient.id,
+          firstName: programme.patient.firstName,
+          lastName: programme.patient.lastName,
+          nom: `${programme.patient.firstName} ${programme.patient.lastName}`,
+          age: calculateAge(programme.patient.birthDate)
+        },
+        programme: {
+          id: programme.id,
+          titre: programme.titre,
+          dateDebut: programme.dateDebut,
+          dateFin: programme.dateFin,
+          isArchived: programme.isArchived  // 🆕 Info archivage
+        },
+        session: {
+          isValidated: !!validation?.isValidated,
+          painLevel: validation?.painLevel || null,
+          difficultyLevel: validation?.difficultyLevel || null,
+          validatedAt: validation?.validatedAt || null
+        }
+      };
+    });
+
+    // 5. Calculer les statistiques rapides
+    const totalPatients = patients.length;
+    const validatedCount = patients.filter(p => p.session.isValidated).length;
+    const adherencePercentage = totalPatients > 0 
+      ? Math.round((validatedCount / totalPatients) * 100)
+      : 0;
+
+    const response = {
+      success: true,
+      date: targetDate.toISOString().split('T')[0],
+      isToday: isToday,                               // 🆕 Nouveau flag
+      isHistorical: !isToday,                         // 🆕 Pour l'UI
+      dataScope: isToday ? 'active_only' : 'all_programmes', // 🆕 Type de données
+      summary: {
+        totalPatients,
+        validatedCount,
+        pendingCount: totalPatients - validatedCount,
+        adherencePercentage
+      },
+      patients,
+      kine: {
+        id: kine.id,
+        nom: `${kine.firstName} ${kine.lastName}`
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    console.log("✅ Liste patients-sessions récupérée:", {
+      date: targetDate.toISOString().split('T')[0],
+      scope: response.dataScope,
+      totalPatients,
+      validatedCount,
+      adherence: `${adherencePercentage}%`
+    });
+
+    res.json(response);
+
+  } catch (err) {
+    console.error("❌ Erreur récupération patients-sessions:", err);
+    res.status(500).json({ 
+      success: false,
+      error: 'Erreur serveur lors de la récupération des sessions patients.',
+      details: err.message
+    });
+  }
+};
+
+// Fonction utilitaire pour calculer l'âge
+function calculateAge(birthDateStr) {
+  const birthDate = new Date(birthDateStr);
+  const ageDiff = Date.now() - birthDate.getTime();
+  return Math.floor(ageDiff / (1000 * 60 * 60 * 24 * 365.25));
+}
+
+module.exports = { 
+  createKine, 
+  getKineProfile, 
+  updateKineProfile,
+  getAdherenceByDate,      // NOUVELLE FONCTION AVEC LOGIQUE CONDITIONNELLE
+  getPatientSessionsByDate // NOUVELLE FONCTION AVEC LOGIQUE CONDITIONNELLE
+};

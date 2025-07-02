@@ -22,7 +22,7 @@ model Kine {
 
   patients         Patient[]
   exercicesModeles ExerciceModele[]
-  chatKine         ChatKine[]        // Nouvelle relation pour le chat kiné
+  chatKine         ChatKine[]
 }
 
 model Patient {
@@ -39,8 +39,9 @@ model Patient {
   kineId     Int
   kine       Kine         @relation(fields: [kineId], references: [id])
 
-  programmes   Programme[]
-  chatSessions ChatSession[]
+  programmes        Programme[]
+  chatSessions      ChatSession[]
+  sessionValidations SessionValidation[] // NOUVELLE RELATION
 }
 
 model ExerciceModele {
@@ -49,7 +50,7 @@ model ExerciceModele {
   kineId      Int
   nom         String
   description String
-  tags        String?  // NOUVEAU : tags séparés par virgules
+  tags        String?  // tags séparés par virgules
   isPublic    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -72,8 +73,9 @@ model Programme {
   patientId   Int
   patient     Patient   @relation(fields: [patientId], references: [id])
 
-  exercices    ExerciceProgramme[]
-  chatSessions ChatSession[]
+  exercices          ExerciceProgramme[]
+  chatSessions       ChatSession[]
+  sessionValidations SessionValidation[] // NOUVELLE RELATION
 }
 
 model ExerciceProgramme {
@@ -111,7 +113,39 @@ model ChatSession {
   @@map("chat_sessions")
 }
 
-// NOUVELLE TABLE pour les conversations kiné
+// NOUVELLE TABLE pour le suivi quotidien des séances
+model SessionValidation {
+  id           Int       @id @default(autoincrement())
+  date         DateTime  @db.Date // Date de la séance (YYYY-MM-DD)
+  isValidated  Boolean   @default(false)
+  validatedAt  DateTime? // Moment exact de la validation
+  
+  // NOUVELLES MÉTRIQUES
+  painLevel       Int?    // Douleur de 0 à 10 (null si pas encore validé)
+  difficultyLevel Int?    // Difficulté de 0 à 10 (null si pas encore validé)
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  // Relations
+  patientId    Int
+  patient      Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  programmeId  Int
+  programme    Programme @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  
+  // Contraintes : Un patient ne peut valider qu'une fois par jour pour un programme donné
+  @@unique([patientId, programmeId, date])
+  
+  // Index pour optimiser les requêtes
+  @@index([date, programmeId]) // Pour récupérer l'adhérence par date/programme
+  @@index([patientId, date])   // Pour récupérer l'historique d'un patient
+  @@index([programmeId])       // Pour stats globales d'un programme
+  
+  @@map("session_validations")
+}
+
+// Chat kiné avec l'IA (existant)
 model ChatKine {
   id          Int      @id @default(autoincrement())
   message     String   // Question du kiné
