@@ -136,8 +136,8 @@ export default function PatientChatPage() {
       if (currentScrollY > lastScrollY && currentScrollY > 50) {
         // Scroll vers le bas - cacher le header
         setHeaderVisible(false);
-      } else {
-        // Scroll vers le haut - montrer le header
+      } else if (currentScrollY < lastScrollY) {
+        // Scroll vers le haut - montrer le header immédiatement
         setHeaderVisible(true);
       }
       
