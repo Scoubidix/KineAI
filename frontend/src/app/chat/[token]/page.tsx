@@ -427,8 +427,8 @@ export default function PatientChatPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Trophy className="w-8 h-8 text-blue-600" />
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trophy className="w-8 h-8 text-primary" />
               </div>
               <h2 className="text-xl font-semibold text-gray-800 mb-2">Validation de séance</h2>
               <p className="text-gray-600">Aidez-nous à suivre votre progression</p>
@@ -451,7 +451,7 @@ export default function PatientChatPage() {
                   />
                   <div className="flex justify-between text-xs text-gray-500">
                     <span>0 - Aucune</span>
-                    <span className="font-medium text-blue-600">{painLevel}/10</span>
+                    <span className="font-medium text-primary">{painLevel}/10</span>
                     <span>10 - Très forte</span>
                   </div>
                 </div>
@@ -473,7 +473,7 @@ export default function PatientChatPage() {
                   />
                   <div className="flex justify-between text-xs text-gray-500">
                     <span>0 - Très facile</span>
-                    <span className="font-medium text-blue-600">{difficultyLevel}/10</span>
+                    <span className="font-medium text-primary">{difficultyLevel}/10</span>
                     <span>10 - Très difficile</span>
                   </div>
                 </div>
@@ -492,7 +492,7 @@ export default function PatientChatPage() {
               <button
                 onClick={handleValidationSubmit}
                 disabled={isSubmittingValidation}
-                className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSubmittingValidation ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -526,7 +526,7 @@ export default function PatientChatPage() {
                 ) : (
                   <button
                     onClick={() => setShowValidationModal(true)}
-                    className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center gap-2"
+                    className="px-3 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                   >
                     <Trophy className="w-4 h-4" />
                     Valider
@@ -551,9 +551,6 @@ export default function PatientChatPage() {
           </div>
         </div>
       </div>
-
-      {/* Indicateur pour montrer que le header peut revenir */}
-      {/* Header maintenant toujours visible */}
 
       {/* Zone de chat */}
       <div 
@@ -586,7 +583,7 @@ export default function PatientChatPage() {
                   className={`
                     max-w-[80%] px-4 py-2 rounded-2xl shadow-sm relative
                     ${message.role === 'user'
-                      ? 'bg-blue-600 text-white rounded-br-md ml-12'
+                      ? 'bg-primary text-primary-foreground rounded-br-md ml-12'
                       : 'bg-white text-gray-800 rounded-bl-md mr-12 border'
                     }
                   `}
@@ -594,7 +591,7 @@ export default function PatientChatPage() {
                   <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
                   <p className={`
                     text-xs mt-1 
-                    ${message.role === 'user' ? 'text-blue-100' : 'text-gray-500'}
+                    ${message.role === 'user' ? 'text-white/70' : 'text-gray-500'}
                   `}>
                     {formatTime(message.timestamp)}
                   </p>
@@ -603,7 +600,7 @@ export default function PatientChatPage() {
                   <div className={`
                     absolute top-0 w-0 h-0
                     ${message.role === 'user'
-                      ? 'right-0 border-l-[8px] border-l-blue-600 border-t-[8px] border-t-transparent'
+                      ? 'right-0 border-l-[8px] border-l-primary border-t-[8px] border-t-transparent'
                       : 'left-0 border-r-[8px] border-r-white border-t-[8px] border-t-transparent'
                     }
                   `} />
@@ -655,7 +652,7 @@ export default function PatientChatPage() {
             <button
               onClick={sendMessage}
               disabled={!currentMessage.trim() || isSending || isLoadingChat}
-              className="w-12 h-12 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-full transition-colors flex items-center justify-center shadow-lg"
+              className="w-12 h-12 bg-primary hover:bg-primary/90 disabled:bg-gray-300 disabled:cursor-not-allowed text-primary-foreground rounded-full transition-colors flex items-center justify-center"
             >
               {isSending ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -684,7 +681,7 @@ export default function PatientChatPage() {
           width: 20px;
           height: 20px;
           border-radius: 50%;
-          background: #3b82f6;
+          background: hsl(var(--primary));
           cursor: pointer;
           border: 2px solid white;
           box-shadow: 0 2px 4px rgba(0,0,0,0.2);
@@ -693,7 +690,7 @@ export default function PatientChatPage() {
           width: 20px;
           height: 20px;
           border-radius: 50%;
-          background: #3b82f6;
+          background: hsl(var(--primary));
           cursor: pointer;
           border: 2px solid white;
           box-shadow: 0 2px 4px rgba(0,0,0,0.2);
