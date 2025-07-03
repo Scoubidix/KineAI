@@ -26,8 +26,39 @@ const { router: whatsappWebhook } = require('./routes/webhook/whatsapp');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// ========== CONFIGURATION CORS ==========
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Autorise les requêtes sans origin (apps mobiles, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'https://monassistantkine.vercel.app',
+      'http://localhost:3000',  // Pour ton HTML de test
+      'http://localhost:3001',  // Pour ton frontend principal
+      'file://'  // Pour les fichiers HTML ouverts directement
+    ];
+    
+    // Vérification spéciale pour les fichiers locaux
+    if (origin.startsWith('file://')) {
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log(`❌ CORS: Origine non autorisée: ${origin}`);
+      callback(new Error('Non autorisé par CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true, // Important pour les cookies et JWT
+  optionsSuccessStatus: 200 // Pour les anciens navigateurs
+};
+
 // Middleware - Augmenté pour les PDFs
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
@@ -148,6 +179,26 @@ app.get('/api/test-whatsapp', (req, res) => {
       hasWebhookToken: !!process.env.WHATSAPP_WEBHOOK_TOKEN,
       webhookUrl: '/webhook/whatsapp',
       configured: !!(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_ID && process.env.WHATSAPP_WEBHOOK_TOKEN)
+    }
+  });
+});
+
+// NOUVEAU : Test CORS
+app.get('/api/test-cors', (req, res) => {
+  res.json({
+    message: 'CORS test successful',
+    timestamp: new Date().toISOString(),
+    origin: req.headers.origin || 'No origin header',
+    userAgent: req.headers['user-agent'] || 'No user agent',
+    headers: req.headers,
+    corsConfig: {
+      allowedOrigins: [
+        'https://monassistantkine.vercel.app',
+        'http://localhost:3001',
+        'http://localhost:3000'
+      ],
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      credentials: true
     }
   });
 });
@@ -350,6 +401,7 @@ app.get('/', (req, res) => {
       vectorTest: '/api/test-vector',
       whatsappTest: '/api/test-whatsapp',
       whatsappWebhook: '/webhook/whatsapp',
+      corsTest: '/api/test-cors',
       // NOUVEAUX ENDPOINTS DEBUG
       debugPrisma: '/debug/prisma-imports',
       debugConnections: '/debug/connections',
@@ -379,6 +431,8 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📊 Vector Test: /api/test-vector`);
   console.log(`📱 WhatsApp Test: /api/test-whatsapp`);
   console.log(`📱 WhatsApp Webhook: /webhook/whatsapp`);
+  console.log(`🔒 CORS Test: /api/test-cors`);
   console.log(`🔍 Debug Prisma: /debug/prisma-imports`);
   console.log(`📊 Debug Connections: /debug/connections`);
+  console.log(`🔒 CORS configuré pour: https://monassistantkine.vercel.app, localhost:3000, localhost:3001, fichiers locaux`);
 });
