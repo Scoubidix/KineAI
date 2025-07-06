@@ -18,7 +18,26 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { UserPlus, ArrowLeft, User, Building, Phone, Mail, Calendar, MapPin, Hash, Lock, Eye, EyeOff, Check, X } from "lucide-react";
+import { 
+  UserPlus, 
+  ArrowLeft, 
+  User, 
+  Building, 
+  Phone, 
+  Mail, 
+  Calendar, 
+  MapPin, 
+  Hash, 
+  Lock, 
+  Eye, 
+  EyeOff, 
+  Check, 
+  X,
+  CheckCircle,
+  RefreshCw,
+  Home
+} from "lucide-react";
+import { sendEmailVerification } from "@/lib/auth-utils";
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -34,6 +53,10 @@ export default function SignupPage() {
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [signupComplete, setSignupComplete] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  
   const router = useRouter();
   const { toast } = useToast();
 
@@ -79,6 +102,33 @@ export default function SignupPage() {
     }
   };
 
+  const handleResendVerification = async () => {
+    setResendLoading(true);
+    try {
+      const result = await sendEmailVerification();
+      if (result.success) {
+        toast({
+          title: "Email renvoyé",
+          description: "Un nouvel email de vérification a été envoyé.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: result.error,
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de renvoyer l'email de vérification.",
+      });
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -96,7 +146,6 @@ export default function SignupPage() {
 
     // Validation du RPPS
     if (rpps.length !== 11) {
-      // Déclenche la validation HTML5 native
       const rppsInput = document.getElementById('rpps') as HTMLInputElement;
       if (rppsInput) {
         rppsInput.setCustomValidity('Le numéro RPPS doit contenir exactement 11 chiffres');
@@ -109,7 +158,6 @@ export default function SignupPage() {
     // Validation du téléphone  
     const phoneDigits = phone.replace(/\s/g, ''); // Supprime les espaces
     if (phoneDigits.length !== 10 || !phoneDigits.match(/^[0-9]{10}$/)) {
-      // Déclenche la validation HTML5 native
       const phoneInput = document.getElementById('phone') as HTMLInputElement;
       if (phoneInput) {
         phoneInput.setCustomValidity('Le numéro de téléphone doit contenir exactement 10 chiffres');
@@ -167,14 +215,26 @@ export default function SignupPage() {
         throw new Error(errorData.error || "Erreur lors de la création du profil");
       }
 
-      const kineData = await response.json();
+      // 3. ✨ Envoyer l'email de vérification automatiquement
+      const emailResult = await sendEmailVerification(user);
+      
+      if (emailResult.success) {
+        setEmailSent(true);
+        toast({
+          title: "Compte créé avec succès !",
+          description: `Bienvenue ${firstName} ${lastName}. Un email de vérification a été envoyé.`,
+        });
+      } else {
+        // Le compte est créé mais l'email n'a pas pu être envoyé
+        toast({
+          title: "Compte créé",
+          description: `Bienvenue ${firstName} ${lastName}. Problème d'envoi de l'email de vérification.`,
+          variant: "destructive"
+        });
+      }
 
-      toast({
-        title: "Inscription réussie !",
-        description: `Bienvenue ${firstName} ${lastName}`,
-      });
+      setSignupComplete(true);
 
-      router.push("/login");
     } catch (error) {
       const err = error as Error;
       
@@ -188,6 +248,118 @@ export default function SignupPage() {
     }
   };
 
+  // ✅ Interface après inscription réussie
+  if (signupComplete) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-8">
+          
+          {/* Header avec logo et titre */}
+          <div className="text-center space-y-6">
+            <div className="flex justify-center">
+              <Image
+                src="/logo.jpg"
+                alt="Mon Assistant Kiné"
+                width={120}
+                height={120}
+                className="mx-auto rounded-xl bg-white p-3 shadow-sm"
+                priority
+              />
+            </div>
+
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                Mon Assistant Kiné
+              </h1>
+              <p className="text-muted-foreground">
+                Vérification de votre email
+              </p>
+            </div>
+          </div>
+
+          {/* Card de vérification email */}
+          <Card className="shadow-lg border">
+            <CardHeader>
+              <CardTitle className="text-2xl font-semibold text-center text-green-600">
+                Compte créé avec succès !
+              </CardTitle>
+              <CardDescription className="text-center">
+                Vérifiez votre email pour activer votre compte
+              </CardDescription>
+            </CardHeader>
+            
+            <CardContent className="space-y-6">
+              <div className="flex justify-center">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="h-8 w-8 text-green-600" />
+                </div>
+              </div>
+
+              <div className="text-center space-y-3">
+                <p className="font-medium text-foreground">
+                  Bienvenue {formData.firstName} {formData.lastName} !
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Un email de vérification a été envoyé à :
+                </p>
+                <p className="font-medium text-foreground">{formData.email}</p>
+                <p className="text-sm text-muted-foreground">
+                  Cliquez sur le lien dans l'email pour activer votre compte et accéder au dashboard.
+                  <br />
+                  <span className="text-xs">Vérifiez aussi vos spams si vous ne voyez pas l'email.</span>
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col space-y-3 pt-4">
+                {emailSent && (
+                  <Button 
+                    onClick={handleResendVerification}
+                    disabled={resendLoading}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    {resendLoading ? (
+                      <div className="flex items-center gap-2">
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Renvoi en cours...
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        Renvoyer l'email de vérification
+                      </div>
+                    )}
+                  </Button>
+                )}
+                
+                <Button className="w-full" asChild>
+                  <Link href="/login">
+                    Se connecter
+                  </Link>
+                </Button>
+
+                <Button variant="ghost" className="w-full" asChild>
+                  <Link href="/">
+                    <Home className="h-4 w-4 mr-2" />
+                    Retour à l'accueil
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Footer */}
+          <div className="text-center text-xs text-muted-foreground space-y-1">
+            <p>© {new Date().getFullYear()} Mon Assistant Kiné</p>
+            <p>Plateforme sécurisée - Données de santé protégées</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Interface de création de compte (inchangée)
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-2xl space-y-6">

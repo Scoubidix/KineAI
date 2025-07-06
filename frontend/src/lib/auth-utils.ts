@@ -2,8 +2,11 @@ import {
   sendPasswordResetEmail as firebaseSendPasswordResetEmail,
   confirmPasswordReset as firebaseConfirmPasswordReset,
   verifyPasswordResetCode as firebaseVerifyPasswordResetCode,
+  sendEmailVerification as firebaseSendEmailVerification,
+  applyActionCode as firebaseApplyActionCode,
   AuthError,
-  ActionCodeSettings
+  ActionCodeSettings,
+  User
 } from 'firebase/auth';
 import { auth } from './firebase/config';
 
@@ -24,13 +27,17 @@ const getErrorMessage = (errorCode: string): string => {
     case 'auth/too-many-requests':
       return 'Trop de tentatives. Veuillez réessayer plus tard.';
     case 'auth/expired-action-code':
-      return 'Le lien de réinitialisation a expiré. Demandez un nouveau lien.';
+      return 'Le lien de vérification a expiré. Demandez un nouveau lien.';
     case 'auth/invalid-action-code':
-      return 'Le lien de réinitialisation est invalide ou a déjà été utilisé.';
+      return 'Le lien de vérification est invalide ou a déjà été utilisé.';
     case 'auth/weak-password':
       return 'Le mot de passe doit contenir au moins 6 caractères.';
     case 'auth/network-request-failed':
       return 'Erreur de connexion. Vérifiez votre connexion internet.';
+    case 'auth/user-disabled':
+      return 'Ce compte utilisateur a été désactivé.';
+    case 'auth/operation-not-allowed':
+      return 'Cette opération n\'est pas autorisée.';
     default:
       return 'Une erreur inattendue s\'est produite. Veuillez réessayer.';
   }
@@ -47,10 +54,10 @@ export const sendPasswordReset = async (email: string): Promise<AuthResponse> =>
       };
     }
 
-    // ✨ Configuration pour rediriger vers votre page custom
+    // ✨ Configuration pour rediriger vers votre page auth-action
     const actionCodeSettings: ActionCodeSettings = {
-      url: `${window.location.origin}/reset-password`,
-      handleCodeInApp: true, // Important : traiter dans votre app
+      url: `${window.location.origin}/auth-action`,
+      handleCodeInApp: true,
     };
 
     await firebaseSendPasswordResetEmail(auth, email, actionCodeSettings);
@@ -71,7 +78,7 @@ export const sendPasswordReset = async (email: string): Promise<AuthResponse> =>
   }
 };
 
-// ✅ 2. Vérifier la validité du code de réinitialisation (inchangée)
+// ✅ 2. Vérifier la validité du code de réinitialisation
 export const verifyResetCode = async (code: string): Promise<AuthResponse & { email?: string }> => {
   try {
     if (!code) {
@@ -101,7 +108,7 @@ export const verifyResetCode = async (code: string): Promise<AuthResponse & { em
   }
 };
 
-// ✅ 3. Confirmer le nouveau mot de passe (inchangée)
+// ✅ 3. Confirmer le nouveau mot de passe
 export const confirmNewPassword = async (code: string, newPassword: string): Promise<AuthResponse> => {
   try {
     // Validations
@@ -138,7 +145,134 @@ export const confirmNewPassword = async (code: string, newPassword: string): Pro
   }
 };
 
-// ✅ 4. Validation côté client du mot de passe (inchangée)
+// ✅ 4. Envoyer un email de vérification (NOUVEAU)
+export const sendEmailVerification = async (user?: User): Promise<AuthResponse> => {
+  try {
+    // Utiliser l'utilisateur passé en paramètre ou l'utilisateur actuel
+    const currentUser = user || auth.currentUser;
+    
+    if (!currentUser) {
+      return {
+        success: false,
+        error: 'Aucun utilisateur connecté pour envoyer la vérification.'
+      };
+    }
+
+    // Si l'email est déjà vérifié
+    if (currentUser.emailVerified) {
+      return {
+        success: true,
+        message: 'Votre email est déjà vérifié.'
+      };
+    }
+
+    // ✨ Configuration pour rediriger vers votre page auth-action
+    const actionCodeSettings: ActionCodeSettings = {
+      url: `${window.location.origin}/auth-action`,
+      handleCodeInApp: true,
+    };
+
+    await firebaseSendEmailVerification(currentUser, actionCodeSettings);
+
+    return {
+      success: true,
+      message: 'Un email de vérification a été envoyé à votre adresse.'
+    };
+
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'email de vérification:', error);
+    
+    const authError = error as AuthError;
+    return {
+      success: false,
+      error: getErrorMessage(authError.code)
+    };
+  }
+};
+
+// ✅ 5. Vérifier le code d'email (NOUVEAU)
+export const verifyEmailCode = async (oobCode: string): Promise<AuthResponse> => {
+  try {
+    if (!oobCode) {
+      return {
+        success: false,
+        error: 'Code de vérification manquant.'
+      };
+    }
+
+    // Appliquer le code de vérification d'email
+    await firebaseApplyActionCode(auth, oobCode);
+
+    // Actualiser l'utilisateur pour mettre à jour le statut emailVerified
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+    }
+
+    return {
+      success: true,
+      message: 'Votre email a été vérifié avec succès.'
+    };
+
+  } catch (error) {
+    console.error('Erreur lors de la vérification de l\'email:', error);
+    
+    const authError = error as AuthError;
+    return {
+      success: false,
+      error: getErrorMessage(authError.code)
+    };
+  }
+};
+
+// ✅ 6. Renvoyer un email de vérification (NOUVEAU)
+export const resendEmailVerification = async (): Promise<AuthResponse> => {
+  try {
+    const currentUser = auth.currentUser;
+    
+    if (!currentUser) {
+      return {
+        success: false,
+        error: 'Aucun utilisateur connecté.'
+      };
+    }
+
+    // Si l'email est déjà vérifié
+    if (currentUser.emailVerified) {
+      return {
+        success: true,
+        message: 'Votre email est déjà vérifié.'
+      };
+    }
+
+    // Renvoyer l'email de vérification
+    return await sendEmailVerification(currentUser);
+
+  } catch (error) {
+    console.error('Erreur lors du renvoi de l\'email de vérification:', error);
+    
+    const authError = error as AuthError;
+    return {
+      success: false,
+      error: getErrorMessage(authError.code)
+    };
+  }
+};
+
+// ✅ 7. Vérifier le statut de vérification d'email (NOUVEAU)
+export const checkEmailVerificationStatus = (): { isVerified: boolean; email?: string } => {
+  const currentUser = auth.currentUser;
+  
+  if (!currentUser) {
+    return { isVerified: false };
+  }
+
+  return {
+    isVerified: currentUser.emailVerified,
+    email: currentUser.email || undefined
+  };
+};
+
+// ✅ 8. Validation côté client du mot de passe
 export const validatePassword = (password: string, confirmPassword?: string): AuthResponse => {
   if (!password) {
     return {
@@ -180,7 +314,7 @@ export const validatePassword = (password: string, confirmPassword?: string): Au
   };
 };
 
-// ✅ 5. Validation de l'email (inchangée)
+// ✅ 9. Validation de l'email
 export const validateEmail = (email: string): AuthResponse => {
   if (!email) {
     return {

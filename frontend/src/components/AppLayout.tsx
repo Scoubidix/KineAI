@@ -735,6 +735,27 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const role = getRoleFromPath(currentPathname);
   const [loading, setLoading] = React.useState(false);
 
+  // ✨ Vérification email obligatoire
+  React.useEffect(() => {
+    const user = getAuth(app).currentUser;
+    if (user && !user.emailVerified && (role === 'kine' || role === 'patient')) {
+      router.replace('/verify-email-required');
+    }
+  }, [role, router]);
+
+  // ✨ Listener pour détecter les changements d'état d'authentification
+  React.useEffect(() => {
+    const auth = getAuth(app);
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        // Forcer le refresh du statut email
+        user.reload();
+      }
+    });
+    
+    return () => unsubscribe();
+  }, []);
+
   const getNavigationItems = () => {
     if (role === 'kine') {
       return [

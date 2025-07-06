@@ -49,15 +49,25 @@ export default function LoginPage() {
 
       const kineData = await response.json();
 
-      // 3. Toast de succès personnalisé
+      // 3. ✨ Vérifier si l'email est vérifié
+      if (!userCredential.user.emailVerified) {
+        // Rediriger vers la page de vérification obligatoire
+        toast({
+          title: "Vérification requise",
+          description: "Vous devez vérifier votre email avant d'accéder à votre compte.",
+          variant: "destructive"
+        });
+        router.push("/verify-email-required");
+        return;
+      }
+
+      // 4. Toast de succès personnalisé (seulement si email vérifié)
       toast({
         title: "Connexion réussie",
         description: `Bienvenue Dr. ${kineData.firstName} ${kineData.lastName}`,
       });
 
-      // 4. Redirection vers le dashboard kiné
-      // Note: Pour l'instant, on assume que tous les utilisateurs sont des kinés
-      // Plus tard, vous pourrez ajouter une logique pour détecter les patients
+      // 5. Redirection vers le dashboard (seulement si email vérifié)
       router.push("/dashboard/kine/home");
 
     } catch (error) {
