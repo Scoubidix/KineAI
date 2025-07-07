@@ -1,6 +1,7 @@
-// utils/chatCleanup.js - Version finale avec connexions dédiées et backup
+// utils/chatCleanup.js - Version finale avec connexions dédiées, backup et notifications
 const cron = require('node-cron');
 const { PrismaClient } = require('@prisma/client');
+const notificationService = require('../services/notificationService');
 
 // Wrapper avec timeout et retry pour les tâches CRON
 const executeWithTimeout = async (taskName, taskFunction, timeoutMs = 120000) => {
@@ -45,6 +46,161 @@ const executeWithTimeout = async (taskName, taskFunction, timeoutMs = 120000) =>
   }
 };
 
+// 🆕 NOUVELLE TÂCHE : Créer notifications pour programmes terminés
+const createProgramCompletedNotificationsTask = async () => {
+  const now = new Date();
+  console.log(`🔔 Début création notifications programmes terminés CONNEXION DÉDIÉE`);
+  
+  let dedicatedPrisma = null;
+  
+  try {
+    console.log(`🔧 Création connexion DÉDIÉE pour notifications programmes`);
+    
+    const cronDbUrl = new URL(process.env.DATABASE_URL);
+    cronDbUrl.searchParams.set('connection_limit', '1');
+    cronDbUrl.searchParams.set('pool_timeout', '60');
+    cronDbUrl.searchParams.set('connect_timeout', '30');
+    cronDbUrl.searchParams.set('application_name', 'kine_program_notifications');
+    
+    dedicatedPrisma = new PrismaClient({
+      log: ['error', 'warn'],
+      datasources: {
+        db: {
+          url: cronDbUrl.toString()
+        }
+      }
+    });
+    
+    console.log(`✅ Connexion DÉDIÉE établie - recherche programmes terminés`);
+    
+    const result = await dedicatedPrisma.$transaction(async (tx) => {
+      // Trouver les programmes terminés (dateFin <= aujourd'hui) et pas encore archivés
+      const completedPrograms = await tx.programme.findMany({
+        where: {
+          dateFin: { lte: now },
+          isArchived: false
+        },
+        include: {
+          patient: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              kineId: true
+            }
+          },
+          sessionValidations: {
+            where: { isValidated: true },
+            select: { id: true }
+          }
+        },
+        orderBy: { dateFin: 'asc' },
+        take: 100
+      });
+
+      console.log(`📋 ${completedPrograms.length} programmes terminés trouvés`);
+
+      if (completedPrograms.length === 0) {
+        return { programmesTraites: 0, notificationsCreees: 0 };
+      }
+
+      let notificationsCreees = 0;
+      const details = [];
+
+      for (const programme of completedPrograms) {
+        try {
+          // Vérifier si une notification PROGRAM_COMPLETED existe déjà
+          const existingNotification = await tx.notification.findFirst({
+            where: {
+              type: 'PROGRAM_COMPLETED',
+              kineId: programme.patient.kineId,
+              patientId: programme.patient.id,
+              programmeId: programme.id
+            }
+          });
+
+          if (!existingNotification) {
+            // Calculer les statistiques de completion
+            const totalDays = Math.ceil(
+              (new Date(programme.dateFin) - new Date(programme.dateDebut)) / (1000 * 60 * 60 * 24)
+            ) + 1;
+            const validatedDays = programme.sessionValidations.length;
+            const completionPercentage = Math.round((validatedDays / totalDays) * 100);
+
+            // Créer la notification
+            const patientName = `${programme.patient.firstName} ${programme.patient.lastName}`;
+            const title = 'Programme terminé';
+            const message = `Le programme "${programme.titre}" de ${patientName} est terminé - Adhérence ${validatedDays}/${totalDays} jours (${completionPercentage}%)`;
+
+            const metadata = {
+              totalDays,
+              validatedDays,
+              completionPercentage,
+              adherenceRatio: `${validatedDays}/${totalDays}`,
+              programmeStartDate: programme.dateDebut,
+              programmeEndDate: programme.dateFin,
+              completedAt: now.toISOString(),
+              trigger: 'cron_daily_check'
+            };
+
+            await tx.notification.create({
+              data: {
+                type: 'PROGRAM_COMPLETED',
+                title,
+                message,
+                kineId: programme.patient.kineId,
+                patientId: programme.patient.id,
+                programmeId: programme.id,
+                metadata: JSON.stringify(metadata),
+                isRead: false
+              }
+            });
+
+            notificationsCreees++;
+            details.push({
+              programmeId: programme.id,
+              titre: programme.titre,
+              patient: patientName,
+              adherence: `${validatedDays}/${totalDays} jours (${completionPercentage}%)`
+            });
+
+            console.log(`🔔 Notification créée: ${patientName} - ${programme.titre} - Adhérence ${validatedDays}/${totalDays} (${completionPercentage}%)`);
+          } else {
+            console.log(`⏭️ Notification déjà existante pour programme ${programme.id}`);
+          }
+        } catch (notifError) {
+          console.error(`❌ Erreur création notification programme ${programme.id}:`, notifError.message);
+        }
+      }
+
+      console.log(`🔔 ${notificationsCreees} notifications créées pour programmes terminés`);
+
+      return {
+        programmesTraites: completedPrograms.length,
+        notificationsCreees,
+        details
+      };
+    }, {
+      timeout: 60000
+    });
+
+    return result;
+    
+  } catch (error) {
+    console.error(`❌ Erreur création notifications:`, error.message);
+    throw error;
+  } finally {
+    if (dedicatedPrisma) {
+      console.log(`🔌 Fermeture connexion DÉDIÉE notifications`);
+      try {
+        await dedicatedPrisma.$disconnect();
+      } catch (error) {
+        console.error(`⚠️ Erreur fermeture:`, error.message);
+      }
+    }
+  }
+};
+
 // Archiver les programmes terminés - VERSION CONNEXION DÉDIÉE
 const archiveFinishedProgramsTask = async () => {
   const now = new Date();
@@ -75,7 +231,7 @@ const archiveFinishedProgramsTask = async () => {
     const result = await dedicatedPrisma.$transaction(async (tx) => {
       const finishedPrograms = await tx.programme.findMany({
         where: {
-          dateFin: { lt: now },
+          dateFin: { lte: now },
           isArchived: false
         },
         select: { id: true, titre: true, dateFin: true },
@@ -285,16 +441,43 @@ const cleanupOldArchivedProgramsTask = async () => {
   }
 };
 
-// Démarrer les tâches automatiques - PRODUCTION avec backup
+// Démarrer les tâches automatiques - PRODUCTION avec backup et notifications
 const startProgramCleanupCron = () => {
-  console.log('🚀 Démarrage PRODUCTION - Toutes tâches CONNEXION DÉDIÉE avec backup');
+  console.log('🚀 Démarrage PRODUCTION - Toutes tâches CONNEXION DÉDIÉE avec backup et notifications');
 
-  // PRODUCTION: Archivage programmes - 23h30 + backup 23h40
-  cron.schedule('30 23 * * *', async () => {
-    console.log(`📅 [23h30] Archivage programmes PRINCIPAL`);
+  // 🆕 NOUVEAU: Notifications programmes terminés - 00h01 + backup 00h09
+  cron.schedule('1 0 * * *', async () => {
+    console.log(`🔔 [00h01] Notifications programmes terminés PRINCIPAL`);
     
     await executeWithTimeout(
-      'archivage programmes PRINCIPAL (23h30)',
+      'notifications programmes terminés PRINCIPAL (00h01)',
+      createProgramCompletedNotificationsTask,
+      90000
+    );
+  }, {
+    timezone: "Europe/Paris",
+    scheduled: true
+  });
+
+  cron.schedule('9 0 * * *', async () => {
+    console.log(`🔔 [00h09] Notifications programmes terminés BACKUP`);
+    
+    await executeWithTimeout(
+      'notifications programmes terminés BACKUP (00h09)',
+      createProgramCompletedNotificationsTask,
+      90000
+    );
+  }, {
+    timezone: "Europe/Paris",
+    scheduled: true
+  });
+
+  // PRODUCTION: Archivage programmes - 00h10 + backup 00h18
+  cron.schedule('10 0 * * *', async () => {
+    console.log(`📅 [00h10] Archivage programmes PRINCIPAL`);
+    
+    await executeWithTimeout(
+      'archivage programmes PRINCIPAL (00h10)',
       archiveFinishedProgramsTask,
       90000
     );
@@ -303,11 +486,11 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  cron.schedule('40 23 * * *', async () => {
-    console.log(`📅 [23h40] Archivage programmes BACKUP`);
+  cron.schedule('18 0 * * *', async () => {
+    console.log(`📅 [00h18] Archivage programmes BACKUP`);
     
     await executeWithTimeout(
-      'archivage programmes BACKUP (23h40)',
+      'archivage programmes BACKUP (00h18)',
       archiveFinishedProgramsTask,
       90000
     );
@@ -316,12 +499,12 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  // PRODUCTION: Nettoyage chat kiné - 00h15 + backup 00h25
-  cron.schedule('15 0 * * *', async () => {
-    console.log(`💬 [00h15] Nettoyage chat kiné PRINCIPAL`);
+  // PRODUCTION: Nettoyage chat kiné - 00h30 + backup 00h38
+  cron.schedule('30 0 * * *', async () => {
+    console.log(`💬 [00h30] Nettoyage chat kiné PRINCIPAL`);
     
     await executeWithTimeout(
-      'nettoyage chat kiné PRINCIPAL (00h15)',
+      'nettoyage chat kiné PRINCIPAL (00h30)',
       cleanOldKineChatHistory,
       60000
     );
@@ -330,11 +513,11 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  cron.schedule('25 0 * * *', async () => {
-    console.log(`💬 [00h25] Nettoyage chat kiné BACKUP`);
+  cron.schedule('38 0 * * *', async () => {
+    console.log(`💬 [00h38] Nettoyage chat kiné BACKUP`);
     
     await executeWithTimeout(
-      'nettoyage chat kiné BACKUP (00h25)',
+      'nettoyage chat kiné BACKUP (00h38)',
       cleanOldKineChatHistory,
       60000
     );
@@ -343,7 +526,7 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  // PRODUCTION: Nettoyage programmes archivés - Mercredi 01h15 + backup 01h25
+  // PRODUCTION: Nettoyage programmes archivés - Mercredi 01h15 + backup 01h23
   cron.schedule('15 1 * * 3', async () => {
     console.log(`🗑️ [Mercredi 01h15] Nettoyage programmes archivés PRINCIPAL`);
     
@@ -357,11 +540,11 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  cron.schedule('25 1 * * 3', async () => {
-    console.log(`🗑️ [Mercredi 01h25] Nettoyage programmes archivés BACKUP`);
+  cron.schedule('23 1 * * 3', async () => {
+    console.log(`🗑️ [Mercredi 01h23] Nettoyage programmes archivés BACKUP`);
     
     await executeWithTimeout(
-      'nettoyage programmes archivés BACKUP (01h25)',
+      'nettoyage programmes archivés BACKUP (01h23)',
       cleanupOldArchivedProgramsTask,
       120000
     );
@@ -370,8 +553,8 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  console.log('✅ PRODUCTION configurée - 6 tâches avec backup automatique');
-  console.log('📅 Planning: 23h30+23h40 archivage, 00h15+00h25 chat, mercredi 01h15+01h25 nettoyage');
+  console.log('✅ PRODUCTION configurée - 8 tâches avec backup automatique + notifications');
+  console.log('📅 Planning: 00h01+00h09 notifications, 00h10+00h18 archivage, 00h30+00h38 chat, mercredi 01h15+01h23 nettoyage');
   console.log('🔒 Toutes les tâches utilisent des connexions dédiées');
 };
 
@@ -400,12 +583,23 @@ const manualKineChatCleanupTest = async () => {
   );
 };
 
+// 🆕 NOUVEAU: Test manuel notifications
+const manualNotificationsTest = async () => {
+  return await executeWithTimeout(
+    'test manuel notifications programmes',
+    createProgramCompletedNotificationsTask,
+    60000
+  );
+};
+
 module.exports = {
   startProgramCleanupCron,
   archiveFinishedProgramsTask,
   cleanupOldArchivedProgramsTask,
   cleanOldKineChatHistory,
+  createProgramCompletedNotificationsTask, // 🆕 NOUVEAU
   manualArchiveTest,
   manualCleanupTest,
-  manualKineChatCleanupTest
+  manualKineChatCleanupTest,
+  manualNotificationsTest // 🆕 NOUVEAU
 };

@@ -23,6 +23,9 @@ const documentsRoutes = require('./routes/documents');
 // NOUVEAU : Import du webhook WhatsApp
 const { router: whatsappWebhook } = require('./routes/webhook/whatsapp');
 
+// 🔔 NOUVEAU : Import des routes notifications
+const notificationRoutes = require('./routes/notifications');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -69,7 +72,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    service: 'KineAI Backend with Vector DB + WhatsApp',
+    service: 'KineAI Backend with Vector DB + WhatsApp + Notifications',
     port: PORT,
     features: [
       'Patient Chat',
@@ -77,7 +80,8 @@ app.get('/health', (req, res) => {
       'Auto Archive System',
       'Kiné Personal AI Assistant Enhanced',
       'PDF Upload & Vector Search',
-      'WhatsApp Integration'
+      'WhatsApp Integration',
+      '🔔 Notification System' // NOUVEAU
     ]
   });
 });
@@ -93,7 +97,7 @@ app.get('/api/test-db', async (req, res) => {
       message: 'Database connection successful',
       timestamp: new Date().toISOString(),
       kineCount: kineCount,
-      database: 'PostgreSQL + Prisma + Supabase Vector'
+      database: 'PostgreSQL + Prisma + Supabase Vector + Notifications'
     });
   } catch (error) {
     console.error('Database connection error:', error);
@@ -181,6 +185,44 @@ app.get('/api/test-whatsapp', (req, res) => {
       configured: !!(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_ID && process.env.WHATSAPP_WEBHOOK_TOKEN)
     }
   });
+});
+
+// 🔔 NOUVEAU : Test notifications
+app.get('/api/test-notifications', async (req, res) => {
+  try {
+    const prisma = prismaService.getInstance();
+    
+    // Compter les notifications dans la DB
+    const notificationCount = await prisma.notification.count();
+    const notificationTypes = await prisma.notification.groupBy({
+      by: ['type'],
+      _count: { type: true }
+    });
+
+    res.json({
+      message: 'Notification system check',
+      timestamp: new Date().toISOString(),
+      notifications: {
+        total: notificationCount,
+        byType: notificationTypes.reduce((acc, item) => {
+          acc[item.type] = item._count.type;
+          return acc;
+        }, {}),
+        endpoints: [
+          'GET /api/notifications',
+          'GET /api/notifications/unread-count',
+          'PUT /api/notifications/:id/read',
+          'PUT /api/notifications/mark-all-read'
+        ]
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Notification system test failed',
+      details: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // NOUVEAU : Test CORS
@@ -342,6 +384,9 @@ app.get('/debug/all-imports', (req, res) => {
 // NOUVEAU : Webhook WhatsApp
 app.use('/webhook/whatsapp', whatsappWebhook);
 
+// 🔔 NOUVEAU : Routes notifications
+app.use('/api/notifications', notificationRoutes);
+
 // Routes existantes
 app.use('/kine', kinesRoutes);
 app.use('/patients', patientsRoutes);
@@ -376,12 +421,23 @@ app.get('/test-cleanup-archived', async (req, res) => {
   }
 });
 
+// 🆕 NOUVEAU : Route de test pour les notifications de programmes
+app.get('/test-notifications-programs', async (req, res) => {
+  const { manualNotificationsTest } = require('./utils/chatCleanup');
+  try {
+    const result = await manualNotificationsTest();
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Route racine mise à jour
 app.get('/', (req, res) => {
   res.json({
-    message: 'Bienvenue sur l API KineAI - Base Vectorielle Supabase + WhatsApp Intégrés',
+    message: 'Bienvenue sur l API KineAI - Base Vectorielle Supabase + WhatsApp + Notifications Intégrés',
     timestamp: new Date().toISOString(),
-    version: '2.3',
+    version: '2.4', // Version mise à jour
     status: 'running',
     features: [
       'Patient Chat',
@@ -390,7 +446,8 @@ app.get('/', (req, res) => {
       'Kiné Personal AI Assistant Enhanced', 
       'PDF Upload & Vector Search',
       'Semantic Knowledge Base',
-      'WhatsApp Business Integration'
+      'WhatsApp Business Integration',
+      '🔔 Real-time Notification System' // NOUVEAU
     ],
     endpoints: {
       chat: '/api/chat/kine/message',
@@ -402,7 +459,12 @@ app.get('/', (req, res) => {
       whatsappTest: '/api/test-whatsapp',
       whatsappWebhook: '/webhook/whatsapp',
       corsTest: '/api/test-cors',
-      // NOUVEAUX ENDPOINTS DEBUG
+      // 🔔 NOUVEAUX ENDPOINTS NOTIFICATIONS
+      notifications: '/api/notifications',
+      notificationsUnreadCount: '/api/notifications/unread-count',
+      notificationsStats: '/api/notifications/stats',
+      notificationsTest: '/api/test-notifications',
+      // ENDPOINTS DEBUG EXISTANTS
       debugPrisma: '/debug/prisma-imports',
       debugConnections: '/debug/connections',
       cleanupConnections: '/debug/cleanup-connections [POST]'
@@ -432,6 +494,8 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📱 WhatsApp Test: /api/test-whatsapp`);
   console.log(`📱 WhatsApp Webhook: /webhook/whatsapp`);
   console.log(`🔒 CORS Test: /api/test-cors`);
+  console.log(`🔔 Notifications: /api/notifications`);
+  console.log(`🔔 Test Notifications: /api/test-notifications`);
   console.log(`🔍 Debug Prisma: /debug/prisma-imports`);
   console.log(`📊 Debug Connections: /debug/connections`);
   console.log(`🔒 CORS configuré pour: https://monassistantkine.vercel.app, localhost:3000, localhost:3001, fichiers locaux`);

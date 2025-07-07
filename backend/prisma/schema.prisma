@@ -23,6 +23,7 @@ model Kine {
   patients         Patient[]
   exercicesModeles ExerciceModele[]
   chatKine         ChatKine[]
+  notifications    Notification[]   // NOUVELLE RELATION
 }
 
 model Patient {
@@ -41,7 +42,8 @@ model Patient {
 
   programmes        Programme[]
   chatSessions      ChatSession[]
-  sessionValidations SessionValidation[] // NOUVELLE RELATION
+  sessionValidations SessionValidation[]
+  notifications     Notification[]      // NOUVELLE RELATION
 }
 
 model ExerciceModele {
@@ -75,7 +77,8 @@ model Programme {
 
   exercices          ExerciceProgramme[]
   chatSessions       ChatSession[]
-  sessionValidations SessionValidation[] // NOUVELLE RELATION
+  sessionValidations SessionValidation[]
+  notifications      Notification[]      // NOUVELLE RELATION
 }
 
 model ExerciceProgramme {
@@ -159,6 +162,46 @@ model ChatKine {
   // Index pour optimiser les requêtes par kiné et date
   @@index([kineId, createdAt])
   @@map("chat_kine")
+}
+
+// NOUVELLE TABLE - Notifications
+model Notification {
+  id          Int              @id @default(autoincrement())
+  type        NotificationType // Type de notification
+  title       String           // Titre court
+  message     String           // Message descriptif
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  
+  // Relation obligatoire avec le kiné
+  kineId      Int
+  kine        Kine             @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  
+  // Relations optionnelles pour le contexte
+  patientId   Int?
+  patient     Patient?         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  programmeId Int?
+  programme   Programme?       @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  
+  // Métadonnées JSON pour infos supplémentaires
+  metadata    Json?            // Ex: { "painLevel": 8, "difficultyLevel": 7, "validationDate": "2025-01-15" }
+  
+  // Index pour optimiser les requêtes
+  @@index([kineId, isRead])    // Pour récupérer les notifications d'un kiné par statut
+  @@index([kineId, createdAt]) // Pour trier par date
+  @@index([type])              // Pour filtrer par type
+  
+  @@map("notifications")
+}
+
+// NOUVEL ENUM - Types de notifications
+enum NotificationType {
+  DAILY_VALIDATION    // Patient valide une journée
+  PROGRAM_COMPLETED   // Programme terminé
+  PAIN_ALERT         // Niveau douleur élevé (≥7)
+  
+  @@map("notification_type")
 }
 
 enum ChatRole {

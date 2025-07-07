@@ -3,6 +3,7 @@ const router = express.Router();
 const prismaService = require('../services/prismaService');
 const { authenticatePatient, checkTokenExpiry, logPatientAccess } = require('../middleware/patientAuth');
 const { generateChatResponse, generateWelcomeMessage } = require('../services/openaiService');
+const notificationTriggers = require('../services/notificationTriggers');
 
 // Fonctions utilitaires pour l'historique lié aux programmes
 const getProgramChatHistory = async (patientId, programmeId) => {
@@ -393,7 +394,7 @@ router.post('/validate/:token',
 );
 
 // ==========================================
-// NOUVELLES ROUTES POUR VALIDATION SÉANCES
+// ROUTES POUR VALIDATION SÉANCES
 // ==========================================
 
 /**
@@ -407,8 +408,11 @@ router.get('/session-status/:token',
     try {
       const patientId = req.patient.id;
       const programmeId = req.programme.id;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Début de journée
+      
+      // Calcul de la date locale (timezone Europe/Paris)
+      const now = new Date();
+      const parisTime = new Date(now.toLocaleString("en-US", {timeZone: "Europe/Paris"}));
+      const localToday = new Date(Date.UTC(parisTime.getFullYear(), parisTime.getMonth(), parisTime.getDate()));
 
       // Vérifier si le programme est archivé
       if (req.programme.isArchived) {
@@ -420,7 +424,6 @@ router.get('/session-status/:token',
       }
 
       // Vérifier si le programme est expiré
-      const now = new Date();
       if (new Date(req.programme.dateFin) < now) {
         return res.status(410).json({
           success: false,
@@ -437,7 +440,7 @@ router.get('/session-status/:token',
           patientId_programmeId_date: {
             patientId: patientId,
             programmeId: programmeId,
-            date: today
+            date: localToday
           }
         }
       });
@@ -497,8 +500,11 @@ router.post('/validate-session/:token',
       const { painLevel, difficultyLevel } = req.body;
       const patientId = req.patient.id;
       const programmeId = req.programme.id;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Début de journée
+      
+      // Calcul de la date locale (timezone Europe/Paris)
+      const now = new Date();
+      const parisTime = new Date(now.toLocaleString("en-US", {timeZone: "Europe/Paris"}));
+      const localToday = new Date(Date.UTC(parisTime.getFullYear(), parisTime.getMonth(), parisTime.getDate()));
 
       // Validation des données d'entrée
       if (typeof painLevel !== 'number' || painLevel < 0 || painLevel > 10) {
@@ -527,7 +533,6 @@ router.post('/validate-session/:token',
       }
 
       // Vérifier que le programme n'est pas expiré
-      const now = new Date();
       if (new Date(req.programme.dateFin) < now) {
         return res.status(410).json({
           success: false,
@@ -544,7 +549,7 @@ router.post('/validate-session/:token',
           patientId_programmeId_date: {
             patientId: patientId,
             programmeId: programmeId,
-            date: today
+            date: localToday
           }
         }
       });
@@ -567,9 +572,9 @@ router.post('/validate-session/:token',
       const validationData = {
         patientId: patientId,
         programmeId: programmeId,
-        date: today,
+        date: localToday,
         isValidated: true,
-        painLevel: Math.round(painLevel), // S'assurer que c'est un entier
+        painLevel: Math.round(painLevel),
         difficultyLevel: Math.round(difficultyLevel),
         validatedAt: new Date()
       };
@@ -579,7 +584,7 @@ router.post('/validate-session/:token',
           patientId_programmeId_date: {
             patientId: patientId,
             programmeId: programmeId,
-            date: today
+            date: localToday
           }
         },
         update: {
@@ -591,8 +596,38 @@ router.post('/validate-session/:token',
         create: validationData
       });
 
-      // Log de l'activité (pour monitoring)
-      console.log(`✅ VALIDATION: Patient ${patientId} - Programme ${programmeId} - Douleur: ${painLevel}/10 - Difficulté: ${difficultyLevel}/10`);
+      // Déclencher les notifications automatiquement
+      try {
+        // Inclure le kineId depuis les données du patient/programme
+        const patientWithKineId = {
+          ...req.patient,
+          kineId: req.patient.kineId || req.programme.patient?.kineId
+        };
+
+        // Si kineId toujours manquant, le récupérer via une requête
+        if (!patientWithKineId.kineId) {
+          const patientData = await prisma.patient.findUnique({
+            where: { id: req.patient.id },
+            select: { kineId: true }
+          });
+          patientWithKineId.kineId = patientData?.kineId;
+        }
+
+        const notificationResult = await notificationTriggers.handleSessionValidation(
+          validation,
+          patientWithKineId,
+          req.programme
+        );
+
+        if (notificationResult.success) {
+          console.log(`🔔 NOTIFICATIONS: ${notificationResult.count} notifications créées pour validation`);
+        } else {
+          console.error('Erreur déclenchement notifications:', notificationResult.error);
+        }
+      } catch (notifError) {
+        // Ne pas faire échouer la validation si les notifications échouent
+        console.error('Erreur notifications (non bloquant):', notifError);
+      }
 
       const response = {
         success: true,

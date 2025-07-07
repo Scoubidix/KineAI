@@ -163,6 +163,7 @@ const updateKineProfile = async (req, res) => {
  * GET /kine/adherence/:date
  * Calculer l'adhérence globale pour une date donnée
  * LOGIQUE: Aujourd'hui = programmes actifs seulement, Passé = tous programmes
+ * 🔧 FIX: Comparaison dates jour seulement + timezone uniforme
  */
 const getAdherenceByDate = async (req, res) => {
   const uid = req.uid; // UID du kiné authentifié
@@ -171,21 +172,19 @@ const getAdherenceByDate = async (req, res) => {
   console.log("📊 Calcul adhérence pour UID:", uid, "Date:", date);
 
   try {
-    // Validation du format de date
-    const targetDate = new Date(date);
-    if (isNaN(targetDate.getTime())) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Format de date invalide. Utilisez YYYY-MM-DD.' 
-      });
-    }
+    // 🔧 FIX TIMEZONE: Utiliser la même méthode que patientChat.js
+    // Créer la date cible en timezone Paris pour cohérence
+    const targetDateStr = date; // YYYY-MM-DD
+    const tempDate = new Date(targetDateStr + 'T12:00:00'); // Midi pour éviter les décalages
+    const parisTime = new Date(tempDate.toLocaleString("en-US", {timeZone: "Europe/Paris"}));
+    const targetDate = new Date(Date.UTC(parisTime.getFullYear(), parisTime.getMonth(), parisTime.getDate()));
 
-    // Normaliser la date (début de journée)
-    targetDate.setHours(0, 0, 0, 0);
+    console.log(`🔧 TIMEZONE FIX: Date "${date}" → targetDate: ${targetDate.toISOString()}`);
 
     // 🔧 LOGIQUE CONDITIONNELLE POUR L'ARCHIVAGE
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const nowParis = new Date(now.toLocaleString("en-US", {timeZone: "Europe/Paris"}));
+    const today = new Date(Date.UTC(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate()));
     const isToday = targetDate.getTime() === today.getTime();
 
     const prisma = prismaService.getInstance();
@@ -203,17 +202,33 @@ const getAdherenceByDate = async (req, res) => {
       });
     }
 
-    // 2. Construire la requête avec logique conditionnelle
+    // 🔧 FIX: Créer les dates de début et fin de la journée cible
+    const targetDateStart = new Date(targetDate);
+    targetDateStart.setHours(0, 0, 0, 0);
+    
+    const targetDateEnd = new Date(targetDate);
+    targetDateEnd.setHours(23, 59, 59, 999);
+
+    // 2. Construire la requête avec logique conditionnelle ET comparaison jour seulement
     const whereClause = {
       patient: {
         kineId: kine.id
       },
-      dateDebut: {
-        lte: targetDate
-      },
-      dateFin: {
-        gte: targetDate
-      }
+      // ✅ FIX: Utiliser une logique qui fonctionne pour toute heure de création
+      AND: [
+        {
+          OR: [
+            // Programme commence aujourd'hui ou avant
+            { dateDebut: { lte: targetDateEnd } },
+          ]
+        },
+        {
+          OR: [
+            // Programme finit aujourd'hui ou après
+            { dateFin: { gte: targetDateStart } },
+          ]
+        }
+      ]
     };
 
     // ✅ SEULEMENT pour aujourd'hui, exclure les programmes archivés
@@ -221,6 +236,8 @@ const getAdherenceByDate = async (req, res) => {
       whereClause.isArchived = false;
     }
     // Pour les dates passées, inclure TOUS les programmes (archivés ou non)
+
+    console.log("🔍 Query WHERE pour adhérence:", JSON.stringify(whereClause, null, 2));
 
     // 3. Trouver tous les programmes pertinents pour cette date
     const activeProgrammes = await prisma.programme.findMany({
@@ -235,11 +252,13 @@ const getAdherenceByDate = async (req, res) => {
         },
         sessionValidations: {
           where: {
-            date: targetDate
+            date: targetDate // ✅ MÊME DATE QUE LA VALIDATION
           }
         }
       }
     });
+
+    console.log(`🔍 Programmes trouvés: ${activeProgrammes.length}`);
 
     // 4. Calculer les statistiques
     const totalPatients = activeProgrammes.length;
@@ -312,6 +331,7 @@ const getAdherenceByDate = async (req, res) => {
  * GET /kine/patients-sessions/:date
  * Récupérer la liste détaillée des patients et leur statut de validation pour une date
  * LOGIQUE: Aujourd'hui = programmes actifs seulement, Passé = tous programmes
+ * 🔧 FIX: Comparaison dates jour seulement + timezone uniforme
  */
 const getPatientSessionsByDate = async (req, res) => {
   const uid = req.uid; // UID du kiné authentifié
@@ -320,21 +340,19 @@ const getPatientSessionsByDate = async (req, res) => {
   console.log("📋 Liste patients-sessions pour UID:", uid, "Date:", date);
 
   try {
-    // Validation du format de date
-    const targetDate = new Date(date);
-    if (isNaN(targetDate.getTime())) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Format de date invalide. Utilisez YYYY-MM-DD.' 
-      });
-    }
+    // 🔧 FIX TIMEZONE: Utiliser la même méthode que patientChat.js
+    // Créer la date cible en timezone Paris pour cohérence
+    const targetDateStr = date; // YYYY-MM-DD
+    const tempDate = new Date(targetDateStr + 'T12:00:00'); // Midi pour éviter les décalages
+    const parisTime = new Date(tempDate.toLocaleString("en-US", {timeZone: "Europe/Paris"}));
+    const targetDate = new Date(Date.UTC(parisTime.getFullYear(), parisTime.getMonth(), parisTime.getDate()));
 
-    // Normaliser la date (début de journée)
-    targetDate.setHours(0, 0, 0, 0);
+    console.log(`🔧 TIMEZONE FIX: Date "${date}" → targetDate: ${targetDate.toISOString()}`);
 
     // 🔧 LOGIQUE CONDITIONNELLE POUR L'ARCHIVAGE
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const nowParis = new Date(now.toLocaleString("en-US", {timeZone: "Europe/Paris"}));
+    const today = new Date(Date.UTC(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate()));
     const isToday = targetDate.getTime() === today.getTime();
 
     const prisma = prismaService.getInstance();
@@ -352,17 +370,33 @@ const getPatientSessionsByDate = async (req, res) => {
       });
     }
 
-    // 2. Construire la requête avec logique conditionnelle
+    // 🔧 FIX: Créer les dates de début et fin de la journée cible
+    const targetDateStart = new Date(targetDate);
+    targetDateStart.setHours(0, 0, 0, 0);
+    
+    const targetDateEnd = new Date(targetDate);
+    targetDateEnd.setHours(23, 59, 59, 999);
+
+    // 2. Construire la requête avec logique conditionnelle ET comparaison jour seulement
     const whereClause = {
       patient: {
         kineId: kine.id
       },
-      dateDebut: {
-        lte: targetDate
-      },
-      dateFin: {
-        gte: targetDate
-      }
+      // ✅ FIX: Utiliser une logique qui fonctionne pour toute heure de création
+      AND: [
+        {
+          OR: [
+            // Programme commence aujourd'hui ou avant
+            { dateDebut: { lte: targetDateEnd } },
+          ]
+        },
+        {
+          OR: [
+            // Programme finit aujourd'hui ou après
+            { dateFin: { gte: targetDateStart } },
+          ]
+        }
+      ]
     };
 
     // ✅ SEULEMENT pour aujourd'hui, exclure les programmes archivés
@@ -370,6 +404,8 @@ const getPatientSessionsByDate = async (req, res) => {
       whereClause.isArchived = false;
     }
     // Pour les dates passées, inclure TOUS les programmes (archivés ou non)
+
+    console.log("🔍 Query WHERE pour patients-sessions:", JSON.stringify(whereClause, null, 2));
 
     // 3. Récupérer tous les patients avec programmes pertinents pour cette date
     const patientsWithSessions = await prisma.programme.findMany({
@@ -385,7 +421,7 @@ const getPatientSessionsByDate = async (req, res) => {
         },
         sessionValidations: {
           where: {
-            date: targetDate
+            date: targetDate // ✅ MÊME DATE QUE LA VALIDATION
           }
         }
       },
@@ -394,6 +430,17 @@ const getPatientSessionsByDate = async (req, res) => {
           lastName: 'asc'
         }
       }
+    });
+
+    console.log(`🔍 Patients avec sessions trouvés: ${patientsWithSessions.length}`);
+    
+    // 🔍 DEBUG: Afficher les validations trouvées
+    patientsWithSessions.forEach(programme => {
+      console.log(`🔍 Programme ${programme.id} (${programme.titre}) - Patient ${programme.patient.firstName} ${programme.patient.lastName}`);
+      console.log(`🔍 - Validations trouvées: ${programme.sessionValidations.length}`);
+      programme.sessionValidations.forEach(val => {
+        console.log(`🔍   - Date: ${val.date.toISOString()}, isValidated: ${val.isValidated}, painLevel: ${val.painLevel}`);
+      });
     });
 
     // 4. Formatter les données pour la réponse
