@@ -35,6 +35,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { sendPasswordReset } from "@/lib/auth-utils";
+import { useToast } from "@/hooks/use-toast"; // Test réactivé
 import { 
   Settings, 
   BarChart2, 
@@ -69,12 +71,12 @@ import {
   Monitor,
   Clock,
   Globe,
-  Database
+  Database,
+  CheckCircle
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { RoleOrUnknown } from '@/types/user';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { getAuth, signOut } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 
@@ -104,12 +106,11 @@ function SettingsModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('account');
   const [showPassword, setShowPassword] = useState(false);
-  const [theme, setTheme] = useState('system');
-  const [notifications, setNotifications] = useState(true);
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [twoFactor, setTwoFactor] = useState(false);
   const [dataRetention, setDataRetention] = useState('5-years');
   const [loading, setLoading] = useState(false);
+  const [saveMessage, setSaveMessage] = useState(''); // Message de sauvegarde
+  const [passwordResetLoading, setPasswordResetLoading] = useState(false); // Loading pour reset password
+  const [passwordResetMessage, setPasswordResetMessage] = useState(''); // Message pour reset password
   const [kineData, setKineData] = useState({
     firstName: '',
     lastName: '',
@@ -119,6 +120,8 @@ function SettingsModal() {
     adresseCabinet: '',
     birthDate: ''
   });
+
+  const { toast } = useToast();
 
   // Charger les données du kiné au montage
   React.useEffect(() => {
@@ -155,9 +158,11 @@ function SettingsModal() {
         });
       } else {
         console.error('Erreur lors du chargement du profil');
+        // Pas de message pour les erreurs de chargement
       }
     } catch (error) {
       console.error('Erreur lors du chargement du profil:', error);
+      // Pas de message pour les erreurs de chargement
     }
   };
 
@@ -168,6 +173,8 @@ function SettingsModal() {
       const user = auth.currentUser;
       if (!user) {
         console.error('Utilisateur non connecté');
+        setSaveMessage('❌ Erreur : Vous devez être connecté');
+        setTimeout(() => setSaveMessage(''), 3000);
         return;
       }
       
@@ -188,17 +195,100 @@ function SettingsModal() {
       if (response.ok) {
         const result = await response.json();
         console.log('Profil mis à jour avec succès:', result);
-        // Optionnel : fermer la modal ou afficher un message de succès
+        
+        console.log('Profil mis à jour avec succès:', result);
+        
+        // Afficher le message de succès pendant 3 secondes
+        setSaveMessage('✅ Profil mis à jour avec succès !');
+        setTimeout(() => {
+          setSaveMessage('');
+        }, 3000);
+        
+        /* 
+        // Version toast à réactiver une fois le Toaster configuré
+        toast({
+          title: "Profil mis à jour",
+          description: "Vos informations ont été sauvegardées avec succès.",
+          duration: 3000,
+          className: "bg-green-50 border-green-200 text-green-800",
+        });
+        */
+        
       } else {
         const error = await response.json();
         console.error('Erreur lors de la mise à jour:', error);
+        setSaveMessage('❌ Erreur lors de la sauvegarde');
+        setTimeout(() => setSaveMessage(''), 3000);
       }
     } catch (error) {
       console.error('Erreur:', error);
+      setSaveMessage('❌ Erreur inattendue');
+      setTimeout(() => setSaveMessage(''), 3000);
     } finally {
       setLoading(false);
     }
   };
+
+  // Fonction pour envoyer un email de réinitialisation du mot de passe
+  const handlePasswordReset = async () => {
+    setPasswordResetLoading(true);
+    
+    try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      
+      if (!user?.email) {
+        setPasswordResetMessage('❌ Erreur : Email non trouvé');
+        setTimeout(() => setPasswordResetMessage(''), 3000);
+        return;
+      }
+
+      // Utiliser la même fonction que la page forgot-password
+      const result = await sendPasswordReset(user.email);
+
+      if (result.success) {
+        setPasswordResetMessage('✅ Email de réinitialisation envoyé !');
+        setTimeout(() => setPasswordResetMessage(''), 3000);
+      } else {
+        setPasswordResetMessage('❌ Erreur lors de l\'envoi');
+        setTimeout(() => setPasswordResetMessage(''), 3000);
+      }
+
+    } catch (error) {
+      console.error('Erreur reset password:', error);
+      setPasswordResetMessage('❌ Erreur inattendue');
+      setTimeout(() => setPasswordResetMessage(''), 3000);
+    } finally {
+      setPasswordResetLoading(false);
+    }
+  };
+
+  // Fonction pour changer le thème
+  const handleThemeChange = (newTheme: string) => {
+    const root = window.document.documentElement;
+    
+    if (newTheme === 'dark') {
+      root.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else if (newTheme === 'light') {
+      root.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    } else { // system
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      if (systemTheme === 'dark') {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+      localStorage.setItem('theme', 'system');
+    }
+  };
+
+  // Charger le thème au montage
+  React.useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') || 'system';
+    handleThemeChange(savedTheme);
+  }, []);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -332,23 +422,36 @@ function SettingsModal() {
                         />
                       </div>
                       
-                      <Button 
-                        className="mt-4" 
-                        onClick={handleSaveProfile}
-                        disabled={loading}
-                      >
-                        {loading ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Sauvegarde...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="h-4 w-4 mr-2" />
-                            Sauvegarder les modifications
-                          </>
+                      <div className="flex items-center gap-4 mt-4">
+                        <Button 
+                          onClick={handleSaveProfile}
+                          disabled={loading}
+                        >
+                          {loading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Sauvegarde...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4 mr-2" />
+                              Sauvegarder les modifications
+                            </>
+                          )}
+                        </Button>
+                        
+                        {/* Message de confirmation */}
+                        {saveMessage && (
+                          <div className={`flex items-center gap-2 text-sm font-medium transition-all duration-300 ${
+                            saveMessage.includes('✅') 
+                              ? 'text-green-600' 
+                              : 'text-red-600'
+                          }`}>
+                            {saveMessage.includes('✅') && <CheckCircle className="h-4 w-4" />}
+                            {saveMessage}
+                          </div>
                         )}
-                      </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
@@ -364,90 +467,60 @@ function SettingsModal() {
                       <CardHeader>
                         <CardTitle className="text-base">Mot de passe</CardTitle>
                         <CardDescription>
-                          Modifiez votre mot de passe de connexion
+                          Modifiez votre mot de passe de connexion via un email sécurisé
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        <div className="relative">
-                          <Label htmlFor="currentPassword">Mot de passe actuel</Label>
-                          <div className="relative">
-                            <Input
-                              id="currentPassword"
-                              type={showPassword ? "text" : "password"}
-                              placeholder="Entrez votre mot de passe actuel"
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="absolute right-0 top-0 h-full px-3"
-                              onClick={() => setShowPassword(!showPassword)}
-                            >
-                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="newPassword">Nouveau mot de passe</Label>
-                          <Input
-                            id="newPassword"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="Entrez votre nouveau mot de passe"
-                          />
-                        </div>
-                        
-                        <Button>Modifier le mot de passe</Button>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Authentification à deux facteurs</CardTitle>
-                        <CardDescription>
-                          Renforcez la sécurité de votre compte
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Activer 2FA</p>
-                            <p className="text-sm text-muted-foreground">
-                              Ajoutez une couche de sécurité supplémentaire
-                            </p>
-                          </div>
-                          <Switch
-                            checked={twoFactor}
-                            onCheckedChange={setTwoFactor}
-                          />
-                        </div>
-                        {twoFactor && (
-                          <Badge variant="secondary" className="mt-2">
-                            2FA activé ✓
-                          </Badge>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Sessions actives</CardTitle>
-                        <CardDescription>
-                          Gérez les appareils connectés à votre compte
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <div className="flex items-start gap-3">
+                            <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                             <div>
-                              <p className="font-medium">Navigateur actuel</p>
-                              <p className="text-sm text-muted-foreground">Chrome • Paris, France</p>
+                              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                Sécurité renforcée
+                              </p>
+                              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                                Pour votre sécurité, la modification du mot de passe se fait via un email de réinitialisation sécurisé envoyé à votre adresse : <span className="font-medium">{kineData.email}</span>
+                              </p>
                             </div>
-                            <Badge variant="secondary">Actuel</Badge>
                           </div>
-                          <Button variant="outline" size="sm">
-                            Déconnecter les autres sessions
+                        </div>
+                        
+                        <div className="flex items-center gap-4">
+                          <Button 
+                            onClick={handlePasswordReset}
+                            disabled={passwordResetLoading || !kineData.email}
+                            variant="outline"
+                          >
+                            {passwordResetLoading ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Envoi en cours...
+                              </>
+                            ) : (
+                              <>
+                                <Shield className="h-4 w-4 mr-2" />
+                                Envoyer l'email de réinitialisation
+                              </>
+                            )}
                           </Button>
+                          
+                          {/* Message de confirmation pour le reset */}
+                          {passwordResetMessage && (
+                            <div className={`flex items-center gap-2 text-sm font-medium transition-all duration-300 ${
+                              passwordResetMessage.includes('✅') 
+                                ? 'text-green-600' 
+                                : 'text-red-600'
+                            }`}>
+                              {passwordResetMessage.includes('✅') && <CheckCircle className="h-4 w-4" />}
+                              {passwordResetMessage}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="text-xs text-muted-foreground">
+                          <p>• L'email sera envoyé à votre adresse de connexion</p>
+                          <p>• Le lien de réinitialisation expire dans 1 heure</p>
+                          <p>• Vérifiez vos spams si vous ne recevez pas l'email</p>
                         </div>
                       </CardContent>
                     </Card>
@@ -471,7 +544,10 @@ function SettingsModal() {
                       <CardContent className="space-y-4">
                         <div>
                           <Label>Thème</Label>
-                          <Select value={theme} onValueChange={setTheme}>
+                          <Select 
+                            defaultValue="system" 
+                            onValueChange={handleThemeChange}
+                          >
                             <SelectTrigger className="w-full mt-1">
                               <SelectValue />
                             </SelectTrigger>
@@ -507,83 +583,14 @@ function SettingsModal() {
                           Configurez vos préférences de notifications
                         </CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Notifications push</p>
-                            <p className="text-sm text-muted-foreground">
-                              Recevoir des notifications dans l'application
+                      <CardContent>
+                        <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <div className="flex items-center gap-3">
+                            <Bell className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                            <p className="text-sm text-blue-700 dark:text-blue-300">
+                              La gestion des notifications sera disponible prochainement.
                             </p>
                           </div>
-                          <Switch
-                            checked={notifications}
-                            onCheckedChange={setNotifications}
-                          />
-                        </div>
-                        
-                        <Separator />
-                        
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Notifications email</p>
-                            <p className="text-sm text-muted-foreground">
-                              Recevoir des emails pour les événements importants
-                            </p>
-                          </div>
-                          <Switch
-                            checked={emailNotifs}
-                            onCheckedChange={setEmailNotifs}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Région et langue</CardTitle>
-                        <CardDescription>
-                          Paramètres régionaux et linguistiques
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <Label>Langue</Label>
-                          <Select defaultValue="fr">
-                            <SelectTrigger className="w-full mt-1">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="fr">
-                                <div className="flex items-center">
-                                  <Globe className="h-4 w-4 mr-2" />
-                                  Français
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="en">
-                                <div className="flex items-center">
-                                  <Globe className="h-4 w-4 mr-2" />
-                                  English
-                                </div>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div>
-                          <Label>Fuseau horaire</Label>
-                          <Select defaultValue="europe-paris">
-                            <SelectTrigger className="w-full mt-1">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="europe-paris">
-                                <div className="flex items-center">
-                                  <Clock className="h-4 w-4 mr-2" />
-                                  Europe/Paris (UTC+1)
-                                </div>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
                         </div>
                       </CardContent>
                     </Card>
@@ -881,18 +888,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
               />
               <span className="font-semibold text-primary">Mon Assistant Kiné</span>
             </div>
-            <div className="ml-auto">
-              <ThemeToggle />
-            </div>
           </div>
         </div>
 
         {/* Contenu principal */}
         <div className="relative p-4 md:p-6 lg:p-8 bg-background text-foreground min-h-screen">
-          {/* ThemeToggle pour desktop uniquement */}
-          <div className="absolute top-4 right-4 md:top-6 md:right-6 z-40 hidden lg:block">
-            <ThemeToggle />
-          </div>
           {children}
         </div>
       </SidebarInset>
