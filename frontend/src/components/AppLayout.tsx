@@ -186,7 +186,6 @@ function SettingsModal() {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          email: kineData.email,
           phone: kineData.phone,
           adresseCabinet: kineData.adresseCabinet
         }),
@@ -388,8 +387,10 @@ function SettingsModal() {
                           id="email" 
                           type="email" 
                           value={kineData.email}
-                          onChange={(e) => setKineData({...kineData, email: e.target.value})}
+                          disabled
+                          className="bg-muted text-muted-foreground"
                         />
+                        <p className="text-xs text-muted-foreground mt-1">Non modifiable</p>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
