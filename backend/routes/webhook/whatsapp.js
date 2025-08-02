@@ -32,9 +32,108 @@ router.post('/', (req, res) => {
   res.status(200).send('EVENT_RECEIVED');
 });
 
-// Fonction pour envoyer un message WhatsApp
-async function sendWhatsAppMessage(phoneNumber, message) {
+// Fonction pour envoyer ton template personnalisé PROGRAMME_KINE
+async function sendProgrammeTemplate(phoneNumber, chatLink) {
   try {
+    console.log('🔄 ENVOI TEMPLATE PROGRAMME_KINE avec lien:', chatLink);
+    
+    // Extraire SEULEMENT le token JWT de l'URL complète
+    const baseUrl = `${process.env.FRONTEND_URL}/chat/`;
+    const jwtToken = chatLink.replace(baseUrl, '');
+    console.log('🔑 Token JWT extrait:', jwtToken);
+    console.log('🌐 Base URL utilisée:', baseUrl);
+    
+    const response = await fetch(WHATSAPP_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: phoneNumber,
+        type: 'template',
+        template: {
+          name: 'programme_kine',
+          language: {
+            code: 'fr'
+          },
+          components: [
+            {
+              type: 'BUTTON',
+              sub_type: 'URL',
+              index: 0,
+              parameters: [
+                {
+                  type: 'TEXT',
+                  text: jwtToken  // Token envoyé au bouton, pas au corps
+                }
+              ]
+            }
+          ]
+        }
+      })
+    });
+
+    const result = await response.json();
+    
+    if (response.ok) {
+      console.log('✅ TEMPLATE PROGRAMME_KINE ENVOYÉ:', result);
+      return { success: true, data: result };
+    } else {
+      console.error('❌ ERREUR TEMPLATE PROGRAMME_KINE:', result);
+      return { success: false, error: result };
+    }
+  } catch (error) {
+    console.error('❌ ERREUR TECHNIQUE TEMPLATE PROGRAMME_KINE:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Fonction pour envoyer le template hello_world (fallback)
+async function sendHelloWorldTemplate(phoneNumber) {
+  try {
+    console.log('🔄 FALLBACK - ENVOI TEMPLATE HELLO_WORLD...');
+    
+    const response = await fetch(WHATSAPP_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: phoneNumber,
+        type: 'template',
+        template: {
+          name: 'hello_world',
+          language: {
+            code: 'en_US'
+          }
+        }
+      })
+    });
+
+    const result = await response.json();
+    
+    if (response.ok) {
+      console.log('✅ TEMPLATE HELLO_WORLD ENVOYÉ:', result);
+      return { success: true, data: result };
+    } else {
+      console.error('❌ ERREUR TEMPLATE HELLO_WORLD:', result);
+      return { success: false, error: result };
+    }
+  } catch (error) {
+    console.error('❌ ERREUR TECHNIQUE TEMPLATE HELLO_WORLD:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Fonction pour envoyer un message texte libre (désactivée pour l'instant)
+async function sendTextMessage(phoneNumber, message) {
+  try {
+    console.log('🔄 Envoi message texte...');
+    
     const response = await fetch(WHATSAPP_API_URL, {
       method: 'POST',
       headers: {
@@ -54,32 +153,47 @@ async function sendWhatsAppMessage(phoneNumber, message) {
     const result = await response.json();
     
     if (response.ok) {
-      console.log('✅ Message WhatsApp envoyé:', result);
+      console.log('✅ Message texte envoyé:', result);
       return { success: true, data: result };
     } else {
-      console.error('❌ Erreur envoi WhatsApp:', result);
+      console.error('❌ Erreur message texte:', result);
       return { success: false, error: result };
     }
   } catch (error) {
-    console.error('❌ Erreur technique WhatsApp:', error);
+    console.error('❌ Erreur technique message texte:', error);
     return { success: false, error: error.message };
   }
 }
 
-// Fonction pour envoyer le lien de programme
+// Fonction principale - UTILISE TON TEMPLATE PERSONNALISÉ
+async function sendWhatsAppMessage(phoneNumber, message, chatLink = null) {
+  console.log('🚀 ENVOI TEMPLATE PROGRAMME_KINE pour:', phoneNumber);
+  
+  // Si on a un lien de chat, utilise le template personnalisé
+  if (chatLink) {
+    console.log('🔄 Tentative template personnalisé PROGRAMME_KINE...');
+    const result = await sendProgrammeTemplate(phoneNumber, chatLink);
+    
+    if (result.success) {
+      return result;
+    }
+    
+    // Si ça échoue, utilise hello_world en fallback
+    console.log('🔄 Template personnalisé échoué, fallback hello_world...');
+    return await sendHelloWorldTemplate(phoneNumber);
+  }
+  
+  // Si pas de lien, utilise hello_world
+  return await sendHelloWorldTemplate(phoneNumber);
+}
+
+// Fonction pour envoyer le lien de programme - UTILISE TON TEMPLATE !
 async function sendProgramLink(phoneNumber, patientName, programLink) {
-  const message = `Bonjour ${patientName},
-
-Votre programme de rééducation du jour est prêt ! 💪
-
-👉 Accédez à votre chat personnalisé :
-${programLink}
-
-Votre kinésithérapeute vous accompagne à distance.
-
-L'équipe Mon Assistant Kiné`;
-
-  return await sendWhatsAppMessage(phoneNumber, message);
+  console.log('📱 Envoi lien programme via TEMPLATE PROGRAMME_KINE pour:', patientName);
+  console.log('🔗 Lien à envoyer:', programLink);
+  
+  // Utilise ton template personnalisé avec le lien
+  return await sendWhatsAppMessage(phoneNumber, null, programLink);
 }
 
 module.exports = {

@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Target, Filter, Dumbbell, Clock, Activity } from 'lucide-react';
+import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Target, Filter, Dumbbell, Clock, Activity, MessageCircle, CheckCircle, AlertCircle } from 'lucide-react';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 interface PatientData {
@@ -49,6 +49,9 @@ interface Programme {
   dateFin: string;
   exercices: any[];
 }
+
+// Type pour le statut WhatsApp
+type WhatsAppStatus = 'idle' | 'sending' | 'success' | 'error';
 
 function calculateAge(birthDateStr: string) {
   const birthDate = new Date(birthDateStr);
@@ -94,15 +97,21 @@ export default function PatientDetailPage() {
   const [selectedExercises, setSelectedExercises] = useState<ProgrammeExercise[]>([]);
   
   // Nouveaux états pour les filtres
-  const [typeFilter, setTypeFilter] = useState<string>('all'); // 'all', 'public', 'private'
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [selectedExerciseId, setSelectedExerciseId] = useState<string>('');
   
-  // États pour génération de lien
+  // États pour génération de lien et WhatsApp
   const [generatingLink, setGeneratingLink] = useState<number | null>(null);
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [currentProgrammeId, setCurrentProgrammeId] = useState<number | null>(null);
+  
+  // États WhatsApp
+  const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus>('idle');
+  const [whatsappError, setWhatsappError] = useState<string | null>(null);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
 
   useEffect(() => {
     const fetchPatient = async () => {
@@ -351,6 +360,10 @@ export default function PatientDetailPage() {
 
   const handleGenerateLink = async (programmeId: number) => {
     setGeneratingLink(programmeId);
+    setCurrentProgrammeId(programmeId);
+    setWhatsappStatus('idle');
+    setWhatsappError(null);
+    
     try {
       const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/programmes/${programmeId}/generate-link`, {
         method: "POST",
@@ -370,6 +383,42 @@ export default function PatientDetailPage() {
       alert("Erreur lors de la génération du lien");
     } finally {
       setGeneratingLink(null);
+    }
+  };
+
+  // NOUVELLE FONCTION : Envoyer le lien par WhatsApp
+  const handleSendWhatsApp = async () => {
+    if (!currentProgrammeId || !generatedLink || !patient) return;
+
+    setSendingWhatsApp(true);
+    setWhatsappStatus('sending');
+    setWhatsappError(null);
+
+    try {
+      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/programmes/${currentProgrammeId}/send-whatsapp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          chatLink: generatedLink
+        })
+      });
+
+      const result = await res.json();
+
+      if (res.ok && result.success) {
+        setWhatsappStatus('success');
+      } else {
+        setWhatsappStatus('error');
+        setWhatsappError(result.error || 'Erreur inconnue');
+      }
+    } catch (err) {
+      console.error("Erreur envoi WhatsApp :", err);
+      setWhatsappStatus('error');
+      setWhatsappError('Erreur technique lors de l\'envoi');
+    } finally {
+      setSendingWhatsApp(false);
     }
   };
 
@@ -963,7 +1012,7 @@ export default function PatientDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Modal pour afficher le lien généré */}
+        {/* Modal pour afficher le lien généré avec WhatsApp */}
         <Dialog open={showLinkModal} onOpenChange={setShowLinkModal}>
           <DialogContent className="max-w-lg">
             <DialogHeader>
@@ -982,23 +1031,126 @@ export default function PatientDetailPage() {
                 </p>
               </div>
               
+              {/* Section WhatsApp */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-blue-600" />
+                  <Label className="text-sm font-medium">Envoi WhatsApp</Label>
+                </div>
+                
+                {/* Statut WhatsApp */}
+                {whatsappStatus === 'idle' && patient?.phone && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-800 mb-2">
+                      📱 Prêt à envoyer à : <strong>{patient.phone}</strong>
+                    </p>
+                    <Button 
+                      onClick={handleSendWhatsApp}
+                      disabled={sendingWhatsApp}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {sendingWhatsApp ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          Envoi en cours...
+                        </>
+                      ) : (
+                        <>
+                          <MessageCircle className="w-4 h-4 mr-2" />
+                          Envoyer sur WhatsApp
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+                
+                {whatsappStatus === 'sending' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                      <p className="text-sm text-blue-800">
+                        Envoi du message WhatsApp en cours...
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {whatsappStatus === 'success' && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <p className="text-sm text-green-800 font-medium">
+                        Message WhatsApp envoyé avec succès ! 📱
+                      </p>
+                    </div>
+                    <p className="text-xs text-green-700">
+                      Votre patient va recevoir le lien sur WhatsApp dans quelques instants.
+                    </p>
+                  </div>
+                )}
+                
+                {whatsappStatus === 'error' && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                      <p className="text-sm text-red-800 font-medium">
+                        Erreur lors de l'envoi WhatsApp
+                      </p>
+                    </div>
+                    <p className="text-xs text-red-700 mb-3">
+                      {whatsappError || 'Une erreur est survenue lors de l\'envoi.'}
+                    </p>
+                    <Button 
+                      onClick={handleSendWhatsApp}
+                      disabled={sendingWhatsApp}
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 border-red-300 hover:bg-red-50"
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Réessayer
+                    </Button>
+                  </div>
+                )}
+                
+                {!patient?.phone && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-orange-600" />
+                      <p className="text-sm text-orange-800">
+                        Numéro de téléphone manquant - WhatsApp indisponible
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Section lien manuel */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Lien à partager :</Label>
+                <Label className="text-sm font-medium">Lien à partager manuellement :</Label>
                 <div className="p-3 bg-gray-100 rounded-lg border text-sm break-all font-mono">
                   {generatedLink}
                 </div>
-              </div>
-              
-              <div className="flex gap-3">
                 <Button 
                   onClick={copyLinkToClipboard}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  variant="outline"
+                  className="w-full"
                 >
                   <Copy className="w-4 h-4 mr-2" />
                   Copier le lien
                 </Button>
+              </div>
+              
+              {/* Actions */}
+              <div className="flex gap-3 pt-4 border-t">
                 <Button 
-                  onClick={() => setShowLinkModal(false)}
+                  onClick={() => {
+                    setShowLinkModal(false);
+                    setWhatsappStatus('idle');
+                    setWhatsappError(null);
+                    setCurrentProgrammeId(null);
+                    setGeneratedLink(null);
+                  }}
                   variant="outline"
                   className="flex-1"
                 >
