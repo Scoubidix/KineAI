@@ -1,10 +1,70 @@
 // services/embeddingService.js - VERSION NETTOYÉE
-// Les fonctions d'embedding et de stockage sont maintenant gérées par n8n
+// Le stockage est géré par n8n, mais on garde l'embedding pour les recherches
+const OpenAI = require('openai');
 const { supabase } = require('./supabaseClient');
+
+// Configuration OpenAI pour les recherches
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+const EMBEDDING_CONFIG = {
+  model: 'text-embedding-3-small',
+  dimensions: 1536
+};
 
 // ==========================================
 // 🔍 FONCTIONS DE RECHERCHE SÉMANTIQUE
 // ==========================================
+
+/**
+ * Génère un embedding pour les recherches (identique au stockage n8n)
+ * @param {string} text - Texte à convertir en embedding
+ * @returns {array} Vecteur d'embedding
+ */
+async function generateEmbedding(text) {
+  try {
+    const optimizedText = preprocessTextForEmbedding(text);
+    
+    console.log('🔄 Génération embedding pour recherche:', optimizedText.substring(0, 100) + '...');
+    
+    const response = await openai.embeddings.create({
+      model: EMBEDDING_CONFIG.model,
+      input: optimizedText,
+      dimensions: EMBEDDING_CONFIG.dimensions
+    });
+
+    const embedding = response.data[0].embedding;
+    console.log('✅ Embedding généré:', embedding.length, 'dimensions');
+    
+    return embedding;
+  } catch (error) {
+    console.error('❌ Erreur génération embedding:', error);
+    throw error;
+  }
+}
+
+/**
+ * Prétraitement du texte pour optimiser l'embedding (même logique que n8n)
+ */
+function preprocessTextForEmbedding(text) {
+  return text
+    // Supprimer les caractères répétitifs
+    .replace(/(.)\1{4,}/g, '$1$1$1')
+    
+    // Normaliser les espaces
+    .replace(/\s+/g, ' ')
+    
+    // Supprimer les mots très courts ou très longs
+    .split(/\s+/)
+    .filter(word => word.length >= 2 && word.length <= 30)
+    .join(' ')
+    
+    // Tronquer si trop long
+    .substring(0, 8000)
+    
+    .trim();
+}
 
 /**
  * Recherche sémantique dans la base vectorielle
@@ -22,10 +82,11 @@ async function searchDocuments(query, options = {}) {
 
     console.log('🔍 Recherche avec fonction Supabase pour:', query);
     
-    // NOTE: L'embedding de la requête est maintenant généré côté n8n
-    // Cette fonction utilise directement la fonction RPC Supabase
+    // Générer l'embedding de la requête (même logique que le stockage n8n)
+    const queryEmbedding = await generateEmbedding(query);
+    
     const { data, error } = await supabase.rpc('search_documents', {
-      query_text: query, // La fonction RPC génère l'embedding automatiquement
+      query_embedding: queryEmbedding,
       match_threshold: matchThreshold,
       match_count: matchCount,
       filter_category: filterCategory
@@ -376,9 +437,11 @@ async function testVectorDatabase() {
       throw error;
     }
 
-    // Test fonction de recherche
+    // Test fonction de recherche avec embedding
+    const testEmbedding = await generateEmbedding('test kinésithérapie');
+    
     const { data: searchTest, error: searchError } = await supabase.rpc('search_documents', {
-      query_text: 'test kinésithérapie',
+      query_embedding: testEmbedding,
       match_threshold: 0.1,
       match_count: 1
     });
@@ -391,9 +454,12 @@ async function testVectorDatabase() {
     return {
       status: 'success',
       supabaseConnected: true,
+      embeddingWorking: true,
       searchFunctionWorking: true,
+      embeddingDimensions: testEmbedding.length,
+      embeddingModel: EMBEDDING_CONFIG.model,
       searchResults: searchTest?.length || 0,
-      embeddingManagedBy: 'n8n workflow',
+      architecture: 'Recherche: embedding service / Stockage: n8n workflow',
       timestamp: new Date().toISOString()
     };
 
@@ -417,6 +483,8 @@ module.exports = {
   // Fonctions de recherche
   searchDocuments,
   searchDocumentsOptimized,
+  generateEmbedding, // Pour les recherches seulement
+  preprocessTextForEmbedding, // Utilitaire d'embedding
   
   // Fonctions de gestion
   getDocumentStats,

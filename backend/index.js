@@ -26,6 +26,14 @@ const { router: whatsappWebhook } = require('./routes/webhook/whatsapp');
 // 🔔 NOUVEAU : Import des routes notifications
 const notificationRoutes = require('./routes/notifications');
 
+// 💳 NOUVEAU : Import des routes Stripe existantes
+const stripeWebhookRoutes = require('./routes/webhook/stripe');
+
+// 💳 NOUVEAU PAYWALL : Import des nouvelles routes paywall
+const subscriptionRoutes = require('./routes/subscription');
+const checkoutRoutes = require('./routes/checkout');
+const plansRoutes = require('./routes/plans');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -60,6 +68,10 @@ const corsOptions = {
   optionsSuccessStatus: 200 // Pour les anciens navigateurs
 };
 
+// 💳 IMPORTANT : Webhook Stripe AVANT les middlewares JSON
+// Le webhook Stripe a besoin du raw body, donc on le place avant express.json()
+app.use('/webhook', stripeWebhookRoutes);
+
 // Middleware - Augmenté pour les PDFs
 app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: '50mb' }));
@@ -72,16 +84,18 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    service: 'KineAI Backend with Vector DB + WhatsApp + Notifications',
+    service: 'KineAI Backend with Vector DB + WhatsApp + Notifications + Stripe + Paywall + 4 IA Spécialisées',
     port: PORT,
     features: [
       'Patient Chat',
       'Programme Management', 
       'Auto Archive System',
-      'Kiné Personal AI Assistant Enhanced',
+      '🤖 4 IA Kinés Spécialisées (Basique, Biblio, Clinique, Administrative)',
       'PDF Upload & Vector Search',
       'WhatsApp Integration',
-      '🔔 Notification System' // NOUVEAU
+      '🔔 Notification System',
+      '💳 Stripe Subscriptions',
+      '🔒 Paywall System'
     ]
   });
 });
@@ -97,7 +111,7 @@ app.get('/api/test-db', async (req, res) => {
       message: 'Database connection successful',
       timestamp: new Date().toISOString(),
       kineCount: kineCount,
-      database: 'PostgreSQL + Prisma + Supabase Vector + Notifications'
+      database: 'PostgreSQL + Prisma + Supabase Vector + Notifications + Stripe + Paywall + 4 Tables IA'
     });
   } catch (error) {
     console.error('Database connection error:', error);
@@ -123,9 +137,15 @@ app.get('/api/test-env', (req, res) => {
       hasDatabaseURL: !!process.env.DATABASE_URL,
       frontendURL: process.env.FRONTEND_URL,
       hasSupabase: !!(process.env.SUPABASE_URL && process.env.SUPABASE_API_KEY),
-      // NOUVEAU : Variables WhatsApp
+      // Variables WhatsApp
       hasWhatsApp: !!(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_ID),
-      whatsappConfigured: !!process.env.WHATSAPP_WEBHOOK_TOKEN
+      whatsappConfigured: !!process.env.WHATSAPP_WEBHOOK_TOKEN,
+      // 💳 NOUVEAU : Variables Stripe
+      hasStripe: !!process.env.STRIPE_SECRET_KEY,
+      hasStripeWebhook: !!process.env.STRIPE_ENDPOINT_SECRET,
+      stripeConfigured: !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_ENDPOINT_SECRET),
+      // 🔒 NOUVEAU PAYWALL : Variables système paywall
+      paywallConfigured: !!(process.env.STRIPE_SECRET_KEY && process.env.FRONTEND_URL)
     }
   });
 });
@@ -223,6 +243,99 @@ app.get('/api/test-notifications', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   }
+});
+
+// 💳 NOUVEAU : Test Stripe
+app.get('/api/test-stripe', (req, res) => {
+  res.json({
+    message: 'Stripe configuration check',
+    timestamp: new Date().toISOString(),
+    stripe: {
+      hasSecretKey: !!process.env.STRIPE_SECRET_KEY,
+      hasWebhookSecret: !!process.env.STRIPE_ENDPOINT_SECRET,
+      hasFrontendUrl: !!process.env.FRONTEND_URL,
+      webhookEndpoint: '/webhook/stripe',
+      configured: !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_ENDPOINT_SECRET),
+      endpoints: [
+        'POST /webhook/stripe',
+        'GET /api/kine/subscription',
+        'GET /api/kine/usage',
+        'POST /api/stripe/create-checkout',
+        'POST /api/stripe/create-portal',
+        'GET /api/plans/PIONNIER/availability'
+      ]
+    }
+  });
+});
+
+// 🔒 NOUVEAU : Test Paywall
+app.get('/api/test-paywall', (req, res) => {
+  res.json({
+    message: 'Paywall system check',
+    timestamp: new Date().toISOString(),
+    paywall: {
+      configured: !!(process.env.STRIPE_SECRET_KEY && process.env.FRONTEND_URL),
+      endpoints: [
+        'GET /api/kine/subscription',
+        'GET /api/kine/usage',
+        'GET /api/kine/limits',
+        'POST /api/kine/usage/refresh',
+        'GET /api/plans/PIONNIER/availability',
+        'GET /api/plans/PIONNIER/remaining-slots',
+        'GET /api/plans/stats',
+        'POST /api/stripe/create-checkout',
+        'POST /api/stripe/create-portal'
+      ],
+      features: [
+        'Plan FREE protection',
+        'Subscription status check',
+        'Usage tracking (chatbots)',
+        'Plan Pionnier limitation (100 slots)',
+        'Feature gates by plan',
+        'Stripe checkout integration'
+      ]
+    }
+  });
+});
+
+// 🤖 NOUVEAU : Test des 4 IA Spécialisées
+app.get('/api/test-ia', (req, res) => {
+  res.json({
+    message: '4 IA Spécialisées system check',
+    timestamp: new Date().toISOString(),
+    iaSystem: {
+      configured: !!process.env.OPENAI_API_KEY,
+      tables: [
+        'chat_ia_basique',
+        'chat_ia_biblio', 
+        'chat_ia_clinique',
+        'chat_ia_administrative'
+      ],
+      endpoints: {
+        iaBasique: 'POST /api/chat/kine/ia-basique',
+        iaBiblio: 'POST /api/chat/kine/ia-biblio',
+        iaClinique: 'POST /api/chat/kine/ia-clinique',
+        iaAdministrative: 'POST /api/chat/kine/ia-administrative',
+        iaStatus: 'GET /api/chat/kine/ia-status',
+        historyBasique: 'GET /api/chat/kine/history-basique',
+        historyBiblio: 'GET /api/chat/kine/history-biblio',
+        historyClinique: 'GET /api/chat/kine/history-clinique',
+        historyAdministrative: 'GET /api/chat/kine/history-administrative',
+        allHistory: 'GET /api/chat/kine/all-history',
+        clearHistoryBasique: 'DELETE /api/chat/kine/history-basique',
+        clearAllHistory: 'DELETE /api/chat/kine/all-history'
+      },
+      features: [
+        'IA Basique - Assistant conversationnel général',
+        'IA Bibliographique - Références scientifiques',
+        'IA Clinique - Aide diagnostic et traitement',
+        'IA Administrative - Gestion cabinet et réglementation',
+        'Historiques séparés par IA',
+        'Recherche vectorielle intégrée',
+        'Prompts spécialisés par domaine'
+      ]
+    }
+  });
 });
 
 // NOUVEAU : Test CORS
@@ -387,6 +500,11 @@ app.use('/webhook/whatsapp', whatsappWebhook);
 // 🔔 NOUVEAU : Routes notifications
 app.use('/api/notifications', notificationRoutes);
 
+// 💳 NOUVEAU PAYWALL : Routes système paywall
+app.use('/api/kine', subscriptionRoutes);  // /api/kine/subscription, /api/kine/usage, etc.
+app.use('/api/stripe', checkoutRoutes);    // /api/stripe/create-checkout, etc.
+app.use('/api/plans', plansRoutes);        // /api/plans/PIONNIER/availability, etc.
+
 // Routes existantes
 app.use('/kine', kinesRoutes);
 app.use('/patients', patientsRoutes);
@@ -395,7 +513,7 @@ app.use('/admin/programmes', programmeAdminRoutes);
 app.use('/exercices', exerciceRoutes);
 app.use('/api/test', testOpenAIRoutes);
 app.use('/api/patient', patientChatRoutes);
-app.use('/api/chat/kine', chatKineRoutes); // Route existante avec nouvelles fonctionnalités
+app.use('/api/chat/kine', chatKineRoutes); // ✅ Route existante avec les 4 nouvelles IA
 
 // NOUVELLE ROUTE VECTORIELLE
 app.use('/api/documents', documentsRoutes);
@@ -435,23 +553,40 @@ app.get('/test-notifications-programs', async (req, res) => {
 // Route racine mise à jour
 app.get('/', (req, res) => {
   res.json({
-    message: 'Bienvenue sur l API KineAI - Base Vectorielle Supabase + WhatsApp + Notifications Intégrés',
+    message: 'Bienvenue sur l API KineAI - 4 IA Spécialisées + Base Vectorielle Supabase + WhatsApp + Notifications + Stripe + Paywall',
     timestamp: new Date().toISOString(),
-    version: '2.4', // Version mise à jour
+    version: '3.0', // Version mise à jour avec 4 IA
     status: 'running',
     features: [
       'Patient Chat',
       'Programme Management', 
       'Auto Archive System',
-      'Kiné Personal AI Assistant Enhanced', 
+      '🤖 4 IA Kinés Spécialisées (Basique, Biblio, Clinique, Administrative)',
       'PDF Upload & Vector Search',
       'Semantic Knowledge Base',
       'WhatsApp Business Integration',
-      '🔔 Real-time Notification System' // NOUVEAU
+      '🔔 Real-time Notification System',
+      '💳 Stripe Subscription Management',
+      '🔒 Paywall & Feature Gates System'
     ],
     endpoints: {
-      chat: '/api/chat/kine/message',
-      chatEnhanced: '/api/chat/kine/message-enhanced',
+      // 🤖 NOUVEAUX ENDPOINTS 4 IA SPÉCIALISÉES
+      iaBasique: '/api/chat/kine/ia-basique',
+      iaBiblio: '/api/chat/kine/ia-biblio',
+      iaClinique: '/api/chat/kine/ia-clinique',
+      iaAdministrative: '/api/chat/kine/ia-administrative',
+      iaStatus: '/api/chat/kine/ia-status',
+      iaTest: '/api/test-ia',
+      // HISTORIQUES IA
+      historyBasique: '/api/chat/kine/history-basique',
+      historyBiblio: '/api/chat/kine/history-biblio',
+      historyClinique: '/api/chat/kine/history-clinique',
+      historyAdministrative: '/api/chat/kine/history-administrative',
+      allHistory: '/api/chat/kine/all-history',
+      // SUPPRESSION HISTORIQUES
+      clearHistoryBasique: '/api/chat/kine/history-basique [DELETE]',
+      clearAllHistory: '/api/chat/kine/all-history [DELETE]',
+      // AUTRES ENDPOINTS
       documents: '/api/documents',
       upload: '/api/documents/upload',
       search: '/api/documents/search',
@@ -459,12 +594,22 @@ app.get('/', (req, res) => {
       whatsappTest: '/api/test-whatsapp',
       whatsappWebhook: '/webhook/whatsapp',
       corsTest: '/api/test-cors',
-      // 🔔 NOUVEAUX ENDPOINTS NOTIFICATIONS
+      // 🔔 ENDPOINTS NOTIFICATIONS
       notifications: '/api/notifications',
       notificationsUnreadCount: '/api/notifications/unread-count',
       notificationsStats: '/api/notifications/stats',
       notificationsTest: '/api/test-notifications',
-      // ENDPOINTS DEBUG EXISTANTS
+      // 💳 ENDPOINTS STRIPE
+      stripeTest: '/api/test-stripe',
+      stripeWebhook: '/webhook/stripe',
+      subscription: '/api/kine/subscription',
+      usage: '/api/kine/usage',
+      // 🔒 ENDPOINTS PAYWALL
+      paywallTest: '/api/test-paywall',
+      plansAvailability: '/api/plans/PIONNIER/availability',
+      stripeCheckout: '/api/stripe/create-checkout',
+      stripePortal: '/api/stripe/create-portal',
+      // ENDPOINTS DEBUG
       debugPrisma: '/debug/prisma-imports',
       debugConnections: '/debug/connections',
       cleanupConnections: '/debug/cleanup-connections [POST]'
@@ -487,8 +632,12 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 KineAI Backend running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-  console.log(`🤖 Chat Kiné: /api/chat/kine/message`);
-  console.log(`🤖 Chat Enhanced: /api/chat/kine/message-enhanced`);
+  console.log(`🤖 IA Basique: /api/chat/kine/ia-basique`);
+  console.log(`🤖 IA Bibliographique: /api/chat/kine/ia-biblio`);
+  console.log(`🤖 IA Clinique: /api/chat/kine/ia-clinique`);
+  console.log(`🤖 IA Administrative: /api/chat/kine/ia-administrative`);
+  console.log(`🤖 Statut 4 IA: /api/chat/kine/ia-status`);
+  console.log(`🤖 Test 4 IA: /api/test-ia`);
   console.log(`📄 Documents API: /api/documents`);
   console.log(`📊 Vector Test: /api/test-vector`);
   console.log(`📱 WhatsApp Test: /api/test-whatsapp`);
@@ -496,6 +645,13 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🔒 CORS Test: /api/test-cors`);
   console.log(`🔔 Notifications: /api/notifications`);
   console.log(`🔔 Test Notifications: /api/test-notifications`);
+  console.log(`💳 Stripe Test: /api/test-stripe`);
+  console.log(`💳 Stripe Webhook: /webhook/stripe`);
+  console.log(`🔒 Paywall Subscription: /api/kine/subscription`);
+  console.log(`🔒 Paywall Usage: /api/kine/usage`);
+  console.log(`🔒 Plans Availability: /api/plans/PIONNIER/availability`);
+  console.log(`💳 Stripe Checkout: /api/stripe/create-checkout`);
+  console.log(`🔒 Paywall Test: /api/test-paywall`);
   console.log(`🔍 Debug Prisma: /debug/prisma-imports`);
   console.log(`📊 Debug Connections: /debug/connections`);
   console.log(`🔒 CORS configuré pour: https://monassistantkine.vercel.app, localhost:3000, localhost:3001, fichiers locaux`);

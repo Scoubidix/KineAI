@@ -149,7 +149,7 @@ export default function KineChatbotPage() {
     try {
       setIsLoadingHistory(true);
       const token = await getAuthToken();
-      const res = await fetch(`${API_BASE}/api/chat/kine?days=5`, {
+      const res = await fetch(`${API_BASE}/api/chat/kine/history-basique?days=5`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -200,7 +200,7 @@ export default function KineChatbotPage() {
     try {
       const token = await getAuthToken();
       
-      const res = await fetch(`${API_BASE}/api/chat/kine/message-enhanced`, {
+      const res = await fetch(`${API_BASE}/api/chat/kine/ia-basique`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -235,7 +235,7 @@ export default function KineChatbotPage() {
         }, 100);
         
         const token = await getAuthToken();
-        const res = await fetch(`${API_BASE}/api/chat/kine?days=5`, {
+        const res = await fetch(`${API_BASE}/api/chat/kine/history-basique?days=5`, {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -283,7 +283,7 @@ export default function KineChatbotPage() {
     try {
       const token = await getAuthToken();
       
-      const res = await fetch('/api/chat/kine?action=delete', {
+      const res = await fetch(`${API_BASE}/api/chat/kine/history-basique`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`

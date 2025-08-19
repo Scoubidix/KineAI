@@ -20,10 +20,26 @@ model Kine {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  patients         Patient[]
-  exercicesModeles ExerciceModele[]
-  chatKine         ChatKine[]
-  notifications    Notification[]   // NOUVELLE RELATION
+  // ========== NOUVEAUX CHAMPS STRIPE ==========
+  stripeCustomerId      String?           // ID client Stripe
+  subscriptionId        String?           // ID abonnement Stripe actuel
+  planType              PlanType?         // Type de plan actuel
+  subscriptionStatus    SubscriptionStatus? // Statut de l'abonnement
+  subscriptionStartDate DateTime?         // Date début abonnement
+  subscriptionEndDate   DateTime?         // Date fin abonnement
+  trialEndDate          DateTime?         // Date fin période d'essai (si applicable)
+  // ===============================================
+
+  patients              Patient[]
+  exercicesModeles      ExerciceModele[]
+  notifications         Notification[]
+  
+  // ========== NOUVELLES RELATIONS IA ==========
+  chatIaBasique         ChatIaBasique[]
+  chatIaBiblio          ChatIaBiblio[]
+  chatIaClinique        ChatIaClinique[]
+  chatIaAdministrative  ChatIaAdministrative[]
+  // =============================================
 }
 
 model Patient {
@@ -43,7 +59,7 @@ model Patient {
   programmes        Programme[]
   chatSessions      ChatSession[]
   sessionValidations SessionValidation[]
-  notifications     Notification[]      // NOUVELLE RELATION
+  notifications     Notification[]
 }
 
 model ExerciceModele {
@@ -78,7 +94,7 @@ model Programme {
   exercices          ExerciceProgramme[]
   chatSessions       ChatSession[]
   sessionValidations SessionValidation[]
-  notifications      Notification[]      // NOUVELLE RELATION
+  notifications      Notification[]
 }
 
 model ExerciceProgramme {
@@ -116,14 +132,13 @@ model ChatSession {
   @@map("chat_sessions")
 }
 
-// NOUVELLE TABLE pour le suivi quotidien des séances
 model SessionValidation {
   id           Int       @id @default(autoincrement())
   date         DateTime  @db.Date // Date de la séance (YYYY-MM-DD)
   isValidated  Boolean   @default(false)
   validatedAt  DateTime? // Moment exact de la validation
   
-  // NOUVELLES MÉTRIQUES
+  // Métriques
   painLevel       Int?    // Douleur de 0 à 10 (null si pas encore validé)
   difficultyLevel Int?    // Difficulté de 0 à 10 (null si pas encore validé)
   
@@ -148,8 +163,9 @@ model SessionValidation {
   @@map("session_validations")
 }
 
-// Chat kiné avec l'IA (existant)
-model ChatKine {
+// ========== NOUVELLES TABLES IA ==========
+
+model ChatIaBasique {
   id          Int      @id @default(autoincrement())
   message     String   // Question du kiné
   response    String   // Réponse de l'IA
@@ -161,10 +177,56 @@ model ChatKine {
   
   // Index pour optimiser les requêtes par kiné et date
   @@index([kineId, createdAt])
-  @@map("chat_kine")
+  @@map("chat_ia_basique")
 }
 
-// NOUVELLE TABLE - Notifications
+model ChatIaBiblio {
+  id          Int      @id @default(autoincrement())
+  message     String   // Question du kiné
+  response    String   // Réponse de l'IA
+  createdAt   DateTime @default(now())
+  
+  // Relation avec le kiné
+  kineId      Int
+  kine        Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  
+  // Index pour optimiser les requêtes par kiné et date
+  @@index([kineId, createdAt])
+  @@map("chat_ia_biblio")
+}
+
+model ChatIaClinique {
+  id          Int      @id @default(autoincrement())
+  message     String   // Question du kiné
+  response    String   // Réponse de l'IA
+  createdAt   DateTime @default(now())
+  
+  // Relation avec le kiné
+  kineId      Int
+  kine        Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  
+  // Index pour optimiser les requêtes par kiné et date
+  @@index([kineId, createdAt])
+  @@map("chat_ia_clinique")
+}
+
+model ChatIaAdministrative {
+  id          Int      @id @default(autoincrement())
+  message     String   // Question du kiné
+  response    String   // Réponse de l'IA
+  createdAt   DateTime @default(now())
+  
+  // Relation avec le kiné
+  kineId      Int
+  kine        Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  
+  // Index pour optimiser les requêtes par kiné et date
+  @@index([kineId, createdAt])
+  @@map("chat_ia_administrative")
+}
+
+// ==========================================
+
 model Notification {
   id          Int              @id @default(autoincrement())
   type        NotificationType // Type de notification
@@ -195,7 +257,31 @@ model Notification {
   @@map("notifications")
 }
 
-// NOUVEL ENUM - Types de notifications
+// ========== NOUVEAUX ENUMS STRIPE ==========
+enum PlanType {
+  FREE
+  DECLIC    // 9€/mois - 1 chatbot + IA conversationnel
+  PRATIQUE  // 19€/mois - 3 chatbots + IA conversationnel + biblio + clinique
+  PIONNIER  // 20€/mois - Plan Expert à prix réduit (limité à 100 places)
+  EXPERT    // 59€/mois - Chatbots illimités + tous les assistants
+  
+  @@map("plan_type")
+}
+
+enum SubscriptionStatus {
+  ACTIVE              // Abonnement actif
+  CANCELED            // Annulé (mais encore actif jusqu'à la fin de période)
+  PAST_DUE           // Impayé
+  UNPAID             // Non payé
+  INCOMPLETE         // Paiement incomplet
+  INCOMPLETE_EXPIRED // Paiement incomplet expiré
+  TRIALING           // En période d'essai
+  PAUSED             // Suspendu
+  
+  @@map("subscription_status")
+}
+// ==========================================
+
 enum NotificationType {
   DAILY_VALIDATION    // Patient valide une journée
   PROGRAM_COMPLETED   // Programme terminé
