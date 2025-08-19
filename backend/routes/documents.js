@@ -1,113 +1,21 @@
-// routes/documents.js
+// routes/documents.js - VERSION NETTOYÉE
+// Les fonctions d'upload et traitement PDF sont maintenant gérées par n8n
 const express = require('express');
-const multer = require('multer');
-const { processPDF, getPDFInfo } = require('../services/pdfProcessor');
-const { searchDocuments } = require('../services/embeddingService');
-const { supabase } = require('../services/supabaseClient');
+const { 
+  searchDocuments, 
+  searchDocumentsOptimized,
+  getDocumentStats,
+  deleteDocument,
+  listDocuments,
+  testVectorDatabase,
+  cleanupDuplicates
+} = require('../services/embeddingService');
 
 const router = express.Router();
 
-// Configuration multer pour l'upload de fichiers
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max
-  },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
-      cb(null, true);
-    } else {
-      cb(new Error('Seuls les fichiers PDF sont acceptés'), false);
-    }
-  }
-});
-
-// ========== ROUTES D'UPLOAD ==========
-
-/**
- * POST /api/documents/upload
- * Upload et traitement d'un PDF
- */
-router.post('/upload', upload.single('pdf'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: 'Aucun fichier PDF fourni'
-      });
-    }
-
-    const { title, category } = req.body;
-    
-    if (!title || !category) {
-      return res.status(400).json({
-        success: false,
-        error: 'Titre et catégorie requis'
-      });
-    }
-
-    console.log('📄 Upload PDF:', title, 'Catégorie:', category);
-    
-    // Traiter le PDF
-    const result = await processPDF(
-      req.file.buffer,
-      title,
-      category,
-      {
-        filename: req.file.originalname,
-        size: req.file.size,
-        uploadedAt: new Date().toISOString()
-      }
-    );
-
-    res.json({
-      success: true,
-      message: 'PDF traité et ajouté à la base de connaissances',
-      data: result,
-      chunks: Array.isArray(result) ? result.length : 1
-    });
-
-  } catch (error) {
-    console.error('❌ Erreur upload PDF:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-/**
- * POST /api/documents/analyze
- * Analyser un PDF sans l'uploader
- */
-router.post('/analyze', upload.single('pdf'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: 'Aucun fichier PDF fourni'
-      });
-    }
-
-    const info = await getPDFInfo(req.file.buffer);
-    
-    res.json({
-      success: true,
-      filename: req.file.originalname,
-      size: req.file.size,
-      info
-    });
-
-  } catch (error) {
-    console.error('❌ Erreur analyse PDF:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// ========== ROUTES DE RECHERCHE ==========
+// ==========================================
+// 🔍 ROUTES DE RECHERCHE SÉMANTIQUE
+// ==========================================
 
 /**
  * POST /api/documents/search
@@ -124,6 +32,8 @@ router.post('/search', async (req, res) => {
       });
     }
 
+    console.log('🔍 Recherche:', query, 'Catégorie:', category);
+
     const results = await searchDocuments(query, {
       matchThreshold: threshold,
       matchCount: limit,
@@ -134,7 +44,9 @@ router.post('/search', async (req, res) => {
       success: true,
       query,
       results,
-      count: results.length
+      count: results.length,
+      threshold,
+      category: category || 'toutes'
     });
 
   } catch (error) {
@@ -146,34 +58,81 @@ router.post('/search', async (req, res) => {
   }
 });
 
-// ========== ROUTES DE GESTION ==========
-
 /**
- * GET /api/documents
- * Lister tous les documents
+ * POST /api/documents/search/optimized
+ * Recherche sémantique optimisée avec seuils adaptatifs
  */
-router.get('/', async (req, res) => {
+router.post('/search/optimized', async (req, res) => {
   try {
-    const { category, limit = 50, offset = 0 } = req.query;
+    const { query, category } = req.body;
     
-    let query = supabase
-      .from('documents_kine')
-      .select('id, title, category, created_at, metadata')
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-    
-    if (category) {
-      query = query.eq('category', category);
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query de recherche requise'
+      });
     }
-    
-    const { data, error } = await query;
-    
-    if (error) throw error;
+
+    console.log('🔍 Recherche optimisée:', query);
+
+    const results = await searchDocumentsOptimized(query, {
+      filterCategory: category
+    });
 
     res.json({
       success: true,
-      documents: data,
-      count: data.length
+      query,
+      results,
+      count: results.length,
+      searchType: 'optimized',
+      category: category || 'toutes'
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur recherche optimisée:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ==========================================
+// 📋 ROUTES DE GESTION DES DOCUMENTS
+// ==========================================
+
+/**
+ * GET /api/documents
+ * Lister les documents avec options de filtrage
+ */
+router.get('/', async (req, res) => {
+  try {
+    const { 
+      category, 
+      limit = 50, 
+      offset = 0,
+      orderBy = 'created_at',
+      orderDirection = 'desc'
+    } = req.query;
+    
+    console.log('📋 Liste documents:', { category, limit, offset });
+
+    const documents = await listDocuments({
+      category,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      orderBy,
+      orderDirection
+    });
+
+    res.json({
+      success: true,
+      documents,
+      count: documents.length,
+      pagination: {
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      }
     });
 
   } catch (error) {
@@ -191,18 +150,22 @@ router.get('/', async (req, res) => {
  */
 router.get('/categories', async (req, res) => {
   try {
+    const { supabase } = require('../services/supabaseClient');
+    
     const { data, error } = await supabase
       .from('documents_kine')
       .select('category')
-      .group('category');
+      .not('category', 'is', null);
     
     if (error) throw error;
 
-    const categories = [...new Set(data.map(item => item.category))];
+    // Extraire les catégories uniques
+    const categories = [...new Set(data.map(item => item.category))].sort();
 
     res.json({
       success: true,
-      categories
+      categories,
+      count: categories.length
     });
 
   } catch (error) {
@@ -216,36 +179,43 @@ router.get('/categories', async (req, res) => {
 
 /**
  * DELETE /api/documents/:id
- * Supprimer un document
+ * Supprimer un document spécifique
  */
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const { data, error } = await supabase
-      .from('documents_kine')
-      .delete()
-      .eq('id', id)
-      .select()
-      .single();
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: 'ID du document requis'
+      });
+    }
+
+    console.log('🗑️ Suppression document ID:', id);
     
-    if (error) throw error;
+    const deletedDocument = await deleteDocument(id);
+
+    res.json({
+      success: true,
+      message: 'Document supprimé avec succès',
+      deleted: {
+        id: deletedDocument.id,
+        title: deletedDocument.title,
+        category: deletedDocument.category
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur suppression:', error);
     
-    if (!data) {
+    if (error.message.includes('not found')) {
       return res.status(404).json({
         success: false,
         error: 'Document non trouvé'
       });
     }
-
-    res.json({
-      success: true,
-      message: 'Document supprimé',
-      deleted: data
-    });
-
-  } catch (error) {
-    console.error('❌ Erreur suppression:', error);
+    
     res.status(500).json({
       success: false,
       error: error.message
@@ -253,44 +223,24 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// ==========================================
+// 📊 ROUTES DE STATISTIQUES ET MONITORING
+// ==========================================
+
 /**
  * GET /api/documents/stats
- * Statistiques des documents
+ * Statistiques complètes de la base documentaire
  */
 router.get('/stats', async (req, res) => {
   try {
-    // Compter par catégorie
-    const { data: categoryStats, error: categoryError } = await supabase
-      .from('documents_kine')
-      .select('category')
-      .group('category');
+    console.log('📊 Récupération des statistiques...');
     
-    if (categoryError) throw categoryError;
-
-    // Total documents
-    const { count: totalCount, error: countError } = await supabase
-      .from('documents_kine')
-      .select('*', { count: 'exact', head: true });
-    
-    if (countError) throw countError;
-
-    // Recherches récentes
-    const { data: recentSearches, error: searchError } = await supabase
-      .from('vector_searches')
-      .select('query, created_at')
-      .order('created_at', { ascending: false })
-      .limit(10);
-    
-    // Ne pas faire échouer si pas de table vector_searches
-    const searches = searchError ? [] : recentSearches;
+    const stats = await getDocumentStats();
 
     res.json({
       success: true,
-      stats: {
-        totalDocuments: totalCount,
-        categories: categoryStats?.length || 0,
-        recentSearches: searches
-      }
+      stats,
+      generatedAt: new Date().toISOString()
     });
 
   } catch (error) {
@@ -300,6 +250,105 @@ router.get('/stats', async (req, res) => {
       error: error.message
     });
   }
+});
+
+/**
+ * GET /api/documents/health
+ * Test de santé de la base vectorielle
+ */
+router.get('/health', async (req, res) => {
+  try {
+    console.log('🔧 Test de santé de la base vectorielle...');
+    
+    const healthCheck = await testVectorDatabase();
+
+    const statusCode = healthCheck.status === 'success' ? 200 : 500;
+
+    res.status(statusCode).json({
+      success: healthCheck.status === 'success',
+      health: healthCheck,
+      checkedAt: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur test santé:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      checkedAt: new Date().toISOString()
+    });
+  }
+});
+
+// ==========================================
+// 🧹 ROUTES DE MAINTENANCE
+// ==========================================
+
+/**
+ * POST /api/documents/cleanup
+ * Nettoyage des doublons (maintenance)
+ */
+router.post('/cleanup', async (req, res) => {
+  try {
+    console.log('🧹 Démarrage du nettoyage des doublons...');
+    
+    const cleanupResult = await cleanupDuplicates();
+
+    res.json({
+      success: true,
+      message: `Nettoyage terminé: ${cleanupResult.deletedCount} doublons supprimés`,
+      cleanup: cleanupResult,
+      completedAt: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur nettoyage:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ==========================================
+// ℹ️ ROUTE D'INFORMATION
+// ==========================================
+
+/**
+ * GET /api/documents/info
+ * Informations sur l'API documents
+ */
+router.get('/info', (req, res) => {
+  res.json({
+    success: true,
+    info: {
+      name: 'Assistant Kiné - API Documents',
+      version: '2.0.0',
+      description: 'API de gestion et recherche sémantique de documents médicaux',
+      features: {
+        search: 'Recherche sémantique dans la base vectorielle',
+        management: 'Gestion des documents (liste, suppression)',
+        statistics: 'Statistiques et monitoring',
+        maintenance: 'Outils de nettoyage et maintenance'
+      },
+      processing: {
+        upload: 'Géré par workflow n8n',
+        embedding: 'Généré automatiquement par n8n',
+        storage: 'Base vectorielle Supabase'
+      },
+      endpoints: {
+        'POST /search': 'Recherche sémantique standard',
+        'POST /search/optimized': 'Recherche avec seuils adaptatifs',
+        'GET /': 'Liste des documents',
+        'GET /categories': 'Catégories disponibles',
+        'DELETE /:id': 'Suppression d\'un document',
+        'GET /stats': 'Statistiques complètes',
+        'GET /health': 'Test de santé de la base',
+        'POST /cleanup': 'Nettoyage des doublons'
+      }
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 module.exports = router;
