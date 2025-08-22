@@ -14,6 +14,250 @@ const EMBEDDING_CONFIG = {
 };
 
 // ==========================================
+// 📋 DICTIONNAIRE MÉTADONNÉES - BASÉ SUR LE GUIDE UTILISATEUR
+// ==========================================
+
+/**
+ * Dictionnaire des pathologies - SEUL utilisé pour le filtrage
+ * Basé sur le guide utilisateur + données réelles
+ */
+const METADATA_DICTIONARY = {
+  pathologies: [
+    // Épaule (guide utilisateur)
+    'capsulite_adhesive', 'tendinopathie_coiffe', 'conflit_sous_acromial', 'luxation_epaule',
+    // Genou (guide utilisateur)
+    'gonarthrose', 'syndrome_rotulien', 'entorse_genou', 'reconstruction_lca',
+    // Rachis (guide utilisateur)
+    'lombalgie_commune', 'hernie_discale', 'cervicalgie', 'scoliose',
+    // AVC (tes données réelles)
+    'avc', 'infarctus_cerebral', 'hemorragie_cerebrale', 'hemiplegie', 'spasticite', 'retractions',
+    // Autres pathologies de tes données
+    'faiblesse_cervicale', 'faiblesse_rachis', 'troubles_marche', 'troubles_prehension',
+    // Générales
+    'tendinopathie', 'arthrose', 'entorse', 'fracture'
+  ]
+};
+
+// Synonymes supprimés - intégrés directement dans analyzeQueryForMetadata()
+
+// ==========================================
+// 🔧 FONCTIONS UTILITAIRES POUR FILTRAGE
+// ==========================================
+
+/**
+ * Calcule la distance de Levenshtein entre deux chaînes
+ */
+function levenshteinDistance(str1, str2) {
+  const matrix = [];
+  const len1 = str1.length;
+  const len2 = str2.length;
+
+  for (let i = 0; i <= len2; i++) {
+    matrix[i] = [i];
+  }
+
+  for (let j = 0; j <= len1; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= len2; i++) {
+    for (let j = 1; j <= len1; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+
+  return matrix[len2][len1];
+}
+
+/**
+ * Trouve le terme le plus proche dans un tableau de métadonnées
+ * AMÉLIORÉ: Évite les faux positifs sur les mots courts
+ */
+function findClosestTerm(word, terms, maxDistance = 2) {
+  let bestMatch = null;
+  let bestDistance = maxDistance + 1;
+  
+  const cleanWord = word.toLowerCase().trim();
+  
+  // 🛡️ PROTECTION: Ignorer les mots trop courts qui causent des faux positifs
+  if (cleanWord.length < 3) {
+    return null;
+  }
+  
+  for (const term of terms) {
+    const cleanTerm = term.toLowerCase();
+    
+    // Correspondance exacte prioritaire
+    if (cleanTerm === cleanWord) {
+      return { term, distance: 0, type: 'exact' };
+    }
+    
+    // Sous-chaîne uniquement si le mot fait au moins 4 caractères
+    if (cleanWord.length >= 4) {
+      if (cleanTerm.includes(cleanWord)) {
+        return { term, distance: 0, type: 'substring_in_term' };
+      }
+      if (cleanWord.includes(cleanTerm) && cleanTerm.length >= 4) {
+        return { term, distance: 0, type: 'term_in_word' };
+      }
+    }
+    
+    // Distance de Levenshtein seulement pour les mots de 4+ caractères
+    if (cleanWord.length >= 4) {
+      const distance = levenshteinDistance(cleanWord, cleanTerm);
+      if (distance < bestDistance && distance <= maxDistance) {
+        bestDistance = distance;
+        bestMatch = term;
+      }
+    }
+  }
+  
+  return bestMatch ? { term: bestMatch, distance: bestDistance, type: 'levenshtein' } : null;
+}
+
+/**
+ * Analyse une requête et extrait UNIQUEMENT les pathologies pour le filtrage
+ * AMÉLIORÉ : Détection fautes de frappe + anatomie → pathologies
+ */
+function analyzeQueryForMetadata(query) {
+  const words = query.toLowerCase()
+    .replace(/[^a-zàâäéèêëïîôöùûüÿçñ\s]/gi, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 2); // Garder mots de 3+ caractères
+  
+  // 🛡️ MOTS À IGNORER pour la détection de PATHOLOGIES uniquement
+  // (L'embedding garde tous les mots pour la similarité sémantique)
+  const IGNORED_WORDS = new Set([
+    'dans', 'avec', 'pour', 'une', 'des', 'les', 'sur', 'par', 'sans', 'vers', 'chez',
+    'sous', 'entre', 'depuis', 'pendant', 'avant', 'après', 'contre', 'selon',
+    'malgré', 'durant', 'lors', 'via', 'dès', 'jusqu', 'parmi', 'hormis',
+    'exercices', 'exercice', 'rééducation', 'reeducation', 'traitement', 'soin',
+    'patient', 'patients', 'kiné', 'kine', 'séance', 'seance', 'programme',
+    'donne', 'donner', 'faire', 'comment', 'quoi', 'quand', 'pourquoi',
+    'mobilité', 'mobilite', 'force', 'équilibre', 'equilibre', 'douleur'
+  ]);
+  
+  const filteredWords = words.filter(word => !IGNORED_WORDS.has(word));
+  
+  const detectedPathologies = [];
+  
+  console.log('🔍 Mots analysés:', words.join(', '));
+  console.log('🔍 Mots pour pathologies:', filteredWords.join(', '));
+  console.log('💡 Note: L\'embedding utilise la requête complète pour la similarité sémantique');
+  
+  // ÉTAPE 1: Synonymes de pathologies + variantes courantes
+  const pathologySynonyms = {
+    'lumbago': 'lombalgie_commune',
+    'mal_dos': 'lombalgie_commune', 
+    'torticolis': 'cervicalgie',
+    'tendinite': 'tendinopathie',
+    'tendinites': 'tendinopathie',
+    'tendiniie': 'tendinopathie', // Faute de frappe courante
+    'tendiite': 'tendinopathie',  // Faute de frappe courante
+    'arthrite': 'arthrose',
+    'avc': 'avc', // Assurer que AVC est bien détecté
+    'accident_vasculaire': 'avc'
+  };
+  
+  for (const word of filteredWords) {
+    if (pathologySynonyms[word]) {
+      if (!detectedPathologies.includes(pathologySynonyms[word])) {
+        detectedPathologies.push(pathologySynonyms[word]);
+        console.log(`✅ Pathologie synonyme: ${word} → ${pathologySynonyms[word]}`);
+      }
+    }
+  }
+  
+  // ÉTAPE 2: Mapping anatomie → pathologies associées
+  const anatomyToPathologies = {
+    'epaule': ['capsulite_adhesive', 'tendinopathie_coiffe', 'conflit_sous_acromial'],
+    'épaule': ['capsulite_adhesive', 'tendinopathie_coiffe', 'conflit_sous_acromial'], 
+    'genou': ['gonarthrose', 'syndrome_rotulien', 'entorse_genou'],
+    'genoux': ['gonarthrose', 'syndrome_rotulien', 'entorse_genou'],
+    'dos': ['lombalgie_commune', 'hernie_discale'],
+    'rachis': ['lombalgie_commune', 'hernie_discale', 'cervicalgie'],
+    'cervical': ['cervicalgie'],
+    'lombaire': ['lombalgie_commune', 'hernie_discale']
+  };
+  
+  for (const word of filteredWords) {
+    if (anatomyToPathologies[word]) {
+      const anatomyPathologies = anatomyToPathologies[word];
+      anatomyPathologies.forEach(pathology => {
+        if (!detectedPathologies.includes(pathology)) {
+          detectedPathologies.push(pathology);
+        }
+      });
+      console.log(`✅ Anatomie détectée: ${word} → pathologies: ${anatomyPathologies.join(', ')}`);
+    }
+  }
+  
+  // ÉTAPE 3: Pathologies exactes
+  const pathologies = METADATA_DICTIONARY.pathologies;
+  for (const word of filteredWords) {
+    if (pathologies.includes(word) && !detectedPathologies.includes(word)) {
+      detectedPathologies.push(word);
+      console.log(`✅ Pathologie exacte: ${word}`);
+    }
+  }
+  
+  // ÉTAPE 4: Similarité pour fautes de frappe (distance 2 max pour les pathologies)
+  for (const word of filteredWords) {
+    if (word.length < 4) continue; // Éviter faux positifs
+    if (detectedPathologies.some(p => p.includes(word) || word.includes(p))) continue; // Déjà trouvé
+    if (pathologySynonyms[word]) continue; // Déjà traité
+    
+    const match = findClosestTerm(word, pathologies, 2); // Distance 2 pour fautes de frappe
+    if (match && match.distance <= 2 && word.length >= 4 && match.term.length >= 4) {
+      // Vérification : éviter les faux positifs absurdes
+      if (word.length >= 5 || match.distance <= 1) { // Seuil plus strict pour mots courts
+        if (!detectedPathologies.includes(match.term)) {
+          detectedPathologies.push(match.term);
+          console.log(`✅ Pathologie faute frappe: ${word} → ${match.term} (distance: ${match.distance})`);
+        }
+      }
+    }
+  }
+  
+  // Retourner format attendu par buildMetadataFilters
+  if (detectedPathologies.length > 0) {
+    console.log(`🎯 Pathologies détectées:`, detectedPathologies);
+    return { pathologies: detectedPathologies };
+  } else {
+    console.log('⚠️ Aucune pathologie détectée - recherche vectorielle générale');
+    return {};
+  }
+}
+
+/**
+ * Construit les filtres SQL Supabase à partir des métadonnées détectées
+ * OPTIMISÉ: Filtrage uniquement sur PATHOLOGIES (moins agressif)
+ */
+function buildMetadataFilters(detectedMetadata) {
+  const filters = {};
+  
+  // 🎯 FILTRAGE UNIQUEMENT SUR LES PATHOLOGIES
+  // Les phases et objectifs sont trop restrictifs et font perdre des documents pertinents
+  
+  if (detectedMetadata.pathologies && detectedMetadata.pathologies.length > 0) {
+    filters.pathologies = detectedMetadata.pathologies;
+    console.log(`🎯 Filtre PATHOLOGIES uniquement:`, filters.pathologies);
+  } else {
+    console.log(`⚠️ Aucune pathologie détectée - recherche vectorielle sur TOUTE la base`);
+  }
+  
+  return filters;
+}
+
+// ==========================================
 // 🔍 FONCTIONS DE RECHERCHE SÉMANTIQUE
 // ==========================================
 
@@ -45,29 +289,21 @@ async function generateEmbedding(text) {
 }
 
 /**
- * Prétraitement du texte pour optimiser l'embedding (même logique que n8n)
+ * Prétraitement minimal du texte pour l'embedding
+ * Garde le maximum de contexte sémantique pour OpenAI
  */
 function preprocessTextForEmbedding(text) {
-  return text
-    // Supprimer les caractères répétitifs
-    .replace(/(.)\1{4,}/g, '$1$1$1')
-    
-    // Normaliser les espaces
-    .replace(/\s+/g, ' ')
-    
-    // Supprimer les mots très courts ou très longs
-    .split(/\s+/)
-    .filter(word => word.length >= 2 && word.length <= 30)
-    .join(' ')
-    
-    // Tronquer si trop long
-    .substring(0, 8000)
-    
+  // Seulement normaliser les espaces et tronquer pour la sécurité
+  const processed = text
+    .replace(/\s+/g, ' ')  // Normaliser les espaces multiples
+    .substring(0, 8000)    // Limite de sécurité OpenAI
     .trim();
+  
+  return processed;
 }
 
 /**
- * Recherche sémantique dans la base vectorielle
+ * Recherche sémantique dans la base vectorielle AVEC filtres métadonnées
  * @param {string} query - Requête de recherche
  * @param {object} options - Options de recherche (seuil, nombre, catégorie)
  * @returns {array} Résultats de recherche enrichis
@@ -80,21 +316,29 @@ async function searchDocuments(query, options = {}) {
       filterCategory = null
     } = options;
 
-    console.log('🔍 Recherche avec fonction Supabase pour:', query);
+    console.log('🔍 Recherche avec filtres métadonnées pour:', query);
     
-    // Générer l'embedding de la requête (même logique que le stockage n8n)
+    // 🆕 ÉTAPE 1: Analyser la requête pour extraire les métadonnées
+    const detectedMetadata = analyzeQueryForMetadata(query);
+    const metadataFilters = buildMetadataFilters(detectedMetadata);
+    
+    // Générer l'embedding de la requête
     const queryEmbedding = await generateEmbedding(query);
     
-    const { data, error } = await supabase.rpc('search_documents', {
+    // 🆕 ÉTAPE 2: Appeler la nouvelle fonction avec filtres métadonnées
+    const { data, error } = await supabase.rpc('search_documents_with_metadata', {
       query_embedding: queryEmbedding,
       match_threshold: matchThreshold,
       match_count: matchCount,
-      filter_category: filterCategory
+      filter_category: filterCategory,
+      metadata_filters: metadataFilters
     });
 
     if (error) {
       console.error('❌ Erreur recherche Supabase:', error);
-      throw error;
+      // Si la nouvelle fonction n'existe pas, retourner résultat vide
+      console.log('⚠️ Fonction search_documents_with_metadata non trouvée. Créez-la dans Supabase !');
+      return [];
     }
 
     if (!data || data.length === 0) {
@@ -111,10 +355,11 @@ async function searchDocuments(query, options = {}) {
       hasMetadata: !!doc.metadata,
       created_at: doc.created_at || new Date().toISOString(),
       ageInDays: doc.created_at ? 
-        Math.floor((new Date() - new Date(doc.created_at)) / (1000 * 60 * 60 * 24)) : 0
+        Math.floor((new Date() - new Date(doc.created_at)) / (1000 * 60 * 60 * 24)) : 0,
+      metadataFiltered: Object.keys(metadataFilters).length > 0
     }));
 
-    console.log(`✅ ${enrichedResults.length} documents trouvés`);
+    console.log(`✅ ${enrichedResults.length} documents trouvés avec filtres métadonnées`);
     await logSearch(query, enrichedResults.length);
     
     return enrichedResults;
@@ -125,34 +370,165 @@ async function searchDocuments(query, options = {}) {
 }
 
 /**
+ * Ancienne fonction de recherche (fallback)
+ */
+async function searchDocumentsLegacy(query, options = {}) {
+  const {
+    matchThreshold = 0.3,
+    matchCount = 10,
+    filterCategory = null
+  } = options;
+
+  console.log('🔍 Recherche legacy (sans filtres métadonnées) pour:', query);
+  
+  const queryEmbedding = await generateEmbedding(query);
+  
+  const { data, error } = await supabase.rpc('search_documents', {
+    query_embedding: queryEmbedding,
+    match_threshold: matchThreshold,
+    match_count: matchCount,
+    filter_category: filterCategory
+  });
+
+  if (error) {
+    console.error('❌ Erreur recherche legacy:', error);
+    throw error;
+  }
+
+  return data || [];
+}
+
+/**
  * Recherche optimisée avec stratégie de seuils adaptatifs
  * Essaie d'abord un seuil élevé, puis réduit si peu de résultats
+ * OPTIMISÉ: Génère l'embedding une seule fois
  */
 async function searchDocumentsOptimized(query, options = {}) {
   try {
+    const {
+      filterCategory = null,
+      allowLowerThreshold = true
+    } = options;
+
+    console.log('🔍 Recherche optimisée avec embedding unique pour:', query);
+    
+    // 🆕 OPTIMISATION: Générer l'embedding UNE SEULE FOIS
+    const detectedMetadata = analyzeQueryForMetadata(query);
+    const metadataFilters = buildMetadataFilters(detectedMetadata);
+    const queryEmbedding = await generateEmbedding(query);
+
     // Première tentative avec seuil élevé (haute qualité)
-    let results = await searchDocuments(query, {
+    console.log('🔍 Tentative seuil élevé (0.7)...');
+    let results = await searchDocumentsWithEmbedding(queryEmbedding, {
       matchThreshold: 0.7,
       matchCount: 3,
-      filterCategory: options.filterCategory
+      filterCategory,
+      metadataFilters
     });
 
     // Si pas assez de résultats, tentative avec seuil plus bas
-    if (results.length < 2 && options.allowLowerThreshold !== false) {
+    if (results.length < 2 && allowLowerThreshold) {
       console.log('🔄 Seuil élevé: ' + results.length + ' résultats, tentative seuil bas...');
       
-      results = await searchDocuments(query, {
+      results = await searchDocumentsWithEmbedding(queryEmbedding, {
         matchThreshold: 0.4,
         matchCount: 6,
-        filterCategory: options.filterCategory
+        filterCategory,
+        metadataFilters
       });
     }
+
+    console.log(`✅ Recherche optimisée terminée: ${results.length} résultats`);
+    await logSearch(query, results.length);
 
     return results;
   } catch (error) {
     console.error('❌ Erreur recherche optimisée:', error);
     throw error;
   }
+}
+
+/**
+ * Recherche avec embedding pré-généré (pour éviter la duplication)
+ */
+async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
+  try {
+    const {
+      matchThreshold = 0.3,
+      matchCount = 10,
+      filterCategory = null,
+      metadataFilters = {}
+    } = options;
+
+    // 🆕 ÉTAPE 2: Appeler la nouvelle fonction avec embedding pré-généré
+    const { data, error } = await supabase.rpc('search_documents_with_metadata', {
+      query_embedding: queryEmbedding,
+      match_threshold: matchThreshold,
+      match_count: matchCount,
+      filter_category: filterCategory,
+      metadata_filters: metadataFilters
+    });
+
+    if (error) {
+      console.error('❌ Erreur recherche Supabase:', error);
+      // Si la nouvelle fonction n'existe pas, retourner résultat vide plutôt que fallback
+      console.log('⚠️ Fonction search_documents_with_metadata non trouvée. Créez-la dans Supabase !');
+      return [];
+    }
+
+    if (!data || data.length === 0) {
+      // Si on a filtré par pathologies mais trouvé 0 résultats
+      if (Object.keys(metadataFilters).length > 0 && metadataFilters.pathologies) {
+        console.log(`⚠️ Aucun document trouvé pour les pathologies: ${metadataFilters.pathologies.join(', ')}`);
+      }
+      return [];
+    }
+
+    // Enrichissement des résultats avec métadonnées utiles
+    const enrichedResults = data.map((doc, index) => ({
+      ...doc,
+      searchRank: index + 1,
+      similarityPercentage: Math.round(doc.similarity * 100),
+      contentLength: doc.content ? doc.content.length : 0,
+      hasMetadata: !!doc.metadata,
+      created_at: doc.created_at || new Date().toISOString(),
+      ageInDays: doc.created_at ? 
+        Math.floor((new Date() - new Date(doc.created_at)) / (1000 * 60 * 60 * 24)) : 0,
+      metadataFiltered: Object.keys(metadataFilters).length > 0
+    }));
+
+    return enrichedResults;
+  } catch (error) {
+    console.error('❌ Erreur recherche avec embedding:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fallback legacy avec embedding pré-généré
+ */
+async function searchDocumentsLegacyWithEmbedding(queryEmbedding, options = {}) {
+  const {
+    matchThreshold = 0.3,
+    matchCount = 10,
+    filterCategory = null
+  } = options;
+
+  console.log('🔍 Recherche legacy avec embedding pré-généré');
+  
+  const { data, error } = await supabase.rpc('search_documents', {
+    query_embedding: queryEmbedding,
+    match_threshold: matchThreshold,
+    match_count: matchCount,
+    filter_category: filterCategory
+  });
+
+  if (error) {
+    console.error('❌ Erreur recherche legacy:', error);
+    throw error;
+  }
+
+  return data || [];
 }
 
 // ==========================================

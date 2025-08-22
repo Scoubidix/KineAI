@@ -1,4 +1,6 @@
 const { OpenAI } = require('openai');
+const knowledgeService = require('./knowledgeService');
+const prismaService = require('./prismaService');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -334,7 +336,252 @@ const cleanChatHistory = (history, maxMessages = 20) => {
     }));
 };
 
+// ========== NOUVELLE FONCTION PRINCIPALE POUR LES IA KINÉ ==========
+
+/**
+ * Génère une réponse IA pour les kinésithérapeutes avec RAG et sauvegarde
+ */
+const generateKineResponse = async (type, message, conversationHistory = [], kineId) => {
+  try {
+    console.log(`🚀 IA ${type} pour kiné ID: ${kineId}`);
+
+    if (!message?.trim()) {
+      throw new Error('Message requis');
+    }
+
+    // 1. Recherche documentaire via knowledgeService
+    const searchResult = await knowledgeService.searchDocuments(message, {
+      filterCategory: null,
+      allowLowerThreshold: true
+    });
+
+    const { allDocuments, selectedSources, metadata } = searchResult;
+
+    // 2. Construction du prompt système selon le type
+    const systemPrompt = getSystemPromptByType(type, allDocuments.slice(0, 6));
+
+    // 3. Préparation des messages pour OpenAI
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...conversationHistory.slice(-6), // Limiter l'historique
+      { role: 'user', content: message }
+    ];
+
+    // 4. Appel OpenAI
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages,
+      max_tokens: 1000,
+      temperature: 0.7,
+      presence_penalty: 0.1,
+      frequency_penalty: 0.1
+    });
+
+    const aiResponse = completion.choices[0].message.content;
+
+    // 5. Sauvegarde dans la bonne table
+    await saveToCorrectTable(type, kineId, message, aiResponse);
+    console.log(`💾 Conversation IA ${type} sauvegardée`);
+
+    // 6. Calcul de la confiance globale
+    const overallConfidence = knowledgeService.calculateOverallConfidence(allDocuments);
+
+    // 7. Construction de la réponse finale
+    const response = {
+      success: true,
+      message: aiResponse,
+      sources: knowledgeService.formatSources(selectedSources),
+      confidence: overallConfidence,
+      metadata: {
+        model: 'gpt-3.5-turbo',
+        iaType: type,
+        kineId: kineId,
+        documentsFound: metadata.totalFound,
+        documentsUsedForAI: Math.min(allDocuments.length, 6),
+        documentsDisplayed: selectedSources.length,
+        averageRelevance: Math.round(metadata.averageScore * 100),
+        categoriesFound: metadata.categoriesFound,
+        hasHighQualityContext: allDocuments.some(doc => doc.finalScore > 0.8),
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    console.log(`✅ IA ${type} - Confiance: ${Math.round(overallConfidence * 100)}%`);
+    return response;
+
+  } catch (error) {
+    console.error(`❌ Erreur generateKineResponse (${type}):`, error);
+    throw {
+      success: false,
+      error: `Erreur lors de la génération de la réponse IA ${type}`,
+      details: error.message
+    };
+  }
+};
+
+/**
+ * Sélectionne le prompt système selon le type d'IA
+ */
+const getSystemPromptByType = (type, contextDocuments) => {
+  const promptBuilders = {
+    'basique': buildBasiqueSystemPrompt,
+    'biblio': buildBiblioSystemPrompt,
+    'clinique': buildCliniqueSystemPrompt,
+    'admin': buildAdministrativeSystemPrompt
+  };
+
+  const builder = promptBuilders[type];
+  if (!builder) {
+    throw new Error(`Type d'IA inconnu: ${type}`);
+  }
+
+  return builder(contextDocuments);
+};
+
+/**
+ * Sauvegarde dans la bonne table selon le type d'IA
+ */
+const saveToCorrectTable = async (type, kineId, message, response) => {
+  const prisma = prismaService.getInstance();
+  
+  const tableMap = {
+    'basique': 'chatIaBasique',
+    'biblio': 'chatIaBiblio', 
+    'clinique': 'chatIaClinique',
+    'admin': 'chatIaAdministrative'
+  };
+
+  const tableName = tableMap[type];
+  if (!tableName) {
+    throw new Error(`Type d'IA inconnu pour la sauvegarde: ${type}`);
+  }
+
+  await prisma[tableName].create({
+    data: {
+      kineId: kineId,
+      message: message,
+      response: response
+    }
+  });
+};
+
+// ========== PROMPTS SYSTÈME SPÉCIALISÉS ==========
+
+function buildBasiqueSystemPrompt(contextDocuments) {
+  let systemPrompt = `ATTENTION : Tu parles à un KINÉSITHÉRAPEUTE PROFESSIONNEL, PAS à un patient !
+
+Tu es un assistant IA conversationnel pour AIDER LES KINÉSITHÉRAPEUTES dans leur travail. L'utilisateur qui te parle est un kinésithérapeute diplômé qui traite des patients.
+
+RÔLE : Assistant conversationnel pour kinésithérapeutes
+UTILISATEUR : Un kinésithérapeute professionnel (pas un patient)
+OBJECTIF : Donner des conseils thérapeutiques professionnels généraux`;
+
+  if (contextDocuments.length > 0) {
+    systemPrompt += `\n\nDOCUMENTS DE RÉFÉRENCE PROFESSIONNELS :
+`;
+
+    contextDocuments.forEach((doc, index) => {
+      const score = Math.round(doc.finalScore * 100);
+      
+      systemPrompt += `📄 Document ${index + 1} (Score: ${score}%) - "${doc.title}" [${doc.category || 'Général'}] :
+${doc.content.substring(0, 800)}
+
+`;
+    });
+  }
+
+  systemPrompt += `\n\nINSTRUCTIONS :
+- TOUJOURS s'adresser au kinésithérapeute, jamais au patient
+- Donner des conseils de professionnel à professionnel
+- Utiliser "vos patients", "dans votre pratique", "je vous recommande"
+- Être précis et technique dans tes recommandations`;
+
+  return systemPrompt;
+}
+
+function buildBiblioSystemPrompt(contextDocuments) {
+  let systemPrompt = `Tu es un assistant bibliographique pour un kinésithérapeute professionnel.
+
+RÔLE : Assistant bibliographique spécialisé
+UTILISATEUR : Kinésithérapeute cherchant des références scientifiques
+OBJECTIF : Fournir des références, études et sources documentaires pertinentes`;
+
+  if (contextDocuments.length > 0) {
+    systemPrompt += `\n\nDOCUMENTS BIBLIOGRAPHIQUES DISPONIBLES :
+`;
+
+    contextDocuments.forEach((doc, index) => {
+      const score = Math.round(doc.finalScore * 100);
+      
+      systemPrompt += `📚 Document ${index + 1} (Pertinence: ${score}%) - "${doc.title}" :
+${doc.content.substring(0, 800)}
+
+`;
+    });
+  }
+
+  systemPrompt += `\n\nFOCUS : Références scientifiques, études cliniques, protocoles validés, sources bibliographiques.`;
+
+  return systemPrompt;
+}
+
+function buildCliniqueSystemPrompt(contextDocuments) {
+  let systemPrompt = `Tu es un assistant clinique pour un kinésithérapeute professionnel.
+
+RÔLE : Assistant clinique spécialisé
+UTILISATEUR : Kinésithérapeute en situation clinique
+OBJECTIF : Aide à la prise en charge clinique, diagnostic kinésithérapique, techniques thérapeutiques`;
+
+  if (contextDocuments.length > 0) {
+    systemPrompt += `\n\nDOCUMENTS CLINIQUES DE RÉFÉRENCE :
+`;
+
+    contextDocuments.forEach((doc, index) => {
+      const score = Math.round(doc.finalScore * 100);
+      
+      systemPrompt += `🏥 Document ${index + 1} (Pertinence: ${score}%) - "${doc.title}" :
+${doc.content.substring(0, 800)}
+
+`;
+    });
+  }
+
+  systemPrompt += `\n\nFOCUS : Diagnostic kinésithérapique, techniques de traitement, protocoles cliniques, évaluation.`;
+
+  return systemPrompt;
+}
+
+function buildAdministrativeSystemPrompt(contextDocuments) {
+  let systemPrompt = `Tu es un assistant administratif pour un kinésithérapeute professionnel.
+
+RÔLE : Assistant administratif spécialisé
+UTILISATEUR : Kinésithérapeute gérant son cabinet
+OBJECTIF : Aide administrative, réglementaire, gestion de cabinet, facturation, législation`;
+
+  if (contextDocuments.length > 0) {
+    systemPrompt += `\n\nDOCUMENTS ADMINISTRATIFS DE RÉFÉRENCE :
+`;
+
+    contextDocuments.forEach((doc, index) => {
+      const score = Math.round(doc.finalScore * 100);
+      
+      systemPrompt += `📋 Document ${index + 1} (Pertinence: ${score}%) - "${doc.title}" :
+${doc.content.substring(0, 800)}
+
+`;
+    });
+  }
+
+  systemPrompt += `\n\nFOCUS : Réglementation, facturation, gestion de cabinet, aspects légaux, démarches administratives.`;
+
+  return systemPrompt;
+}
+
 module.exports = {
+  // Nouvelles fonctions IA Kiné
+  generateKineResponse,
+  
+  // Anciennes fonctions chat patients (conservées)
   generateChatResponse,
   generateWelcomeMessage,
   anonymizePatientData,
