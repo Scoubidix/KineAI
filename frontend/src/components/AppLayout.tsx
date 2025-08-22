@@ -72,7 +72,9 @@ import {
   Clock,
   Globe,
   Database,
-  CheckCircle
+  CheckCircle,
+  BookOpen,
+  Stethoscope
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -772,7 +774,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { href: '/dashboard/kine/patients', label: 'Patients', icon: Users, disabled: false },
         { href: '/dashboard/kine/create-exercise', label: 'Mes Exercices', icon: Dumbbell, disabled: false },
         { href: '/dashboard/kine/programmes', label: 'Programmes', icon: Calendar, disabled: false },
-        { href: '/dashboard/kine/chatbot', label: 'Assistant IA Kiné', icon: Wand2, disabled: false },
+        { href: '/dashboard/kine/chatbot', label: 'IA Basique', icon: Wand2, disabled: false },
+        { href: '/dashboard/kine/chatbot-biblio', label: 'IA Bibliographique', icon: BookOpen, disabled: false },
+        { href: '/dashboard/kine/chatbot-clinique', label: 'IA Clinique', icon: Stethoscope, disabled: false },
+        { href: '/dashboard/kine/chatbot-admin', label: 'IA Administrative', icon: FileText, disabled: false },
         { href: '/dashboard/kine/analytics', label: 'Statistiques', icon: BarChart2, disabled: false },
         { href: '/dashboard/kine/public-programs', label: 'Programmes Publics (Bientôt)', icon: Share2, disabled: false },
         { href: '/dashboard/kine/blog', label: 'Blog Pro (Bientôt)', icon: Library, disabled: false },
