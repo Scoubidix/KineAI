@@ -40,6 +40,10 @@ model Kine {
   chatIaClinique        ChatIaClinique[]
   chatIaAdministrative  ChatIaAdministrative[]
   // =============================================
+
+  // ========== RELATION RGPD ==========
+  rgpdExports           RgpdExport[]
+  // ===================================
 }
 
 model Patient {
@@ -52,6 +56,11 @@ model Patient {
   goals      String
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
+
+  // ========== SOFT DELETE ==========
+  isActive   Boolean     @default(true)
+  deletedAt  DateTime?
+  // ================================
 
   kineId     Int
   kine       Kine         @relation(fields: [kineId], references: [id])
@@ -87,6 +96,11 @@ model Programme {
   archivedAt  DateTime? // Date d'archivage (pour suppression après 6 mois)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  // ========== SOFT DELETE ==========
+  isActive    Boolean   @default(true)
+  deletedAt   DateTime?
+  // ================================
 
   patientId   Int
   patient     Patient   @relation(fields: [patientId], references: [id])
@@ -281,6 +295,29 @@ enum SubscriptionStatus {
   @@map("subscription_status")
 }
 // ==========================================
+
+model RgpdExport {
+  id           Int      @id @default(autoincrement())
+  kineId       Int
+  kine         Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  exportToken  String   @unique
+  generatedAt  DateTime @default(now())
+  downloadedAt DateTime?
+  expiresAt    DateTime
+  fileSize     Int?     // Taille du fichier en bytes
+  isValid      Boolean  @default(true)
+  
+  // Métadonnées pour audit
+  ipAddress    String?
+  userAgent    String?
+  
+  // Index pour optimiser les requêtes
+  @@index([kineId, generatedAt])
+  @@index([exportToken])
+  @@index([expiresAt])
+  
+  @@map("rgpd_exports")
+}
 
 enum NotificationType {
   DAILY_VALIDATION    // Patient valide une journée

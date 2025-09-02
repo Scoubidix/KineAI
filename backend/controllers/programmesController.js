@@ -1,5 +1,6 @@
 const prismaService = require('../services/prismaService');
 const { generateChatUrl } = require('../services/patientTokenService');
+const logger = require('../utils/logger');
 
 // 🔽 GET tous les programmes actifs du kiné connecté
 exports.getAllProgrammesByKine = async (req, res) => {
@@ -10,21 +11,23 @@ exports.getAllProgrammesByKine = async (req, res) => {
     const kineUid = req.uid; // Défini par votre middleware authenticate.js
     
     if (!kineUid) {
-      console.error('❌ UID Firebase manquant dans req.uid');
+      logger.error('❌ UID Firebase manquant dans req.uid');
       return res.status(401).json({ 
         error: "Authentification invalide - UID manquant"
       });
     }
     
-    console.log('✅ UID Firebase utilisé:', kineUid);
+    logger.debug('✅ UID Firebase utilisé:', kineUid);
     
     const programmes = await prisma.programme.findMany({
       where: {
         isArchived: false,
+        isActive: true, // Filtrer les programmes supprimés
         patient: {
           kine: {
             uid: kineUid // Filtrer par le kiné connecté via son UID Firebase
-          }
+          },
+          isActive: true // Filtrer les patients supprimés
         }
       },
       include: {
@@ -46,10 +49,10 @@ exports.getAllProgrammesByKine = async (req, res) => {
       orderBy: { dateDebut: 'desc' }
     });
     
-    console.log(`✅ Trouvé ${programmes.length} programmes pour le kiné ${kineUid}`);
+    logger.debug(`✅ Trouvé ${programmes.length} programmes pour le kiné ${kineUid}`);
     res.json(programmes);
   } catch (error) {
-    console.error("Erreur récupération programmes kiné :", error);
+    logger.error("Erreur récupération programmes kiné :", error);
     res.status(500).json({ error: "Erreur récupération programmes" });
   }
 };
@@ -63,7 +66,8 @@ exports.getProgrammesByPatient = async (req, res) => {
     const programmes = await prisma.programme.findMany({
       where: {
         patientId,
-        isArchived: false
+        isArchived: false,
+        isActive: true // Filtrer les programmes supprimés
       },
       include: {
         exercices: {
@@ -73,7 +77,7 @@ exports.getProgrammesByPatient = async (req, res) => {
     });
     res.json(programmes);
   } catch (error) {
-    console.error("Erreur récupération programmes :", error);
+    logger.error("Erreur récupération programmes :", error);
     res.status(500).json({ error: "Erreur récupération programmes" });
   }
 };
@@ -111,7 +115,7 @@ exports.createProgramme = async (req, res) => {
 
     res.json(newProgramme);
   } catch (error) {
-    console.error("Erreur création programme :", error);
+    logger.error("Erreur création programme :", error);
     res.status(500).json({ error: "Erreur création programme" });
   }
 };
@@ -120,7 +124,7 @@ exports.createProgramme = async (req, res) => {
 exports.generateProgrammeLink = async (req, res) => {
   const programmeId = parseInt(req.params.programmeId);
   
-  console.log("Génération lien pour programme ID:", programmeId);
+  logger.debug("Génération lien pour programme ID:", programmeId);
 
   try {
     const prisma = prismaService.getInstance();
@@ -140,7 +144,7 @@ exports.generateProgrammeLink = async (req, res) => {
       }
     });
 
-    console.log("Programme trouvé:", programme ? "Oui" : "Non");
+    logger.debug("Programme trouvé:", programme ? "Oui" : "Non");
 
     if (!programme) {
       return res.status(404).json({ 
@@ -157,7 +161,7 @@ exports.generateProgrammeLink = async (req, res) => {
     }
 
     // Générer le lien de chat
-    console.log("Génération du token pour:", {
+    logger.debug("Génération du token pour:", {
       patientId: programme.patientId,
       programmeId: programme.id,
       dateFin: programme.dateFin
@@ -169,7 +173,7 @@ exports.generateProgrammeLink = async (req, res) => {
       programme.dateFin
     );
 
-    console.log("Résultat génération lien:", linkResult);
+    logger.debug("Résultat génération lien:", linkResult);
 
     if (!linkResult.success) {
       return res.status(500).json({
@@ -197,7 +201,7 @@ exports.generateProgrammeLink = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Erreur génération lien programme :", error);
+    logger.error("Erreur génération lien programme :", error);
     res.status(500).json({ 
       success: false, 
       error: "Erreur serveur lors de la génération du lien",
@@ -245,31 +249,31 @@ exports.updateProgramme = async (req, res) => {
 
     res.json(updatedProgramme);
   } catch (error) {
-    console.error("Erreur mise à jour programme :", error);
+    logger.error("Erreur mise à jour programme :", error);
     res.status(500).json({ error: "Erreur mise à jour programme" });
   }
 };
 
-// 🔽 DELETE programme (suppression définitive)
+// 🔽 DELETE programme (SOFT DELETE)
 exports.deleteProgramme = async (req, res) => {
   const programmeId = parseInt(req.params.id);
 
   try {
     const prisma = prismaService.getInstance();
     
-    // Supprimer d'abord les exercices liés
-    await prisma.exerciceProgramme.deleteMany({ 
-      where: { programmeId } 
-    });
-    
-    // Puis supprimer le programme
-    await prisma.programme.delete({ 
-      where: { id: programmeId } 
+    // Soft delete au lieu de suppression définitive
+    // Les exercices liés restent intacts pour préserver l'intégrité
+    await prisma.programme.update({ 
+      where: { id: programmeId },
+      data: {
+        isActive: false,
+        deletedAt: new Date()
+      }
     });
 
     res.json({ message: "Programme supprimé avec succès" });
   } catch (error) {
-    console.error("Erreur suppression programme :", error);
+    logger.error("Erreur suppression programme :", error);
     res.status(500).json({ error: "Erreur suppression programme" });
   }
 };
@@ -293,7 +297,7 @@ exports.archiveProgramme = async (req, res) => {
 
     res.json(archivedProgramme);
   } catch (error) {
-    console.error("Erreur archivage programme :", error);
+    logger.error("Erreur archivage programme :", error);
     res.status(500).json({ error: "Erreur archivage programme" });
   }
 };

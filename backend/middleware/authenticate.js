@@ -1,4 +1,5 @@
 const admin = require('../firebase/firebase');
+const logger = require('../utils/logger');
 
 const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -19,7 +20,7 @@ const authenticate = async (req, res, next) => {
     // ✅ Log uniquement les NOUVELLES connexions (première requête de la session)
     // Détection simple : si c'est une route de "connexion" ou première action
     if (req.path.includes('/dashboard') || req.path.includes('/patients')) {
-      console.log(`🔐 AUTH: Kiné connecté ${decodedToken.email} - IP: ${req.ip}`);
+      logger.debug(`🔐 AUTH: Kiné connecté ${decodedToken.email} - IP: ${req.ip}`);
     }
     
     next();
@@ -27,7 +28,7 @@ const authenticate = async (req, res, next) => {
     const ip = req.ip || req.connection.remoteAddress;
     
     // ✅ Log toujours les ÉCHECS (sécurité critique)
-    console.error(`❌ AUTH: Token invalide - IP: ${ip} - Route: ${req.path} - Erreur: ${error.code}`);
+    logger.warn(`❌ AUTH: Token invalide - IP: ${ip} - Route: ${req.path} - Erreur: ${error.code}`);
     
     return res.status(401).json({ message: "Token invalide." });
   }

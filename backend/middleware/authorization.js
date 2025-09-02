@@ -1,4 +1,5 @@
 // middleware/authorization.js
+const logger = require('../utils/logger');
 // Middleware pour vérifier les autorisations selon le plan d'abonnement
 
 const { PrismaClient } = require('@prisma/client');
@@ -82,7 +83,7 @@ const canCreateProgramme = async (req, res, next) => {
     next();
 
   } catch (error) {
-    console.error('Erreur vérification création programme:', error);
+    logger.error('Erreur vérification création programme:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 };
@@ -143,7 +144,7 @@ const requireAssistant = (assistantType) => {
       next();
 
     } catch (error) {
-      console.error('Erreur vérification assistant IA:', error);
+      logger.error('Erreur vérification assistant IA:', error);
       res.status(500).json({ error: 'Erreur interne du serveur' });
     }
   };
@@ -193,7 +194,7 @@ const requireFeature = (feature) => {
       }
 
     } catch (error) {
-      console.error('Erreur vérification fonctionnalité:', error);
+      logger.error('Erreur vérification fonctionnalité:', error);
       res.status(500).json({ error: 'Erreur interne du serveur' });
     }
   };
@@ -218,7 +219,7 @@ const getPlanInfo = async (req, res, next) => {
     next();
 
   } catch (error) {
-    console.error('Erreur récupération info plan:', error);
+    logger.error('Erreur récupération info plan:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 };

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { Plus, Trash2, Pencil, Loader2, UserCheck, Check, X } from 'lucide-react';
+import { Plus, Trash2, Pencil, Loader2, UserCheck, Check, X, User, Mail, Phone, Calendar, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -218,8 +219,8 @@ export default function PatientsPage() {
             }
           }}>
             <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Plus className="h-4 w-4 mr-2" /> {form.id ? 'Modifier' : 'Créer'} un patient
+              <Button className="flex items-center gap-2">
+                <Plus className="h-4 w-4" /> {form.id ? 'Modifier' : 'Créer'} un patient
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
@@ -492,13 +493,42 @@ export default function PatientsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12"></TableHead>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Prénom</TableHead>
-                    <TableHead>Date de naissance</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Téléphone</TableHead>
-                    <TableHead>Objectifs</TableHead>
-                    <TableHead className="text-center">Programme en cours</TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-gray-500" />
+                        Nom
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-gray-500" />
+                        Prénom
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        Date de naissance
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-gray-500" />
+                        Email
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-gray-500" />
+                        Téléphone
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Activity className="w-4 h-4 text-gray-500" />
+                        Programme en cours
+                      </div>
+                    </TableHead>
                     <TableHead className="w-24"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -517,17 +547,19 @@ export default function PatientsPage() {
                       <TableCell>{formatDate(p.birthDate)}</TableCell>
                       <TableCell>{p.email}</TableCell>
                       <TableCell>{p.phone}</TableCell>
-                      <TableCell className="max-w-xs truncate" title={p.goals}>{p.goals}</TableCell>
                       <TableCell className="text-center">
-                        {p.hasActiveProgram ? (
-                          <div className="flex items-center justify-center">
-                            <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center">
-                            <X className="w-5 h-5 text-red-500 dark:text-red-400" />
-                          </div>
-                        )}
+                        <div className="flex items-center justify-center">
+                          {p.hasActiveProgram ? (
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800">
+                              <Check className="w-3 h-3 mr-1" />
+                              Actif
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400">
+                              Aucun
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="flex gap-2">
                         <Button size="icon" variant="outline" onClick={() => handleEditPatient(p)}>

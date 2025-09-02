@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../utils/logger');
 const router = express.Router();
 const chatKineController = require('../controllers/chatKineController');
 const { authenticate } = require('../middleware/authenticate');
@@ -106,7 +107,7 @@ router.post('/search-documents', authenticate, async (req, res) => {
       });
     }
 
-    console.log('🔍 Recherche documents pour kiné:', firebaseUid);
+    logger.debug('🔍 Recherche documents pour kiné:', firebaseUid);
 
     const { searchDocuments } = require('../services/embeddingService');
     
@@ -132,7 +133,7 @@ router.post('/search-documents', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erreur recherche documents:', error);
+    logger.error('❌ Erreur recherche documents:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -188,7 +189,7 @@ router.get('/vector-status', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erreur vector status:', error);
+    logger.error('❌ Erreur vector status:', error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -266,7 +267,7 @@ router.get('/ia-status', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erreur ia status:', error);
+    logger.error('❌ Erreur ia status:', error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -359,7 +360,7 @@ router.get('/all-history', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erreur all-history:', error);
+    logger.error('❌ Erreur all-history:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -421,7 +422,7 @@ router.delete('/all-history', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erreur delete all-history:', error);
+    logger.error('❌ Erreur delete all-history:', error);
     res.status(500).json({
       success: false,
       error: error.message

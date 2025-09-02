@@ -1,4 +1,5 @@
 // routes/documents.js - VERSION NETTOYÉE
+const logger = require('../utils/logger');
 // Les fonctions d'upload et traitement PDF sont maintenant gérées par n8n
 const express = require('express');
 const { 
@@ -32,7 +33,7 @@ router.post('/search', async (req, res) => {
       });
     }
 
-    console.log('🔍 Recherche:', query, 'Catégorie:', category);
+    logger.debug('🔍 Recherche:', query, 'Catégorie:', category);
 
     const results = await searchDocuments(query, {
       matchThreshold: threshold,
@@ -50,7 +51,7 @@ router.post('/search', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erreur recherche:', error);
+    logger.error('❌ Erreur recherche:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -73,7 +74,7 @@ router.post('/search/optimized', async (req, res) => {
       });
     }
 
-    console.log('🔍 Recherche optimisée:', query);
+    logger.debug('🔍 Recherche optimisée:', query);
 
     const results = await searchDocumentsOptimized(query, {
       filterCategory: category
@@ -89,7 +90,7 @@ router.post('/search/optimized', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erreur recherche optimisée:', error);
+    logger.error('❌ Erreur recherche optimisée:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -115,7 +116,7 @@ router.get('/', async (req, res) => {
       orderDirection = 'desc'
     } = req.query;
     
-    console.log('📋 Liste documents:', { category, limit, offset });
+    logger.debug('📋 Liste documents:', { category, limit, offset });
 
     const documents = await listDocuments({
       category,
@@ -136,7 +137,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erreur liste documents:', error);
+    logger.error('❌ Erreur liste documents:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -169,7 +170,7 @@ router.get('/categories', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erreur catégories:', error);
+    logger.error('❌ Erreur catégories:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -192,7 +193,7 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    console.log('🗑️ Suppression document ID:', id);
+    logger.debug('🗑️ Suppression document ID:', id);
     
     const deletedDocument = await deleteDocument(id);
 
@@ -207,7 +208,7 @@ router.delete('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erreur suppression:', error);
+    logger.error('❌ Erreur suppression:', error);
     
     if (error.message.includes('not found')) {
       return res.status(404).json({
@@ -233,7 +234,7 @@ router.delete('/:id', async (req, res) => {
  */
 router.get('/stats', async (req, res) => {
   try {
-    console.log('📊 Récupération des statistiques...');
+    logger.debug('📊 Récupération des statistiques...');
     
     const stats = await getDocumentStats();
 
@@ -244,7 +245,7 @@ router.get('/stats', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erreur stats:', error);
+    logger.error('❌ Erreur stats:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -258,7 +259,7 @@ router.get('/stats', async (req, res) => {
  */
 router.get('/health', async (req, res) => {
   try {
-    console.log('🔧 Test de santé de la base vectorielle...');
+    logger.debug('🔧 Test de santé de la base vectorielle...');
     
     const healthCheck = await testVectorDatabase();
 
@@ -271,7 +272,7 @@ router.get('/health', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erreur test santé:', error);
+    logger.error('❌ Erreur test santé:', error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -290,7 +291,7 @@ router.get('/health', async (req, res) => {
  */
 router.post('/cleanup', async (req, res) => {
   try {
-    console.log('🧹 Démarrage du nettoyage des doublons...');
+    logger.debug('🧹 Démarrage du nettoyage des doublons...');
     
     const cleanupResult = await cleanupDuplicates();
 
@@ -302,7 +303,7 @@ router.post('/cleanup', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erreur nettoyage:', error);
+    logger.error('❌ Erreur nettoyage:', error);
     res.status(500).json({
       success: false,
       error: error.message

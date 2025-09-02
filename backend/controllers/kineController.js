@@ -3,11 +3,12 @@
 // ==========================================
 
 const prismaService = require('../services/prismaService');
+const logger = require('../utils/logger');
 
 const createKine = async (req, res) => {
   const { uid, email, firstName, lastName, phone, rpps, adresseCabinet, birthDate } = req.body;
 
-  console.log("📥 Données reçues pour création kiné :", req.body);
+  logger.warn("📥 Création kiné - UID:", req.body.uid);
 
   try {
     const prisma = prismaService.getInstance();
@@ -33,11 +34,11 @@ const createKine = async (req, res) => {
       },
     });
 
-    console.log("✅ Kiné créé :", newKine);
+    logger.warn("✅ Kiné créé - ID:", newKine.id, "Email:", newKine.email);
 
     return res.status(201).json(newKine);
   } catch (err) {
-    console.error("❌ Erreur création kiné :", err);
+    logger.error("❌ Erreur création kiné:", err.message);
     return res.status(500).json({ error: 'Erreur serveur lors de la création du kiné.' });
   }
 };
@@ -45,7 +46,7 @@ const createKine = async (req, res) => {
 const getKineProfile = async (req, res) => {
   const uid = req.uid; // Récupéré depuis le middleware authenticate
 
-  console.log("📥 Récupération profil kiné pour UID :", uid);
+  logger.info("📥 Récupération profil kiné pour UID:", uid);
 
   try {
     const prisma = prismaService.getInstance();
@@ -70,20 +71,15 @@ const getKineProfile = async (req, res) => {
     });
 
     if (!kine) {
-      console.log("❌ Kiné non trouvé pour UID :", uid);
+      logger.error("❌ Kiné non trouvé pour UID:", uid);
       return res.status(404).json({ error: 'Kiné non trouvé dans la base de données.' });
     }
 
-    console.log("✅ Profil kiné récupéré :", {
-      id: kine.id,
-      email: kine.email,
-      firstName: kine.firstName,
-      lastName: kine.lastName
-    });
+    logger.info("✅ Profil kiné récupéré - ID:", kine.id);
 
     return res.status(200).json(kine);
   } catch (err) {
-    console.error("❌ Erreur récupération profil kiné :", err);
+    logger.error("❌ Erreur récupération profil kiné:", err.message);
     return res.status(500).json({ error: 'Erreur serveur lors de la récupération du profil.' });
   }
 };
@@ -92,8 +88,7 @@ const updateKineProfile = async (req, res) => {
   const uid = req.uid; // Récupéré depuis le middleware authenticate
   const { email, phone, adresseCabinet } = req.body;
 
-  console.log("📥 Mise à jour profil kiné pour UID :", uid);
-  console.log("📥 Données à modifier :", { email, phone, adresseCabinet });
+  logger.info("📥 Mise à jour profil kiné pour UID:", uid);
 
   try {
     const prisma = prismaService.getInstance();
@@ -104,7 +99,7 @@ const updateKineProfile = async (req, res) => {
     });
 
     if (!existingKine) {
-      console.log("❌ Kiné non trouvé pour UID :", uid);
+      logger.error("❌ Kiné non trouvé pour UID:", uid);
       return res.status(404).json({ error: 'Kiné non trouvé dans la base de données.' });
     }
 
@@ -137,11 +132,7 @@ const updateKineProfile = async (req, res) => {
       }
     });
 
-    console.log("✅ Profil kiné mis à jour :", {
-      id: updatedKine.id,
-      email: updatedKine.email,
-      champsModifiés: Object.keys(updateData)
-    });
+    logger.info("✅ Profil kiné mis à jour - ID:", updatedKine.id);
 
     return res.status(200).json({
       message: 'Profil mis à jour avec succès',
@@ -149,7 +140,7 @@ const updateKineProfile = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("❌ Erreur mise à jour profil kiné :", err);
+    logger.error("❌ Erreur mise à jour profil kiné:", err.message);
     return res.status(500).json({ error: 'Erreur serveur lors de la mise à jour du profil.' });
   }
 };
@@ -169,7 +160,7 @@ const getAdherenceByDate = async (req, res) => {
   const uid = req.uid; // UID du kiné authentifié
   const { date } = req.params; // Format: YYYY-MM-DD
 
-  console.log("📊 Calcul adhérence pour UID:", uid, "Date:", date);
+  logger.info("📊 Calcul adhérence pour UID:", uid, "Date:", date);
 
   try {
     // 🔧 FIX TIMEZONE: Utiliser la même méthode que patientChat.js
@@ -179,7 +170,7 @@ const getAdherenceByDate = async (req, res) => {
     const parisTime = new Date(tempDate.toLocaleString("en-US", {timeZone: "Europe/Paris"}));
     const targetDate = new Date(Date.UTC(parisTime.getFullYear(), parisTime.getMonth(), parisTime.getDate()));
 
-    console.log(`🔧 TIMEZONE FIX: Date "${date}" → targetDate: ${targetDate.toISOString()}`);
+    logger.debug("🔧 TIMEZONE FIX:", date, "→", targetDate.toISOString());
 
     // 🔧 LOGIQUE CONDITIONNELLE POUR L'ARCHIVAGE
     const now = new Date();
@@ -212,8 +203,10 @@ const getAdherenceByDate = async (req, res) => {
     // 2. Construire la requête avec logique conditionnelle ET comparaison jour seulement
     const whereClause = {
       patient: {
-        kineId: kine.id
+        kineId: kine.id,
+        isActive: true // Filtrer les patients supprimés
       },
+      isActive: true, // Filtrer les programmes supprimés
       // ✅ FIX: Utiliser une logique qui fonctionne pour toute heure de création
       AND: [
         {
@@ -237,7 +230,7 @@ const getAdherenceByDate = async (req, res) => {
     }
     // Pour les dates passées, inclure TOUS les programmes (archivés ou non)
 
-    console.log("🔍 Query WHERE pour adhérence:", JSON.stringify(whereClause, null, 2));
+    logger.debug("🔍 Query adhérence construite");
 
     // 3. Trouver tous les programmes pertinents pour cette date
     const activeProgrammes = await prisma.programme.findMany({
@@ -258,7 +251,7 @@ const getAdherenceByDate = async (req, res) => {
       }
     });
 
-    console.log(`🔍 Programmes trouvés: ${activeProgrammes.length}`);
+    logger.debug("🔍 Programmes trouvés:", activeProgrammes.length);
 
     // 4. Calculer les statistiques
     const totalPatients = activeProgrammes.length;
@@ -307,18 +300,12 @@ const getAdherenceByDate = async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    console.log("✅ Adhérence calculée:", {
-      date: targetDate.toISOString().split('T')[0],
-      scope: response.dataScope,
-      adherence: `${validatedPatients}/${totalPatients} (${adherencePercentage}%)`,
-      avgPain: avgPainLevel,
-      avgDifficulty: avgDifficultyLevel
-    });
+    logger.info("✅ Adhérence calculée:", `${validatedPatients}/${totalPatients} (${adherencePercentage}%)`);
 
     res.json(response);
 
   } catch (err) {
-    console.error("❌ Erreur calcul adhérence:", err);
+    logger.error("❌ Erreur calcul adhérence:", err.message);
     res.status(500).json({ 
       success: false,
       error: 'Erreur serveur lors du calcul de l\'adhérence.',
@@ -337,7 +324,7 @@ const getPatientSessionsByDate = async (req, res) => {
   const uid = req.uid; // UID du kiné authentifié
   const { date } = req.params; // Format: YYYY-MM-DD
 
-  console.log("📋 Liste patients-sessions pour UID:", uid, "Date:", date);
+  logger.info("📋 Liste patients-sessions pour UID:", uid, "Date:", date);
 
   try {
     // 🔧 FIX TIMEZONE: Utiliser la même méthode que patientChat.js
@@ -347,7 +334,7 @@ const getPatientSessionsByDate = async (req, res) => {
     const parisTime = new Date(tempDate.toLocaleString("en-US", {timeZone: "Europe/Paris"}));
     const targetDate = new Date(Date.UTC(parisTime.getFullYear(), parisTime.getMonth(), parisTime.getDate()));
 
-    console.log(`🔧 TIMEZONE FIX: Date "${date}" → targetDate: ${targetDate.toISOString()}`);
+    logger.debug("🔧 TIMEZONE FIX:", date, "→", targetDate.toISOString());
 
     // 🔧 LOGIQUE CONDITIONNELLE POUR L'ARCHIVAGE
     const now = new Date();
@@ -380,8 +367,10 @@ const getPatientSessionsByDate = async (req, res) => {
     // 2. Construire la requête avec logique conditionnelle ET comparaison jour seulement
     const whereClause = {
       patient: {
-        kineId: kine.id
+        kineId: kine.id,
+        isActive: true // Filtrer les patients supprimés
       },
+      isActive: true, // Filtrer les programmes supprimés
       // ✅ FIX: Utiliser une logique qui fonctionne pour toute heure de création
       AND: [
         {
@@ -405,7 +394,7 @@ const getPatientSessionsByDate = async (req, res) => {
     }
     // Pour les dates passées, inclure TOUS les programmes (archivés ou non)
 
-    console.log("🔍 Query WHERE pour patients-sessions:", JSON.stringify(whereClause, null, 2));
+    logger.debug("🔍 Query patients-sessions construite");
 
     // 3. Récupérer tous les patients avec programmes pertinents pour cette date
     const patientsWithSessions = await prisma.programme.findMany({
@@ -432,16 +421,10 @@ const getPatientSessionsByDate = async (req, res) => {
       }
     });
 
-    console.log(`🔍 Patients avec sessions trouvés: ${patientsWithSessions.length}`);
+    logger.debug("🔍 Patients avec sessions trouvés:", patientsWithSessions.length);
     
-    // 🔍 DEBUG: Afficher les validations trouvées
-    patientsWithSessions.forEach(programme => {
-      console.log(`🔍 Programme ${programme.id} (${programme.titre}) - Patient ${programme.patient.firstName} ${programme.patient.lastName}`);
-      console.log(`🔍 - Validations trouvées: ${programme.sessionValidations.length}`);
-      programme.sessionValidations.forEach(val => {
-        console.log(`🔍   - Date: ${val.date.toISOString()}, isValidated: ${val.isValidated}, painLevel: ${val.painLevel}`);
-      });
-    });
+    // Debug: Validations trouvées (niveau debug uniquement)
+    logger.debug("🔍 Détails validations par programme disponibles");
 
     // 4. Formatter les données pour la réponse
     const patients = patientsWithSessions.map(programme => {
@@ -498,18 +481,12 @@ const getPatientSessionsByDate = async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    console.log("✅ Liste patients-sessions récupérée:", {
-      date: targetDate.toISOString().split('T')[0],
-      scope: response.dataScope,
-      totalPatients,
-      validatedCount,
-      adherence: `${adherencePercentage}%`
-    });
+    logger.info("✅ Liste patients-sessions récupérée:", `${validatedCount}/${totalPatients} patients`);
 
     res.json(response);
 
   } catch (err) {
-    console.error("❌ Erreur récupération patients-sessions:", err);
+    logger.error("❌ Erreur récupération patients-sessions:", err.message);
     res.status(500).json({ 
       success: false,
       error: 'Erreur serveur lors de la récupération des sessions patients.',

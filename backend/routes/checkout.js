@@ -33,7 +33,7 @@ router.post('/create-checkout', authenticate, async (req, res) => {
     }
 
     // URLs par défaut si non fournies
-    const defaultSuccessUrl = successUrl || `${process.env.FRONTEND_URL}/dashboard/kine?upgrade=success`;
+    const defaultSuccessUrl = successUrl || `${process.env.FRONTEND_URL}/dashboard/kine/upgrade/success?upgrade=success`;
     const defaultCancelUrl = cancelUrl || `${process.env.FRONTEND_URL}/dashboard/kine?upgrade=cancel`;
 
     try {
@@ -187,7 +187,7 @@ router.get('/subscription/:subscriptionId', authenticate, async (req, res) => {
     // Récupérer le kiné via son UID Firebase
     const kine = await prisma.kine.findUnique({
       where: { uid: req.uid },
-      select: { id: true, stripeSubscriptionId: true }
+      select: { id: true, subscriptionId: true }
     });
 
     if (!kine) {
@@ -195,7 +195,7 @@ router.get('/subscription/:subscriptionId', authenticate, async (req, res) => {
     }
 
     // Vérifier que l'abonnement appartient au kiné connecté
-    if (kine.stripeSubscriptionId !== subscriptionId) {
+    if (kine.subscriptionId !== subscriptionId) {
       return res.status(403).json({ error: 'Accès non autorisé à cet abonnement' });
     }
 
@@ -366,6 +366,73 @@ router.get('/invoices', authenticate, async (req, res) => {
 
   } catch (error) {
     console.error('Erreur get invoices:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// POST /api/stripe/refresh-subscription-dates - Forcer la mise à jour des dates depuis Stripe
+router.post('/refresh-subscription-dates', authenticate, async (req, res) => {
+  try {
+    // Récupérer le kiné via son UID Firebase
+    const kine = await prisma.kine.findUnique({
+      where: { uid: req.uid },
+      select: { id: true, subscriptionId: true }
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: 'Kinésithérapeute non trouvé' });
+    }
+
+    if (!kine.subscriptionId) {
+      return res.status(400).json({ error: 'Aucun abonnement actif trouvé' });
+    }
+
+    try {
+      // Récupérer les vraies données depuis Stripe
+      const subscription = await StripeService.getSubscription(kine.subscriptionId);
+      
+      // Mettre à jour en base avec les vraies dates
+      const updateData = {};
+      
+      if (subscription.current_period_start) {
+        updateData.subscriptionStartDate = new Date(subscription.current_period_start * 1000);
+      }
+      
+      if (subscription.current_period_end) {
+        updateData.subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await prisma.kine.update({
+          where: { id: kine.id },
+          data: updateData
+        });
+
+        console.log(`✅ Dates d'abonnement mises à jour pour kiné ${kine.id}:`, {
+          start: updateData.subscriptionStartDate?.toISOString(),
+          end: updateData.subscriptionEndDate?.toISOString()
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Dates d\'abonnement mises à jour',
+        dates: {
+          startDate: updateData.subscriptionStartDate,
+          endDate: updateData.subscriptionEndDate
+        }
+      });
+
+    } catch (stripeError) {
+      console.error('Erreur récupération abonnement Stripe:', stripeError);
+      return res.status(400).json({ 
+        error: 'Erreur lors de la récupération des données Stripe',
+        details: stripeError.message 
+      });
+    }
+
+  } catch (error) {
+    console.error('Erreur refresh-subscription-dates:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });

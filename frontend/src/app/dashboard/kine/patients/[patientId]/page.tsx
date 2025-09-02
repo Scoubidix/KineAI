@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Target, Filter, Dumbbell, Clock, Activity, MessageCircle, CheckCircle, AlertCircle } from 'lucide-react';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { useToast } from '@/hooks/use-toast';
+import { handleProgrammeCreationError } from '@/utils/handleProgrammeError';
 
 interface PatientData {
   id: number;
@@ -74,6 +76,7 @@ function parseTagsFromString(tagsString?: string): string[] {
 
 export default function PatientDetailPage() {
   const { patientId } = useParams();
+  const { toast } = useToast();
   const [patient, setPatient] = useState<PatientData | null>(null);
   const [programmesData, setProgrammesData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -282,13 +285,14 @@ export default function PatientDetailPage() {
           }))
         })
       });
-      if (!res.ok) throw new Error("Erreur création programme");
+      if (!res.ok) throw res; // Passer la Response pour que handleProgrammeCreationError puisse lire le status et le JSON
       
       setOpenCreateModal(false);
       resetCreateForm();
       await refreshProgrammes();
     } catch (err) {
-      console.error("Erreur création programme :", err);
+      // Utiliser le gestionnaire d'erreur centralisé
+      await handleProgrammeCreationError(err, toast);
     }
   };
 

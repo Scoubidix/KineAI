@@ -1,6 +1,7 @@
 // services/chatService.js
 const prismaService = require('./prismaService');
 const { generateChatResponse, generateWelcomeMessage } = require('./openaiService');
+const logger = require('../utils/logger');
 
 // Récupérer l'historique de chat pour un programme spécifique
 const getProgramChatHistory = async (patientId, programmeId) => {
@@ -30,7 +31,7 @@ const getProgramChatHistory = async (patientId, programmeId) => {
     }));
 
   } catch (error) {
-    console.error('Erreur récupération historique chat:', error);
+    logger.error('Erreur récupération historique chat:', error.message);
     return [];
   }
 };
@@ -49,7 +50,7 @@ const saveChatMessage = async (patientId, programmeId, message, role) => {
       }
     });
   } catch (error) {
-    console.error('Erreur sauvegarde message chat:', error);
+    logger.error('Erreur sauvegarde message chat:', error.message);
     throw error;
   }
 };
@@ -89,7 +90,7 @@ const processChatMessage = async (patientData, programmes, userMessage) => {
     return aiResponse;
 
   } catch (error) {
-    console.error('Erreur traitement message chat:', error);
+    logger.error('Erreur traitement message chat:', error.message);
     return {
       success: false,
       error: 'Erreur lors du traitement de votre message. Veuillez réessayer.',
@@ -140,7 +141,7 @@ const initializeChatSession = async (patientData, programmes) => {
     };
 
   } catch (error) {
-    console.error('Erreur initialisation chat:', error);
+    logger.error('Erreur initialisation chat:', error.message);
     return {
       success: false,
       error: 'Erreur lors de l\'initialisation du chat.',
@@ -162,10 +163,10 @@ const archiveProgram = async (programmeId) => {
       }
     });
 
-    console.log(`📦 Programme ${programmeId} archivé avec ses conversations`);
+    logger.info(`📦 Programme ${programmeId} archivé avec ses conversations`);
     return result;
   } catch (error) {
-    console.error('Erreur archivage programme:', error);
+    logger.error('Erreur archivage programme:', error.message);
     throw error;
   }
 };
@@ -190,7 +191,7 @@ const cleanupArchivedPrograms = async () => {
     });
 
     if (oldArchivedPrograms.length === 0) {
-      console.log('🧹 Aucun programme archivé à supprimer (< 6 mois)');
+      logger.debug('🧹 Aucun programme archivé à supprimer (< 6 mois)');
       return { programs: 0, messages: 0 };
     }
 
@@ -221,13 +222,13 @@ const cleanupArchivedPrograms = async () => {
           archivedAt: program.archivedAt
         });
         
-        console.log(`🗑️ Programme supprimé: "${program.titre}" (ID: ${program.id})`);
+        logger.info(`🗑️ Programme supprimé: "${program.titre}" (ID: ${program.id})`);
       } catch (deleteError) {
-        console.error(`❌ Erreur suppression programme ${program.id}:`, deleteError.message);
+        logger.error(`❌ Erreur suppression programme ${program.id}:`, deleteError.message);
       }
     }
 
-    console.log(`🗑️ Suppression définitive: ${deletedPrograms} programmes et ${messageCount} messages (archivés > 6 mois)`);
+    logger.info(`🗑️ Suppression définitive: ${deletedPrograms} programmes et ${messageCount} messages (archivés > 6 mois)`);
     
     return {
       programs: deletedPrograms,
@@ -236,7 +237,7 @@ const cleanupArchivedPrograms = async () => {
     };
 
   } catch (error) {
-    console.error('❌ Erreur nettoyage programmes archivés:', error);
+    logger.error('❌ Erreur nettoyage programmes archivés:', error.message);
     throw error;
   }
 };
@@ -260,7 +261,7 @@ const archiveFinishedPrograms = async () => {
     });
 
     if (finishedPrograms.length === 0) {
-      console.log('📋 Aucun programme terminé à archiver');
+      logger.debug('📋 Aucun programme terminé à archiver');
       return 0;
     }
 
@@ -277,7 +278,7 @@ const archiveFinishedPrograms = async () => {
       }
     });
 
-    console.log(`📦 ${result.count} programmes terminés archivés avec leurs conversations`);
+    logger.info(`📦 ${result.count} programmes terminés archivés avec leurs conversations`);
     
     // Compter les messages associés
     const messageCount = await prisma.chatSession.count({
@@ -288,7 +289,7 @@ const archiveFinishedPrograms = async () => {
       }
     });
 
-    console.log(`💬 ${messageCount} messages de chat archivés avec les programmes`);
+    logger.info(`💬 ${messageCount} messages de chat archivés avec les programmes`);
 
     return {
       programs: result.count,
@@ -297,7 +298,7 @@ const archiveFinishedPrograms = async () => {
     };
 
   } catch (error) {
-    console.error('❌ Erreur archivage programmes terminés:', error);
+    logger.error('❌ Erreur archivage programmes terminés:', error.message);
     throw error;
   }
 };
@@ -324,7 +325,7 @@ const getChatStats = async (patientId, programmeId) => {
     }, {});
 
   } catch (error) {
-    console.error('Erreur statistiques chat:', error);
+    logger.error('Erreur statistiques chat:', error.message);
     return {};
   }
 };
@@ -344,7 +345,7 @@ const deleteProgramAndChats = async (programmeId) => {
       where: { id: parseInt(programmeId) }
     });
 
-    console.log(`🗑️ Programme ${programmeId} supprimé avec ${messageCount} messages de chat`);
+    logger.info(`🗑️ Programme ${programmeId} supprimé avec ${messageCount} messages de chat`);
     
     return {
       program: result,
@@ -352,7 +353,7 @@ const deleteProgramAndChats = async (programmeId) => {
     };
 
   } catch (error) {
-    console.error('❌ Erreur suppression programme et chats:', error);
+    logger.error('❌ Erreur suppression programme et chats:', error.message);
     throw error;
   }
 };

@@ -1,8 +1,10 @@
 const express = require('express');
+const logger = require('../utils/logger');
 const router = express.Router();
 
 const programmesController = require('../controllers/programmesController');
 const { authenticate } = require('../middleware/authenticate');
+const { canCreateProgramme } = require('../middleware/authorization');
 
 // ROUTES SPÉCIFIQUES EN PREMIER (avant les routes avec paramètres)
 
@@ -114,7 +116,7 @@ router.get('/stats', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur récupération statistiques:', error);
+    logger.error('Erreur récupération statistiques:', error);
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la récupération des statistiques',
@@ -213,7 +215,7 @@ router.post('/:id/send-whatsapp', authenticate, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Erreur envoi WhatsApp:', error);
+    logger.error('Erreur envoi WhatsApp:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Erreur interne du serveur',
@@ -223,7 +225,7 @@ router.post('/:id/send-whatsapp', authenticate, async (req, res) => {
 });
 
 // Routes CRUD standard
-router.post('/', authenticate, programmesController.createProgramme);
+router.post('/', authenticate, canCreateProgramme, programmesController.createProgramme);
 router.put('/:id', authenticate, programmesController.updateProgramme);
 router.delete('/:id', authenticate, programmesController.deleteProgramme);
 

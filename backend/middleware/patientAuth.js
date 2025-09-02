@@ -1,4 +1,5 @@
 const { validatePatientToken } = require('../services/patientTokenService');
+const logger = require('../utils/logger');
 const prismaService = require('../services/prismaService');
 
 /**
@@ -63,7 +64,7 @@ const authenticatePatient = async (req, res, next) => {
     });
 
     if (!patient) {
-      console.error(`❌ PATIENT_AUTH: Patient inexistant - ID: ${tokenValidation.patientId}`);
+      logger.warn(`❌ PATIENT_AUTH: Patient inexistant - ID: ${tokenValidation.patientId}`);
       return res.status(404).json({
         success: false,
         error: 'Patient non trouvé',
@@ -82,7 +83,7 @@ const authenticatePatient = async (req, res, next) => {
     });
 
     if (!programme) {
-      console.error(`❌ PATIENT_AUTH: Programme inexistant - ID: ${tokenValidation.programmeId}`);
+      logger.warn(`❌ PATIENT_AUTH: Programme inexistant - ID: ${tokenValidation.programmeId}`);
       return res.status(404).json({
         success: false,
         error: 'Programme non trouvé',
@@ -119,14 +120,14 @@ const authenticatePatient = async (req, res, next) => {
     // ✅ Log uniquement les NOUVELLES sessions (première connexion du jour)
     // Détection : si c'est la route d'initialisation du chat
     if (req.path.includes('/init') || req.method === 'GET') {
-      console.log(`💬 PATIENT_CHAT: Session démarrée - Patient: ${patient.id} - Programme: ${programme.titre}`);
+      logger.debug(`💬 PATIENT_CHAT: Session démarrée - Patient: ${patient.id} - Programme: ${programme.titre}`);
     }
 
     // 9. Continuer vers la route suivante
     next();
 
   } catch (error) {
-    console.error(`❌ PATIENT_AUTH: Erreur serveur - ${error.message}`);
+    logger.warn(`❌ PATIENT_AUTH: Erreur serveur - ${error.message}`);
     res.status(500).json({
       success: false,
       error: 'Erreur serveur lors de l\'authentification',
@@ -167,7 +168,7 @@ const checkTokenExpiry = (hoursBeforeWarning = 24) => {
 
       next();
     } catch (error) {
-      console.error(`❌ PATIENT_EXPIRY: Erreur vérification - ${error.message}`);
+      logger.warn(`❌ PATIENT_EXPIRY: Erreur vérification - ${error.message}`);
       next(); // Continuer même en cas d'erreur
     }
   };
@@ -187,7 +188,7 @@ const logPatientAccess = (req, res, next) => {
     const ip = req.ip || req.connection.remoteAddress;
     const userAgent = req.get('User-Agent');
     
-    console.log(`🔍 PATIENT_ACCESS: ID:${req.patient?.id} IP:${ip} Programme:${req.programme?.id} UA:${userAgent?.substring(0, 50)}`);
+    logger.debug(`🔍 PATIENT_ACCESS: ID:${req.patient?.id} IP:${ip} Programme:${req.programme?.id} UA:${userAgent?.substring(0, 50)}`);
   }
   
   next();

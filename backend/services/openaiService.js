@@ -1,6 +1,7 @@
 const { OpenAI } = require('openai');
 const knowledgeService = require('./knowledgeService');
 const prismaService = require('./prismaService');
+const logger = require('../utils/logger');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -185,7 +186,7 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
     };
 
   } catch (error) {
-    console.error('Erreur OpenAI Chat:', error);
+    logger.error('Erreur OpenAI Chat:', error.message);
     
     // Messages d'erreur contextualisés
     let errorMessage = "Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.";
@@ -273,7 +274,7 @@ IMPORTANT:
     };
 
   } catch (error) {
-    console.error('Erreur génération message d\'accueil:', error);
+    logger.error('Erreur génération message d\'accueil:', error.message);
     
     // Message d'accueil de fallback simple et propre
     let fallbackMessage = 'Bonjour ! 👋\n\n';
@@ -343,7 +344,7 @@ const cleanChatHistory = (history, maxMessages = 20) => {
  */
 const generateKineResponse = async (type, message, conversationHistory = [], kineId) => {
   try {
-    console.log(`🚀 IA ${type} pour kiné ID: ${kineId}`);
+    logger.debug(`🚀 IA ${type} pour kiné ID: ${kineId}`);
 
     if (!message?.trim()) {
       throw new Error('Message requis');
@@ -381,7 +382,7 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
 
     // 5. Sauvegarde dans la bonne table
     await saveToCorrectTable(type, kineId, message, aiResponse);
-    console.log(`💾 Conversation IA ${type} sauvegardée`);
+    logger.debug(`💾 Conversation IA ${type} sauvegardée`);
 
     // 6. Calcul de la confiance globale
     const overallConfidence = knowledgeService.calculateOverallConfidence(allDocuments);
@@ -406,11 +407,11 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
       }
     };
 
-    console.log(`✅ IA ${type} - Confiance: ${Math.round(overallConfidence * 100)}%`);
+    logger.debug(`✅ IA ${type} - Confiance: ${Math.round(overallConfidence * 100)}%`);
     return response;
 
   } catch (error) {
-    console.error(`❌ Erreur generateKineResponse (${type}):`, error);
+    logger.error(`❌ Erreur generateKineResponse (${type}):`, error.message);
     throw {
       success: false,
       error: `Erreur lors de la génération de la réponse IA ${type}`,

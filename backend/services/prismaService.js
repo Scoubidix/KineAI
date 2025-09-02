@@ -1,5 +1,6 @@
 // services/prismaService.js - Version Production
 const { PrismaClient } = require('@prisma/client');
+const logger = require('../utils/logger');
 
 // Instance globale unique
 let prismaInstance = null;
@@ -20,11 +21,11 @@ class PrismaService {
       currentConnectionId = totalCreations;
       
       // Log avec vraie info
-      console.log(`🔧 Connexion Prisma (${currentConnectionId}) créée [Total: ${totalCreations}]`);
+      logger.warn("🔧 Connexion DB créée - Total:", totalCreations);
       
       // Debug détaillé seulement en dev
       if (DEBUG_LOGS) {
-        console.log('📍 Créée depuis:', new Error().stack.split('\n')[2]?.trim());
+        logger.debug('📍 Stack:', new Error().stack.split('\n')[2]?.trim());
       }
       
       const dbUrl = new URL(process.env.DATABASE_URL);
@@ -49,7 +50,7 @@ class PrismaService {
       ['SIGINT', 'SIGTERM', 'SIGQUIT', 'beforeExit'].forEach(event => {
         if (!process.listenerCount(event)) {
           process.on(event, async () => {
-            console.log(`🛑 Arrêt ${event} - fermeture Connexion (${currentConnectionId})`);
+            logger.warn(`🛑 Arrêt ${event} - fermeture connexion DB`);
             await this.forceDisconnect();
             if (event !== 'beforeExit') process.exit(0);
           });
@@ -57,7 +58,7 @@ class PrismaService {
       });
 
     } else if (DEBUG_LOGS) {
-      console.log(`♻️ Réutilisation connexion (${currentConnectionId})`);
+      logger.debug(`♻️ Réutilisation connexion (${currentConnectionId})`);
     }
     
     this.markActivity();
@@ -68,7 +69,7 @@ class PrismaService {
     lastActivity = Date.now();
     // Log détaillé seulement en debug
     if (DEBUG_LOGS) {
-      console.log('🔄 Activité:', new Date(lastActivity).toISOString());
+      logger.debug('🔄 Activité:', new Date(lastActivity).toISOString());
     }
   }
 
@@ -81,17 +82,17 @@ class PrismaService {
 
       // Log check seulement en debug
       if (DEBUG_LOGS) {
-        console.log(`⏰ Inactivité: ${Math.round(inactiveTime/1000)}s / ${maxInactiveTime/1000}s max`);
+        logger.debug(`⏰ Inactivité: ${Math.round(inactiveTime/1000)}s / ${maxInactiveTime/1000}s max`);
       }
 
       if (inactiveTime > maxInactiveTime && isConnected) {
-        console.log(`🧹 Fermeture automatique Connexion (${currentConnectionId})`);
+        logger.info(`🧹 Fermeture automatique connexion DB`);
         await this.forceDisconnect();
       }
     }, 2 * 60 * 1000); // Check toutes les 2 minutes
 
     if (DEBUG_LOGS) {
-      console.log('⏰ Timer de nettoyage démarré');
+      logger.debug('⏰ Timer de nettoyage démarré');
     }
   }
 
@@ -110,7 +111,7 @@ class PrismaService {
     this.stopCleanupTimer();
 
     if (prismaInstance && isConnected) {
-      console.log(`🔌 Fermeture connexion Prisma (${currentConnectionId})...`);
+      logger.info(`🔌 Fermeture connexion DB...`);
       try {
         await Promise.race([
           prismaInstance.$disconnect(),
@@ -118,9 +119,9 @@ class PrismaService {
             setTimeout(() => reject(new Error('Timeout disconnect')), 3000)
           )
         ]);
-        console.log(`🔌 Connexion (${currentConnectionId}) fermée`);
+        logger.info(`🔌 Connexion DB fermée`);
       } catch (error) {
-        console.error(`❌ Erreur fermeture Connexion (${currentConnectionId}):`, error.message);
+        logger.error(`❌ Erreur fermeture connexion DB:`, error.message);
       } finally {
         prismaInstance = null;
         isConnected = false;
@@ -147,7 +148,7 @@ class PrismaService {
       this.markActivity();
       return result;
     } catch (error) {
-      console.error('❌ Erreur transaction:', error.message);
+      logger.error('❌ Erreur transaction:', error.message);
       throw error;
     }
   }
@@ -155,7 +156,7 @@ class PrismaService {
   async executeWithTempConnection(callback) {
     // Logs minimalistes
     if (DEBUG_LOGS) {
-      console.log('🔄 executeWithTempConnection');
+      logger.debug('🔄 executeWithTempConnection');
     }
     
     const prisma = this.getInstance();
@@ -166,12 +167,12 @@ class PrismaService {
       this.markActivity();
       
       if (DEBUG_LOGS) {
-        console.log('✅ executeWithTempConnection terminé');
+        logger.debug('✅ executeWithTempConnection terminé');
       }
       
       return result;
     } catch (error) {
-      console.error('❌ Erreur executeWithTempConnection:', error.message);
+      logger.error('❌ Erreur executeWithTempConnection:', error.message);
       throw error;
     }
   }
@@ -192,7 +193,7 @@ class PrismaService {
     } catch (error) {
       // Log warning seulement pour les vraies erreurs
       if (!error.message.includes('timeout') && !error.message.includes('pool')) {
-        console.error('❌ Health check failed:', error.message);
+        logger.error('❌ Health check failed:', error.message);
         await this.forceDisconnect();
         return { status: 'reconnected' };
       }

@@ -4,15 +4,14 @@ export const dynamic = 'force-dynamic';
 import React, { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { AuthGuard } from '@/components/AuthGuard';
-import { useSubscription } from '@/hooks/useSubscription';
-import { PaywallModal } from '@/components/PaywallModal';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Bell, AlertCircle, Users, CheckCircle, XCircle, CalendarDays, Percent, Calendar as CalendarIcon, RefreshCw, Clock, Trophy, Lock } from 'lucide-react';
+import { Bell, AlertCircle, Users, CheckCircle, XCircle, CalendarDays, Percent, Calendar as CalendarIcon, RefreshCw, Clock, Trophy } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Progress } from '@/components/ui/progress';
+
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -27,13 +26,6 @@ interface KineData {
   firstName: string;
   lastName: string;
   email: string;
-}
-
-interface Subscription {
-  planType: string | null;
-  status: string;
-  currentPeriodEnd: string | null;
-  createdAt: string;
 }
 
 interface NotificationData {
@@ -141,15 +133,6 @@ export default function KineHomePage() {
   const [loading, setLoading] = useState(true);
   const [loadingAdherence, setLoadingAdherence] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // État du modal paywall (LOCAL)
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Hook subscription pour vérifier le plan
-  const { subscription, isLoading: subscriptionLoading } = useSubscription() as {
-    subscription: Subscription | null;
-    isLoading: boolean;
-  };
 
   // URL de l'API
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -163,54 +146,93 @@ export default function KineHomePage() {
     return await user.getIdToken();
   };
 
-  // Récupération du profil kiné
+  // Chargement initial : profil + données de base
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(getAuth(), async (user) => {
       if (user) {
-        try {
-          const response = await fetch(`${API_URL}/kine/profile`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${await user.getIdToken()}`,
-            },
-          });
-
-          if (response.ok) {
-            const kineData = await response.json();
-            setKine(kineData);
-          }
-        } catch (error) {
-          console.error('Erreur lors du chargement du profil kiné:', error);
-        }
+        await loadInitialData(user);
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
     return () => unsubscribe();
   }, [API_URL]);
 
-  // Chargement des données d'adhérence selon la date sélectionnée
+  // Rechargement adhérence lors du changement de date
   useEffect(() => {
     if (kine) {
       fetchAdherenceData(selectedDate);
     }
-  }, [selectedDate, kine]);
+  }, [selectedDate]);
 
-  // Chargement du count des notifications
-  useEffect(() => {
-    if (kine) {
-      fetchUnreadCount();
-    }
-  }, [kine]);
-
-  const fetchUnreadCount = async () => {
+  // Chargement initial avec Promise.allSettled pour résilience
+  const loadInitialData = async (user: any) => {
     try {
-      const token = await getAuthToken();
+      const token = await user.getIdToken();
+      
+      // Étape 1: Charger le profil kiné (critique)
+      const profileResult = await fetchKineProfile(token);
+      
+      if (profileResult.success) {
+        setKine(profileResult.data);
+        
+        // Étape 2: En parallèle, charger les données dépendantes
+        const [adherenceResult, notificationsResult] = await Promise.allSettled([
+          fetchAdherenceData(selectedDate, token),
+          fetchUnreadCount(token)
+        ]);
+        
+        // Traiter les résultats individuellement
+        if (adherenceResult.status === 'fulfilled') {
+          // Adhérence déjà gérée dans fetchAdherenceData
+        } else {
+          console.error('Erreur adhérence:', adherenceResult.reason);
+        }
+        
+        if (notificationsResult.status === 'fulfilled') {
+          // Notifications déjà gérées dans fetchUnreadCount
+        } else {
+          console.error('Erreur notifications:', notificationsResult.reason);
+        }
+      }
+    } catch (error) {
+      console.error('Erreur chargement initial:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      // Récupérer seulement le count des non lues
+  // Récupération du profil kiné
+  const fetchKineProfile = async (token: string) => {
+    try {
+      const response = await fetch(`${API_URL}/kine/profile`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const kineData = await response.json();
+        return { success: true, data: kineData };
+      } else {
+        throw new Error('Erreur récupération profil');
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement du profil kiné:', error);
+      return { success: false, error };
+    }
+  };
+
+  // Récupération du count des notifications
+  const fetchUnreadCount = async (token?: string) => {
+    try {
+      const authToken = token || await getAuthToken();
+
       const unreadResponse = await fetch(`${API_URL}/api/notifications/unread-count`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json',
         },
       });
@@ -219,52 +241,55 @@ export default function KineHomePage() {
         const unreadData = await unreadResponse.json();
         if (unreadData.success) {
           setUnreadCount(unreadData.count);
+          return { success: true };
         }
       }
-
+      return { success: false };
     } catch (error) {
       console.error('Erreur chargement count notifications:', error);
+      return { success: false, error };
     }
   };
 
-  const fetchAdherenceData = async (date: Date) => {
-    if (!kine) return;
-
+  const fetchAdherenceData = async (date: Date, token?: string) => {
     setLoadingAdherence(true);
     setError(null);
 
     try {
       const dateStr = format(date, 'yyyy-MM-dd');
-      const token = await getAuthToken();
+      const authToken = token || await getAuthToken();
 
-      // Récupérer les données d'adhérence
-      const adherenceResponse = await fetch(`${API_URL}/kine/adherence/${dateStr}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      // Récupérer les détails des patients
-      const patientsResponse = await fetch(`${API_URL}/kine/patients-sessions/${dateStr}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // Récupérer en parallèle les données d'adhérence et patients
+      const [adherenceResponse, patientsResponse] = await Promise.all([
+        fetch(`${API_URL}/kine/adherence/${dateStr}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${authToken}`,
+          },
+        }),
+        fetch(`${API_URL}/kine/patients-sessions/${dateStr}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${authToken}`,
+          },
+        })
+      ]);
 
       if (!adherenceResponse.ok || !patientsResponse.ok) {
         throw new Error('Erreur lors du chargement des données');
       }
 
-      const adherenceResult = await adherenceResponse.json();
-      const patientsResult = await patientsResponse.json();
+      const [adherenceResult, patientsResult] = await Promise.all([
+        adherenceResponse.json(),
+        patientsResponse.json()
+      ]);
 
       if (adherenceResult.success && patientsResult.success) {
         setAdherenceData(adherenceResult);
         setPatientsData(patientsResult);
+        return { success: true };
       } else {
         throw new Error('Données invalides reçues du serveur');
       }
@@ -272,6 +297,7 @@ export default function KineHomePage() {
     } catch (err) {
       console.error('Erreur lors du chargement des données d\'adhérence:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      return { success: false, error: err };
       // Données par défaut en cas d'erreur
       setAdherenceData({
         success: false,
@@ -315,83 +341,38 @@ export default function KineHomePage() {
   };
 
   // Chargement en cours
-  if (loading || subscriptionLoading) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Chargement de votre tableau de bord...</p>
+      <AppLayout>
+        <AuthGuard role="kine" />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Chargement de votre tableau de bord...</p>
+          </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   // Erreur de chargement kiné
   if (!kine) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Erreur de chargement</h2>
-          <p className="text-muted-foreground mb-4">Impossible de charger vos informations.</p>
-          <Button onClick={() => window.location.reload()}>Réessayer</Button>
-        </div>
-      </div>
-    );
-  }
-
-  // PROTECTION PAYWALL : Plan FREE bloqué
-  if (!subscription || subscription.planType === 'FREE') {
-    return (
-      <>
-        {/* 🚀 MODAL EN PORTAL - AVANT AppLayout */}
-        <PaywallModal 
-          isOpen={isModalOpen} 
-          onClose={() => setIsModalOpen(false)} 
-        />
-        
-        {/* AppLayout avec contenu bloqué */}
-        <AppLayout>
-          <AuthGuard role="kine" />
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <Card className="max-w-md mx-auto text-center border-amber-200 bg-amber-50">
-              <CardHeader>
-                <div className="mx-auto mb-4 p-3 bg-amber-100 rounded-full w-fit">
-                  <Lock className="h-8 w-8 text-amber-600" />
-                </div>
-                <CardTitle className="text-amber-900">Tableau de bord premium</CardTitle>
-                <CardDescription className="text-amber-700">
-                  Accédez à votre tableau de bord avec toutes les fonctionnalités en choisissant un plan d'abonnement.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-amber-700 mb-4">
-                  Le tableau de bord complet avec adhérence patients, notifications et statistiques nécessite un abonnement actif.
-                </p>
-                <Button 
-                  onClick={() => setIsModalOpen(true)}
-                  className="w-full bg-amber-600 hover:bg-amber-700 text-white"
-                >
-                  Choisir mon abonnement
-                </Button>
-              </CardContent>
-            </Card>
+      <AppLayout>
+        <AuthGuard role="kine" />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Erreur de chargement</h2>
+            <p className="text-muted-foreground mb-4">Impossible de charger vos informations.</p>
+            <Button onClick={() => window.location.reload()}>Réessayer</Button>
           </div>
-        </AppLayout>
-      </>
+        </div>
+      </AppLayout>
     );
   }
 
-  // CONTENU NORMAL : Votre page exacte si abonnement actif
   return (
-    <>
-      {/* 🚀 MODAL EN PORTAL - AVANT AppLayout */}
-      <PaywallModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-      />
-      
-      {/* AppLayout avec contenu normal */}
       <AppLayout>
         <AuthGuard role="kine" />
         <div className="space-y-6">
@@ -611,6 +592,5 @@ export default function KineHomePage() {
           </Card>
         </div>
       </AppLayout>
-    </>
   );
 }

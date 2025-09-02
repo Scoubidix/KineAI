@@ -81,6 +81,9 @@ import Link from 'next/link';
 import type { RoleOrUnknown } from '@/types/user';
 import { getAuth, signOut } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
+import { PlanIndicator } from './PlanIndicator';
+import { RGPDExportModal } from './RGPDExportModal';
+import { RGPDDeleteModal } from './RGPDDeleteModal';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -122,6 +125,10 @@ function SettingsModal() {
     adresseCabinet: '',
     birthDate: ''
   });
+
+  // 🔒 NOUVEAU : États pour les modales RGPD
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const { toast } = useToast();
 
@@ -619,10 +626,14 @@ function SettingsModal() {
                           <div>
                             <p className="font-medium">Télécharger mes données</p>
                             <p className="text-sm text-muted-foreground">
-                              Exportez toutes vos données personnelles
+                              Exportez toutes vos données personnelles (ZIP, 24h de validité)
                             </p>
                           </div>
-                          <Button variant="outline" size="sm">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setIsExportModalOpen(true)}
+                          >
                             <Download className="h-4 w-4 mr-2" />
                             Télécharger
                           </Button>
@@ -632,10 +643,14 @@ function SettingsModal() {
                           <div>
                             <p className="font-medium text-destructive">Supprimer mon compte</p>
                             <p className="text-sm text-muted-foreground">
-                              Suppression définitive de toutes vos données
+                              Suppression définitive après période de grâce de 7 jours
                             </p>
                           </div>
-                          <Button variant="destructive" size="sm">
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            onClick={() => setIsDeleteModalOpen(true)}
+                          >
                             <Trash2 className="h-4 w-4 mr-2" />
                             Supprimer
                           </Button>
@@ -735,6 +750,19 @@ function SettingsModal() {
           </Tabs>
         </div>
       </DialogContent>
+
+      {/* 🔒 NOUVEAU : Modales RGPD */}
+      <RGPDExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        kineData={kineData}
+      />
+      
+      <RGPDDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        kineData={kineData}
+      />
     </Dialog>
   );
 }
@@ -886,7 +914,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border lg:hidden">
           <div className="flex h-14 items-center px-4">
             <SidebarTrigger className="mr-2" />
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1">
               <img 
                 src="/logo.jpg" 
                 alt="Mon Assistant Kiné" 
@@ -894,6 +922,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
               />
               <span className="font-semibold text-primary">Mon Assistant Kiné</span>
             </div>
+            {/* Plan Indicator mobile - seulement pour les kinés en FREE */}
+            {role === 'kine' && <PlanIndicator />}
+          </div>
+        </div>
+
+        {/* Barre de navigation desktop - seulement visible sur lg+ */}
+        <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border hidden lg:block">
+          <div className="flex h-16 items-center px-6 justify-end">
+            {/* Plan Indicator desktop - seulement pour les kinés en FREE */}
+            {role === 'kine' && <PlanIndicator />}
           </div>
         </div>
 

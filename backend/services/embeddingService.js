@@ -2,6 +2,7 @@
 // Le stockage est géré par n8n, mais on garde l'embedding pour les recherches
 const OpenAI = require('openai');
 const { supabase } = require('./supabaseClient');
+const logger = require('../utils/logger');
 
 // Configuration OpenAI pour les recherches
 const openai = new OpenAI({
@@ -149,9 +150,9 @@ function analyzeQueryForMetadata(query) {
   
   const detectedPathologies = [];
   
-  console.log('🔍 Mots analysés:', words.join(', '));
-  console.log('🔍 Mots pour pathologies:', filteredWords.join(', '));
-  console.log('💡 Note: L\'embedding utilise la requête complète pour la similarité sémantique');
+  logger.debug('🔍 Mots analysés:', words.join(', '));
+  logger.debug('🔍 Mots pour pathologies:', filteredWords.join(', '));
+  logger.debug('💡 Note: L\'embedding utilise la requête complète pour la similarité sémantique');
   
   // ÉTAPE 1: Synonymes de pathologies + variantes courantes
   const pathologySynonyms = {
@@ -171,7 +172,7 @@ function analyzeQueryForMetadata(query) {
     if (pathologySynonyms[word]) {
       if (!detectedPathologies.includes(pathologySynonyms[word])) {
         detectedPathologies.push(pathologySynonyms[word]);
-        console.log(`✅ Pathologie synonyme: ${word} → ${pathologySynonyms[word]}`);
+        logger.debug(`✅ Pathologie synonyme: ${word} → ${pathologySynonyms[word]}`);
       }
     }
   }
@@ -196,7 +197,7 @@ function analyzeQueryForMetadata(query) {
           detectedPathologies.push(pathology);
         }
       });
-      console.log(`✅ Anatomie détectée: ${word} → pathologies: ${anatomyPathologies.join(', ')}`);
+      logger.debug(`✅ Anatomie détectée: ${word} → pathologies: ${anatomyPathologies.join(', ')}`);
     }
   }
   
@@ -205,7 +206,7 @@ function analyzeQueryForMetadata(query) {
   for (const word of filteredWords) {
     if (pathologies.includes(word) && !detectedPathologies.includes(word)) {
       detectedPathologies.push(word);
-      console.log(`✅ Pathologie exacte: ${word}`);
+      logger.debug(`✅ Pathologie exacte: ${word}`);
     }
   }
   
@@ -221,7 +222,7 @@ function analyzeQueryForMetadata(query) {
       if (word.length >= 5 || match.distance <= 1) { // Seuil plus strict pour mots courts
         if (!detectedPathologies.includes(match.term)) {
           detectedPathologies.push(match.term);
-          console.log(`✅ Pathologie faute frappe: ${word} → ${match.term} (distance: ${match.distance})`);
+          logger.debug(`✅ Pathologie faute frappe: ${word} → ${match.term} (distance: ${match.distance})`);
         }
       }
     }
@@ -229,10 +230,10 @@ function analyzeQueryForMetadata(query) {
   
   // Retourner format attendu par buildMetadataFilters
   if (detectedPathologies.length > 0) {
-    console.log(`🎯 Pathologies détectées:`, detectedPathologies);
+    logger.debug(`🎯 Pathologies détectées:`, detectedPathologies);
     return { pathologies: detectedPathologies };
   } else {
-    console.log('⚠️ Aucune pathologie détectée - recherche vectorielle générale');
+    logger.debug('⚠️ Aucune pathologie détectée - recherche vectorielle générale');
     return {};
   }
 }
@@ -249,9 +250,9 @@ function buildMetadataFilters(detectedMetadata) {
   
   if (detectedMetadata.pathologies && detectedMetadata.pathologies.length > 0) {
     filters.pathologies = detectedMetadata.pathologies;
-    console.log(`🎯 Filtre PATHOLOGIES uniquement:`, filters.pathologies);
+    logger.debug(`🎯 Filtre PATHOLOGIES uniquement:`, filters.pathologies);
   } else {
-    console.log(`⚠️ Aucune pathologie détectée - recherche vectorielle sur TOUTE la base`);
+    logger.debug(`⚠️ Aucune pathologie détectée - recherche vectorielle sur TOUTE la base`);
   }
   
   return filters;
@@ -270,7 +271,7 @@ async function generateEmbedding(text) {
   try {
     const optimizedText = preprocessTextForEmbedding(text);
     
-    console.log('🔄 Génération embedding pour recherche:', optimizedText.substring(0, 100) + '...');
+    logger.debug('🔄 Génération embedding pour recherche:', optimizedText.substring(0, 100) + '...');
     
     const response = await openai.embeddings.create({
       model: EMBEDDING_CONFIG.model,
@@ -279,11 +280,11 @@ async function generateEmbedding(text) {
     });
 
     const embedding = response.data[0].embedding;
-    console.log('✅ Embedding généré:', embedding.length, 'dimensions');
+    logger.debug('✅ Embedding généré:', embedding.length, 'dimensions');
     
     return embedding;
   } catch (error) {
-    console.error('❌ Erreur génération embedding:', error);
+    logger.error('❌ Erreur génération embedding:', error);
     throw error;
   }
 }
@@ -316,7 +317,7 @@ async function searchDocuments(query, options = {}) {
       filterCategory = null
     } = options;
 
-    console.log('🔍 Recherche avec filtres métadonnées pour:', query);
+    logger.debug('🔍 Recherche avec filtres métadonnées pour:', query);
     
     // 🆕 ÉTAPE 1: Analyser la requête pour extraire les métadonnées
     const detectedMetadata = analyzeQueryForMetadata(query);
@@ -335,14 +336,14 @@ async function searchDocuments(query, options = {}) {
     });
 
     if (error) {
-      console.error('❌ Erreur recherche Supabase:', error);
+      logger.error('❌ Erreur recherche Supabase:', error);
       // Si la nouvelle fonction n'existe pas, retourner résultat vide
-      console.log('⚠️ Fonction search_documents_with_metadata non trouvée. Créez-la dans Supabase !');
+      logger.debug('⚠️ Fonction search_documents_with_metadata non trouvée. Créez-la dans Supabase !');
       return [];
     }
 
     if (!data || data.length === 0) {
-      console.log('⚠️ Aucun document trouvé avec seuil', matchThreshold);
+      logger.debug('⚠️ Aucun document trouvé avec seuil', matchThreshold);
       return [];
     }
 
@@ -359,12 +360,12 @@ async function searchDocuments(query, options = {}) {
       metadataFiltered: Object.keys(metadataFilters).length > 0
     }));
 
-    console.log(`✅ ${enrichedResults.length} documents trouvés avec filtres métadonnées`);
+    logger.debug(`✅ ${enrichedResults.length} documents trouvés avec filtres métadonnées`);
     await logSearch(query, enrichedResults.length);
     
     return enrichedResults;
   } catch (error) {
-    console.error('❌ Erreur recherche sémantique:', error);
+    logger.error('❌ Erreur recherche sémantique:', error);
     throw error;
   }
 }
@@ -379,7 +380,7 @@ async function searchDocumentsLegacy(query, options = {}) {
     filterCategory = null
   } = options;
 
-  console.log('🔍 Recherche legacy (sans filtres métadonnées) pour:', query);
+  logger.debug('🔍 Recherche legacy (sans filtres métadonnées) pour:', query);
   
   const queryEmbedding = await generateEmbedding(query);
   
@@ -391,7 +392,7 @@ async function searchDocumentsLegacy(query, options = {}) {
   });
 
   if (error) {
-    console.error('❌ Erreur recherche legacy:', error);
+    logger.error('❌ Erreur recherche legacy:', error);
     throw error;
   }
 
@@ -410,7 +411,7 @@ async function searchDocumentsOptimized(query, options = {}) {
       allowLowerThreshold = true
     } = options;
 
-    console.log('🔍 Recherche optimisée avec embedding unique pour:', query);
+    logger.debug('🔍 Recherche optimisée avec embedding unique pour:', query);
     
     // 🆕 OPTIMISATION: Générer l'embedding UNE SEULE FOIS
     const detectedMetadata = analyzeQueryForMetadata(query);
@@ -418,7 +419,7 @@ async function searchDocumentsOptimized(query, options = {}) {
     const queryEmbedding = await generateEmbedding(query);
 
     // Première tentative avec seuil élevé (haute qualité)
-    console.log('🔍 Tentative seuil élevé (0.7)...');
+    logger.debug('🔍 Tentative seuil élevé (0.7)...');
     let results = await searchDocumentsWithEmbedding(queryEmbedding, {
       matchThreshold: 0.7,
       matchCount: 3,
@@ -428,7 +429,7 @@ async function searchDocumentsOptimized(query, options = {}) {
 
     // Si pas assez de résultats, tentative avec seuil plus bas
     if (results.length < 2 && allowLowerThreshold) {
-      console.log('🔄 Seuil élevé: ' + results.length + ' résultats, tentative seuil bas...');
+      logger.debug('🔄 Seuil élevé: ' + results.length + ' résultats, tentative seuil bas...');
       
       results = await searchDocumentsWithEmbedding(queryEmbedding, {
         matchThreshold: 0.4,
@@ -438,12 +439,12 @@ async function searchDocumentsOptimized(query, options = {}) {
       });
     }
 
-    console.log(`✅ Recherche optimisée terminée: ${results.length} résultats`);
+    logger.info(`✅ Recherche optimisée terminée: ${results.length} résultats`);
     await logSearch(query, results.length);
 
     return results;
   } catch (error) {
-    console.error('❌ Erreur recherche optimisée:', error);
+    logger.error('❌ Erreur recherche optimisée:', error);
     throw error;
   }
 }
@@ -470,16 +471,16 @@ async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
     });
 
     if (error) {
-      console.error('❌ Erreur recherche Supabase:', error);
+      logger.error('❌ Erreur recherche Supabase:', error);
       // Si la nouvelle fonction n'existe pas, retourner résultat vide plutôt que fallback
-      console.log('⚠️ Fonction search_documents_with_metadata non trouvée. Créez-la dans Supabase !');
+      logger.debug('⚠️ Fonction search_documents_with_metadata non trouvée. Créez-la dans Supabase !');
       return [];
     }
 
     if (!data || data.length === 0) {
       // Si on a filtré par pathologies mais trouvé 0 résultats
       if (Object.keys(metadataFilters).length > 0 && metadataFilters.pathologies) {
-        console.log(`⚠️ Aucun document trouvé pour les pathologies: ${metadataFilters.pathologies.join(', ')}`);
+        logger.debug(`⚠️ Aucun document trouvé pour les pathologies: ${metadataFilters.pathologies.join(', ')}`);
       }
       return [];
     }
@@ -499,7 +500,7 @@ async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
 
     return enrichedResults;
   } catch (error) {
-    console.error('❌ Erreur recherche avec embedding:', error);
+    logger.error('❌ Erreur recherche avec embedding:', error);
     throw error;
   }
 }
@@ -514,7 +515,7 @@ async function searchDocumentsLegacyWithEmbedding(queryEmbedding, options = {}) 
     filterCategory = null
   } = options;
 
-  console.log('🔍 Recherche legacy avec embedding pré-généré');
+  logger.debug('🔍 Recherche legacy avec embedding pré-généré');
   
   const { data, error } = await supabase.rpc('search_documents', {
     query_embedding: queryEmbedding,
@@ -524,7 +525,7 @@ async function searchDocumentsLegacyWithEmbedding(queryEmbedding, options = {}) 
   });
 
   if (error) {
-    console.error('❌ Erreur recherche legacy:', error);
+    logger.error('❌ Erreur recherche legacy:', error);
     throw error;
   }
 
@@ -598,7 +599,7 @@ async function getDocumentStats() {
     };
 
   } catch (error) {
-    console.error('❌ Erreur stats documents:', error);
+    logger.error('❌ Erreur stats documents:', error);
     return {
       totalDocuments: 0,
       categories: 0,
@@ -636,7 +637,7 @@ async function listDocuments(options = {}) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('❌ Erreur listage documents:', error);
+      logger.error('❌ Erreur listage documents:', error);
       throw error;
     }
 
@@ -648,11 +649,11 @@ async function listDocuments(options = {}) {
         Math.round(((doc.metadata.ol - doc.metadata.cl) / doc.metadata.ol) * 100) + '%' : 'N/A'
     }));
 
-    console.log(`📋 ${enrichedData.length} documents récupérés`);
+    logger.debug(`📋 ${enrichedData.length} documents récupérés`);
     return enrichedData;
 
   } catch (error) {
-    console.error('❌ Erreur listage:', error);
+    logger.error('❌ Erreur listage:', error);
     throw error;
   }
 }
@@ -662,7 +663,7 @@ async function listDocuments(options = {}) {
  */
 async function deleteDocument(documentId) {
   try {
-    console.log('🗑️ Suppression document ID:', documentId);
+    logger.debug('🗑️ Suppression document ID:', documentId);
 
     const { data, error } = await supabase
       .from('documents_kine')
@@ -672,15 +673,15 @@ async function deleteDocument(documentId) {
       .single();
 
     if (error) {
-      console.error('❌ Erreur suppression:', error);
+      logger.error('❌ Erreur suppression:', error);
       throw error;
     }
 
-    console.log('✅ Document supprimé:', data.title);
+    logger.debug('✅ Document supprimé:', data.title);
     return data;
 
   } catch (error) {
-    console.error('❌ Erreur suppression document:', error);
+    logger.error('❌ Erreur suppression document:', error);
     throw error;
   }
 }
@@ -695,7 +696,7 @@ async function deleteDocument(documentId) {
  */
 async function cleanupDuplicates() {
   try {
-    console.log('🧹 Nettoyage des doublons...');
+    logger.debug('🧹 Nettoyage des doublons...');
     
     const { data: allDocs, error } = await supabase
       .from('documents_kine')
@@ -721,7 +722,7 @@ async function cleanupDuplicates() {
       }
     }
 
-    console.log(`🔍 Trouvé ${duplicates.length} doublons potentiels`);
+    logger.debug(`🔍 Trouvé ${duplicates.length} doublons potentiels`);
 
     // Suppression des doublons confirmés
     let deletedCount = 0;
@@ -731,15 +732,15 @@ async function cleanupDuplicates() {
       if (similarity > 0.95) { // 95% de similarité = doublon certain
         await deleteDocument(duplicate.id);
         deletedCount++;
-        console.log(`🗑️ Doublon supprimé: ${duplicate.title}`);
+        logger.debug(`🗑️ Doublon supprimé: ${duplicate.title}`);
       }
     }
 
-    console.log(`✅ ${deletedCount} doublons supprimés`);
+    logger.debug(`✅ ${deletedCount} doublons supprimés`);
     return { deletedCount, scannedCount: allDocs.length };
 
   } catch (error) {
-    console.error('❌ Erreur nettoyage doublons:', error);
+    logger.error('❌ Erreur nettoyage doublons:', error);
     throw error;
   }
 }
@@ -789,10 +790,10 @@ async function logSearch(query, resultsCount, patientId = null) {
       .single();
 
     if (error && error.code !== '42P01') {
-      console.warn('⚠️ Erreur log recherche:', error.message);
+      logger.warn('⚠️ Erreur log recherche:', error.message);
     }
   } catch (error) {
-    console.warn('⚠️ Log recherche ignoré:', error.message);
+    logger.warn('⚠️ Log recherche ignoré:', error.message);
   }
 }
 
@@ -801,7 +802,7 @@ async function logSearch(query, resultsCount, patientId = null) {
  */
 async function testVectorDatabase() {
   try {
-    console.log('🔧 Test base vectorielle...');
+    logger.debug('🔧 Test base vectorielle...');
 
     // Test connexion Supabase
     const { data, error } = await supabase
@@ -826,7 +827,7 @@ async function testVectorDatabase() {
       throw new Error(`Fonction search_documents error: ${searchError.message}`);
     }
 
-    console.log('✅ Base vectorielle opérationnelle');
+    logger.info('✅ Base vectorielle opérationnelle');
     return {
       status: 'success',
       supabaseConnected: true,
@@ -840,7 +841,7 @@ async function testVectorDatabase() {
     };
 
   } catch (error) {
-    console.error('❌ Erreur test base vectorielle:', error);
+    logger.error('❌ Erreur test base vectorielle:', error);
     return {
       status: 'error',
       error: error.message,

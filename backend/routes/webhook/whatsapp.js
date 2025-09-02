@@ -1,4 +1,5 @@
 // routes/webhook/whatsapp.js
+const logger = require('../../utils/logger');
 const express = require('express');
 const router = express.Router();
 
@@ -14,13 +15,13 @@ router.get('/', (req, res) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  console.log('Meta teste le webhook:', { mode, token, challenge });
+  logger.debug('Meta teste le webhook:', { mode, token, challenge });
 
   if (mode === 'subscribe' && token === WEBHOOK_VERIFY_TOKEN) {
-    console.log('✅ Webhook vérifié avec succès');
+    logger.debug('✅ Webhook vérifié avec succès');
     res.status(200).send(challenge);
   } else {
-    console.log('❌ Échec de la vérification du webhook');
+    logger.debug('❌ Échec de la vérification du webhook');
     res.sendStatus(403);
   }
 });
@@ -28,20 +29,20 @@ router.get('/', (req, res) => {
 // Réception des messages (POST) - Pas encore utilisé mais nécessaire
 router.post('/', (req, res) => {
   const body = req.body;
-  console.log('Message WhatsApp reçu:', body);
+  logger.debug('Message WhatsApp reçu:', body);
   res.status(200).send('EVENT_RECEIVED');
 });
 
 // Fonction pour envoyer ton template personnalisé PROGRAMME_KINE
 async function sendProgrammeTemplate(phoneNumber, chatLink) {
   try {
-    console.log('🔄 ENVOI TEMPLATE PROGRAMME_KINE avec lien:', chatLink);
+    logger.debug('🔄 ENVOI TEMPLATE PROGRAMME_KINE avec lien:', chatLink);
     
     // Extraire SEULEMENT le token JWT de l'URL complète
     const baseUrl = `${process.env.FRONTEND_URL}/chat/`;
     const jwtToken = chatLink.replace(baseUrl, '');
-    console.log('🔑 Token JWT extrait:', jwtToken);
-    console.log('🌐 Base URL utilisée:', baseUrl);
+    logger.debug('🔑 Token JWT extrait:', jwtToken);
+    logger.debug('🌐 Base URL utilisée:', baseUrl);
     
     const response = await fetch(WHATSAPP_API_URL, {
       method: 'POST',
@@ -78,14 +79,14 @@ async function sendProgrammeTemplate(phoneNumber, chatLink) {
     const result = await response.json();
     
     if (response.ok) {
-      console.log('✅ TEMPLATE PROGRAMME_KINE ENVOYÉ:', result);
+      logger.debug('✅ TEMPLATE PROGRAMME_KINE ENVOYÉ:', result);
       return { success: true, data: result };
     } else {
-      console.error('❌ ERREUR TEMPLATE PROGRAMME_KINE:', result);
+      logger.error('❌ ERREUR TEMPLATE PROGRAMME_KINE:', result);
       return { success: false, error: result };
     }
   } catch (error) {
-    console.error('❌ ERREUR TECHNIQUE TEMPLATE PROGRAMME_KINE:', error);
+    logger.error('❌ ERREUR TECHNIQUE TEMPLATE PROGRAMME_KINE:', error);
     return { success: false, error: error.message };
   }
 }
@@ -93,7 +94,7 @@ async function sendProgrammeTemplate(phoneNumber, chatLink) {
 // Fonction pour envoyer le template hello_world (fallback)
 async function sendHelloWorldTemplate(phoneNumber) {
   try {
-    console.log('🔄 FALLBACK - ENVOI TEMPLATE HELLO_WORLD...');
+    logger.debug('🔄 FALLBACK - ENVOI TEMPLATE HELLO_WORLD...');
     
     const response = await fetch(WHATSAPP_API_URL, {
       method: 'POST',
@@ -117,14 +118,14 @@ async function sendHelloWorldTemplate(phoneNumber) {
     const result = await response.json();
     
     if (response.ok) {
-      console.log('✅ TEMPLATE HELLO_WORLD ENVOYÉ:', result);
+      logger.debug('✅ TEMPLATE HELLO_WORLD ENVOYÉ:', result);
       return { success: true, data: result };
     } else {
-      console.error('❌ ERREUR TEMPLATE HELLO_WORLD:', result);
+      logger.error('❌ ERREUR TEMPLATE HELLO_WORLD:', result);
       return { success: false, error: result };
     }
   } catch (error) {
-    console.error('❌ ERREUR TECHNIQUE TEMPLATE HELLO_WORLD:', error);
+    logger.error('❌ ERREUR TECHNIQUE TEMPLATE HELLO_WORLD:', error);
     return { success: false, error: error.message };
   }
 }
@@ -132,7 +133,7 @@ async function sendHelloWorldTemplate(phoneNumber) {
 // Fonction pour envoyer un message texte libre (désactivée pour l'instant)
 async function sendTextMessage(phoneNumber, message) {
   try {
-    console.log('🔄 Envoi message texte...');
+    logger.debug('🔄 Envoi message texte...');
     
     const response = await fetch(WHATSAPP_API_URL, {
       method: 'POST',
@@ -153,25 +154,25 @@ async function sendTextMessage(phoneNumber, message) {
     const result = await response.json();
     
     if (response.ok) {
-      console.log('✅ Message texte envoyé:', result);
+      logger.debug('✅ Message texte envoyé:', result);
       return { success: true, data: result };
     } else {
-      console.error('❌ Erreur message texte:', result);
+      logger.error('❌ Erreur message texte:', result);
       return { success: false, error: result };
     }
   } catch (error) {
-    console.error('❌ Erreur technique message texte:', error);
+    logger.error('❌ Erreur technique message texte:', error);
     return { success: false, error: error.message };
   }
 }
 
 // Fonction principale - UTILISE TON TEMPLATE PERSONNALISÉ
 async function sendWhatsAppMessage(phoneNumber, message, chatLink = null) {
-  console.log('🚀 ENVOI TEMPLATE PROGRAMME_KINE pour:', phoneNumber);
+  logger.debug('🚀 ENVOI TEMPLATE PROGRAMME_KINE pour:', phoneNumber);
   
   // Si on a un lien de chat, utilise le template personnalisé
   if (chatLink) {
-    console.log('🔄 Tentative template personnalisé PROGRAMME_KINE...');
+    logger.debug('🔄 Tentative template personnalisé PROGRAMME_KINE...');
     const result = await sendProgrammeTemplate(phoneNumber, chatLink);
     
     if (result.success) {
@@ -179,7 +180,7 @@ async function sendWhatsAppMessage(phoneNumber, message, chatLink = null) {
     }
     
     // Si ça échoue, utilise hello_world en fallback
-    console.log('🔄 Template personnalisé échoué, fallback hello_world...');
+    logger.debug('🔄 Template personnalisé échoué, fallback hello_world...');
     return await sendHelloWorldTemplate(phoneNumber);
   }
   
@@ -189,8 +190,8 @@ async function sendWhatsAppMessage(phoneNumber, message, chatLink = null) {
 
 // Fonction pour envoyer le lien de programme - UTILISE TON TEMPLATE !
 async function sendProgramLink(phoneNumber, patientName, programLink) {
-  console.log('📱 Envoi lien programme via TEMPLATE PROGRAMME_KINE pour:', patientName);
-  console.log('🔗 Lien à envoyer:', programLink);
+  logger.debug('📱 Envoi lien programme via TEMPLATE PROGRAMME_KINE pour:', patientName);
+  logger.debug('🔗 Lien à envoyer:', programLink);
   
   // Utilise ton template personnalisé avec le lien
   return await sendWhatsAppMessage(phoneNumber, null, programLink);

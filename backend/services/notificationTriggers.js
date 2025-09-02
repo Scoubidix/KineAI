@@ -1,6 +1,7 @@
 // services/notificationTriggers.js
 const notificationService = require('./notificationService');
 const prismaService = require('./prismaService');
+const logger = require('../utils/logger');
 
 class NotificationTriggers {
 
@@ -43,7 +44,7 @@ class NotificationTriggers {
         notifications.push(programCompletedNotif.notification);
       }
 
-      console.log(`🔔 TRIGGERS: ${notifications.length} notifications créées pour validation session`);
+      logger.info(`🔔 TRIGGERS: ${notifications.length} notifications créées pour validation session`);
 
       return {
         success: true,
@@ -52,7 +53,7 @@ class NotificationTriggers {
       };
 
     } catch (error) {
-      console.error('Erreur déclenchement notifications:', error);
+      logger.error('Erreur déclenchement notifications:', error.message);
       return {
         success: false,
         error: error.message
@@ -94,7 +95,7 @@ class NotificationTriggers {
       });
 
     } catch (error) {
-      console.error('Erreur création notification validation quotidienne:', error);
+      logger.error('Erreur création notification validation quotidienne:', error.message);
       return {
         success: false,
         error: error.message
@@ -136,7 +137,7 @@ class NotificationTriggers {
       });
 
     } catch (error) {
-      console.error('Erreur création notification alerte douleur:', error);
+      logger.error('Erreur création notification alerte douleur:', error.message);
       return {
         success: false,
         error: error.message
@@ -185,14 +186,14 @@ class NotificationTriggers {
       const isHighCompletion = completionPercentage >= 90;
 
       // 🔍 DEBUG: Logs pour comprendre la logique
-      console.log(`🔍 PROGRAMME COMPLETION DEBUG:`);
-      console.log(`🔍 - Programme: ${programme.titre} (ID: ${programme.id})`);
-      console.log(`🔍 - Date début: ${programmeStartDay.toISOString().split('T')[0]}`);
-      console.log(`🔍 - Date fin: ${programmeEndDay.toISOString().split('T')[0]}`);
-      console.log(`🔍 - Date actuelle: ${currentDay.toISOString().split('T')[0]}`);
-      console.log(`🔍 - isPastEndDate: ${isPastEndDate}`);
-      console.log(`🔍 - Jours validés: ${validatedDays}/${totalDays} (${completionPercentage}%)`);
-      console.log(`🔍 - isHighCompletion: ${isHighCompletion}`);
+      logger.debug(`🔍 PROGRAMME COMPLETION DEBUG:`);
+      logger.debug(`🔍 - Programme: ${programme.titre} (ID: ${programme.id})`);
+      logger.debug(`🔍 - Date début: ${programmeStartDay.toISOString().split('T')[0]}`);
+      logger.debug(`🔍 - Date fin: ${programmeEndDay.toISOString().split('T')[0]}`);
+      logger.debug(`🔍 - Date actuelle: ${currentDay.toISOString().split('T')[0]}`);
+      logger.debug(`🔍 - isPastEndDate: ${isPastEndDate}`);
+      logger.debug(`🔍 - Jours validés: ${validatedDays}/${totalDays} (${completionPercentage}%)`);
+      logger.debug(`🔍 - isHighCompletion: ${isHighCompletion}`);
 
       if (isPastEndDate || isHighCompletion) {
         // Vérifier qu'on n'a pas déjà créé cette notification
@@ -239,15 +240,15 @@ class NotificationTriggers {
             metadata
           });
 
-          console.log(`🎉 PROGRAMME TERMINÉ: ${patientName} - ${programme.titre} - Adhérence ${validatedDays}/${totalDays} (${completionPercentage}%)`);
-          console.log(`🎉 Trigger: ${isPastEndDate ? 'Date atteinte' : 'Adhérence élevée'}`);
+          logger.info(`🎉 PROGRAMME TERMINÉ: ${patientName} - ${programme.titre} - Adhérence ${validatedDays}/${totalDays} (${completionPercentage}%)`);
+          logger.info(`🎉 Trigger: ${isPastEndDate ? 'Date atteinte' : 'Adhérence élevée'}`);
 
           return result;
         } else {
-          console.log(`⚠️ PROGRAMME TERMINÉ: Notification déjà existante pour ${programme.titre}`);
+          logger.debug(`⚠️ PROGRAMME TERMINÉ: Notification déjà existante pour ${programme.titre}`);
         }
       } else {
-        console.log(`⏳ PROGRAMME EN COURS: ${programme.titre} - ${validatedDays}/${totalDays} jours (${completionPercentage}%)`);
+        logger.debug(`⏳ PROGRAMME EN COURS: ${programme.titre} - ${validatedDays}/${totalDays} jours (${completionPercentage}%)`);
       }
 
       // Programme pas encore terminé ou notification déjà créée
@@ -263,7 +264,7 @@ class NotificationTriggers {
       };
 
     } catch (error) {
-      console.error('Erreur vérification programme terminé:', error);
+      logger.error('Erreur vérification programme terminé:', error.message);
       return {
         success: false,
         error: error.message
@@ -304,7 +305,7 @@ class NotificationTriggers {
       });
 
     } catch (error) {
-      console.error('Erreur création notification message patient:', error);
+      logger.error('Erreur création notification message patient:', error.message);
       return {
         success: false,
         error: error.message
@@ -341,7 +342,7 @@ class NotificationTriggers {
           }
         });
 
-        console.log(`🧹 CLEANUP: ${deleteResult.count} notifications dupliquées supprimées`);
+        logger.info(`🧹 CLEANUP: ${deleteResult.count} notifications dupliquées supprimées`);
       }
 
       return {
@@ -350,7 +351,7 @@ class NotificationTriggers {
       };
 
     } catch (error) {
-      console.error('Erreur nettoyage doublons notifications:', error);
+      logger.error('Erreur nettoyage doublons notifications:', error.message);
       return {
         success: false,
         error: error.message

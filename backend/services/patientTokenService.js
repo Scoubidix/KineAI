@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const logger = require('../utils/logger');
 
 // Secret spécifique aux patients (différent de Firebase)
 const PATIENT_JWT_SECRET = process.env.JWT_SECRET_PATIENT || 'your_patient_secret_here';
@@ -37,7 +38,7 @@ const generatePatientToken = (patientId, programmeId, dateFin) => {
     };
 
   } catch (error) {
-    console.error('Erreur génération token patient:', error);
+    logger.error('Erreur génération token patient:', error.message);
     return {
       success: false,
       error: 'Erreur lors de la génération du token',
@@ -84,7 +85,7 @@ const validatePatientToken = (token) => {
     };
 
   } catch (error) {
-    console.error('Erreur validation token patient:', error);
+    logger.error('Erreur validation token patient:', error.message);
 
     // Gestion des erreurs JWT spécifiques
     if (error.name === 'TokenExpiredError') {

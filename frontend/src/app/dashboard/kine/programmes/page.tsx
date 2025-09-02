@@ -17,6 +17,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { handleProgrammeCreationError } from '@/utils/handleProgrammeError';
 import { 
   Search, 
   Calendar, 
@@ -426,16 +427,11 @@ export default function ProgrammesPage() {
           router.push(`/dashboard/kine/patients/${selectedPatient.id}`);
         }, 1000);
       } else {
-        throw new Error("Erreur création programme");
+        throw res; // Passer la Response pour que handleProgrammeCreationError puisse lire le status et le JSON
       }
     } catch (err) {
-      console.error("Erreur création programme :", err);
-      toast({
-        title: "❌ Erreur lors de la création",
-        description: "Une erreur est survenue lors de la création du programme. Veuillez réessayer.",
-        variant: "destructive",
-        duration: 4000,
-      });
+      // Utiliser le gestionnaire d'erreur centralisé  
+      await handleProgrammeCreationError(err, toast);
     } finally {
       setCreatingProgramme(false);
     }
@@ -545,13 +541,6 @@ export default function ProgrammesPage() {
                   : 'Vous n\'avez pas encore créé de programmes.'
                 }
               </p>
-              {(!searchQuery && statusFilter === 'all') && (
-                <Button asChild>
-                  <Link href="/dashboard/kine/patients">
-                    Créer votre premier programme
-                  </Link>
-                </Button>
-              )}
             </CardContent>
           </Card>
         ) : (

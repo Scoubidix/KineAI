@@ -1,6 +1,7 @@
 // controllers/chatKineController.js
 const prismaService = require('../services/prismaService');
 const { generateKineResponse } = require('../services/openaiService');
+const logger = require('../utils/logger');
 
 // ========== HANDLER UNIFIÉ ==========
 const handleKineRequest = async (req, res, iaType) => {
@@ -41,7 +42,7 @@ const handleKineRequest = async (req, res, iaType) => {
     res.json(response);
 
   } catch (error) {
-    console.error(`❌ Erreur handleKineRequest (${iaType}):`, error);
+    logger.error(`❌ Erreur handleKineRequest (${iaType}):`, error);
     
     const errorResponse = error.success === false ? error : {
       success: false,
@@ -104,7 +105,7 @@ const getHistoryBasique = async (req, res) => {
       history: history 
     });
   } catch (error) {
-    console.error('Erreur getHistoryBasique:', error.message);
+    logger.error('Erreur getHistoryBasique:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
       details: error.message 
@@ -145,7 +146,7 @@ const getHistoryBiblio = async (req, res) => {
       history: history 
     });
   } catch (error) {
-    console.error('Erreur getHistoryBiblio:', error.message);
+    logger.error('Erreur getHistoryBiblio:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
       details: error.message 
@@ -186,7 +187,7 @@ const getHistoryClinique = async (req, res) => {
       history: history 
     });
   } catch (error) {
-    console.error('Erreur getHistoryClinique:', error.message);
+    logger.error('Erreur getHistoryClinique:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
       details: error.message 
@@ -227,7 +228,7 @@ const getHistoryAdministrative = async (req, res) => {
       history: history 
     });
   } catch (error) {
-    console.error('Erreur getHistoryAdministrative:', error.message);
+    logger.error('Erreur getHistoryAdministrative:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
       details: error.message 
@@ -268,7 +269,7 @@ const clearHistoryBasique = async (req, res) => {
       message: 'Historique IA Basique supprimé' 
     });
   } catch (error) {
-    console.error('Erreur clearHistoryBasique:', error.message);
+    logger.error('Erreur clearHistoryBasique:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
       details: error.message 
@@ -308,7 +309,7 @@ const clearHistoryBiblio = async (req, res) => {
       message: 'Historique IA Bibliographique supprimé' 
     });
   } catch (error) {
-    console.error('Erreur clearHistoryBiblio:', error.message);
+    logger.error('Erreur clearHistoryBiblio:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
       details: error.message 
@@ -348,7 +349,7 @@ const clearHistoryClinique = async (req, res) => {
       message: 'Historique IA Clinique supprimé' 
     });
   } catch (error) {
-    console.error('Erreur clearHistoryClinique:', error.message);
+    logger.error('Erreur clearHistoryClinique:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
       details: error.message 
@@ -388,7 +389,7 @@ const clearHistoryAdministrative = async (req, res) => {
       message: 'Historique IA Administrative supprimé' 
     });
   } catch (error) {
-    console.error('Erreur clearHistoryAdministrative:', error.message);
+    logger.error('Erreur clearHistoryAdministrative:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
       details: error.message 

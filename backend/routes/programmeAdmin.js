@@ -1,4 +1,5 @@
 // routes/programmeAdmin.js
+const logger = require('../utils/logger');
 const express = require('express');
 const router = express.Router();
 const prismaService = require('../services/prismaService');
@@ -63,7 +64,7 @@ router.post('/:id/archive', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur archivage programme:', error);
+    logger.error('Erreur archivage programme:', error);
     res.status(500).json({
       success: false,
       error: 'Erreur lors de l\'archivage du programme',
@@ -117,7 +118,7 @@ router.delete('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur suppression programme:', error);
+    logger.error('Erreur suppression programme:', error);
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la suppression du programme',
@@ -165,7 +166,7 @@ router.get('/archived', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur récupération programmes archivés:', error);
+    logger.error('Erreur récupération programmes archivés:', error);
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la récupération des programmes archivés',
@@ -192,7 +193,7 @@ router.post('/cleanup/finished', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur archivage manuel programmes terminés:', error);
+    logger.error('Erreur archivage manuel programmes terminés:', error);
     res.status(500).json({
       success: false,
       error: 'Erreur lors de l\'archivage des programmes terminés',
@@ -219,7 +220,7 @@ router.post('/cleanup/archived', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur nettoyage manuel programmes archivés:', error);
+    logger.error('Erreur nettoyage manuel programmes archivés:', error);
     res.status(500).json({
       success: false,
       error: 'Erreur lors du nettoyage des programmes archivés',
@@ -277,7 +278,7 @@ router.get('/stats', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur récupération statistiques:', error);
+    logger.error('Erreur récupération statistiques:', error);
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la récupération des statistiques',

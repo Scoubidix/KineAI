@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../utils/logger');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 
@@ -53,7 +54,7 @@ router.get('/:planType/availability', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur vérification disponibilité plan:', error);
+    logger.error('Erreur vérification disponibilité plan:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -88,7 +89,7 @@ router.get('/:planType/remaining-slots', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur récupération slots restants:', error);
+    logger.error('Erreur récupération slots restants:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -137,7 +138,7 @@ router.get('/stats', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur récupération stats plans:', error);
+    logger.error('Erreur récupération stats plans:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -193,7 +194,7 @@ router.post('/check-pionnier-eligibility', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur vérification éligibilité Pionnier:', error);
+    logger.error('Erreur vérification éligibilité Pionnier:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });

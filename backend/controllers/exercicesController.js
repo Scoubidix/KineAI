@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const prismaService = require('../services/prismaService');
 
 // 🔐 Toutes les routes supposent que req.uid est défini par le middleware authenticate
@@ -40,7 +41,7 @@ exports.getPublicExercices = async (req, res) => {
 
     res.json(sortedExercices);
   } catch (err) {
-    console.error("Erreur récupération exercices publics :", err);
+    logger.error("Erreur récupération exercices publics :", err);
     res.status(500).json({ error: "Erreur récupération exercices publics" });
   }
 };
@@ -73,7 +74,7 @@ exports.getPrivateExercices = async (req, res) => {
 
     res.json(sortedExercices);
   } catch (err) {
-    console.error("Erreur récupération exercices privés :", err);
+    logger.error("Erreur récupération exercices privés :", err);
     res.status(500).json({ error: "Erreur récupération exercices privés" });
   }
 };
@@ -113,7 +114,7 @@ exports.getAllTags = async (req, res) => {
 
     res.json(uniqueTags);
   } catch (err) {
-    console.error("Erreur récupération tags :", err);
+    logger.error("Erreur récupération tags :", err);
     res.status(500).json({ error: "Erreur récupération tags" });
   }
 };
@@ -145,7 +146,7 @@ exports.createExercice = async (req, res) => {
 
     res.status(201).json(newExercice);
   } catch (err) {
-    console.error("Erreur création exercice :", err);
+    logger.error("Erreur création exercice :", err);
     res.status(500).json({ error: "Erreur création exercice" });
   }
 };
@@ -185,7 +186,7 @@ exports.updateExercice = async (req, res) => {
 
     res.json(updated);
   } catch (err) {
-    console.error("Erreur modification exercice :", err);
+    logger.error("Erreur modification exercice :", err);
     res.status(500).json({ error: "Erreur modification exercice" });
   }
 };
@@ -240,7 +241,7 @@ exports.deleteExercice = async (req, res) => {
 
     res.status(204).send();
   } catch (err) {
-    console.error("Erreur suppression exercice :", err);
+    logger.error("Erreur suppression exercice :", err);
     res.status(500).json({ error: "Erreur suppression exercice" });
   }
 };

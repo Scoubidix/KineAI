@@ -1,4 +1,5 @@
 require('dotenv').config()
+const logger = require('./utils/logger');
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -6,6 +7,22 @@ const prismaService = require('./services/prismaService');
 
 // Import du nouveau système d'archivage
 const { startProgramCleanupCron } = require('./utils/chatCleanup');
+
+// 🚦 NOUVEAU : Import des rate limiters
+const {
+  stripePaymentLimiter,
+  stripeSubscriptionLimiter,
+  stripeWebhookLimiter,
+  gptLimiter,
+  gptHeavyLimiter,
+  generalLimiter,
+  authLimiter,
+  whatsappSendLimiter,
+  documentSearchLimiter,
+  rgpdExportLimiter,
+  rgpdDeleteLimiter,
+  rateLimitLogger
+} = require('./middleware/rateLimiter');
 
 // Import des routes existantes
 const kinesRoutes = require('./routes/kines');
@@ -34,6 +51,9 @@ const subscriptionRoutes = require('./routes/subscription');
 const checkoutRoutes = require('./routes/checkout');
 const plansRoutes = require('./routes/plans');
 
+// 🔒 NOUVEAU RGPD : Import des routes RGPD
+const rgpdRoutes = require('./routes/rgpd');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -58,7 +78,7 @@ const corsOptions = {
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log(`❌ CORS: Origine non autorisée: ${origin}`);
+      logger.info(`❌ CORS: Origine non autorisée: ${origin}`);
       callback(new Error('Non autorisé par CORS'));
     }
   },
@@ -70,12 +90,15 @@ const corsOptions = {
 
 // 💳 IMPORTANT : Webhook Stripe AVANT les middlewares JSON
 // Le webhook Stripe a besoin du raw body, donc on le place avant express.json()
-app.use('/webhook', stripeWebhookRoutes);
+app.use('/webhook', stripeWebhookLimiter, stripeWebhookRoutes);
 
 // Middleware - Augmenté pour les PDFs
 app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+
+// 🚦 Rate limiter logger seulement (globalLimiter supprimé pour navigation libre)
+app.use(rateLimitLogger);
 
 // ========== ROUTES DE TEST - POUR DEBUG ==========
 
@@ -114,7 +137,7 @@ app.get('/api/test-db', async (req, res) => {
       database: 'PostgreSQL + Prisma + Supabase Vector + Notifications + Stripe + Paywall + 4 Tables IA'
     });
   } catch (error) {
-    console.error('Database connection error:', error);
+    logger.error('Database connection error:', error);
     res.status(500).json({
       error: 'Database connection failed',
       details: error.message,
@@ -447,7 +470,7 @@ app.get('/debug/connections', async (req, res) => {
 // Route pour forcer le nettoyage des connexions
 app.post('/debug/cleanup-connections', async (req, res) => {
   try {
-    console.log('🧹 Nettoyage forcé des connexions demandé via API');
+    logger.info('🧹 Nettoyage forcé des connexions demandé via API');
     await prismaService.forceDisconnect();
     
     // Petit délai pour laisser les connexions se fermer
@@ -497,26 +520,73 @@ app.get('/debug/all-imports', (req, res) => {
 // NOUVEAU : Webhook WhatsApp
 app.use('/webhook/whatsapp', whatsappWebhook);
 
-// 🔔 NOUVEAU : Routes notifications
+// 🔔 NOUVEAU : Routes notifications (LIBRES - navigation)
 app.use('/api/notifications', notificationRoutes);
 
-// 💳 NOUVEAU PAYWALL : Routes système paywall
-app.use('/api/kine', subscriptionRoutes);  // /api/kine/subscription, /api/kine/usage, etc.
-app.use('/api/stripe', checkoutRoutes);    // /api/stripe/create-checkout, etc.
-app.use('/api/plans', plansRoutes);        // /api/plans/PIONNIER/availability, etc.
+// 💳 NOUVEAU PAYWALL : Routes système paywall (LIBRES - navigation)
+app.use('/api/kine', subscriptionRoutes);  // /api/kine/subscription, /api/kine/usage, etc. - LIBRES
+app.use('/api/stripe', stripePaymentLimiter, checkoutRoutes);    // 🚦 Rate limiter paiements (5/min)
+app.use('/api/plans', plansRoutes);        // /api/plans/PIONNIER/availability, etc. - LIBRES
 
-// Routes existantes
-app.use('/kine', kinesRoutes);
-app.use('/patients', patientsRoutes);
-app.use('/programmes', programmeRoutes);
-app.use('/admin/programmes', programmeAdminRoutes);
-app.use('/exercices', exerciceRoutes);
-app.use('/api/test', testOpenAIRoutes);
-app.use('/api/patient', patientChatRoutes);
-app.use('/api/chat/kine', chatKineRoutes); // ✅ Route existante avec les 4 nouvelles IA
+// 🔒 NOUVEAU RGPD : Routes de conformité RGPD (rate limiting sélectif)
+app.use('/api/rgpd', (req, res, next) => {
+  if (req.method === 'POST' && req.path === '/export-data') {
+    // 🚦 Export RGPD : 1 export par heure par utilisateur (ultra sécurisé)
+    return rgpdExportLimiter(req, res, next);
+  } else if (req.method === 'POST' && req.path === '/delete-account') {
+    // 🚦 Suppression compte : 3 tentatives par jour (ultra sécurisé)
+    return rgpdDeleteLimiter(req, res, next);
+  }
+  // ✅ Autres routes RGPD (téléchargement, stats) : LIBRES
+  next();
+}, rgpdRoutes);
 
-// NOUVELLE ROUTE VECTORIELLE
-app.use('/api/documents', documentsRoutes);
+// ========== ROUTES MÉTIER - RATE LIMITING SÉLECTIF ==========
+
+// Routes de navigation (LIBRES)
+app.use('/kine', kinesRoutes);              // Profile, adhérence, sessions - LIBRES
+app.use('/patients', patientsRoutes);       // CRUD patients - LIBRES
+
+// Programmes : Rate limiting sélectif par route
+app.use('/programmes', (req, res, next) => {
+  if (req.method === 'POST' && req.path.endsWith('/send-whatsapp')) {
+    // 🚦 Envoi WhatsApp : 1 par programme/heure
+    return whatsappSendLimiter(req, res, next);
+  } else if (req.method === 'POST' && !req.path.includes('/send-whatsapp') && !req.path.includes('/generate-link')) {
+    // 🚦 Création de programmes : Rate limiting heavy (génération IA - 5/5min)
+    return gptHeavyLimiter(req, res, next);
+  }
+  // ✅ Autres routes (GET, generate-link, etc.) : LIBRES
+  next();
+}, programmeRoutes);
+
+app.use('/admin/programmes', programmeAdminRoutes);  // Admin - LIBRES
+app.use('/exercices', exerciceRoutes);               // CRUD exercices - LIBRES
+app.use('/api/test', testOpenAIRoutes);             // Tests - LIBRES
+
+// ========== ROUTES IA/CHAT - RATE LIMITED ==========
+
+// 🚦 Patient chat : Même limite que les kinés IA (10/min)
+app.use('/api/patient', gptLimiter, patientChatRoutes);
+
+// 🚦 IA Kinés : Rate limiting sélectif (POST seulement)
+app.use('/api/chat/kine', (req, res, next) => {
+  if (req.method === 'POST' && (req.path.includes('/ia-') || req.path.includes('/search-documents'))) {
+    // 🚦 Appels IA : Rate limiting (10/min)
+    return gptLimiter(req, res, next);
+  }
+  // ✅ GET historiques, statuts, etc. : LIBRES
+  next();
+}, chatKineRoutes);
+
+// 🚦 Documents : Rate limiting recherche vectorielle (10/min)
+app.use('/api/documents', (req, res, next) => {
+  if (req.method === 'POST' && (req.path.includes('/search') || req.path.includes('/search/optimized'))) {
+    return documentSearchLimiter(req, res, next);
+  }
+  // ✅ Autres routes documents (GET stats, etc.) : LIBRES
+  next();
+}, documentsRoutes);
 
 // Routes de test pour le système d'archivage
 app.get('/test-archive-finished', async (req, res) => {
@@ -609,6 +679,11 @@ app.get('/', (req, res) => {
       plansAvailability: '/api/plans/PIONNIER/availability',
       stripeCheckout: '/api/stripe/create-checkout',
       stripePortal: '/api/stripe/create-portal',
+      // 🔒 ENDPOINTS RGPD
+      rgpdExportData: '/api/rgpd/export-data',
+      rgpdDownload: '/api/rgpd/download/:token',
+      rgpdDeleteAccount: '/api/rgpd/delete-account',
+      rgpdStats: '/api/rgpd/stats [DEV]',
       // ENDPOINTS DEBUG
       debugPrisma: '/debug/prisma-imports',
       debugConnections: '/debug/connections',
@@ -622,37 +697,40 @@ startProgramCleanupCron();
 
 // Gestion gracieuse de l'arrêt
 process.on('SIGINT', async () => {
-  console.log('🛑 Arrêt du serveur...');
+  logger.info('🛑 Arrêt du serveur...');
   await prismaService.disconnect();
   process.exit(0);
 });
 
 // Démarrage du serveur
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 KineAI Backend running on port ${PORT}`);
-  console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-  console.log(`🤖 IA Basique: /api/chat/kine/ia-basique`);
-  console.log(`🤖 IA Bibliographique: /api/chat/kine/ia-biblio`);
-  console.log(`🤖 IA Clinique: /api/chat/kine/ia-clinique`);
-  console.log(`🤖 IA Administrative: /api/chat/kine/ia-administrative`);
-  console.log(`🤖 Statut 4 IA: /api/chat/kine/ia-status`);
-  console.log(`🤖 Test 4 IA: /api/test-ia`);
-  console.log(`📄 Documents API: /api/documents`);
-  console.log(`📊 Vector Test: /api/test-vector`);
-  console.log(`📱 WhatsApp Test: /api/test-whatsapp`);
-  console.log(`📱 WhatsApp Webhook: /webhook/whatsapp`);
-  console.log(`🔒 CORS Test: /api/test-cors`);
-  console.log(`🔔 Notifications: /api/notifications`);
-  console.log(`🔔 Test Notifications: /api/test-notifications`);
-  console.log(`💳 Stripe Test: /api/test-stripe`);
-  console.log(`💳 Stripe Webhook: /webhook/stripe`);
-  console.log(`🔒 Paywall Subscription: /api/kine/subscription`);
-  console.log(`🔒 Paywall Usage: /api/kine/usage`);
-  console.log(`🔒 Plans Availability: /api/plans/PIONNIER/availability`);
-  console.log(`💳 Stripe Checkout: /api/stripe/create-checkout`);
-  console.log(`🔒 Paywall Test: /api/test-paywall`);
-  console.log(`🔍 Debug Prisma: /debug/prisma-imports`);
-  console.log(`📊 Debug Connections: /debug/connections`);
-  console.log(`🔒 CORS configuré pour: https://monassistantkine.vercel.app, localhost:3000, localhost:3001, fichiers locaux`);
+  logger.info(`🚀 KineAI Backend running on port ${PORT}`);
+  logger.info(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`🔗 Health check: http://localhost:${PORT}/health`);
+  logger.info(`🤖 IA Basique: /api/chat/kine/ia-basique`);
+  logger.info(`🤖 IA Bibliographique: /api/chat/kine/ia-biblio`);
+  logger.info(`🤖 IA Clinique: /api/chat/kine/ia-clinique`);
+  logger.info(`🤖 IA Administrative: /api/chat/kine/ia-administrative`);
+  logger.info(`🤖 Statut 4 IA: /api/chat/kine/ia-status`);
+  logger.info(`🤖 Test 4 IA: /api/test-ia`);
+  logger.info(`📄 Documents API: /api/documents`);
+  logger.info(`📊 Vector Test: /api/test-vector`);
+  logger.info(`📱 WhatsApp Test: /api/test-whatsapp`);
+  logger.info(`📱 WhatsApp Webhook: /webhook/whatsapp`);
+  logger.info(`🔒 CORS Test: /api/test-cors`);
+  logger.info(`🔔 Notifications: /api/notifications`);
+  logger.info(`🔔 Test Notifications: /api/test-notifications`);
+  logger.info(`💳 Stripe Test: /api/test-stripe`);
+  logger.info(`💳 Stripe Webhook: /webhook/stripe`);
+  logger.info(`🔒 Paywall Subscription: /api/kine/subscription`);
+  logger.info(`🔒 Paywall Usage: /api/kine/usage`);
+  logger.info(`🔒 Plans Availability: /api/plans/PIONNIER/availability`);
+  logger.info(`💳 Stripe Checkout: /api/stripe/create-checkout`);
+  logger.info(`🔒 Paywall Test: /api/test-paywall`);
+  logger.info(`🔒 Export RGPD: /api/rgpd/export-data`);
+  logger.info(`🔒 Téléchargement RGPD: /api/rgpd/download/:token`);
+  logger.info(`🔒 Suppression compte: /api/rgpd/delete-account`);
+  logger.info(`🔍 Debug Prisma: /debug/prisma-imports`);
+  logger.info(`📊 Debug Connections: /debug/connections`);
+  logger.info(`🔒 CORS configuré pour: https://monassistantkine.vercel.app, localhost:3000, localhost:3001, fichiers locaux`);
 });

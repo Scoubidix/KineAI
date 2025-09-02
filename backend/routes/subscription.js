@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../utils/logger');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const { authenticate } = require('../middleware/authenticate');
@@ -67,7 +68,7 @@ router.get('/subscription', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur récupération abonnement:', error);
+    logger.error('Erreur récupération abonnement:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -143,7 +144,7 @@ router.get('/usage', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur récupération usage:', error);
+    logger.error('Erreur récupération usage:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -218,7 +219,7 @@ router.get('/limits', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur récupération limites:', error);
+    logger.error('Erreur récupération limites:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -286,7 +287,7 @@ router.post('/usage/refresh', authenticate, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur refresh usage:', error);
+    logger.error('Erreur refresh usage:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });

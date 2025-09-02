@@ -1,5 +1,6 @@
 const prismaService = require('../services/prismaService');
 
+const logger = require('../utils/logger');
 // 🔐 Toutes les routes supposent que req.uid est défini par le middleware authenticate
 
 // GET /patients
@@ -17,12 +18,15 @@ exports.getPatients = async (req, res) => {
     }
 
     const patients = await prisma.patient.findMany({
-      where: { kineId: kine.id },
+      where: { 
+        kineId: kine.id,
+        isActive: true // Filtrer les patients supprimés
+      },
     });
 
     res.json(patients);
   } catch (err) {
-    console.error("Erreur récupération patients :", err);
+    logger.error("Erreur récupération patients :", err);
     res.status(500).json({ error: "Erreur récupération patients" });
   }
 };
@@ -47,6 +51,7 @@ exports.getPatientById = async (req, res) => {
       where: {
         id: parseInt(id),
         kineId: kine.id, // Assure que le kiné a bien accès à ce patient
+        isActive: true // Filtrer les patients supprimés
       },
     });
 
@@ -56,7 +61,7 @@ exports.getPatientById = async (req, res) => {
 
     res.json(patient);
   } catch (err) {
-    console.error("Erreur récupération patient :", err);
+    logger.error("Erreur récupération patient :", err);
     res.status(500).json({ error: "Erreur récupération patient" });
   }
 };
@@ -98,7 +103,7 @@ exports.createPatient = async (req, res) => {
 
     res.status(201).json(newPatient);
   } catch (err) {
-    console.error("Erreur création patient :", err);
+    logger.error("Erreur création patient :", err);
     res.status(500).json({ error: "Erreur création patient" });
   }
 };
@@ -132,25 +137,30 @@ exports.updatePatient = async (req, res) => {
 
     res.json(updatedPatient);
   } catch (err) {
-    console.error("Erreur update patient :", err);
+    logger.error("Erreur update patient :", err);
     res.status(500).json({ error: "Erreur modification patient" });
   }
 };
 
-// DELETE /patients/:id
+// DELETE /patients/:id (SOFT DELETE)
 exports.deletePatient = async (req, res) => {
   const { id } = req.params;
 
   try {
     const prisma = prismaService.getInstance();
     
-    await prisma.patient.delete({
+    // Soft delete au lieu de suppression définitive
+    await prisma.patient.update({
       where: { id: parseInt(id) },
+      data: {
+        isActive: false,
+        deletedAt: new Date()
+      }
     });
 
     res.status(200).json({ message: "Patient supprimé" });
   } catch (err) {
-    console.error("Erreur suppression patient :", err);
+    logger.error("Erreur suppression patient :", err);
     res.status(500).json({ error: "Erreur suppression patient" });
   }
 };

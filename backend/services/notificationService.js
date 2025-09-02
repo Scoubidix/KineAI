@@ -1,5 +1,6 @@
 // services/notificationService.js
 const prismaService = require('./prismaService');
+const logger = require('../utils/logger');
 
 class NotificationService {
   
@@ -46,7 +47,7 @@ class NotificationService {
         }
       });
 
-      console.log(`📢 NOTIFICATION: ${type} créée pour kiné ${kineId} - ${title}`);
+      logger.info(`📢 NOTIFICATION: ${type} créée pour kiné ${kineId} - ${title}`);
       
       return {
         success: true,
@@ -54,7 +55,7 @@ class NotificationService {
       };
 
     } catch (error) {
-      console.error('Erreur création notification:', error);
+      logger.error('Erreur création notification:', error.message);
       return {
         success: false,
         error: error.message
@@ -161,7 +162,7 @@ class NotificationService {
       };
 
     } catch (error) {
-      console.error('Erreur récupération notifications:', error);
+      logger.error('Erreur récupération notifications:', error.message);
       return {
         success: false,
         error: error.message
@@ -202,7 +203,7 @@ class NotificationService {
       };
 
     } catch (error) {
-      console.error('Erreur comptage notifications non lues:', error);
+      logger.error('Erreur comptage notifications non lues:', error.message);
       return {
         success: false,
         error: error.message
@@ -261,7 +262,7 @@ class NotificationService {
       };
 
     } catch (error) {
-      console.error('Erreur marquage notification lue:', error);
+      logger.error('Erreur marquage notification lue:', error.message);
       return {
         success: false,
         error: error.message
@@ -305,7 +306,7 @@ class NotificationService {
       };
 
     } catch (error) {
-      console.error('Erreur marquage toutes notifications lues:', error);
+      logger.error('Erreur marquage toutes notifications lues:', error.message);
       return {
         success: false,
         error: error.message
@@ -332,7 +333,7 @@ class NotificationService {
         }
       });
 
-      console.log(`🧹 CLEANUP: ${result.count} notifications supprimées (+ de ${daysOld} jours)`);
+      logger.info(`🧹 CLEANUP: ${result.count} notifications supprimées (+ de ${daysOld} jours)`);
 
       return {
         success: true,
@@ -340,7 +341,7 @@ class NotificationService {
       };
 
     } catch (error) {
-      console.error('Erreur nettoyage notifications:', error);
+      logger.error('Erreur nettoyage notifications:', error.message);
       return {
         success: false,
         error: error.message
@@ -411,7 +412,7 @@ class NotificationService {
       };
 
     } catch (error) {
-      console.error('Erreur statistiques notifications:', error);
+      logger.error('Erreur statistiques notifications:', error.message);
       return {
         success: false,
         error: error.message

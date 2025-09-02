@@ -2,6 +2,7 @@
 // Service pour gérer les interactions avec l'API Stripe
 
 const Stripe = require('stripe');
+const logger = require('../utils/logger');
 
 class StripeService {
   constructor() {
@@ -102,7 +103,7 @@ class StripeService {
       return session;
 
     } catch (error) {
-      console.error('Erreur création session checkout:', error);
+      logger.error('Erreur création session checkout:', error.message);
       throw error;
     }
   }
@@ -171,7 +172,7 @@ class StripeService {
       };
       
     } catch (error) {
-      console.error('Erreur vérification disponibilité plan:', error);
+      logger.error('Erreur vérification disponibilité plan:', error.message);
       return { available: false, remaining: 0, error: error.message };
     }
   }
@@ -205,7 +206,7 @@ class StripeService {
       return session;
 
     } catch (error) {
-      console.error('Erreur création portail client:', error);
+      logger.error('Erreur création portail client:', error.message);
       throw new Error('Impossible de créer le portail client');
     }
   }
@@ -225,7 +226,7 @@ class StripeService {
       );
       return event;
     } catch (error) {
-      console.error('Erreur validation webhook:', error);
+      logger.error('Erreur validation webhook:', error.message);
       throw new Error('Webhook invalide');
     }
   }
@@ -299,7 +300,7 @@ class StripeService {
       return updatedSubscription;
 
     } catch (error) {
-      console.error('Erreur changement de plan:', error);
+      logger.error('Erreur changement de plan:', error.message);
       throw error;
     }
   }
@@ -337,7 +338,7 @@ class StripeService {
       return subscription;
 
     } catch (error) {
-      console.error('Erreur annulation abonnement:', error);
+      logger.error('Erreur annulation abonnement:', error.message);
       throw error;
     }
   }
@@ -369,7 +370,7 @@ class StripeService {
       return subscription;
 
     } catch (error) {
-      console.error('Erreur réactivation abonnement:', error);
+      logger.error('Erreur réactivation abonnement:', error.message);
       throw error;
     }
   }
@@ -403,7 +404,7 @@ class StripeService {
       return invoices;
 
     } catch (error) {
-      console.error('Erreur récupération factures:', error);
+      logger.error('Erreur récupération factures:', error.message);
       throw error;
     }
   }
@@ -418,7 +419,7 @@ class StripeService {
       const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
       return subscription;
     } catch (error) {
-      console.error('Erreur récupération abonnement:', error);
+      logger.error('Erreur récupération abonnement:', error.message);
       throw new Error('Impossible de récupérer l\'abonnement');
     }
   }

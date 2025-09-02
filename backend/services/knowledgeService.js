@@ -1,5 +1,6 @@
 // services/knowledgeService.js
 const { searchDocumentsOptimized } = require('./embeddingService');
+const logger = require('../utils/logger');
 
 class KnowledgeService {
   
@@ -14,12 +15,12 @@ class KnowledgeService {
         ...options
       };
 
-      console.log(`🔍 Recherche documentaire pour: "${message.substring(0, 50)}..."`);
+      logger.debug(`🔍 Recherche documentaire pour: "${message.substring(0, 50)}..."`); 
       
       const searchResults = await searchDocumentsOptimized(message, searchOptions);
       
       if (!searchResults || searchResults.length === 0) {
-        console.log('⚠️ Aucun document trouvé');
+        logger.debug('⚠️ Aucun document trouvé');
         return {
           allDocuments: [],
           selectedSources: [],
@@ -49,7 +50,7 @@ class KnowledgeService {
         lowThresholdResults: searchResults.filter(doc => doc.similarity <= 0.7).length
       };
 
-      console.log(`✅ ${scoredDocuments.length} documents scorés, ${selectedSources.length} sources sélectionnées`);
+      logger.debug(`✅ ${scoredDocuments.length} documents scorés, ${selectedSources.length} sources sélectionnées`);
       
       return {
         allDocuments: scoredDocuments,
@@ -58,7 +59,7 @@ class KnowledgeService {
       };
 
     } catch (error) {
-      console.error('❌ Erreur recherche documentaire:', error.message);
+      logger.error('❌ Erreur recherche documentaire:', error.message);
       
       return {
         allDocuments: [],

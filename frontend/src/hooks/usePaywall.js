@@ -7,20 +7,14 @@ export const usePaywall = () => {
   const [modalContext, setModalContext] = useState('');
   const { subscription, usage, isLoading } = useSubscription();
 
-  console.log('🎯 usePaywall called - subscription:', subscription);
-  console.log('📊 usePaywall - usage:', usage);
 
   // Vérifier si une fonctionnalité est accessible selon le plan
   const canAccessFeature = (feature) => {
-    console.log(`🔍 canAccessFeature called for: ${feature}`);
-    
     if (isLoading || !subscription) {
-      console.log('❌ No subscription or loading');
       return false;
     }
 
     const currentPlan = subscription.planType || 'FREE';
-    console.log(`📋 Current plan: ${currentPlan}`);
     
     switch (feature) {
       case 'CREATE_PROGRAMME':
@@ -33,43 +27,29 @@ export const usePaywall = () => {
           'EXPERT': Infinity
         };
         const canCreate = usage.activeProgrammes < limits[currentPlan];
-        console.log(`🏥 CREATE_PROGRAMME - activeProgrammes: ${usage.activeProgrammes}, limit: ${limits[currentPlan]}, can create: ${canCreate}`);
         return canCreate;
 
       case 'AI_CONVERSATIONNEL':
-        const hasConversationnel = ['DECLIC', 'PRATIQUE', 'PIONNIER', 'EXPERT'].includes(currentPlan);
-        console.log(`💬 AI_CONVERSATIONNEL - plan: ${currentPlan}, has access: ${hasConversationnel}`);
-        return hasConversationnel;
+        return ['DECLIC', 'PRATIQUE', 'PIONNIER', 'EXPERT'].includes(currentPlan);
 
       case 'AI_BIBLIOTHEQUE':
-        const hasBiblio = ['PRATIQUE', 'PIONNIER', 'EXPERT'].includes(currentPlan);
-        console.log(`📚 AI_BIBLIOTHEQUE - plan: ${currentPlan}, has access: ${hasBiblio}`);
-        return hasBiblio;
+        return ['PRATIQUE', 'PIONNIER', 'EXPERT'].includes(currentPlan);
 
       case 'AI_CLINIQUE':
-        const hasClinique = ['PRATIQUE', 'PIONNIER', 'EXPERT'].includes(currentPlan);
-        console.log(`🏥 AI_CLINIQUE - plan: ${currentPlan}, has access: ${hasClinique}`);
-        return hasClinique;
+        return ['PRATIQUE', 'PIONNIER', 'EXPERT'].includes(currentPlan);
 
       case 'AI_ADMINISTRATIF':
-        const hasAdministratif = ['PIONNIER', 'EXPERT'].includes(currentPlan);
-        console.log(`📋 AI_ADMINISTRATIF - plan: ${currentPlan}, has access: ${hasAdministratif}`);
-        return hasAdministratif;
+        return ['PIONNIER', 'EXPERT'].includes(currentPlan);
 
       default:
-        console.log(`❓ Unknown feature: ${feature}`);
         return false;
     }
   };
 
   // Afficher le paywall avec contexte
   const showPaywall = (feature, context = '') => {
-    console.log(`🚨 showPaywall called for feature: ${feature}, context: ${context}`);
-    
     setModalContext(context);
     setIsModalOpen(true);
-    
-    console.log('✅ Modal should open now - isModalOpen set to true');
     
     // Toast informatif
     const messages = {
@@ -91,7 +71,6 @@ export const usePaywall = () => {
 
   // Fermer le modal
   const closeModal = () => {
-    console.log('❌ closeModal called');
     setIsModalOpen(false);
     setModalContext('');
   };
@@ -153,7 +132,6 @@ export const usePaywall = () => {
     }
   };
 
-  console.log(`📊 usePaywall state - isModalOpen: ${isModalOpen}, modalContext: ${modalContext}`);
 
   return {
     canAccessFeature,

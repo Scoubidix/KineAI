@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../utils/logger');
 const router = express.Router();
 const prismaService = require('../services/prismaService');
 const { authenticatePatient, checkTokenExpiry, logPatientAccess } = require('../middleware/patientAuth');
@@ -31,7 +32,7 @@ const getProgramChatHistory = async (patientId, programmeId) => {
       timestamp: msg.createdAt
     }));
   } catch (error) {
-    console.error('Erreur récupération historique chat:', error);
+    logger.error('Erreur récupération historique chat:', error);
     return [];
   }
 };
@@ -49,7 +50,7 @@ const saveChatMessage = async (patientId, programmeId, message, role) => {
       }
     });
   } catch (error) {
-    console.error('Erreur sauvegarde message chat:', error);
+    logger.error('Erreur sauvegarde message chat:', error);
     throw error;
   }
 };
@@ -144,7 +145,7 @@ router.post('/chat/:token',
       res.json(response);
 
     } catch (error) {
-      console.error('Erreur route chat patient:', error);
+      logger.error('Erreur route chat patient:', error);
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors du chat',
@@ -268,7 +269,7 @@ router.get('/welcome/:token',
       res.json(response);
 
     } catch (error) {
-      console.error('Erreur route welcome patient:', error);
+      logger.error('Erreur route welcome patient:', error);
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la génération du message d\'accueil',
@@ -306,7 +307,7 @@ router.get('/chat-history/:token',
       });
 
     } catch (error) {
-      console.error('Erreur récupération historique chat:', error);
+      logger.error('Erreur récupération historique chat:', error);
       res.status(500).json({
         success: false,
         error: 'Erreur lors de la récupération de l\'historique',
@@ -356,7 +357,7 @@ router.get('/programme/:token',
       res.json(response);
 
     } catch (error) {
-      console.error('Erreur route programme patient:', error);
+      logger.error('Erreur route programme patient:', error);
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la récupération du programme',
@@ -477,7 +478,7 @@ router.get('/session-status/:token',
       res.json(response);
 
     } catch (error) {
-      console.error('Erreur route session-status patient:', error);
+      logger.error('Erreur route session-status patient:', error);
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la vérification du statut',
@@ -620,13 +621,13 @@ router.post('/validate-session/:token',
         );
 
         if (notificationResult.success) {
-          console.log(`🔔 NOTIFICATIONS: ${notificationResult.count} notifications créées pour validation`);
+          logger.debug(`🔔 NOTIFICATIONS: ${notificationResult.count} notifications créées pour validation`);
         } else {
-          console.error('Erreur déclenchement notifications:', notificationResult.error);
+          logger.error('Erreur déclenchement notifications:', notificationResult.error);
         }
       } catch (notifError) {
         // Ne pas faire échouer la validation si les notifications échouent
-        console.error('Erreur notifications (non bloquant):', notifError);
+        logger.error('Erreur notifications (non bloquant):', notifError);
       }
 
       const response = {
@@ -662,7 +663,7 @@ router.post('/validate-session/:token',
       res.status(201).json(response);
 
     } catch (error) {
-      console.error('Erreur route validate-session patient:', error);
+      logger.error('Erreur route validate-session patient:', error);
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la validation',

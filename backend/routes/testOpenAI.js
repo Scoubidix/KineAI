@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../utils/logger');
 const router = express.Router();
 const { generateChatResponse, generateWelcomeMessage } = require('../services/openaiService');
 const { generateChatUrl, validatePatientToken } = require('../services/patientTokenService');
@@ -120,7 +121,7 @@ router.post('/test-chat', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Erreur test chat:', error);
+    logger.error('Erreur test chat:', error);
     res.status(500).json({
       success: false,
       error: "Erreur serveur",
@@ -182,7 +183,7 @@ router.get('/test-welcome', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur test welcome:', error);
+    logger.error('Erreur test welcome:', error);
     res.status(500).json({
       success: false,
       error: "Erreur serveur", 
@@ -244,7 +245,7 @@ router.get('/test-welcome/:patientId', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur test welcome:', error);
+    logger.error('Erreur test welcome:', error);
     res.status(500).json({
       success: false,
       error: "Erreur serveur", 

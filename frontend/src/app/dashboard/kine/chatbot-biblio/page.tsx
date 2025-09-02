@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { BookOpen, History, Trash2, Send, Loader2, CheckCircle, Target } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
+import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
+import { usePaywall } from '@/hooks/usePaywall';
 
 interface ChatMessage {
   id: number;
@@ -42,6 +44,9 @@ export default function KineChatbotBiblioPage() {
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [chatMessages, setChatMessages] = useState<HistoryMessage[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  
+  // Hook paywall pour vérifier les permissions
+  const { isLoading: paywallLoading, canAccessFeature, subscription } = usePaywall();
   
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
   
@@ -316,9 +321,31 @@ export default function KineChatbotBiblioPage() {
     });
   };
 
+  // ✅ Attendre la fin du chargement des permissions avant d'afficher la page
+  if (paywallLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Vérification de vos permissions...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="max-w-6xl mx-auto p-4">
+        
+        {/* Header Upgrade si pas d'accès */}
+        <ChatUpgradeHeader 
+          assistantType="BIBLIOTHEQUE"
+          canAccessFeature={canAccessFeature}
+          isLoading={paywallLoading}
+          subscription={subscription}
+        />
         
         {/* Header */}
         <div className="mb-6">
@@ -342,10 +369,15 @@ export default function KineChatbotBiblioPage() {
         </div>
 
         {/* Zone de chat principale */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          
-          {/* Chat */}
-          <div className="lg:col-span-3">
+        <ChatDisabledOverlay 
+          assistantType="BIBLIOTHEQUE"
+          canAccessFeature={canAccessFeature}
+          isLoading={paywallLoading}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            
+            {/* Chat */}
+            <div className="lg:col-span-3">
             <Card className="shadow-md min-h-[60vh] max-h-[75vh] flex flex-col">
               
               <CardContent 
@@ -615,8 +647,9 @@ export default function KineChatbotBiblioPage() {
               </CardContent>
             </Card>
 
+            </div>
           </div>
-        </div>
+        </ChatDisabledOverlay>
       </div>
     </AppLayout>
   );

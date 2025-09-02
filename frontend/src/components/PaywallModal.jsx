@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,6 @@ import {
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { useSubscription } from '../hooks/useSubscription';
 import { getAuth } from 'firebase/auth';
 import { 
   Crown, 
@@ -28,35 +27,31 @@ import { plans } from '../config/plans';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-export const PaywallModal = ({ isOpen, onClose }) => {
-  const { subscription } = useSubscription();
+export const PaywallModal = ({ isOpen, onClose, subscription }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [pioneerSlotsRemaining, setPioneerSlotsRemaining] = useState(null);
 
-  console.log('🚀 Modal ouvert:', isOpen);
-  console.log('📊 Plan actuel:', subscription?.planType);
 
-  // Récupérer les places restantes pour le plan Pionnier
-  useEffect(() => {
-    const fetchPioneerSlots = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/plans/PIONNIER/remaining-slots`);
-        const data = await response.json();
-        setPioneerSlotsRemaining(data.remaining);
-        console.log('🏆 Places Pionnier restantes:', data.remaining);
-      } catch (error) {
-        console.error('❌ Erreur slots Pionnier:', error);
-      }
-    };
-
-    if (isOpen) {
-      fetchPioneerSlots();
+  // Récupérer les places restantes pour le plan Pionnier (optimisé)
+  const fetchPioneerSlots = useCallback(async () => {
+    if (!isOpen) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/plans/PIONNIER/remaining-slots`);
+      const data = await response.json();
+      setPioneerSlotsRemaining(data.remaining);
+    } catch (error) {
+      console.error('Erreur slots Pionnier:', error);
+      setPioneerSlotsRemaining(0); // Fallback sécurisé
     }
   }, [isOpen]);
 
-  // Créer une session de checkout
-  const handleUpgrade = async (planType) => {
-    console.log('🛒 Création commande pour plan:', planType);
+  useEffect(() => {
+    fetchPioneerSlots();
+  }, [fetchPioneerSlots]);
+
+  // Créer une session de checkout (optimisé)
+  const handleUpgrade = useCallback(async (planType) => {
     
     const user = getAuth().currentUser;
     if (!user) {
@@ -81,16 +76,14 @@ export const PaywallModal = ({ isOpen, onClose }) => {
         },
         body: JSON.stringify({ 
           planType,
-          successUrl: `${window.location.origin}/dashboard/kine?upgrade=success`,
+          successUrl: `${window.location.origin}/dashboard/kine/upgrade/success?upgrade=success`,
           cancelUrl: `${window.location.origin}/dashboard/kine?upgrade=cancel`
         })
       });
 
       const data = await response.json();
-      console.log('📡 Réponse Stripe:', response.status, data);
 
       if (response.ok && data.url) {
-        console.log('✅ Redirection vers Stripe:', data.url);
         window.location.href = data.url;
       } else {
         throw new Error(data.error || 'Erreur checkout');
@@ -105,7 +98,7 @@ export const PaywallModal = ({ isOpen, onClose }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []); // Pas de dépendances car utilise seulement des APIs externes
 
   // Vérifier si le plan est disponible
   const isPlanAvailable = (planType) => {
@@ -284,7 +277,6 @@ export const PaywallModal = ({ isOpen, onClose }) => {
                     {/* Bouton d'action */}
                     <Button
                       onClick={() => {
-                        console.log(`🖱️ Click sur: ${plan.type}`);
                         handleUpgrade(plan.type);
                       }}
                       disabled={isCurrentPlan || !isAvailable || isLoading}

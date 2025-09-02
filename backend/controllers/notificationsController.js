@@ -1,5 +1,6 @@
 // controllers/notificationsController.js
 const notificationService = require('../services/notificationService');
+const logger = require('../utils/logger');
 
 const notificationsController = {
 
@@ -51,7 +52,7 @@ const notificationsController = {
       });
 
     } catch (error) {
-      console.error('Erreur contrôleur getNotifications:', error);
+      logger.error('Erreur contrôleur getNotifications:', error);
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la récupération des notifications',
@@ -91,7 +92,7 @@ const notificationsController = {
       });
 
     } catch (error) {
-      console.error('Erreur contrôleur getUnreadCount:', error);
+      logger.error('Erreur contrôleur getUnreadCount:', error);
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors du comptage des notifications',
@@ -143,7 +144,7 @@ const notificationsController = {
       });
 
     } catch (error) {
-      console.error('Erreur contrôleur markAsRead:', error);
+      logger.error('Erreur contrôleur markAsRead:', error);
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors du marquage de la notification',
@@ -184,7 +185,7 @@ const notificationsController = {
       });
 
     } catch (error) {
-      console.error('Erreur contrôleur markAllAsRead:', error);
+      logger.error('Erreur contrôleur markAllAsRead:', error);
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors du marquage des notifications',
@@ -224,7 +225,7 @@ const notificationsController = {
       });
 
     } catch (error) {
-      console.error('Erreur contrôleur getStats:', error);
+      logger.error('Erreur contrôleur getStats:', error);
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la récupération des statistiques',
@@ -275,7 +276,7 @@ const notificationsController = {
       });
 
     } catch (error) {
-      console.error('Erreur contrôleur cleanup:', error);
+      logger.error('Erreur contrôleur cleanup:', error);
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors du nettoyage',
@@ -318,7 +319,7 @@ const notificationsController = {
       });
 
     } catch (error) {
-      console.error('Erreur contrôleur getTypes:', error);
+      logger.error('Erreur contrôleur getTypes:', error);
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la récupération des types',
