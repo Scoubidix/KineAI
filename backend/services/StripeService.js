@@ -423,6 +423,81 @@ class StripeService {
       throw new Error('Impossible de récupérer l\'abonnement');
     }
   }
+
+  /**
+   * Valider une IP Stripe avec debug détaillé
+   * @param {Object} req - Request Express
+   * @returns {Object} - Résultat de validation avec debug info
+   */
+  validateStripeIP(req) {
+    const STRIPE_IPS = [
+      '3.18.12.63', '3.130.192.231', '13.235.14.237', '13.235.122.149',
+      '18.211.135.69', '35.154.171.200', '52.15.183.38', '54.88.130.119',
+      '54.88.130.237', '54.187.174.169', '54.187.205.235', '54.187.216.72'
+    ];
+
+    // Récupérer tous les headers IP possibles
+    const headers = {
+      'x-forwarded-for': req.headers['x-forwarded-for']?.split(',')[0]?.trim(),
+      'x-real-ip': req.headers['x-real-ip'],
+      'cf-connecting-ip': req.headers['cf-connecting-ip'],
+      'x-client-ip': req.headers['x-client-ip'],
+      'x-cluster-client-ip': req.headers['x-cluster-client-ip'],
+      'forwarded': req.headers['forwarded'],
+      'direct-ip': req.ip,
+      'connection-ip': req.connection?.remoteAddress,
+      'socket-ip': req.socket?.remoteAddress
+    };
+
+    logger.debug('🔍 StripeService - Headers IP complets:', headers);
+
+    // En développement, bypass avec logs complets
+    if (process.env.NODE_ENV === 'development') {
+      logger.warn('🔓 StripeService - Mode dev, validation IP bypassée');
+      logger.warn('📋 Headers pour debug production:', headers);
+      return {
+        valid: true,
+        ip: headers['x-forwarded-for'] || headers['direct-ip'] || '127.0.0.1',
+        source: 'development-bypass',
+        environment: 'development',
+        headers,
+        stripeIPs: STRIPE_IPS
+      };
+    }
+
+    // Tester chaque header
+    const headerPriority = [
+      'x-forwarded-for', 'x-real-ip', 'cf-connecting-ip', 
+      'x-client-ip', 'x-cluster-client-ip', 
+      'direct-ip', 'connection-ip', 'socket-ip'
+    ];
+
+    for (const headerName of headerPriority) {
+      const ip = headers[headerName];
+      if (ip && STRIPE_IPS.includes(ip)) {
+        logger.warn(`✅ StripeService - IP validée: ${ip} (${headerName})`);
+        return {
+          valid: true,
+          ip,
+          source: headerName,
+          environment: 'production',
+          headers
+        };
+      }
+    }
+
+    logger.error('🚫 StripeService - Aucune IP Stripe valide');
+    logger.error('📋 Headers analysés:', headers);
+    logger.error('📝 IPs Stripe attendues:', STRIPE_IPS);
+
+    return {
+      valid: false,
+      environment: 'production',
+      headers,
+      stripeIPs: STRIPE_IPS,
+      reason: 'no_valid_stripe_ip_found'
+    };
+  }
 }
 
 // Export singleton

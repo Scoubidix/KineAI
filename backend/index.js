@@ -92,6 +92,11 @@ const corsOptions = {
 // Le webhook Stripe a besoin du raw body, donc on le place avant express.json()
 app.use('/webhook', stripeWebhookLimiter, stripeWebhookRoutes);
 
+// 🌐 CONFIGURATION PROXY : Trust proxy pour récupérer les vraies IPs
+// Nécessaire pour les webhooks Stripe derrière ngrok/load balancers
+app.set('trust proxy', true);
+logger.warn('🔧 Configuration proxy activée pour récupération IP correcte');
+
 // Middleware - Augmenté pour les PDFs
 app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: '50mb' }));

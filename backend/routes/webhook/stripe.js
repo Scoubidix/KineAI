@@ -17,26 +17,118 @@ const STRIPE_IPS = [
 ];
 
 /**
- * Middleware de vérification IP pour les webhooks Stripe
+ * Validation IP intelligente avec fallback sur plusieurs headers
+ * @param {Object} req - Request Express
+ * @returns {Object} - {valid: boolean, ip: string, source: string, headers: Object}
+ */
+const validateIPWithFallback = (req) => {
+  // Récupérer tous les headers IP possibles
+  const headers = {
+    'x-forwarded-for': req.headers['x-forwarded-for']?.split(',')[0]?.trim(),
+    'x-real-ip': req.headers['x-real-ip'],
+    'cf-connecting-ip': req.headers['cf-connecting-ip'], // Cloudflare
+    'x-forwarded-proto': req.headers['x-forwarded-proto'], // Info protocole
+    'direct-ip': req.ip,
+    'connection-ip': req.connection?.remoteAddress,
+    'socket-ip': req.socket?.remoteAddress
+  };
+
+  logger.debug('🔍 Headers IP debug complet:', {
+    headers,
+    userAgent: req.headers['user-agent'],
+    host: req.headers.host
+  });
+
+  // En développement, on skip la vérification mais on affiche les headers pour debug
+  if (process.env.NODE_ENV === 'development') {
+    logger.warn('🔓 Dev mode - Validation IP bypassée');
+    logger.warn('📋 Headers disponibles pour production:', headers);
+    return { 
+      valid: true, 
+      ip: headers['x-forwarded-for'] || headers['direct-ip'] || '127.0.0.1', 
+      source: 'development-bypass',
+      headers 
+    };
+  }
+
+  // Fonction de normalisation et validation d'une IP
+  const normalizeAndValidateIP = (ip) => {
+    if (!ip) return { normalized: null, valid: false };
+    
+    // Normaliser les IPs IPv6 locales vers IPv4
+    let normalizedIP = ip;
+    if (ip === '::1' || ip === '::ffff:127.0.0.1') {
+      normalizedIP = '127.0.0.1';
+      logger.debug(`🔄 IP normalisée: ${ip} → ${normalizedIP}`);
+    }
+    
+    // Nettoyer les préfixes IPv6-mapped IPv4
+    if (ip.startsWith('::ffff:')) {
+      normalizedIP = ip.replace('::ffff:', '');
+      logger.debug(`🔄 IP nettoyée IPv6-mapped: ${ip} → ${normalizedIP}`);
+    }
+    
+    // Validation Stripe
+    const isValidStripe = STRIPE_IPS.some(stripeIP => 
+      normalizedIP === stripeIP || normalizedIP.includes(stripeIP)
+    );
+    
+    return { normalized: normalizedIP, valid: isValidStripe, original: ip };
+  };
+
+  // Test chaque header dans l'ordre de priorité
+  const headerPriority = [
+    'x-forwarded-for',    // Le plus courant pour les proxies
+    'x-real-ip',          // Nginx
+    'cf-connecting-ip',   // Cloudflare
+    'direct-ip',          // Express req.ip
+    'connection-ip',      // Connection directe
+    'socket-ip'           // Socket niveau bas
+  ];
+
+  logger.warn('🔍 Début validation IP Stripe...');
+  
+  for (const headerName of headerPriority) {
+    const ip = headers[headerName];
+    if (ip) {
+      const validation = normalizeAndValidateIP(ip);
+      logger.debug(`🔍 Test ${headerName}: ${ip} → ${validation.normalized} (Stripe: ${validation.valid})`);
+      
+      if (validation.valid) {
+        logger.warn(`✅ IP Stripe validée: ${validation.normalized} (source: ${headerName}, original: ${ip})`);
+        return { valid: true, ip: validation.normalized, originalIP: ip, source: headerName, headers };
+      }
+    }
+  }
+
+  // Aucune IP valide trouvée
+  logger.error('🚫 Aucune IP Stripe valide trouvée dans les headers');
+  logger.error('📋 Headers analysés:', headers);
+  return { valid: false, headers };
+};
+
+/**
+ * Middleware de vérification IP pour les webhooks Stripe avec fallback intelligent
  */
 const verifyStripeIP = (req, res, next) => {
-  const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'];
+  const validation = validateIPWithFallback(req);
   
-  // En développement, on skip la vérification IP
-  if (process.env.NODE_ENV === 'development') {
-    logger.warn(`🔓 Dev mode - Skipping IP verification for ${clientIP}`);
-    return next();
+  if (!validation.valid) {
+    logger.error(`🚫 Webhook rejété - IP non autorisée`);
+    logger.error('🔍 Headers reçus:', validation.headers);
+    logger.error('📝 IPs Stripe autorisées:', STRIPE_IPS.slice(0, 3), '...');
+    return res.status(403).json({ 
+      error: 'IP non autorisée',
+      headers: Object.keys(validation.headers),
+      timestamp: new Date().toISOString()
+    });
   }
   
-  // Vérifier si l'IP est dans la liste Stripe
-  const isValidIP = STRIPE_IPS.some(stripeIP => clientIP.includes(stripeIP));
+  logger.warn(`✅ Webhook autorisé - IP: ${validation.ip} (${validation.source})`);
   
-  if (!isValidIP) {
-    logger.error(`🚫 Webhook rejété - IP non autorisée: ${clientIP}`);
-    return res.status(403).json({ error: 'IP non autorisée' });
-  }
+  // Ajouter les infos de validation à la request pour logging ultérieur
+  req.stripeValidation = validation;
   
-  logger.warn(`✅ Webhook autorisé - IP validée: ${clientIP}`);
   next();
 };
 
@@ -47,8 +139,10 @@ router.use('/stripe', express.raw({ type: 'application/json' }));
 router.post('/stripe', verifyStripeIP, async (req, res) => {
   const signature = req.get('stripe-signature');
   const eventId = req.headers['stripe-event-id'] || 'unknown';
+  const validation = req.stripeValidation || { ip: 'unknown', source: 'unknown' };
   
-  logger.warn(`🎯 Webhook Stripe reçu - ID: ${eventId} - IP: ${req.ip}`);
+  logger.warn(`🎯 Webhook Stripe reçu - ID: ${eventId} - IP: ${validation.ip} (${validation.source})`);
+  logger.debug('🔍 Validation détaillée:', validation);
   
   try {
     // Valider le webhook avec Stripe
