@@ -58,7 +58,7 @@ const PLANS = {
     id: 'PRATIQUE',
     type: 'PRATIQUE',
     name: 'Pratique', 
-    price: 19,
+    price: 29,
     currency: 'EUR',
     interval: 'month',
     stripePriceId: 'price_1Rtpv9EHFuBHSJxk20JM0SqR',

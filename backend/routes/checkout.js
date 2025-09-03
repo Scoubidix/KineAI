@@ -6,15 +6,20 @@ const StripeService = require('../services/StripeService');
 
 const prisma = new PrismaClient();
 
-// POST /api/stripe/create-checkout - Créer une session de checkout Stripe
+// POST /api/stripe/create-checkout - Créer une session de checkout Stripe OU changer de plan
 router.post('/create-checkout', authenticate, async (req, res) => {
   try {
     const { planType, successUrl, cancelUrl } = req.body;
     
-    // Récupérer le kiné via son UID Firebase
+    // Récupérer le kiné avec ses infos d'abonnement
     const kine = await prisma.kine.findUnique({
       where: { uid: req.uid },
-      select: { id: true }
+      select: { 
+        id: true, 
+        subscriptionId: true, 
+        planType: true,
+        subscriptionStatus: true 
+      }
     });
 
     if (!kine) {
@@ -36,6 +41,51 @@ router.post('/create-checkout', authenticate, async (req, res) => {
     const defaultSuccessUrl = successUrl || `${process.env.FRONTEND_URL}/dashboard/kine/upgrade/success?upgrade=success`;
     const defaultCancelUrl = cancelUrl || `${process.env.FRONTEND_URL}/dashboard/kine?upgrade=cancel`;
 
+    // 🔥 NOUVEAU : Vérifier si un abonnement existe déjà
+    const hasActiveSubscription = kine.subscriptionId && 
+      ['ACTIVE', 'TRIALING', 'PAST_DUE'].includes(kine.subscriptionStatus);
+
+    if (hasActiveSubscription) {
+      // Changement de plan pour abonnement existant
+      console.log(`🔄 Changement de plan détecté: ${kine.planType} → ${planType}`);
+      
+      // Vérifier si c'est vraiment un changement (éviter les doublons)
+      if (kine.planType === planType) {
+        return res.status(400).json({ 
+          error: 'Vous avez déjà ce plan',
+          currentPlan: kine.planType 
+        });
+      }
+      
+      try {
+        const result = await StripeService.changePlan(kineId, planType);
+        
+        console.log(`✅ Plan changé avec succès: ${kine.planType} → ${planType}`);
+        
+        // Retourner une URL de succès directement (pas de checkout)
+        return res.json({
+          url: `${defaultSuccessUrl}?change=success&from=${kine.planType}&to=${planType}`,
+          type: 'plan_change',
+          subscription: {
+            id: result.id,
+            status: result.status,
+            previousPlan: kine.planType,
+            newPlan: planType
+          }
+        });
+        
+      } catch (changePlanError) {
+        console.error('Erreur changement de plan:', changePlanError);
+        return res.status(400).json({ 
+          error: 'Erreur lors du changement de plan',
+          details: changePlanError.message 
+        });
+      }
+    }
+    
+    // Nouveau checkout pour utilisateurs sans abonnement actif
+    console.log(`🆕 Nouveau checkout pour utilisateur ${kine.planType || 'FREE'}`);
+
     try {
       // Créer la session via le service Stripe
       const session = await StripeService.createCheckoutSession(
@@ -47,7 +97,8 @@ router.post('/create-checkout', authenticate, async (req, res) => {
 
       res.json({
         url: session.url,
-        sessionId: session.id
+        sessionId: session.id,
+        type: 'new_checkout'
       });
 
     } catch (stripeError) {

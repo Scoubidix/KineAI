@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   Tabs,
@@ -37,6 +38,8 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { sendPasswordReset } from "@/lib/auth-utils";
 import { useToast } from "@/hooks/use-toast"; // Test réactivé
+import { useSubscription } from "@/hooks/useSubscription";
+import { PLANS, getPlanByType } from "@/config/plans";
 import { 
   Settings, 
   BarChart2, 
@@ -74,7 +77,9 @@ import {
   Database,
   CheckCircle,
   BookOpen,
-  Stethoscope
+  Stethoscope,
+  CreditCard,
+  AlertTriangle
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -84,6 +89,7 @@ import { app } from '@/lib/firebase/config';
 import { PlanIndicator } from './PlanIndicator';
 import { RGPDExportModal } from './RGPDExportModal';
 import { RGPDDeleteModal } from './RGPDDeleteModal';
+import { PaywallModal } from './PaywallModal';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -129,8 +135,16 @@ function SettingsModal() {
   // 🔒 NOUVEAU : États pour les modales RGPD
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  
+  // 💳 NOUVEAU : État pour la modal Paywall
+  const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
+  
+  // 🚫 NOUVEAU : État pour la modal de résiliation
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   const { toast } = useToast();
+  const { subscription, usage, isLoading: subscriptionLoading, refreshSubscription } = useSubscription();
 
   // Charger les données du kiné au montage
   React.useEffect(() => {
@@ -298,6 +312,69 @@ function SettingsModal() {
     handleThemeChange(savedTheme);
   }, []);
 
+  // Fonction pour résilier l'abonnement
+  const handleCancelSubscription = async () => {
+    setCancelLoading(true);
+    
+    try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      
+      if (!user) {
+        toast({
+          title: "Erreur",
+          description: "Vous devez être connecté",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const token = await user.getIdToken();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stripe/cancel-subscription`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          cancelAtPeriodEnd: true // Pas de résiliation immédiate
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const endDate = subscription?.currentPeriodEnd 
+          ? new Date(subscription.currentPeriodEnd).toLocaleDateString('fr-FR')
+          : 'la fin de la période en cours';
+          
+        toast({
+          title: "Résiliation programmée",
+          description: `Votre abonnement sera résilié le ${endDate}. Vous gardez l'accès jusqu'à cette date.`,
+          className: "bg-orange-50 border-orange-200 text-orange-800",
+          duration: 8000
+        });
+        
+        // Fermer la modal et rafraîchir les données
+        setIsCancelModalOpen(false);
+        await refreshSubscription();
+        
+      } else {
+        throw new Error(data.details || data.error || 'Erreur lors de la résiliation');
+      }
+
+    } catch (error) {
+      console.error('Erreur résiliation:', error);
+      toast({
+        title: "Erreur de résiliation",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -342,6 +419,13 @@ function SettingsModal() {
               >
                 <Palette className="h-4 w-4 mr-2" />
                 Interface
+              </TabsTrigger>
+              <TabsTrigger
+                value="subscription"
+                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                Mon Abonnement
               </TabsTrigger>
               <TabsTrigger
                 value="compliance"
@@ -608,6 +692,168 @@ function SettingsModal() {
                 </div>
               </TabsContent>
 
+              {/* Mon Abonnement */}
+              <TabsContent value="subscription" className="m-0 p-6 space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Mon Abonnement</h3>
+                  
+                  {subscriptionLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                      <span className="ml-2">Chargement de votre abonnement...</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Informations essentielles */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-base">Plan actuel</CardTitle>
+                          <CardDescription>
+                            Informations sur votre abonnement en cours
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="flex items-center justify-between p-4 border rounded-lg">
+                            <div>
+                              <div className="flex items-center gap-3">
+                                <h4 className="font-semibold text-lg">
+                                  {subscription ? getPlanByType(subscription.planType).name : 'Aucun abonnement'}
+                                </h4>
+                                <Badge 
+                                  variant={subscription ? 'default' : 'secondary'}
+                                  className={subscription ? 'bg-green-100 text-green-800' : ''}
+                                >
+                                  {subscription ? 'Actif' : 'Gratuit'}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {subscription ? 
+                                  `${getPlanByType(subscription.planType).price}€/mois` : 
+                                  'Plan gratuit limité'
+                                }
+                              </p>
+                              {subscription && subscription.currentPeriodEnd && (
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  Prochain paiement : {new Date(subscription.currentPeriodEnd).toLocaleDateString('fr-FR')}
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium">
+                                Statut : <span className={subscription ? 'text-green-600' : 'text-orange-600'}>
+                                  {subscription ? 'Payé' : 'Gratuit'}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Gestion des paiements */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-base">Gestion des paiements</CardTitle>
+                          <CardDescription>
+                            Gérez vos factures et moyens de paiement
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="flex items-center justify-between p-3 border rounded-lg">
+                            <div>
+                              <p className="font-medium">Historique des factures</p>
+                              <p className="text-sm text-muted-foreground">
+                                Téléchargez vos factures et relevés
+                              </p>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                // TODO: Implémenter téléchargement factures
+                                toast({
+                                  title: "Bientôt disponible",
+                                  description: "Le téléchargement des factures sera disponible prochainement."
+                                });
+                              }}
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Télécharger
+                            </Button>
+                          </div>
+                          
+                          <div className="flex items-center justify-between p-3 border rounded-lg">
+                            <div>
+                              <p className="font-medium">Gérer la facturation</p>
+                              <p className="text-sm text-muted-foreground">
+                                Modifier vos informations de paiement via Stripe
+                              </p>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                // TODO: Ouvrir portail Stripe
+                                toast({
+                                  title: "Bientôt disponible", 
+                                  description: "Le portail de facturation sera disponible prochainement."
+                                });
+                              }}
+                            >
+                              <CreditCard className="h-4 w-4 mr-2" />
+                              Gérer
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Actions d'abonnement */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-base">Actions d'abonnement</CardTitle>
+                          <CardDescription>
+                            Modifier ou résilier votre abonnement
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="flex items-center justify-between p-3 border rounded-lg border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+                            <div>
+                              <p className="font-medium text-blue-900 dark:text-blue-100">Passer au plan supérieur</p>
+                              <p className="text-sm text-blue-700 dark:text-blue-300">
+                                Débloquez plus de fonctionnalités et augmentez vos limites
+                              </p>
+                            </div>
+                            <Button 
+                              size="sm"
+                              onClick={() => setIsPaywallModalOpen(true)}
+                            >
+                              Upgrader
+                            </Button>
+                          </div>
+                          
+                          {subscription && (
+                            <div className="flex items-center justify-between p-3 border rounded-lg border-red-200">
+                              <div>
+                                <p className="font-medium text-red-900">Résilier mon abonnement</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Votre accès restera actif jusqu'à la fin de la période
+                                </p>
+                              </div>
+                              <Button 
+                                variant="destructive" 
+                                size="sm"
+                                onClick={() => setIsCancelModalOpen(true)}
+                              >
+                                Résilier
+                              </Button>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
               {/* Conformité RGPD */}
               <TabsContent value="compliance" className="m-0 p-6 space-y-6">
                 <div>
@@ -662,39 +908,18 @@ function SettingsModal() {
                       <CardHeader>
                         <CardTitle className="text-base">Conservation des données</CardTitle>
                         <CardDescription>
-                          Durée de conservation de vos données médicales
+                          Durée de conservation de vos données
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div>
                           <Label>Durée de conservation</Label>
-                          <Select value={dataRetention} onValueChange={setDataRetention}>
-                            <SelectTrigger className="w-full mt-1">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="1-year">
-                                <div className="flex items-center">
-                                  <Database className="h-4 w-4 mr-2" />
-                                  1 an
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="5-years">
-                                <div className="flex items-center">
-                                  <Database className="h-4 w-4 mr-2" />
-                                  5 ans (recommandé)
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="10-years">
-                                <div className="flex items-center">
-                                  <Database className="h-4 w-4 mr-2" />
-                                  10 ans
-                                </div>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="flex items-center mt-1 p-3 border rounded-lg bg-muted/20">
+                            <Database className="h-4 w-4 mr-2" />
+                            <span>10 ans</span>
+                          </div>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Conforme aux obligations légales de conservation des données de santé
+                            Conforme aux obligations légales de conservation des données
                           </p>
                         </div>
                       </CardContent>
@@ -707,40 +932,7 @@ function SettingsModal() {
                           Gérez vos consentements pour le traitement des données
                         </CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Données de santé</p>
-                            <p className="text-sm text-muted-foreground">
-                              Traitement des données médicales des patients
-                            </p>
-                          </div>
-                          <Badge variant="secondary">Accepté ✓</Badge>
-                        </div>
-                        
-                        <Separator />
-                        
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Analytics</p>
-                            <p className="text-sm text-muted-foreground">
-                              Amélioration de l'application via des statistiques anonymes
-                            </p>
-                          </div>
-                          <Switch defaultChecked />
-                        </div>
-                        
-                        <Separator />
-                        
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Communications marketing</p>
-                            <p className="text-sm text-muted-foreground">
-                              Recevoir des informations sur les nouvelles fonctionnalités
-                            </p>
-                          </div>
-                          <Switch />
-                        </div>
+                      <CardContent>
                       </CardContent>
                     </Card>
                   </div>
@@ -763,6 +955,85 @@ function SettingsModal() {
         onClose={() => setIsDeleteModalOpen(false)}
         kineData={kineData}
       />
+      
+      {/* 💳 NOUVEAU : Modal Paywall pour upgrade */}
+      <PaywallModal
+        isOpen={isPaywallModalOpen}
+        onClose={() => setIsPaywallModalOpen(false)}
+        subscription={subscription}
+      />
+      
+      {/* 🚫 NOUVEAU : Modal de confirmation de résiliation */}
+      <Dialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-destructive">
+              Résilier votre abonnement ?
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              Cette action programmera la résiliation de votre abonnement
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Informations sur l'abonnement actuel */}
+            {subscription && (
+              <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="h-5 w-5 text-red-600" />
+                  <span className="font-medium text-red-900">
+                    Plan {getPlanByType(subscription.planType).name}
+                  </span>
+                </div>
+                <div className="text-sm text-red-700 space-y-1">
+                  <p>• Résiliation programmée pour le {subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('fr-FR') : 'fin de période'}</p>
+                  <p>• Accès maintenu jusqu'à cette date</p>
+                  <p>• Aucun remboursement (facturation au prorata)</p>
+                  <p>• Vous pourrez réactiver à tout moment avant l'expiration</p>
+                </div>
+              </div>
+            )}
+
+            {/* Avertissement */}
+            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-orange-800">
+                  <p className="font-medium">Êtes-vous sûr de vouloir résilier ?</p>
+                  <p className="mt-1">Cette action peut être annulée avant la date d'expiration en contactant le support.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Boutons */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsCancelModalOpen(false)}
+                className="flex-1"
+                disabled={cancelLoading}
+              >
+                Annuler
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleCancelSubscription}
+                disabled={cancelLoading}
+                className="flex-1"
+              >
+                {cancelLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Résiliation...
+                  </>
+                ) : (
+                  'Confirmer la résiliation'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

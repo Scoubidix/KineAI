@@ -287,14 +287,23 @@ class StripeService {
       // Récupérer l'abonnement actuel
       const subscription = await this.stripe.subscriptions.retrieve(kine.subscriptionId);
       
-      // Modifier l'abonnement
-      const updatedSubscription = await this.stripe.subscriptions.update(kine.subscriptionId, {
+      // Préparer les données de mise à jour
+      const updateData = {
         items: [{
           id: subscription.items.data[0].id,
           price: newPriceId,
         }],
         proration_behavior: 'create_prorations',
-      });
+      };
+      
+      // 🔧 SÉCURISÉ : Réactiver seulement si résiliation programmée
+      if (subscription.cancel_at_period_end === true) {
+        updateData.cancel_at_period_end = false;
+        logger.info(`🔄 Réactivation de l'abonnement ${kine.subscriptionId} lors du changement de plan`);
+      }
+      
+      // Modifier l'abonnement
+      const updatedSubscription = await this.stripe.subscriptions.update(kine.subscriptionId, updateData);
       
       await prisma.$disconnect();
       return updatedSubscription;
