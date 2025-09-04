@@ -5,6 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const admin = require('../firebase/firebase');
 const logger = require('../utils/logger');
+const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../utils/logSanitizer');
 
 class RGPDService {
   constructor() {
@@ -20,7 +21,7 @@ class RGPDService {
     try {
       const prisma = prismaService.getInstance();
       
-      logger.warn(`🔍 Début de l'export RGPD pour le kiné: ${kineUid}`);
+      logger.warn(`🔍 Début de l'export RGPD pour le kiné: ${sanitizeUID(kineUid)}`);
 
       // 1. Récupérer le profil kiné
       const kine = await prisma.kine.findUnique({
@@ -31,7 +32,7 @@ class RGPDService {
         return { success: false, error: 'Kiné non trouvé' };
       }
 
-      logger.warn(`✅ Kiné trouvé: ${kine.firstName} ${kine.lastName}`);
+      logger.warn(`✅ Kiné trouvé: ${sanitizeName(kine.firstName)} ${sanitizeName(kine.lastName)}`);
 
       // 2. Collecter toutes les données associées
       const [
@@ -325,7 +326,7 @@ class RGPDService {
       const { data, kineUid } = exportInfo;
       const filename = `export_rgpd_${data.profilKine.informationsPersonnelles.prenom}_${data.profilKine.informationsPersonnelles.nom}_${new Date().toISOString().split('T')[0]}.zip`;
 
-      logger.warn(`📦 Génération du ZIP pour: ${kineUid}`);
+      logger.warn(`📦 Génération du ZIP pour: ${sanitizeUID(kineUid)}`);
 
       // Configuration des headers pour le téléchargement
       res.setHeader('Content-Type', 'application/zip');
@@ -400,7 +401,7 @@ Pour toute question concernant vos données: contact@monassistantkine.com
       // Nettoyer le token après utilisation
       this.exportTokens.delete(token);
 
-      logger.warn(`✅ Export ZIP généré et envoyé pour: ${kineUid}`);
+      logger.warn(`✅ Export ZIP généré et envoyé pour: ${sanitizeUID(kineUid)}`);
 
     } catch (error) {
       logger.error('❌ Erreur lors du téléchargement:', error.message);
@@ -447,7 +448,7 @@ Pour toute question concernant vos données: contact@monassistantkine.com
       });
 
       if (recentExports.length === 0) {
-        logger.debug(`🔍 Aucun export récent trouvé pour ${kineUid}`);
+        logger.debug(`🔍 Aucun export récent trouvé pour ${sanitizeUID(kineUid)}`);
         return { 
           hasRecentExport: false, 
           message: 'Aucun export de données récent (< 7 jours)' 
@@ -455,7 +456,7 @@ Pour toute question concernant vos données: contact@monassistantkine.com
       }
 
       const lastExport = recentExports[0];
-      logger.debug(`✅ Export récent trouvé pour ${kineUid} - Date: ${lastExport.generatedAt}`);
+      logger.debug(`✅ Export récent trouvé pour ${sanitizeUID(kineUid)} - Date: ${lastExport.generatedAt}`);
 
       return {
         hasRecentExport: true,
@@ -548,7 +549,7 @@ Pour toute question concernant vos données: contact@monassistantkine.com
     try {
       const prisma = prismaService.getInstance();
       
-      logger.warn(`🗑️ Début de la suppression de compte pour: ${kineUid}`);
+      logger.warn(`🗑️ Début de la suppression de compte pour: ${sanitizeUID(kineUid)}`);
 
       // 1. Vérifier que le kiné existe et est en plan FREE
       const kine = await prisma.kine.findUnique({
@@ -567,7 +568,7 @@ Pour toute question concernant vos données: contact@monassistantkine.com
         };
       }
 
-      logger.warn(`✅ Kiné vérifié: ${kine.firstName} ${kine.lastName} (Plan: ${kine.planType || 'FREE'})`);
+      logger.warn(`✅ Kiné vérifié: ${sanitizeName(kine.firstName)} ${sanitizeName(kine.lastName)} (Plan: ${kine.planType || 'FREE'})`);
 
       // 2. Compter les données qui vont être supprimées
       const [
@@ -623,19 +624,19 @@ Pour toute question concernant vos données: contact@monassistantkine.com
         // Enfin, supprimer le kiné
         await tx.kine.delete({ where: { id: kine.id } });
 
-        logger.warn(`✅ Suppression en base de données terminée pour: ${kineUid}`);
+        logger.warn(`✅ Suppression en base de données terminée pour: ${sanitizeUID(kineUid)}`);
       });
 
       // 4. Supprimer l'utilisateur Firebase
       try {
         await admin.auth().deleteUser(kineUid);
-        logger.warn(`✅ Utilisateur Firebase supprimé: ${kineUid}`);
+        logger.warn(`✅ Utilisateur Firebase supprimé: ${sanitizeUID(kineUid)}`);
       } catch (firebaseError) {
         logger.error('⚠️ Erreur suppression Firebase (non bloquante):', firebaseError.message);
         // On continue même si Firebase échoue
       }
 
-      logger.warn(`🎯 Suppression de compte terminée avec succès pour: ${kineUid}`);
+      logger.warn(`🎯 Suppression de compte terminée avec succès pour: ${sanitizeUID(kineUid)}`);
 
       return { 
         success: true, 

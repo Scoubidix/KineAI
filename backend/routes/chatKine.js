@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const chatKineController = require('../controllers/chatKineController');
 const { authenticate } = require('../middleware/authenticate');
+const { requireAdmin } = require('../middleware/authorization');
 
 // ========== NOUVELLES ROUTES IA SPÉCIALISÉES ==========
 
@@ -203,9 +204,9 @@ router.get('/vector-status', authenticate, async (req, res) => {
 
 /**
  * GET /api/chat/kine/ia-status
- * Statut des 4 IA pour ce kiné authentifié
+ * Statut des 4 IA - ADMIN UNIQUEMENT (infos techniques sensibles)
  */
-router.get('/ia-status', authenticate, async (req, res) => {
+router.get('/ia-status', authenticate, requireAdmin, async (req, res) => {
   try {
     const firebaseUid = req.uid;
     
@@ -260,7 +261,7 @@ router.get('/ia-status', authenticate, async (req, res) => {
       services: {
         authentication: '✅ Fonctionnel',
         vectorSearch: '✅ Fonctionnel',
-        openai: !!process.env.OPENAI_API_KEY ? '✅ Configuré' : '❌ Manquant',
+        aiService: '✅ Service configuré',
         multipleIA: '✅ 4 IA Disponibles'
       },
       timestamp: new Date().toISOString()

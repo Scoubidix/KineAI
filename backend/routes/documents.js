@@ -2,6 +2,8 @@
 const logger = require('../utils/logger');
 // Les fonctions d'upload et traitement PDF sont maintenant gérées par n8n
 const express = require('express');
+const { authenticate } = require('../middleware/authenticate');
+const { requireAdmin } = require('../middleware/authorization');
 const { 
   searchDocuments, 
   searchDocumentsOptimized,
@@ -13,6 +15,9 @@ const {
 } = require('../services/embeddingService');
 
 const router = express.Router();
+
+// Protection globale : toutes les routes nécessitent une authentification
+router.use(authenticate);
 
 // ==========================================
 // 🔍 ROUTES DE RECHERCHE SÉMANTIQUE
@@ -180,9 +185,9 @@ router.get('/categories', async (req, res) => {
 
 /**
  * DELETE /api/documents/:id
- * Supprimer un document spécifique
+ * Supprimer un document spécifique (ADMIN UNIQUEMENT)
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -230,9 +235,9 @@ router.delete('/:id', async (req, res) => {
 
 /**
  * GET /api/documents/stats
- * Statistiques complètes de la base documentaire
+ * Statistiques complètes de la base documentaire (ADMIN UNIQUEMENT)
  */
-router.get('/stats', async (req, res) => {
+router.get('/stats', requireAdmin, async (req, res) => {
   try {
     logger.debug('📊 Récupération des statistiques...');
     
@@ -255,9 +260,9 @@ router.get('/stats', async (req, res) => {
 
 /**
  * GET /api/documents/health
- * Test de santé de la base vectorielle
+ * Test de santé de la base vectorielle (ADMIN UNIQUEMENT)
  */
-router.get('/health', async (req, res) => {
+router.get('/health', requireAdmin, async (req, res) => {
   try {
     logger.debug('🔧 Test de santé de la base vectorielle...');
     
@@ -287,9 +292,9 @@ router.get('/health', async (req, res) => {
 
 /**
  * POST /api/documents/cleanup
- * Nettoyage des doublons (maintenance)
+ * Nettoyage des doublons (maintenance - ADMIN UNIQUEMENT)
  */
-router.post('/cleanup', async (req, res) => {
+router.post('/cleanup', requireAdmin, async (req, res) => {
   try {
     logger.debug('🧹 Démarrage du nettoyage des doublons...');
     

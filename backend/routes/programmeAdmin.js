@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const express = require('express');
 const router = express.Router();
 const prismaService = require('../services/prismaService');
+const { authenticate } = require('../middleware/authenticate');
+const { requireAdmin } = require('../middleware/authorization');
 const { 
   archiveProgram, 
   deleteProgramAndChats,
@@ -12,9 +14,9 @@ const {
 
 /**
  * POST /programmes/:id/archive
- * Archiver manuellement un programme
+ * Archiver manuellement un programme (ADMIN UNIQUEMENT)
  */
-router.post('/:id/archive', async (req, res) => {
+router.post('/:id/archive', authenticate, requireAdmin, async (req, res) => {
   try {
     const programmeId = parseInt(req.params.id);
     const prisma = prismaService.getInstance();
@@ -75,9 +77,9 @@ router.post('/:id/archive', async (req, res) => {
 
 /**
  * DELETE /programmes/:id
- * Supprimer définitivement un programme et ses conversations
+ * Supprimer définitivement un programme et ses conversations (ADMIN UNIQUEMENT)
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
     const programmeId = parseInt(req.params.id);
     const prisma = prismaService.getInstance();
@@ -129,9 +131,9 @@ router.delete('/:id', async (req, res) => {
 
 /**
  * GET /programmes/archived
- * Lister tous les programmes archivés
+ * Lister tous les programmes archivés (ADMIN UNIQUEMENT)
  */
-router.get('/archived', async (req, res) => {
+router.get('/archived', authenticate, requireAdmin, async (req, res) => {
   try {
     const prisma = prismaService.getInstance();
     
@@ -177,9 +179,9 @@ router.get('/archived', async (req, res) => {
 
 /**
  * POST /programmes/cleanup/finished
- * Déclencher manuellement l'archivage des programmes terminés
+ * Déclencher manuellement l'archivage des programmes terminés (ADMIN UNIQUEMENT)
  */
-router.post('/cleanup/finished', async (req, res) => {
+router.post('/cleanup/finished', authenticate, requireAdmin, async (req, res) => {
   try {
     const result = await archiveFinishedProgramsTask();
 
@@ -206,7 +208,7 @@ router.post('/cleanup/finished', async (req, res) => {
  * POST /programmes/cleanup/archived
  * Déclencher manuellement la suppression des programmes archivés > 6 mois
  */
-router.post('/cleanup/archived', async (req, res) => {
+router.post('/cleanup/archived', authenticate, requireAdmin, async (req, res) => {
   try {
     const result = await cleanupOldArchivedProgramsTask();
 
@@ -233,7 +235,7 @@ router.post('/cleanup/archived', async (req, res) => {
  * GET /programmes/stats
  * Statistiques sur les programmes et conversations
  */
-router.get('/stats', async (req, res) => {
+router.get('/stats', authenticate, requireAdmin, async (req, res) => {
   try {
     const prisma = prismaService.getInstance();
     

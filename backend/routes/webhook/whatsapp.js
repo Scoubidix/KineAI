@@ -2,6 +2,7 @@
 const logger = require('../../utils/logger');
 const express = require('express');
 const router = express.Router();
+const { sanitizeName } = require('../../utils/logSanitizer');
 
 // Configuration WhatsApp
 const WHATSAPP_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
@@ -190,7 +191,7 @@ async function sendWhatsAppMessage(phoneNumber, message, chatLink = null) {
 
 // Fonction pour envoyer le lien de programme - UTILISE TON TEMPLATE !
 async function sendProgramLink(phoneNumber, patientName, programLink) {
-  logger.debug('📱 Envoi lien programme via TEMPLATE PROGRAMME_KINE pour:', patientName);
+  logger.debug('📱 Envoi lien programme via TEMPLATE PROGRAMME_KINE pour:', sanitizeName(patientName));
   logger.debug('🔗 Lien à envoyer:', programLink);
   
   // Utilise ton template personnalisé avec le lien

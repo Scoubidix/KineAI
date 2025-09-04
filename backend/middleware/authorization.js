@@ -1,5 +1,6 @@
 // middleware/authorization.js
 const logger = require('../utils/logger');
+const { sanitizeEmail } = require('../utils/logSanitizer');
 // Middleware pour vérifier les autorisations selon le plan d'abonnement
 
 const { PrismaClient } = require('@prisma/client');
@@ -224,9 +225,63 @@ const getPlanInfo = async (req, res, next) => {
   }
 };
 
+/**
+ * Middleware pour vérifier l'accès administrateur
+ * Basé sur une liste d'emails autorisés
+ */
+const requireAdmin = async (req, res, next) => {
+  try {
+    // Récupérer l'utilisateur depuis son UID Firebase
+    const kine = await prisma.kine.findUnique({
+      where: { uid: req.uid },
+      select: { id: true, email: true, firstName: true, lastName: true }
+    });
+
+    if (!kine) {
+      return res.status(404).json({ 
+        error: 'Utilisateur non trouvé',
+        code: 'USER_NOT_FOUND'
+      });
+    }
+
+    // Liste des emails administrateurs
+    const adminEmails = [
+      'val50.jean@hotmail.fr',
+      'admin@monassistantkine.com'
+    ];
+
+    // Vérifier si l'email est dans la liste admin
+    if (!adminEmails.includes(kine.email)) {
+      logger.warn(`🚫 Tentative accès admin refusée - User: ${sanitizeEmail(kine.email)} - Route: ${req.path}`);
+      return res.status(403).json({ 
+        error: 'Accès administrateur requis',
+        code: 'ADMIN_ACCESS_REQUIRED',
+        message: 'Cette fonctionnalité est réservée aux administrateurs'
+      });
+    }
+
+    // Accès accordé
+    logger.info(`✅ Accès admin accordé - User: ${sanitizeEmail(kine.email)} - Route: ${req.path}`);
+    req.kineId = kine.id;
+    req.isAdmin = true;
+    req.adminEmail = kine.email;
+    req.adminName = `${kine.firstName} ${kine.lastName}`;
+    
+    next();
+
+  } catch (error) {
+    logger.error('Erreur vérification admin:', error);
+    res.status(500).json({ 
+      error: 'Erreur interne du serveur',
+      code: 'ADMIN_CHECK_ERROR'
+    });
+  }
+};
+
 module.exports = {
   canCreateProgramme,
   requireAssistant,
   requireFeature,
-  getPlanInfo
+  getPlanInfo,
+  requireAdmin
 };

@@ -134,6 +134,7 @@ router.post('/:id/send-whatsapp', authenticate, async (req, res) => {
     const { sendProgramLink } = require('../routes/webhook/whatsapp');
     const prismaService = require('../services/prismaService');
     const prisma = prismaService.getInstance();
+    const firebaseUid = req.uid;
     
     const programmeId = parseInt(req.params.id);
     const { chatLink } = req.body;
@@ -146,9 +147,22 @@ router.post('/:id/send-whatsapp', authenticate, async (req, res) => {
       });
     }
 
-    // Récupérer le programme avec le patient
-    const programme = await prisma.programme.findUnique({
-      where: { id: programmeId },
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    // Récupérer le programme avec vérification ownership
+    const programme = await prisma.programme.findFirst({
+      where: { 
+        id: programmeId,
+        patient: {
+          kineId: kine.id
+        }
+      },
       include: { 
         patient: {
           include: {
@@ -161,7 +175,7 @@ router.post('/:id/send-whatsapp', authenticate, async (req, res) => {
     if (!programme) {
       return res.status(404).json({ 
         success: false, 
-        error: 'Programme non trouvé' 
+        error: 'Programme non trouvé ou accès refusé' 
       });
     }
 

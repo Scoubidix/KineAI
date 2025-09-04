@@ -3,6 +3,11 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const { generateChatResponse, generateWelcomeMessage } = require('../services/openaiService');
 const { generateChatUrl, validatePatientToken } = require('../services/patientTokenService');
+const { authenticate } = require('../middleware/authenticate');
+const { requireAdmin } = require('../middleware/authorization');
+
+// Protection admin sur toutes les routes de test
+router.use(authenticate, requireAdmin);
 
 // Test génération token patient
 router.post('/test-token', (req, res) => {

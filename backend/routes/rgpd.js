@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const { authenticate } = require('../middleware/authenticate');
 const rgpdService = require('../services/rgpdService');
+const { sanitizeUID } = require('../utils/logSanitizer');
 
 /**
  * POST /api/rgpd/export-data
@@ -12,7 +13,7 @@ router.post('/export-data', authenticate, async (req, res) => {
   try {
     const kineUid = req.uid;
     
-    logger.debug(`📦 Demande d'export RGPD pour: ${kineUid}`);
+    logger.debug(`📦 Demande d'export RGPD pour: ${sanitizeUID(kineUid)}`);
 
     const result = await rgpdService.generateDataExport(kineUid);
 
@@ -81,7 +82,7 @@ router.get('/eligibility', authenticate, async (req, res) => {
   try {
     const kineUid = req.uid;
     
-    logger.debug(`🔍 Vérification éligibilité suppression pour: ${kineUid}`);
+    logger.debug(`🔍 Vérification éligibilité suppression pour: ${sanitizeUID(kineUid)}`);
 
     const eligibility = await rgpdService.checkDeletionEligibility(kineUid);
 
@@ -114,7 +115,7 @@ router.post('/delete-account', authenticate, async (req, res) => {
       agreesToDataLoss 
     } = req.body;
 
-    logger.debug(`🗑️ Demande de suppression de compte pour: ${kineUid}`);
+    logger.debug(`🗑️ Demande de suppression de compte pour: ${sanitizeUID(kineUid)}`);
 
     // 1. Vérifications de sécurité frontend
     if (!confirmationText || confirmationText !== 'SUPPRIMER') {

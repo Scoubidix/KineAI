@@ -1,6 +1,7 @@
 const prismaService = require('../services/prismaService');
 const { generateChatUrl } = require('../services/patientTokenService');
 const logger = require('../utils/logger');
+const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../utils/logSanitizer');
 
 // 🔽 GET tous les programmes actifs du kiné connecté
 exports.getAllProgrammesByKine = async (req, res) => {
@@ -17,7 +18,7 @@ exports.getAllProgrammesByKine = async (req, res) => {
       });
     }
     
-    logger.debug('✅ UID Firebase utilisé:', kineUid);
+    logger.debug('✅ UID Firebase utilisé:', sanitizeUID(kineUid));
     
     const programmes = await prisma.programme.findMany({
       where: {
@@ -49,7 +50,7 @@ exports.getAllProgrammesByKine = async (req, res) => {
       orderBy: { dateDebut: 'desc' }
     });
     
-    logger.debug(`✅ Trouvé ${programmes.length} programmes pour le kiné ${kineUid}`);
+    logger.debug(`✅ Trouvé ${programmes.length} programmes pour le kiné ${sanitizeUID(kineUid)}`);
     res.json(programmes);
   } catch (error) {
     logger.error("Erreur récupération programmes kiné :", error);
@@ -60,8 +61,30 @@ exports.getAllProgrammesByKine = async (req, res) => {
 // 🔽 GET programmes actifs (pas archivés)
 exports.getProgrammesByPatient = async (req, res) => {
   const patientId = parseInt(req.params.patientId);
+  const firebaseUid = req.uid;
     try {
     const prisma = prismaService.getInstance();
+    
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    // Vérifier ownership du patient avant récupération programmes
+    const patient = await prisma.patient.findFirst({
+      where: { 
+        id: patientId,
+        kineId: kine.id,
+        isActive: true
+      }
+    });
+
+    if (!patient) {
+      return res.status(404).json({ error: "Patient non trouvé ou accès refusé" });
+    }
     
     const programmes = await prisma.programme.findMany({
       where: {
@@ -123,15 +146,29 @@ exports.createProgramme = async (req, res) => {
 // 🔽 POST génération du lien de chat pour un programme
 exports.generateProgrammeLink = async (req, res) => {
   const programmeId = parseInt(req.params.programmeId);
+  const firebaseUid = req.uid;
   
   logger.debug("Génération lien pour programme ID:", programmeId);
 
   try {
     const prisma = prismaService.getInstance();
     
-    // Récupérer le programme avec les infos patient
-    const programme = await prisma.programme.findUnique({
-      where: { id: programmeId },
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+    
+    // Récupérer le programme avec vérification ownership
+    const programme = await prisma.programme.findFirst({
+      where: { 
+        id: programmeId,
+        patient: {
+          kineId: kine.id
+        }
+      },
       include: {
         patient: {
           select: {
@@ -149,7 +186,7 @@ exports.generateProgrammeLink = async (req, res) => {
     if (!programme) {
       return res.status(404).json({ 
         success: false, 
-        error: "Programme non trouvé" 
+        error: "Programme non trouvé ou accès refusé" 
       });
     }
 
@@ -197,7 +234,7 @@ exports.generateProgrammeLink = async (req, res) => {
       chatLink: linkResult.chatUrl,
       token: linkResult.token,
       expiresAt: linkResult.expiresAt,
-      message: `Lien généré avec succès pour ${programme.patient.firstName} ${programme.patient.lastName}`
+      message: `Lien généré avec succès pour ${sanitizeName(programme.patient.firstName)} ${sanitizeName(programme.patient.lastName)}`
     });
 
   } catch (error) {
@@ -213,10 +250,34 @@ exports.generateProgrammeLink = async (req, res) => {
 // 🔽 PUT modification programme
 exports.updateProgramme = async (req, res) => {
   const programmeId = parseInt(req.params.id);
+  const firebaseUid = req.uid;
   const { titre, description, duree, exercises } = req.body;
 
   try {
     const prisma = prismaService.getInstance();
+    
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    // Vérifier ownership avant modification
+    const programme = await prisma.programme.findFirst({
+      where: { 
+        id: programmeId,
+        patient: {
+          kineId: kine.id
+        },
+        isActive: true
+      }
+    });
+
+    if (!programme) {
+      return res.status(404).json({ error: "Programme non trouvé ou accès refusé" });
+    }
     
     // Supprimer les anciens exercices du programme
     await prisma.exerciceProgramme.deleteMany({ 
@@ -257,9 +318,33 @@ exports.updateProgramme = async (req, res) => {
 // 🔽 DELETE programme (SOFT DELETE)
 exports.deleteProgramme = async (req, res) => {
   const programmeId = parseInt(req.params.id);
+  const firebaseUid = req.uid;
 
   try {
     const prisma = prismaService.getInstance();
+    
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    // Vérifier ownership avant suppression
+    const programme = await prisma.programme.findFirst({
+      where: { 
+        id: programmeId,
+        patient: {
+          kineId: kine.id
+        },
+        isActive: true
+      }
+    });
+
+    if (!programme) {
+      return res.status(404).json({ error: "Programme non trouvé ou accès refusé" });
+    }
     
     // Soft delete au lieu de suppression définitive
     // Les exercices liés restent intacts pour préserver l'intégrité
@@ -281,9 +366,33 @@ exports.deleteProgramme = async (req, res) => {
 // 🔽 PATCH archiver programme (alternative plus douce à DELETE)
 exports.archiveProgramme = async (req, res) => {
   const programmeId = parseInt(req.params.id);
+  const firebaseUid = req.uid;
 
   try {
     const prisma = prismaService.getInstance();
+    
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    // Vérifier ownership avant archivage
+    const programme = await prisma.programme.findFirst({
+      where: { 
+        id: programmeId,
+        patient: {
+          kineId: kine.id
+        },
+        isActive: true
+      }
+    });
+
+    if (!programme) {
+      return res.status(404).json({ error: "Programme non trouvé ou accès refusé" });
+    }
     
     const archivedProgramme = await prisma.programme.update({
       where: { id: programmeId },

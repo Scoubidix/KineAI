@@ -1,6 +1,7 @@
 // services/notificationService.js
 const prismaService = require('./prismaService');
 const logger = require('../utils/logger');
+const { sanitizeId } = require('../utils/logSanitizer');
 
 class NotificationService {
   
@@ -47,7 +48,7 @@ class NotificationService {
         }
       });
 
-      logger.info(`📢 NOTIFICATION: ${type} créée pour kiné ${kineId} - ${title}`);
+      logger.info(`📢 NOTIFICATION: ${type} créée pour kiné ${sanitizeId(kineId)} - ${title}`);
       
       return {
         success: true,

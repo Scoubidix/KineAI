@@ -1,6 +1,7 @@
 const { validatePatientToken } = require('../services/patientTokenService');
 const logger = require('../utils/logger');
 const prismaService = require('../services/prismaService');
+const { sanitizeId, sanitizeIP } = require('../utils/logSanitizer');
 
 /**
  * Middleware pour valider l'authentification des patients via JWT
@@ -27,7 +28,7 @@ const authenticatePatient = async (req, res, next) => {
 
     if (!token) {
       const ip = req.ip || req.connection.remoteAddress;
-      console.warn(`🚨 PATIENT_AUTH: Token manquant - IP: ${ip} - Route: ${req.path}`);
+      console.warn(`🚨 PATIENT_AUTH: Token manquant - IP: ${sanitizeIP(ip)} - Route: ${req.path}`);
       return res.status(401).json({
         success: false,
         error: 'Token d\'authentification requis',
@@ -64,7 +65,7 @@ const authenticatePatient = async (req, res, next) => {
     });
 
     if (!patient) {
-      logger.warn(`❌ PATIENT_AUTH: Patient inexistant - ID: ${tokenValidation.patientId}`);
+      logger.warn(`❌ PATIENT_AUTH: Patient inexistant - ID: ${sanitizeId(tokenValidation.patientId)}`);
       return res.status(404).json({
         success: false,
         error: 'Patient non trouvé',
@@ -93,7 +94,7 @@ const authenticatePatient = async (req, res, next) => {
 
     // 5. Vérifier que le programme appartient bien au patient
     if (programme.patientId !== patient.id) {
-      console.warn(`🚨 PATIENT_AUTH: Tentative accès programme non autorisé - Patient: ${patient.id} - Programme: ${programme.id}`);
+      console.warn(`🚨 PATIENT_AUTH: Tentative accès programme non autorisé - Patient: ${sanitizeId(patient.id)} - Programme: ${sanitizeId(programme.id)}`);
       return res.status(403).json({
         success: false,
         error: 'Accès non autorisé à ce programme',
@@ -120,7 +121,7 @@ const authenticatePatient = async (req, res, next) => {
     // ✅ Log uniquement les NOUVELLES sessions (première connexion du jour)
     // Détection : si c'est la route d'initialisation du chat
     if (req.path.includes('/init') || req.method === 'GET') {
-      logger.debug(`💬 PATIENT_CHAT: Session démarrée - Patient: ${patient.id} - Programme: ${programme.titre}`);
+      logger.debug(`💬 PATIENT_CHAT: Session démarrée - Patient: ${sanitizeId(patient.id)} - Programme: ${programme.titre}`);
     }
 
     // 9. Continuer vers la route suivante
@@ -155,7 +156,7 @@ const checkTokenExpiry = (hoursBeforeWarning = 24) => {
       if (hoursUntilExpiry <= hoursBeforeWarning && hoursUntilExpiry > 0) {
         // ✅ Log uniquement les expirations imminentes (< 6h)
         if (hoursUntilExpiry <= 6) {
-          console.warn(`⚠️ PATIENT_EXPIRY: Token expire bientôt - Patient: ${req.patient?.id} - ${Math.round(hoursUntilExpiry)}h restantes`);
+          console.warn(`⚠️ PATIENT_EXPIRY: Token expire bientôt - Patient: ${sanitizeId(req.patient?.id)} - ${Math.round(hoursUntilExpiry)}h restantes`);
         }
         
         // Ajouter un warning dans la réponse
@@ -188,7 +189,7 @@ const logPatientAccess = (req, res, next) => {
     const ip = req.ip || req.connection.remoteAddress;
     const userAgent = req.get('User-Agent');
     
-    logger.debug(`🔍 PATIENT_ACCESS: ID:${req.patient?.id} IP:${ip} Programme:${req.programme?.id} UA:${userAgent?.substring(0, 50)}`);
+    logger.debug(`🔍 PATIENT_ACCESS: ID:${sanitizeId(req.patient?.id)} IP:${sanitizeIP(ip)} Programme:${sanitizeId(req.programme?.id)} UA:${userAgent?.substring(0, 50)}`);
   }
   
   next();

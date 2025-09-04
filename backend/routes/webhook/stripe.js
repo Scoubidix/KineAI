@@ -5,6 +5,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const stripeService = require('../../services/StripeService');
 const logger = require('../../utils/logger');
+const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../../utils/logSanitizer');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -315,7 +316,7 @@ async function handleCheckoutCompleted(session, eventId) {
       });
       
       const duration = Date.now() - startTime;
-      const successMessage = `Kiné ${kineId} (${kine.email}) mis à jour: ${planType} - Customer: ${session.customer} - Subscription: ${session.subscription} (${duration}ms)`;
+      const successMessage = `Kiné ${kineId} (${sanitizeEmail(kine.email)}) mis à jour: ${planType} - Customer: ${session.customer} - Subscription: ${session.subscription} (${duration}ms)`;
       
       logger.info(`🎉 [${eventId}] ${successMessage}`);
       return { success: true, message: successMessage };

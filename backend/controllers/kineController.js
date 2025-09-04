@@ -4,11 +4,12 @@
 
 const prismaService = require('../services/prismaService');
 const logger = require('../utils/logger');
+const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../utils/logSanitizer');
 
 const createKine = async (req, res) => {
   const { uid, email, firstName, lastName, phone, rpps, adresseCabinet, birthDate } = req.body;
 
-  logger.warn("📥 Création kiné - UID:", req.body.uid);
+  logger.warn("📥 Création kiné - UID:", sanitizeUID(req.body.uid));
 
   try {
     const prisma = prismaService.getInstance();
@@ -34,7 +35,7 @@ const createKine = async (req, res) => {
       },
     });
 
-    logger.warn("✅ Kiné créé - ID:", newKine.id, "Email:", newKine.email);
+    logger.warn("✅ Kiné créé - ID:", sanitizeId(newKine.id), "Email:", sanitizeEmail(newKine.email));
 
     return res.status(201).json(newKine);
   } catch (err) {
@@ -46,7 +47,7 @@ const createKine = async (req, res) => {
 const getKineProfile = async (req, res) => {
   const uid = req.uid; // Récupéré depuis le middleware authenticate
 
-  logger.info("📥 Récupération profil kiné pour UID:", uid);
+  logger.info("📥 Récupération profil kiné pour UID:", sanitizeUID(uid));
 
   try {
     const prisma = prismaService.getInstance();
@@ -71,11 +72,11 @@ const getKineProfile = async (req, res) => {
     });
 
     if (!kine) {
-      logger.error("❌ Kiné non trouvé pour UID:", uid);
+      logger.error("❌ Kiné non trouvé pour UID:", sanitizeUID(uid));
       return res.status(404).json({ error: 'Kiné non trouvé dans la base de données.' });
     }
 
-    logger.info("✅ Profil kiné récupéré - ID:", kine.id);
+    logger.info("✅ Profil kiné récupéré - ID:", sanitizeId(kine.id));
 
     return res.status(200).json(kine);
   } catch (err) {
@@ -88,7 +89,7 @@ const updateKineProfile = async (req, res) => {
   const uid = req.uid; // Récupéré depuis le middleware authenticate
   const { email, phone, adresseCabinet } = req.body;
 
-  logger.info("📥 Mise à jour profil kiné pour UID:", uid);
+  logger.info("📥 Mise à jour profil kiné pour UID:", sanitizeUID(uid));
 
   try {
     const prisma = prismaService.getInstance();
@@ -99,7 +100,7 @@ const updateKineProfile = async (req, res) => {
     });
 
     if (!existingKine) {
-      logger.error("❌ Kiné non trouvé pour UID:", uid);
+      logger.error("❌ Kiné non trouvé pour UID:", sanitizeUID(uid));
       return res.status(404).json({ error: 'Kiné non trouvé dans la base de données.' });
     }
 
@@ -132,7 +133,7 @@ const updateKineProfile = async (req, res) => {
       }
     });
 
-    logger.info("✅ Profil kiné mis à jour - ID:", updatedKine.id);
+    logger.info("✅ Profil kiné mis à jour - ID:", sanitizeId(updatedKine.id));
 
     return res.status(200).json({
       message: 'Profil mis à jour avec succès',
@@ -160,7 +161,7 @@ const getAdherenceByDate = async (req, res) => {
   const uid = req.uid; // UID du kiné authentifié
   const { date } = req.params; // Format: YYYY-MM-DD
 
-  logger.info("📊 Calcul adhérence pour UID:", uid, "Date:", date);
+  logger.info("📊 Calcul adhérence pour UID:", sanitizeUID(uid), "Date:", date);
 
   try {
     // 🔧 FIX TIMEZONE: Utiliser la même méthode que patientChat.js
@@ -324,7 +325,7 @@ const getPatientSessionsByDate = async (req, res) => {
   const uid = req.uid; // UID du kiné authentifié
   const { date } = req.params; // Format: YYYY-MM-DD
 
-  logger.info("📋 Liste patients-sessions pour UID:", uid, "Date:", date);
+  logger.info("📋 Liste patients-sessions pour UID:", sanitizeUID(uid), "Date:", date);
 
   try {
     // 🔧 FIX TIMEZONE: Utiliser la même méthode que patientChat.js

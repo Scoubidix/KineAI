@@ -1,5 +1,6 @@
 const admin = require('../firebase/firebase');
 const logger = require('../utils/logger');
+const { sanitizeEmail, sanitizeIP } = require('../utils/logSanitizer');
 
 const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -20,7 +21,7 @@ const authenticate = async (req, res, next) => {
     // ✅ Log uniquement les NOUVELLES connexions (première requête de la session)
     // Détection simple : si c'est une route de "connexion" ou première action
     if (req.path.includes('/dashboard') || req.path.includes('/patients')) {
-      logger.debug(`🔐 AUTH: Kiné connecté ${decodedToken.email} - IP: ${req.ip}`);
+      logger.debug(`🔐 AUTH: Kiné connecté ${sanitizeEmail(decodedToken.email)} - IP: ${sanitizeIP(req.ip)}`);
     }
     
     next();

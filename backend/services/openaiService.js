@@ -2,6 +2,7 @@ const { OpenAI } = require('openai');
 const knowledgeService = require('./knowledgeService');
 const prismaService = require('./prismaService');
 const logger = require('../utils/logger');
+const { sanitizeUID, sanitizeName } = require('../utils/logSanitizer');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -344,7 +345,7 @@ const cleanChatHistory = (history, maxMessages = 20) => {
  */
 const generateKineResponse = async (type, message, conversationHistory = [], kineId) => {
   try {
-    logger.debug(`🚀 IA ${type} pour kiné ID: ${kineId}`);
+    logger.debug(`🚀 IA ${type} pour kiné ID: ${sanitizeUID(kineId)}`);
 
     if (!message?.trim()) {
       throw new Error('Message requis');

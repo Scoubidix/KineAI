@@ -3,6 +3,7 @@
 
 const rateLimit = require('express-rate-limit');
 const logger = require('../utils/logger');
+const { sanitizeUID, sanitizeIP } = require('../utils/logSanitizer');
 
 /**
  * Helper pour générer des clés sécurisées IPv6/IPv4
@@ -51,7 +52,8 @@ const stripePaymentLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => generateSecureKey(req, 'stripe_payment'),
   handler: (req, res) => {
-    logger.warn(`🚫 Rate limit dépassé - Paiement Stripe - User: ${req.uid || req.ip}`);
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Paiement Stripe - User: ${safeUser}`);
     res.status(429).json({
       error: 'Trop de tentatives de paiement',
       details: 'Veuillez patienter 1 minute avant de réessayer',
@@ -76,7 +78,8 @@ const stripeSubscriptionLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => generateSecureKey(req, 'stripe_subscription'),
   handler: (req, res) => {
-    logger.warn(`🚫 Rate limit dépassé - Modification abonnement - User: ${req.uid || req.ip}`);
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Modification abonnement - User: ${safeUser}`);
     res.status(429).json({
       error: 'Trop de modifications d\'abonnement',
       details: 'Veuillez patienter 1 minute avant de réessayer',
@@ -124,7 +127,8 @@ const gptLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => generateSecureKey(req, 'gpt'),
   handler: (req, res) => {
-    logger.warn(`🚫 Rate limit dépassé - Appels GPT - User: ${req.uid || req.ip}`);
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Appels GPT - User: ${safeUser}`);
     res.status(429).json({
       error: 'Trop d\'appels à l\'IA',
       details: 'Veuillez patienter 1 minute avant de réessayer',
@@ -149,7 +153,8 @@ const gptHeavyLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => generateSecureKey(req, 'gpt_heavy'),
   handler: (req, res) => {
-    logger.warn(`🚫 Rate limit dépassé - Génération programme - User: ${req.uid || req.ip}`);
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Génération programme - User: ${safeUser}`);
     res.status(429).json({
       error: 'Trop de générations de programmes',
       details: 'Veuillez patienter 5 minutes avant de créer un nouveau programme',
@@ -174,7 +179,8 @@ const generalLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => generateSecureKey(req, 'general'),
   handler: (req, res) => {
-    logger.warn(`🚫 Rate limit dépassé - Général - User: ${req.uid || req.ip} - Route: ${req.path}`);
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Général - User: ${safeUser} - Route: ${req.path}`);
     res.status(429).json({
       error: 'Trop de requêtes',
       details: 'Veuillez patienter 1 minute avant de réessayer',
@@ -229,7 +235,8 @@ const whatsappSendLimiter = rateLimit({
   },
   handler: (req, res) => {
     const programmeId = req.params.id;
-    logger.warn(`🚫 Rate limit dépassé - Envoi WhatsApp - User: ${req.uid || req.ip} - Programme: ${programmeId}`);
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Envoi WhatsApp - User: ${safeUser} - Programme: ${programmeId}`);
     res.status(429).json({
       error: 'Envoi WhatsApp déjà effectué pour ce programme',
       details: 'Vous devez attendre 1 heure avant de renvoyer le lien de ce programme par WhatsApp',
@@ -254,7 +261,8 @@ const documentSearchLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => generateSecureKey(req, 'document_search'),
   handler: (req, res) => {
-    logger.warn(`🚫 Rate limit dépassé - Recherche Documents - User: ${req.uid || req.ip}`);
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Recherche Documents - User: ${safeUser}`);
     res.status(429).json({
       error: 'Trop de recherches documentaires',
       details: 'Veuillez patienter 1 minute avant de relancer une recherche',
@@ -279,7 +287,8 @@ const rgpdExportLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => generateSecureKey(req, 'rgpd_export'),
   handler: (req, res) => {
-    logger.warn(`🚫 Rate limit dépassé - Export RGPD - User: ${req.uid || req.ip}`);
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Export RGPD - User: ${safeUser}`);
     res.status(429).json({
       error: 'Export de données limité',
       details: 'Un seul export de données RGPD par heure autorisé. Veuillez patienter 60 minutes.',
@@ -305,7 +314,8 @@ const rgpdDeleteLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => generateSecureKey(req, 'rgpd_delete'),
   handler: (req, res) => {
-    logger.warn(`🚫 Rate limit dépassé - Suppression compte - User: ${req.uid || req.ip}`);
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Suppression compte - User: ${safeUser}`);
     res.status(429).json({
       error: 'Tentatives de suppression limitées',
       details: 'Limite de 3 tentatives de suppression de compte atteinte. Essayez demain ou contactez le support.',
@@ -325,7 +335,8 @@ const rateLimitLogger = (req, res, next) => {
   res.send = function(data) {
     // Logger seulement si rate limit info disponible
     if (res.get('X-RateLimit-Limit')) {
-      logger.warn(`📊 Rate Limit - ${req.method} ${req.path} - User: ${req.uid || req.ip} - ${res.get('X-RateLimit-Remaining')}/${res.get('X-RateLimit-Limit')} remaining`);
+      const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+      logger.warn(`📊 Rate Limit - ${req.method} ${req.path} - User: ${safeUser} - ${res.get('X-RateLimit-Remaining')}/${res.get('X-RateLimit-Limit')} remaining`);
     }
     
     originalSend.call(this, data);

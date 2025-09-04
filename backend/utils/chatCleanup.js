@@ -3,6 +3,7 @@ const cron = require('node-cron');
 const { PrismaClient } = require('@prisma/client');
 const notificationService = require('../services/notificationService');
 const logger = require('./logger');
+const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('./logSanitizer');
 
 // Wrapper avec timeout et retry pour les tâches CRON
 const executeWithTimeout = async (taskName, taskFunction, timeoutMs = 120000) => {
@@ -129,7 +130,7 @@ const createProgramCompletedNotificationsTask = async () => {
             const completionPercentage = Math.round((validatedDays / totalDays) * 100);
 
             // Créer la notification
-            const patientName = `${programme.patient.firstName} ${programme.patient.lastName}`;
+            const patientName = `${sanitizeName(programme.patient.firstName)} ${sanitizeName(programme.patient.lastName)}`;
             const title = 'Programme terminé';
             const message = `Le programme "${programme.titre}" de ${patientName} est terminé - Adhérence ${validatedDays}/${totalDays} jours (${completionPercentage}%)`;
 
@@ -165,7 +166,7 @@ const createProgramCompletedNotificationsTask = async () => {
               adherence: `${validatedDays}/${totalDays} jours (${completionPercentage}%)`
             });
 
-            logger.info(`🔔 Notification créée: ${patientName} - ${programme.titre} - Adhérence ${validatedDays}/${totalDays} (${completionPercentage}%)`);
+            logger.info(`🔔 Notification créée: ${sanitizeName(patientName)} - ${programme.titre} - Adhérence ${validatedDays}/${totalDays} (${completionPercentage}%)`);
           } else {
             logger.info(`⏭️ Notification déjà existante pour programme ${programme.id}`);
           }

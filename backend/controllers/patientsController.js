@@ -111,6 +111,7 @@ exports.createPatient = async (req, res) => {
 // PUT /patients/:id
 exports.updatePatient = async (req, res) => {
   const { id } = req.params;
+  const firebaseUid = req.uid;
   const {
     firstName,
     lastName,
@@ -122,6 +123,27 @@ exports.updatePatient = async (req, res) => {
 
   try {
     const prisma = prismaService.getInstance();
+    
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    // Vérifier ownership avant modification
+    const patient = await prisma.patient.findFirst({
+      where: { 
+        id: parseInt(id),
+        kineId: kine.id,
+        isActive: true
+      }
+    });
+
+    if (!patient) {
+      return res.status(404).json({ error: "Patient non trouvé ou accès refusé" });
+    }
     
     const updatedPatient = await prisma.patient.update({
       where: { id: parseInt(id) },
@@ -145,9 +167,31 @@ exports.updatePatient = async (req, res) => {
 // DELETE /patients/:id (SOFT DELETE)
 exports.deletePatient = async (req, res) => {
   const { id } = req.params;
+  const firebaseUid = req.uid;
 
   try {
     const prisma = prismaService.getInstance();
+    
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    // Vérifier ownership avant suppression
+    const patient = await prisma.patient.findFirst({
+      where: { 
+        id: parseInt(id),
+        kineId: kine.id,
+        isActive: true
+      }
+    });
+
+    if (!patient) {
+      return res.status(404).json({ error: "Patient non trouvé ou accès refusé" });
+    }
     
     // Soft delete au lieu de suppression définitive
     await prisma.patient.update({

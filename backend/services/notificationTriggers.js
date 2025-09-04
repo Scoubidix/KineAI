@@ -2,6 +2,7 @@
 const notificationService = require('./notificationService');
 const prismaService = require('./prismaService');
 const logger = require('../utils/logger');
+const { sanitizeName } = require('../utils/logSanitizer');
 
 class NotificationTriggers {
 
@@ -240,7 +241,7 @@ class NotificationTriggers {
             metadata
           });
 
-          logger.info(`🎉 PROGRAMME TERMINÉ: ${patientName} - ${programme.titre} - Adhérence ${validatedDays}/${totalDays} (${completionPercentage}%)`);
+          logger.info(`🎉 PROGRAMME TERMINÉ: ${sanitizeName(patientName)} - ${programme.titre} - Adhérence ${validatedDays}/${totalDays} (${completionPercentage}%)`);
           logger.info(`🎉 Trigger: ${isPastEndDate ? 'Date atteinte' : 'Adhérence élevée'}`);
 
           return result;
