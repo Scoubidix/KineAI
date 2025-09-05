@@ -7,7 +7,7 @@ const authenticate = async (req, res, next) => {
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     const ip = req.ip || req.connection.remoteAddress;
-    console.warn(`🚨 AUTH: Token manquant - IP: ${ip} - Route: ${req.path}`);
+    logger.warn(`🚨 AUTH: Token manquant - IP: ${ip} - Route: ${req.path}`);
     return res.status(401).json({ message: "Token manquant ou invalide." });
   }
 

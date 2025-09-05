@@ -257,6 +257,21 @@ async function handleCheckoutCompleted(session, eventId) {
       return { success: false, message: error };
     }
 
+    // 🔒 Log acceptation CGV (conformité légale)
+    try {
+      logger.info(`🔒 CGV acceptées lors du checkout`, {
+        kineId: sanitizeId(kineId),
+        planType: planType,
+        sessionId: sanitizeId(session.id),
+        customerId: sanitizeId(session.customer),
+        timestamp: new Date().toISOString(),
+        eventId: sanitizeId(eventId),
+        consentCollected: session.consent_collection?.terms_of_service || 'unavailable'
+      });
+    } catch (logError) {
+      logger.error(`⚠️ [${eventId}] Erreur log CGV (non bloquante):`, logError.message);
+    }
+
     // Récupérer le kiné avec retry
     let kine = null;
     let attempts = 0;

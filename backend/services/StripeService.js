@@ -83,6 +83,15 @@ class StripeService {
           address: 'auto',  // Stripe récupère l'adresse du client automatiquement
           shipping: 'auto'  // Pour le calcul des taxes de livraison si nécessaire
         },
+        // ✅ CGV NATIVES STRIPE - Case à cocher obligatoire
+        consent_collection: {
+          terms_of_service: 'required'
+        },
+        custom_text: {
+          terms_of_service_acceptance: {
+            message: `J'accepte les [Conditions Générales de Vente](${process.env.FRONTEND_URL}/legal/cgv.html) de Mon Assistant Kiné.`
+          }
+        },
         metadata: {
           kineId: kineId.toString(),
           planType: planType,

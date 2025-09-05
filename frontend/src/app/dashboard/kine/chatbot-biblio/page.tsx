@@ -403,7 +403,7 @@ export default function KineChatbotBiblioPage() {
                         Recherche Bibliographique
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Posez vos questions pour accéder aux références scientifiques et publications médicales
+                        Posez vos questions pour accéder aux références et publications scientifiques
                       </p>
                     </div>
                   </div>

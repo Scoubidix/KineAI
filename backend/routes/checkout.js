@@ -3,6 +3,7 @@ const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const { authenticate } = require('../middleware/authenticate');
 const StripeService = require('../services/StripeService');
+const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
 
@@ -47,7 +48,7 @@ router.post('/create-checkout', authenticate, async (req, res) => {
 
     if (hasActiveSubscription) {
       // Changement de plan pour abonnement existant
-      console.log(`🔄 Changement de plan détecté: ${kine.planType} → ${planType}`);
+      logger.log(`🔄 Changement de plan détecté: ${kine.planType} → ${planType}`);
       
       // Vérifier si c'est vraiment un changement (éviter les doublons)
       if (kine.planType === planType) {
@@ -60,7 +61,7 @@ router.post('/create-checkout', authenticate, async (req, res) => {
       try {
         const result = await StripeService.changePlan(kineId, planType);
         
-        console.log(`✅ Plan changé avec succès: ${kine.planType} → ${planType}`);
+        logger.log(`✅ Plan changé avec succès: ${kine.planType} → ${planType}`);
         
         // Retourner une URL de succès directement (pas de checkout)
         return res.json({
@@ -75,7 +76,7 @@ router.post('/create-checkout', authenticate, async (req, res) => {
         });
         
       } catch (changePlanError) {
-        console.error('Erreur changement de plan:', changePlanError);
+        logger.error('Erreur changement de plan:', changePlanError);
         return res.status(400).json({ 
           error: 'Erreur lors du changement de plan',
           details: changePlanError.message 
@@ -84,7 +85,7 @@ router.post('/create-checkout', authenticate, async (req, res) => {
     }
     
     // Nouveau checkout pour utilisateurs sans abonnement actif
-    console.log(`🆕 Nouveau checkout pour utilisateur ${kine.planType || 'FREE'}`);
+    logger.log(`🆕 Nouveau checkout pour utilisateur ${kine.planType || 'FREE'}`);
 
     try {
       // Créer la session via le service Stripe
@@ -102,7 +103,7 @@ router.post('/create-checkout', authenticate, async (req, res) => {
       });
 
     } catch (stripeError) {
-      console.error('Erreur Stripe checkout:', stripeError);
+      logger.error('Erreur Stripe checkout:', stripeError);
       
       // Messages d'erreur spécifiques
       if (stripeError.message.includes('Plan Pionnier')) {
@@ -127,7 +128,7 @@ router.post('/create-checkout', authenticate, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Erreur create-checkout:', error);
+    logger.error('Erreur create-checkout:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -159,7 +160,7 @@ router.post('/create-portal', authenticate, async (req, res) => {
       });
 
     } catch (stripeError) {
-      console.error('Erreur Stripe portal:', stripeError);
+      logger.error('Erreur Stripe portal:', stripeError);
       return res.status(400).json({ 
         error: 'Erreur lors de la création du portail',
         details: stripeError.message 
@@ -167,7 +168,7 @@ router.post('/create-portal', authenticate, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Erreur create-portal:', error);
+    logger.error('Erreur create-portal:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -209,7 +210,7 @@ router.post('/change-plan', authenticate, async (req, res) => {
       });
 
     } catch (stripeError) {
-      console.error('Erreur changement plan:', stripeError);
+      logger.error('Erreur changement plan:', stripeError);
       
       if (stripeError.message.includes('Plan Pionnier')) {
         return res.status(400).json({ 
@@ -225,7 +226,7 @@ router.post('/change-plan', authenticate, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Erreur change-plan:', error);
+    logger.error('Erreur change-plan:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -270,7 +271,7 @@ router.get('/subscription/:subscriptionId', authenticate, async (req, res) => {
       });
 
     } catch (stripeError) {
-      console.error('Erreur récupération abonnement:', stripeError);
+      logger.error('Erreur récupération abonnement:', stripeError);
       return res.status(400).json({ 
         error: 'Erreur lors de la récupération de l\'abonnement',
         details: stripeError.message 
@@ -278,7 +279,7 @@ router.get('/subscription/:subscriptionId', authenticate, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Erreur get subscription:', error);
+    logger.error('Erreur get subscription:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -312,7 +313,7 @@ router.post('/cancel-subscription', authenticate, async (req, res) => {
       });
 
     } catch (stripeError) {
-      console.error('Erreur annulation abonnement:', stripeError);
+      logger.error('Erreur annulation abonnement:', stripeError);
       return res.status(400).json({ 
         error: 'Erreur lors de l\'annulation',
         details: stripeError.message 
@@ -320,7 +321,7 @@ router.post('/cancel-subscription', authenticate, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Erreur cancel subscription:', error);
+    logger.error('Erreur cancel subscription:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -350,7 +351,7 @@ router.post('/reactivate-subscription', authenticate, async (req, res) => {
       });
 
     } catch (stripeError) {
-      console.error('Erreur réactivation abonnement:', stripeError);
+      logger.error('Erreur réactivation abonnement:', stripeError);
       return res.status(400).json({ 
         error: 'Erreur lors de la réactivation',
         details: stripeError.message 
@@ -358,7 +359,7 @@ router.post('/reactivate-subscription', authenticate, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Erreur reactivate subscription:', error);
+    logger.error('Erreur reactivate subscription:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -408,7 +409,7 @@ router.get('/invoices', authenticate, async (req, res) => {
       });
 
     } catch (stripeError) {
-      console.error('Erreur récupération factures:', stripeError);
+      logger.error('Erreur récupération factures:', stripeError);
       return res.status(400).json({ 
         error: 'Erreur lors de la récupération des factures',
         details: stripeError.message 
@@ -416,7 +417,7 @@ router.get('/invoices', authenticate, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Erreur get invoices:', error);
+    logger.error('Erreur get invoices:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -459,7 +460,7 @@ router.post('/refresh-subscription-dates', authenticate, async (req, res) => {
           data: updateData
         });
 
-        console.log(`✅ Dates d'abonnement mises à jour pour kiné ${kine.id}:`, {
+        logger.info(`✅ Dates d'abonnement mises à jour pour kiné ${kine.id}:`, {
           start: updateData.subscriptionStartDate?.toISOString(),
           end: updateData.subscriptionEndDate?.toISOString()
         });
@@ -475,7 +476,7 @@ router.post('/refresh-subscription-dates', authenticate, async (req, res) => {
       });
 
     } catch (stripeError) {
-      console.error('Erreur récupération abonnement Stripe:', stripeError);
+      logger.error('Erreur récupération abonnement Stripe:', stripeError);
       return res.status(400).json({ 
         error: 'Erreur lors de la récupération des données Stripe',
         details: stripeError.message 
@@ -483,7 +484,7 @@ router.post('/refresh-subscription-dates', authenticate, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Erreur refresh-subscription-dates:', error);
+    logger.error('Erreur refresh-subscription-dates:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });

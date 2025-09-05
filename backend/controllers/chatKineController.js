@@ -97,7 +97,7 @@ const getHistoryBasique = async (req, res) => {
     const kineId = kine.id;
     const days = parseInt(req.query.days) || 5;
 
-    const history = await getHistoryFromTable('chatIaBasique', kineId, days);
+      const history = await getHistoryFromTable('chatIaBasique', kineId, days);
     
     res.json({ 
       success: true, 

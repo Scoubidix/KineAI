@@ -28,7 +28,7 @@ const authenticatePatient = async (req, res, next) => {
 
     if (!token) {
       const ip = req.ip || req.connection.remoteAddress;
-      console.warn(`🚨 PATIENT_AUTH: Token manquant - IP: ${sanitizeIP(ip)} - Route: ${req.path}`);
+      logger.warn(`🚨 PATIENT_AUTH: Token manquant - IP: ${sanitizeIP(ip)} - Route: ${req.path}`);
       return res.status(401).json({
         success: false,
         error: 'Token d\'authentification requis',
@@ -41,7 +41,7 @@ const authenticatePatient = async (req, res, next) => {
     
     if (!tokenValidation.success) {
       const ip = req.ip || req.connection.remoteAddress;
-      console.warn(`🚨 PATIENT_AUTH: Token invalide - IP: ${ip} - Code: ${tokenValidation.code}`);
+      logger.warn(`🚨 PATIENT_AUTH: Token invalide - IP: ${ip} - Code: ${tokenValidation.code}`);
       return res.status(401).json({
         success: false,
         error: tokenValidation.error,
@@ -94,7 +94,7 @@ const authenticatePatient = async (req, res, next) => {
 
     // 5. Vérifier que le programme appartient bien au patient
     if (programme.patientId !== patient.id) {
-      console.warn(`🚨 PATIENT_AUTH: Tentative accès programme non autorisé - Patient: ${sanitizeId(patient.id)} - Programme: ${sanitizeId(programme.id)}`);
+      logger.warn(`🚨 PATIENT_AUTH: Tentative accès programme non autorisé - Patient: ${sanitizeId(patient.id)} - Programme: ${sanitizeId(programme.id)}`);
       return res.status(403).json({
         success: false,
         error: 'Accès non autorisé à ce programme',
@@ -104,7 +104,7 @@ const authenticatePatient = async (req, res, next) => {
 
     // 6. Vérifier que le programme n'est pas archivé
     if (programme.isArchived) {
-      console.warn(`⚠️ PATIENT_AUTH: Tentative accès programme archivé - ID: ${programme.id}`);
+      logger.warn(`⚠️ PATIENT_AUTH: Tentative accès programme archivé - ID: ${programme.id}`);
       return res.status(410).json({
         success: false,
         error: 'Programme archivé, chat non disponible',
@@ -156,7 +156,7 @@ const checkTokenExpiry = (hoursBeforeWarning = 24) => {
       if (hoursUntilExpiry <= hoursBeforeWarning && hoursUntilExpiry > 0) {
         // ✅ Log uniquement les expirations imminentes (< 6h)
         if (hoursUntilExpiry <= 6) {
-          console.warn(`⚠️ PATIENT_EXPIRY: Token expire bientôt - Patient: ${sanitizeId(req.patient?.id)} - ${Math.round(hoursUntilExpiry)}h restantes`);
+          logger.warn(`⚠️ PATIENT_EXPIRY: Token expire bientôt - Patient: ${sanitizeId(req.patient?.id)} - ${Math.round(hoursUntilExpiry)}h restantes`);
         }
         
         // Ajouter un warning dans la réponse
