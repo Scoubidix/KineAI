@@ -351,10 +351,11 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
       throw new Error('Message requis');
     }
 
-    // 1. Recherche documentaire via knowledgeService
+    // 1. Recherche documentaire via knowledgeService avec type d'IA
     const searchResult = await knowledgeService.searchDocuments(message, {
       filterCategory: null,
-      allowLowerThreshold: true
+      allowLowerThreshold: true,
+      iaType: type  // NOUVEAU: Passer le type d'IA pour les filtres adaptés
     });
 
     const { allDocuments, selectedSources, metadata } = searchResult;
@@ -363,9 +364,11 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
     const systemPrompt = getSystemPromptByType(type, allDocuments.slice(0, 6));
 
     // 3. Préparation des messages pour OpenAI
+    const limitedHistory = conversationHistory.slice(-6);
+
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...conversationHistory.slice(-6), // Limiter l'historique
+      ...limitedHistory, // Limiter l'historique
       { role: 'user', content: message }
     ];
 
@@ -502,77 +505,121 @@ ${doc.content.substring(0, 800)}
 }
 
 function buildBiblioSystemPrompt(contextDocuments) {
-  let systemPrompt = `Tu es une intelligence artificielle spécialisée dans l'analyse critique de la littérature scientifique. Tu t'adresses à un kinésithérapeute professionnel qui cherche des informations basées sur les preuves pour sa pratique clinique.
+  let systemPrompt = `Tu es une IA spécialisée dans l'ANALYSE BIBLIOGRAPHIQUE EVIDENCE-BASED pour kinésithérapeutes professionnels.
 
-⚠️ IMPÉRATIF : Tu dois TOUJOURS suivre exactement cette structure de réponse, sans exception :
+OBJECTIF : Fournir des recommandations cliniques basées UNIQUEMENT sur les ÉTUDES SCIENTIFIQUES de notre base vérifiée.
 
-## 🎯 INDICATIONS THÉRAPEUTIQUES
-[Recommandations cliniques directement applicables en pratique, basées sur les preuves]
+STRUCTURE DE RÉPONSE OBLIGATOIRE :
 
-## 📊 SYNTHÈSE DES PREUVES SCIENTIFIQUES
-[Résumé concis de 2-3 phrases des principales conclusions de la littérature, sans citer les études]
+COMMENCE DIRECTEMENT PAR (sans introduction) :
 
-## 📚 RÉFÉRENCES SCIENTIFIQUES
-**PRIORITÉ ABSOLUE : Utilise d'abord les documents de notre base vérifiée ci-dessous, puis complète avec tes connaissances si nécessaire.**
+**🎯 RECOMMANDATIONS CLINIQUES EVIDENCE-BASED**
+[Synthèse pratique des recommandations pour la prise en charge basées sur les preuves]
 
-**Format OBLIGATOIRE pour chaque étude :**
-**[Auteurs et al., Année]** - *Titre complet*
-📈 **Niveau de preuve :** [Niveau selon GRADE - A/B/C/D]
+**📊 ANALYSE DES PREUVES SCIENTIFIQUES**
+[Résumé des principaux résultats, statistiques, et conclusions des études]
 
-**ORDRE DE PRIORITÉ :**
-1. **CITER D'ABORD** les documents de notre base documentaire (fournis ci-dessous)
-2. **COMPLÉTER SEULEMENT** avec tes connaissances si la base est insuffisante
-3. **CLASSER** par niveau de preuve décroissant
+**📚 RÉFÉRENCES BIBLIOGRAPHIQUES**
+[Liste des études sous la forme : "Titre document, auteurs (année), niveau de preuve"]
 
-[Lister ici TOUTES les études de 3 à 7 maximum, par ordre de niveau de preuve décroissant]
+**⚠️ QUALITÉ DES PREUVES & LIMITATIONS**
+[Niveau des preuves, limitations méthodologiques, contre-indications mentionnées]
 
-## ⚠️ POINTS DE VIGILANCE
-• [Biais méthodologiques identifiés]
-• [Limitations des études]
-• [Red flags à surveiller]
+RÈGLES ABSOLUES POUR L'EVIDENCE-BASED PRACTICE :
+- Utilise UNIQUEMENT les ÉTUDES SCIENTIFIQUES fournies ci-dessous (type_contenu=etude)
+- Groupe les sections de la MÊME étude (même source) en une seule référence bibliographique
+- Cite OBLIGATOIREMENT : Auteur + Année + Niveau de preuve
+- Hiérarchise les recommandations selon la FORCE DES PREUVES (Niveau A > B > C > D)
+- Ne jamais inventer de références ou données non mentionnées (IMPORTANT)
 
-## 🔄 CONTROVERSES ET NUANCES
-[Si applicable : études avec résultats contradictoires et leurs niveaux de preuve]
+RÈGLES D'ANALYSE BIBLIOGRAPHIQUE :
+- PRIORISE les études de haut niveau (A: méta-analyses, B: RCT) dans tes recommandations
+- Indique la FORCE DE RECOMMANDATION basée sur le niveau de preuve
+- Signale les POPULATIONS ÉTUDIÉES et leur pertinence clinique
+- SEULEMENT si tu n'as AUCUN document fourni ci-dessous, indique : "Nous ne disposons pas d'études sur ce sujet dans notre base, si un document vous parait pertinent, n'hésitez pas à le proposer"
 
-## 🔗 APPROFONDISSEMENTS
-• [Seulement si pertinent : mentionner des domaines de recherche émergents ou des applications particulières, SANS citer d'autres études]
-
----
-
-**RÈGLES ABSOLUES - UTILISATION DE NOTRE BASE DOCUMENTAIRE :**
-- 🔥 PRIORITÉ 1 : Utilise EN PREMIER les documents fournis de notre base vérifiée
-- 🔥 Si des documents de notre base correspondent à la question, tu DOIS les citer dans "Références scientifiques"
-- 🔥 Utilise EXACTEMENT les titres fournis, ne les modifie pas
-- 🚫 INTERDICTION FORMELLE d'inventer des références si notre base contient déjà des études pertinentes
-- 🚫 INTERDICTION de citer des études dans "Approfondissements"
-- ✅ Compléter avec tes connaissances SEULEMENT si notre base est insuffisante
-- ✅ Ne citer que les études dont tu es ABSOLUMENT certain de l'existence
-- ✅ Préférer moins de références VRAIES plutôt que des références inventées
-- ✅ Hiérarchie des preuves : Méta-analyse > RCT > Étude observationnelle > Avis d'expert
-- ✅ Aucune question en fin de réponse
-
-⚠️ ATTENTION : Notre base documentaire contient des études vérifiées. Utilise-la en priorité absolue avant tes connaissances générales.`;
+RÈGLES DE COHÉRENCE AVEC L'HISTORIQUE :
+- RESTE COHÉRENT avec tes réponses précédentes dans la conversation
+- Si tu as déjà cité une étude, tu as accès à ses informations disponibles
+- Pour des questions de détails sur une étude déjà citée, fouille dans les sections disponibles de cette étude
+- Ne jamais dire "nous n'avons pas accès" à une étude que tu viens d'utiliser dans l'historique`;
 
   if (contextDocuments.length > 0) {
-    systemPrompt += `\n\n🔥 DOCUMENTS DE NOTRE BASE VÉRIFIÉE - À CITER EN PRIORITÉ :
-Les documents suivants sont VÉRIFIÉS et proviennent de notre base documentaire professionnelle. 
-Si ils correspondent à ta réponse, tu DOIS les utiliser dans ta section "Références scientifiques".
+    // 🧪 LOGS SIMPLIFIÉ - Juste le nombre de documents
+    logger.debug(`🧪 IA Biblio - ${contextDocuments.length} documents transmis à GPT`);
 
-`;
+    // Grouper les documents par source_file (études scientifiques)
+    const groupedBySource = {};
+    contextDocuments.forEach((doc) => {
+      const source = doc.metadata?.source_file || doc.title || 'Document sans titre';
+      if (!groupedBySource[source]) {
+        groupedBySource[source] = {
+          source_file: source,
+          title: (source || 'Document sans titre').replace('.pdf', '').replace(/_/g, ' '),
+          auteur: doc.metadata?.auteur || 'Auteur non spécifié',
+          date: doc.metadata?.date || 'Date non spécifiée',
+          pathologies: doc.metadata?.pathologies || [], // Peut être absent selon l'étude
+          niveau_preuve: doc.metadata?.niveau_preuve || 'Non spécifié',
+          type_contenu: doc.metadata?.type_contenu || 'Non spécifié',
+          sections: [],
+          bestScore: doc.finalScore
+        };
+      }
+      groupedBySource[source].sections.push({
+        content: doc.content,
+        title: doc.title,
+        score: Math.round(doc.finalScore * 100)
+      });
+      // Garder le meilleur score
+      if (doc.finalScore > groupedBySource[source].bestScore) {
+        groupedBySource[source].bestScore = doc.finalScore;
+      }
+    });
 
-    contextDocuments.forEach((doc, index) => {
-      const score = Math.round(doc.finalScore * 100);
-      
-      systemPrompt += `📚 RÉFÉRENCE VÉRIFIÉE ${index + 1} (Pertinence: ${score}%) :
-📖 **TITRE À CITER :** "${doc.title}"
-📄 **CONTENU :** ${doc.content.substring(0, 800)}
+    // Trier les études par niveau de preuve (A > B > C > D)
+    const preuveOrder = { 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
+    const sortedStudies = Object.values(groupedBySource).sort((a, b) => {
+      const scoreA = preuveOrder[a.niveau_preuve] || 0;
+      const scoreB = preuveOrder[b.niveau_preuve] || 0;
+      return scoreB - scoreA; // Tri décroissant (meilleur niveau en premier)
+    });
 
-⚠️ UTILISE EXACTEMENT CE TITRE dans ta section "Références scientifiques" si pertinent pour la question.
+    systemPrompt += `\n\nÉTUDES SCIENTIFIQUES DE NOTRE BASE (triées par niveau de preuve) :\n`;
 
+    sortedStudies.forEach((study, index) => {
+      const score = Math.round(study.bestScore * 100);
+      const pathologiesText = Array.isArray(study.pathologies) && study.pathologies.length > 0
+        ? study.pathologies.join(', ')
+        : 'Non spécifiées';
+
+      systemPrompt += `\n📚 ÉTUDE ${index + 1} (Pertinence: ${score}%) :
+📖 TITRE : "${study.title || 'Titre non disponible'}"
+👥 AUTEUR(S) : ${study.auteur}
+📅 ANNÉE : ${study.date}
+📈 NIVEAU DE PREUVE : ${study.niveau_preuve}
+🎯 PATHOLOGIES ÉTUDIÉES : ${pathologiesText}
+📑 TYPE : ${study.type_contenu}
+
+SECTIONS ANALYSÉES (${study.sections.length} sections) :
+${study.sections.map((section, idx) =>
+  `[Section ${idx + 1}] ${section.content.substring(0, 600)}...`
+).join('\n\n')}
+
+---
 `;
     });
 
-    systemPrompt += `\n🔥 RAPPEL CRITIQUE : Ces ${contextDocuments.length} documents de notre base DOIVENT être cités en priorité s'ils correspondent à la question posée. Ne pas inventer d'autres références sur le même sujet.`;
+    systemPrompt += `\nINSTRUCTIONS EVIDENCE-BASED FINALES :
+- Dans "RÉFÉRENCES BIBLIOGRAPHIQUES", cite : *[TITRE] - [AUTEUR] (ANNÉE)* - Niveau [A/B/C/D]
+- TOUJOURS respecter ce format avec italiques (*texte*) pour titre-auteur-année
+- EXEMPLE : *Revue Systématique BFR et Reconstruction LCA - Colapietro et al. (2023)* - Niveau A
+- HIÉRARCHISE tes recommandations selon les niveaux de preuve ci-dessus
+- BASE-TOI sur le CONTENU des sections pour tes analyses statistiques
+- INDIQUE la force des recommandations selon le niveau des preuves disponibles`;
+  } else {
+    // Cas où aucun document n'est fourni
+    systemPrompt += `\n\nAUCUN DOCUMENT FOURNI - Répondre uniquement :
+"Nous ne disposons pas d'études sur ce sujet dans notre base, si un document vous parait pertinent, n'hésitez pas à le proposer"`;
   }
 
   return systemPrompt;

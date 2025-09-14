@@ -57,3 +57,6 @@ firebase-admin-sdk.json
 .env.local.template
 .idx/
 dev.nix
+
+# 👉 Scripts de preprocessing n8n
+../preprocessing.js

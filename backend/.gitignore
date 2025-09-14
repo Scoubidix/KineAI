@@ -20,3 +20,6 @@ firebase.local.*
 
 # 👉 Fichiers temporaires ou systèmes
 .DS_Store
+
+# 👉 Scripts de preprocessing n8n (ne pas versionner)
+preprocessing*.js

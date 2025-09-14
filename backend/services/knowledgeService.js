@@ -6,21 +6,23 @@ class KnowledgeService {
   
   /**
    * Recherche sémantique unifiée pour toutes les IA
+   * MODIFIÉ: Support des filtres par type d'IA
    */
   async searchDocuments(message, options = {}) {
     try {
       const searchOptions = {
         filterCategory: options.filterCategory || null,
         allowLowerThreshold: options.allowLowerThreshold !== false, // true par défaut
+        iaType: options.iaType || 'basique',  // NOUVEAU: Type d'IA
         ...options
       };
 
-      logger.debug(`🔍 Recherche documentaire pour: "${message.substring(0, 50)}..."`); 
+      logger.debug(`🔍 Recherche documentaire IA ${searchOptions.iaType} pour: "${message.substring(0, 50)}..."`); 
       
       const searchResults = await searchDocumentsOptimized(message, searchOptions);
       
       if (!searchResults || searchResults.length === 0) {
-        logger.debug('⚠️ Aucun document trouvé');
+        logger.debug(`⚠️ IA ${searchOptions.iaType} - Aucun document trouvé`);
         return {
           allDocuments: [],
           selectedSources: [],
@@ -28,7 +30,8 @@ class KnowledgeService {
             totalFound: 0,
             averageScore: 0,
             categoriesFound: [],
-            usedOptimizedSearch: true
+            usedOptimizedSearch: true,
+            iaType: searchOptions.iaType
           }
         };
       }
@@ -39,7 +42,7 @@ class KnowledgeService {
       // Sélection des meilleures sources
       const selectedSources = this.selectTopSources(scoredDocuments, 3);
       
-      // Métadonnées de recherche
+      // Métadonnées de recherche avec type IA
       const metadata = {
         totalFound: searchResults.length,
         averageScore: scoredDocuments.length > 0 ? 
@@ -47,10 +50,12 @@ class KnowledgeService {
         categoriesFound: [...new Set(scoredDocuments.map(d => d.category).filter(Boolean))],
         usedOptimizedSearch: true,
         highThresholdResults: searchResults.filter(doc => doc.similarity > 0.7).length,
-        lowThresholdResults: searchResults.filter(doc => doc.similarity <= 0.7).length
+        lowThresholdResults: searchResults.filter(doc => doc.similarity <= 0.7).length,
+        iaType: searchOptions.iaType,  // NOUVEAU: Type d'IA utilisé
+        appliedFilters: searchResults.length > 0 ? searchResults[0].appliedFilters : {}
       };
 
-      logger.debug(`✅ ${scoredDocuments.length} documents scorés, ${selectedSources.length} sources sélectionnées`);
+      logger.debug(`✅ IA ${searchOptions.iaType} - ${scoredDocuments.length} documents scorés, ${selectedSources.length} sources sélectionnées`);
       
       return {
         allDocuments: scoredDocuments,
@@ -69,6 +74,7 @@ class KnowledgeService {
           averageScore: 0,
           categoriesFound: [],
           usedOptimizedSearch: false,
+          iaType: options.iaType || 'basique',
           error: error.message
         }
       };

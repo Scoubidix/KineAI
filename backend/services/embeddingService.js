@@ -240,19 +240,46 @@ function analyzeQueryForMetadata(query) {
 
 /**
  * Construit les filtres SQL Supabase à partir des métadonnées détectées
- * OPTIMISÉ: Filtrage uniquement sur PATHOLOGIES (moins agressif)
+ * OPTIMISÉ: Filtrage par pathologies + type_contenu selon le type d'IA
  */
-function buildMetadataFilters(detectedMetadata) {
+function buildMetadataFilters(detectedMetadata, iaType = 'basique') {
   const filters = {};
   
-  // 🎯 FILTRAGE UNIQUEMENT SUR LES PATHOLOGIES
-  // Les phases et objectifs sont trop restrictifs et font perdre des documents pertinents
-  
-  if (detectedMetadata.pathologies && detectedMetadata.pathologies.length > 0) {
-    filters.pathologies = detectedMetadata.pathologies;
-    logger.debug(`🎯 Filtre PATHOLOGIES uniquement:`, filters.pathologies);
-  } else {
-    logger.debug(`⚠️ Aucune pathologie détectée - recherche vectorielle sur TOUTE la base`);
+  switch(iaType) {
+    case 'biblio':
+      // IA Biblio : TOUJOURS filtrer sur type_contenu = 'etude' + pathologies si détectées
+      filters.type_contenu = 'etude';
+      if (detectedMetadata.pathologies && detectedMetadata.pathologies.length > 0) {
+        filters.pathologies = detectedMetadata.pathologies;
+        logger.debug(`🔬 IA Biblio - Filtres: études + pathologies [${detectedMetadata.pathologies.join(', ')}]`);
+      } else {
+        logger.debug(`🔬 IA Biblio - Filtres: études seulement (aucune pathologie détectée)`);
+      }
+      logger.debug(`🔬 IA Biblio - Filtres finaux:`, filters);
+      break;
+      
+    case 'clinique':
+      // IA Clinique : Pathologies uniquement pour le moment
+      // TODO: Ajouter filtre type_contenu = 'livre' quand les chunks livres seront créés
+      if (detectedMetadata.pathologies && detectedMetadata.pathologies.length > 0) {
+        filters.pathologies = detectedMetadata.pathologies;
+      }
+      logger.debug(`📚 IA Clinique - Filtres: pathologies seulement (TODO: ajouter livres):`, filters);
+      break;
+      
+    case 'admin':
+      // IA Admin : PAS DE RAG - retourner null pour court-circuiter
+      logger.debug(`📋 IA Admin - Pas de RAG utilisé`);
+      return null;
+      
+    case 'basique':
+    default:
+      // IA Basique : Pathologies uniquement (comportement actuel)
+      if (detectedMetadata.pathologies && detectedMetadata.pathologies.length > 0) {
+        filters.pathologies = detectedMetadata.pathologies;
+      }
+      logger.debug(`💬 IA Basique - Filtres: pathologies uniquement:`, filters);
+      break;
   }
   
   return filters;
@@ -332,8 +359,11 @@ async function searchDocuments(query, options = {}) {
       match_threshold: matchThreshold,
       match_count: matchCount,
       filter_category: filterCategory,
-      metadata_filters: metadataFilters
+      metadata_filters: JSON.stringify(metadataFilters)  // CONVERSION en JSON string
     });
+    
+    // DEBUG: Log pour voir exactement ce qui est envoyé
+    logger.debug(`🔬 Metadata filters fonction directe:`, JSON.stringify(metadataFilters));
 
     if (error) {
       logger.error('❌ Erreur recherche Supabase:', error);
@@ -384,6 +414,7 @@ async function searchDocumentsLegacy(query, options = {}) {
   
   const queryEmbedding = await generateEmbedding(query);
   
+  logger.debug('🚨 APPEL LEGACY search_documents (SANS FILTRES) - CECI EXPLIQUE LE BUG !');
   const { data, error } = await supabase.rpc('search_documents', {
     query_embedding: queryEmbedding,
     match_threshold: matchThreshold,
@@ -402,40 +433,52 @@ async function searchDocumentsLegacy(query, options = {}) {
 /**
  * Recherche optimisée avec stratégie de seuils adaptatifs
  * Essaie d'abord un seuil élevé, puis réduit si peu de résultats
- * OPTIMISÉ: Génère l'embedding une seule fois
+ * OPTIMISÉ: Génère l'embedding une seule fois + filtres par type d'IA
  */
 async function searchDocumentsOptimized(query, options = {}) {
   try {
     const {
       filterCategory = null,
-      allowLowerThreshold = true
+      allowLowerThreshold = true,
+      iaType = 'basique'  // NOUVEAU: Type d'IA pour les filtres
     } = options;
 
-    logger.debug('🔍 Recherche optimisée avec embedding unique pour:', query);
+    logger.debug(`🔍 Recherche optimisée pour IA ${iaType} avec embedding unique:`, query);
     
-    // 🆕 OPTIMISATION: Générer l'embedding UNE SEULE FOIS
+    // 🆕 OPTIMISATION: Générer l'embedding UNE SEULE FOIS + filtres par IA
     const detectedMetadata = analyzeQueryForMetadata(query);
-    const metadataFilters = buildMetadataFilters(detectedMetadata);
+    const metadataFilters = buildMetadataFilters(detectedMetadata, iaType);
+    
+    // Court-circuit pour IA Admin (pas de RAG)
+    if (metadataFilters === null) {
+      logger.debug('📋 IA Admin - Court-circuit RAG');
+      return [];
+    }
+    
     const queryEmbedding = await generateEmbedding(query);
 
     // Première tentative avec seuil élevé (haute qualité)
     logger.debug('🔍 Tentative seuil élevé (0.7)...');
+    logger.debug('🔍 Filtres seuil élevé:', JSON.stringify(metadataFilters));
     let results = await searchDocumentsWithEmbedding(queryEmbedding, {
       matchThreshold: 0.7,
       matchCount: 3,
       filterCategory,
-      metadataFilters
+      metadataFilters,
+      iaType  // Passer le type d'IA
     });
 
     // Si pas assez de résultats, tentative avec seuil plus bas
     if (results.length < 2 && allowLowerThreshold) {
       logger.debug('🔄 Seuil élevé: ' + results.length + ' résultats, tentative seuil bas...');
+      logger.debug('🔄 Filtres seuil bas:', JSON.stringify(metadataFilters));
       
       results = await searchDocumentsWithEmbedding(queryEmbedding, {
         matchThreshold: 0.4,
         matchCount: 6,
         filterCategory,
-        metadataFilters
+        metadataFilters,
+        iaType  // Passer le type d'IA
       });
     }
 
@@ -451,6 +494,7 @@ async function searchDocumentsOptimized(query, options = {}) {
 
 /**
  * Recherche avec embedding pré-généré (pour éviter la duplication)
+ * MODIFIÉ: Support des fonctions SQL spécialisées par type d'IA
  */
 async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
   try {
@@ -458,34 +502,82 @@ async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
       matchThreshold = 0.3,
       matchCount = 10,
       filterCategory = null,
-      metadataFilters = {}
+      metadataFilters = {},
+      iaType = 'basique'
     } = options;
 
-    // 🆕 ÉTAPE 2: Appeler la nouvelle fonction avec embedding pré-généré
-    const { data, error } = await supabase.rpc('search_documents_with_metadata', {
-      query_embedding: queryEmbedding,
-      match_threshold: matchThreshold,
-      match_count: matchCount,
-      filter_category: filterCategory,
-      metadata_filters: metadataFilters
-    });
+    logger.debug(`🎯 APPEL searchDocumentsWithEmbedding - IA ${iaType} - Seuil: ${matchThreshold}, Filtres: ${JSON.stringify(metadataFilters)}`);
+
+    let data, error;
+
+    // 🆕 APPEL SPÉCIALISÉ PAR TYPE D'IA
+    if (iaType === 'biblio') {
+      logger.debug(`🔬 IA BIBLIO - Appel fonction spécialisée search_documents_biblio`);
+      logger.debug(`🔬 Metadata filters IA Biblio:`, JSON.stringify(metadataFilters));
+
+      const result = await supabase.rpc('search_documents_biblio', {
+        query_embedding: queryEmbedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount,
+        metadata_filters: JSON.stringify(metadataFilters)
+      });
+
+      data = result.data;
+      error = result.error;
+
+    } else if (iaType === 'clinique') {
+      // TODO: Fonction search_documents_clinique à créer
+      logger.debug(`📚 IA CLINIQUE - Fallback fonction générale (TODO: créer search_documents_clinique)`);
+
+      const result = await supabase.rpc('search_documents_with_metadata', {
+        query_embedding: queryEmbedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount,
+        filter_category: filterCategory,
+        metadata_filters: JSON.stringify(metadataFilters)
+      });
+
+      data = result.data;
+      error = result.error;
+
+    } else {
+      // IA Basique ou autres - fonction générale
+      logger.debug(`💬 IA ${iaType} - Fonction générale search_documents_with_metadata`);
+
+      const result = await supabase.rpc('search_documents_with_metadata', {
+        query_embedding: queryEmbedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount,
+        filter_category: filterCategory,
+        metadata_filters: JSON.stringify(metadataFilters)
+      });
+
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
       logger.error('❌ Erreur recherche Supabase:', error);
-      // Si la nouvelle fonction n'existe pas, retourner résultat vide plutôt que fallback
-      logger.debug('⚠️ Fonction search_documents_with_metadata non trouvée. Créez-la dans Supabase !');
+      logger.debug('⚠️ Fonction search_documents_with_metadata non trouvée. Exécutez la fonction SQL dans Supabase !');
       return [];
     }
 
     if (!data || data.length === 0) {
-      // Si on a filtré par pathologies mais trouvé 0 résultats
-      if (Object.keys(metadataFilters).length > 0 && metadataFilters.pathologies) {
-        logger.debug(`⚠️ Aucun document trouvé pour les pathologies: ${metadataFilters.pathologies.join(', ')}`);
+      // Messages de debug spécifiques selon le type d'IA
+      if (Object.keys(metadataFilters).length > 0) {
+        if (metadataFilters.type_contenu && metadataFilters.pathologies) {
+          logger.debug(`⚠️ IA ${iaType} - Aucun document ${metadataFilters.type_contenu} pour pathologies: ${metadataFilters.pathologies.join(', ')}`);
+        } else if (metadataFilters.pathologies) {
+          logger.debug(`⚠️ IA ${iaType} - Aucun document pour pathologies: ${metadataFilters.pathologies.join(', ')}`);
+        } else {
+          logger.debug(`⚠️ IA ${iaType} - Aucun document ${metadataFilters.type_contenu} trouvé`);
+        }
       }
+      logger.debug(`🔍 RETOUR VIDE - Seuil: ${matchThreshold}, Filtres: ${JSON.stringify(metadataFilters)}`);
       return [];
     }
 
-    // Enrichissement des résultats avec métadonnées utiles
+    // Enrichissement des résultats avec métadonnées utiles + info IA
     const enrichedResults = data.map((doc, index) => ({
       ...doc,
       searchRank: index + 1,
@@ -495,9 +587,13 @@ async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
       created_at: doc.created_at || new Date().toISOString(),
       ageInDays: doc.created_at ? 
         Math.floor((new Date() - new Date(doc.created_at)) / (1000 * 60 * 60 * 24)) : 0,
-      metadataFiltered: Object.keys(metadataFilters).length > 0
+      metadataFiltered: Object.keys(metadataFilters).length > 0,
+      iaType: iaType,  // Ajout du type d'IA pour debug
+      appliedFilters: metadataFilters  // Ajout des filtres appliqués
     }));
 
+    logger.debug(`✅ IA ${iaType} - ${enrichedResults.length} documents trouvés avec filtres:`, Object.keys(metadataFilters));
+    logger.debug(`🎯 SUCCÈS DATA - Seuil: ${matchThreshold}, Count: ${enrichedResults.length}, Premier titre: "${enrichedResults[0]?.title || 'N/A'}"`);
     return enrichedResults;
   } catch (error) {
     logger.error('❌ Erreur recherche avec embedding:', error);
@@ -517,6 +613,7 @@ async function searchDocumentsLegacyWithEmbedding(queryEmbedding, options = {}) 
 
   logger.debug('🔍 Recherche legacy avec embedding pré-généré');
   
+  logger.debug('🚨 APPEL LEGACY search_documents (SANS FILTRES) - CECI EXPLIQUE LE BUG !');
   const { data, error } = await supabase.rpc('search_documents', {
     query_embedding: queryEmbedding,
     match_threshold: matchThreshold,
