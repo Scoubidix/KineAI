@@ -1,334 +1,435 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, History, Trash2, Send, Loader2, CheckCircle, Target, BookOpen } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { FileText, Search, Loader2, CheckCircle, Mail, MessageSquare, AlertCircle, User } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
 import { usePaywall } from '@/hooks/usePaywall';
+import { useToast } from '@/hooks/use-toast';
 
-interface ChatMessage {
+interface Template {
   id: number;
-  message: string;
-  response: string;
-  createdAt: string;
-}
-
-interface Source {
   title: string;
   category: string;
-  similarity: string;
-  confidence: number;
-  relevanceLevel: string;
-  rank: number;
-  preview?: string;
+  subject: string | null;
+  body: string;
+  tags: string[];
+  usageCount: number;
 }
 
-interface HistoryMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  sources?: Source[];
-  enhanced?: boolean;
-  confidence?: number;
+interface Patient {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string | null;
+  emailConsent: boolean;
+  whatsappConsent: boolean;
+}
+
+interface PersonalizedTemplate {
+  template: {
+    id: number;
+    title: string;
+    category: string;
+    originalBody: string;
+    originalSubject: string | null;
+  };
+  personalizedBody: string;
+  personalizedSubject: string;
+  autoFilledVariables: Array<{ variable: string; value: string; replaced: boolean }>;
+  remainingVariables: string[];
+  patient: Patient;
 }
 
 export default function KineChatbotAdminPage() {
-  const [message, setMessage] = useState('');
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [filteredTemplates, setFilteredTemplates] = useState<Template[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
+  const [categories, setCategories] = useState<Array<{ name: string; count: number }>>([]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [patientSearch, setPatientSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+
+  const [personalizedData, setPersonalizedData] = useState<PersonalizedTemplate | null>(null);
+  const [editedSubject, setEditedSubject] = useState('');
+  const [editedBody, setEditedBody] = useState('');
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isPersonalizing, setIsPersonalizing] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [history, setHistory] = useState<ChatMessage[]>([]);
-  const [chatMessages, setChatMessages] = useState<HistoryMessage[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-  
+
   // Hook paywall pour vérifier les permissions
   const { isLoading: paywallLoading, canAccessFeature, subscription } = usePaywall();
-  
+
+  // Hook toast pour les notifications
+  const { toast } = useToast();
+
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
-  
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lastBotMessageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    loadHistory();
+    loadData();
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [chatMessages]);
+    filterTemplates();
+  }, [searchQuery, selectedCategory, templates]);
 
   useEffect(() => {
-    if (isSending) {
-      scrollToBottom();
-    }
-  }, [isSending]);
-
-  const scrollToBottom = () => {
-    if (messagesContainerRef.current && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ 
-        behavior: 'smooth',
-        block: 'end',
-        inline: 'nearest'
-      });
-    }
-  };
-
-  const scrollToBotMessage = () => {
-    if (messagesContainerRef.current && lastBotMessageRef.current) {
-      lastBotMessageRef.current.scrollIntoView({ 
-        behavior: 'smooth',
-        block: 'start',
-        inline: 'nearest'
-      });
-    }
-  };
+    filterPatients();
+  }, [patientSearch, patients]);
 
   const getAuthToken = async () => {
     const auth = getAuth(app);
     return await auth.currentUser?.getIdToken();
   };
 
-  const areSourcesRelevant = (sources: Source[], userQuestion: string) => {
-    if (!sources || sources.length === 0) return false;
-    
-    const questionLower = userQuestion.toLowerCase();
-    
-    const anatomicalKeywords = [
-      'épaule', 'epaule', 'shoulder',
-      'genou', 'knee', 
-      'cheville', 'ankle', 
-      'dos', 'back', 'lombalgie', 'lombaire',
-      'cervical', 'cou', 'neck',
-      'coude', 'elbow',
-      'poignet', 'wrist',
-      'hanche', 'hip',
-      'achille', 'tendon',
-      'main', 'hand',
-      'pied', 'foot'
-    ];
-    
-    const questionAnatomy = anatomicalKeywords.filter(keyword => 
-      questionLower.includes(keyword)
-    );
-    
-    if (questionAnatomy.length === 0) {
-      const MIN_CONFIDENCE_THRESHOLD = 85;
-      return sources.some(source => source.confidence >= MIN_CONFIDENCE_THRESHOLD);
-    }
-    
-    const relevantSources = sources.filter(source => {
-      const sourceText = (source.title + ' ' + source.category).toLowerCase();
-      
-      const hasAnatomicalMatch = questionAnatomy.some(anatomy => 
-        sourceText.includes(anatomy)
-      );
-      
-      const hasDecentScore = source.confidence >= 70;
-      
-      return hasAnatomicalMatch && hasDecentScore;
-    });
-    
-    return relevantSources.length > 0;
-  };
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 90) return 'text-green-600 bg-green-50';
-    if (confidence >= 80) return 'text-blue-600 bg-blue-50';
-    if (confidence >= 70) return 'text-yellow-600 bg-yellow-50';
-    return 'text-gray-600 bg-gray-50';
-  };
-
-  const getConfidenceIcon = (confidence: number) => {
-    if (confidence >= 90) return <Target className="w-3 h-3" />;
-    if (confidence >= 80) return <CheckCircle className="w-3 h-3" />;
-    if (confidence >= 70) return <BookOpen className="w-3 h-3" />;
-    return <FileText className="w-3 h-3" />;
-  };
-
-  const loadHistory = async () => {
+  const loadData = async () => {
     try {
-      setIsLoadingHistory(true);
+      setIsLoading(true);
       const token = await getAuthToken();
-      const res = await fetch(`${API_BASE}/api/chat/kine/history-administrative?days=5`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      
-      const data = await res.json();
-      if (data.success) {
-        setHistory(data.history);
-        
-        if (chatMessages.length === 0) {
-          const chatHistory: HistoryMessage[] = [];
-          data.history.reverse().forEach((chat: ChatMessage) => {
-            chatHistory.push({
-              role: 'user',
-              content: chat.message,
-              timestamp: chat.createdAt
-            });
-            chatHistory.push({
-              role: 'assistant',
-              content: chat.response,
-              timestamp: chat.createdAt
-            });
-          });
-          setChatMessages(chatHistory);
-        }
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+
+      if (!user) {
+        console.error('Utilisateur non authentifié');
+        return;
       }
+
+      // Charger les templates
+      const templatesRes = await fetch(`${API_BASE}/api/templates`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const templatesData = await templatesRes.json();
+      if (templatesData.success) {
+        setTemplates(templatesData.templates);
+      }
+
+      // Charger les catégories
+      const categoriesRes = await fetch(`${API_BASE}/api/templates/categories`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const categoriesData = await categoriesRes.json();
+      if (categoriesData.success) {
+        setCategories(categoriesData.categories);
+      }
+
+      // Charger les patients (même route que la page patients)
+      const patientsRes = await fetch(`${API_BASE}/patients/kine/${user.uid}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (patientsRes.ok) {
+        const patientsData = await patientsRes.json();
+        setPatients(patientsData);
+        setFilteredPatients(patientsData);
+      }
+
     } catch (error) {
-      console.error('Erreur chargement historique:', error);
+      console.error('Erreur chargement données:', error);
     } finally {
-      setIsLoadingHistory(false);
+      setIsLoading(false);
     }
   };
 
-  const handleAsk = async () => {
-    if (!message.trim() || isSending) return;
-    
-    const userMessage: HistoryMessage = {
-      role: 'user',
-      content: message.trim(),
-      timestamp: new Date().toISOString()
-    };
-    
-    setChatMessages(prev => [...prev, userMessage]);
-    const currentMessage = message;
-    setMessage('');
-    setIsSending(true);
+  const filterTemplates = () => {
+    let filtered = templates;
 
+    // Filtrer par catégorie
+    if (selectedCategory) {
+      filtered = filtered.filter(t => t.category === selectedCategory);
+    }
+
+    // Filtrer par recherche
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(t =>
+        t.title.toLowerCase().includes(query) ||
+        t.body.toLowerCase().includes(query) ||
+        t.tags.some(tag => tag.toLowerCase().includes(query))
+      );
+    }
+
+    setFilteredTemplates(filtered);
+  };
+
+  const filterPatients = () => {
+    if (!patientSearch.trim()) {
+      setFilteredPatients(patients);
+      return;
+    }
+
+    const query = patientSearch.toLowerCase();
+    const filtered = patients.filter(p =>
+      `${p.firstName} ${p.lastName}`.toLowerCase().includes(query) ||
+      p.email.toLowerCase().includes(query) ||
+      (p.phone && p.phone.includes(query))
+    );
+
+    setFilteredPatients(filtered);
+  };
+
+  const handleTemplateSelect = async (template: Template) => {
+    setSelectedTemplate(template);
+    setPersonalizedData(null);
+    setEditedSubject('');
+    setEditedBody('');
+
+    // Si un patient est déjà sélectionné, personnaliser automatiquement
+    if (selectedPatient) {
+      await personalizeTemplate(template.id, selectedPatient.id);
+    }
+  };
+
+  const handlePatientSelect = async (patient: Patient) => {
+    setSelectedPatient(patient);
+    setPatientSearch(''); // Réinitialiser la recherche
+    setFilteredPatients(patients); // Réafficher tous les patients
+
+    // Si un template est déjà sélectionné, personnaliser automatiquement
+    if (selectedTemplate) {
+      await personalizeTemplate(selectedTemplate.id, patient.id);
+    }
+  };
+
+  const personalizeTemplate = async (templateId: number, patientId: number) => {
     try {
+      setIsPersonalizing(true);
       const token = await getAuthToken();
-      
-      const res = await fetch(`${API_BASE}/api/chat/kine/ia-administrative`, {
+
+      const res = await fetch(`${API_BASE}/api/templates/personalize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ 
-          message: currentMessage,
-          conversationHistory: chatMessages.slice(-6).map(msg => ({
-            role: msg.role,
-            content: msg.content
-          }))
-        })
+        body: JSON.stringify({ templateId, patientId })
       });
 
       const data = await res.json();
-      
+
       if (data.success) {
-        setIsSending(false);
-        
-        const assistantMessage: HistoryMessage = {
-          role: 'assistant',
-          content: data.message,
-          timestamp: new Date().toISOString(),
-          sources: data.sources && areSourcesRelevant(data.sources, currentMessage) ? data.sources : [],
-          enhanced: data.metadata?.enhanced,
-          confidence: data.confidence
-        };
-        setChatMessages(prev => [...prev, assistantMessage]);
-        
-        setTimeout(() => {
-          scrollToBotMessage();
-        }, 100);
-        
-        const token = await getAuthToken();
-        const res = await fetch(`${API_BASE}/api/chat/kine/history-administrative?days=5`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-        const historyData = await res.json();
-        if (historyData.success) {
-          setHistory(historyData.history);
-        }
+        setPersonalizedData(data);
+        setEditedSubject(data.personalizedSubject || '');
+        setEditedBody(data.personalizedBody);
       } else {
-        setIsSending(false);
-        
-        const errorMessage: HistoryMessage = {
-          role: 'assistant',
-          content: data.error || 'Erreur lors de la génération de la réponse',
-          timestamp: new Date().toISOString()
-        };
-        setChatMessages(prev => [...prev, errorMessage]);
-        
-        setTimeout(() => {
-          scrollToBotMessage();
-        }, 100);
+        alert('Erreur lors de la personnalisation du template');
       }
+
     } catch (error) {
-      console.error('Erreur envoi message:', error);
-      setIsSending(false);
-      
-      const errorMessage: HistoryMessage = {
-        role: 'assistant',
-        content: "Erreur lors de l'appel à l'assistant.",
-        timestamp: new Date().toISOString()
-      };
-      setChatMessages(prev => [...prev, errorMessage]);
-      
-      setTimeout(() => {
-        scrollToBotMessage();
-      }, 100);
+      console.error('Erreur personnalisation:', error);
+      alert('Erreur lors de la personnalisation du template');
+    } finally {
+      setIsPersonalizing(false);
     }
   };
 
-  const clearHistory = async () => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer tout l\'historique ?')) {
+  const highlightVariables = (text: string) => {
+    if (!text) return text;
+
+    // Remplacer les variables [xxx] par du texte surligné en jaune
+    return text.replace(/\[([^\]]+)\]/g, '<mark class="bg-yellow-300 text-black px-1 rounded">[$1]</mark>');
+  };
+
+  const canSendWhatsApp = () => {
+    if (!selectedTemplate || !selectedPatient) return false;
+
+    // WhatsApp uniquement pour "Communications Patients"
+    if (selectedTemplate.category !== 'Communications Patients') return false;
+
+    // Patient doit avoir donné son consentement WhatsApp
+    return selectedPatient.whatsappConsent && selectedPatient.phone;
+  };
+
+  const canSendEmail = () => {
+    if (!selectedPatient) return false;
+
+    // Patient doit avoir donné son consentement email
+    return selectedPatient.emailConsent && selectedPatient.email;
+  };
+
+  const handleSendEmail = async () => {
+    if (!selectedTemplate || !selectedPatient || !personalizedData) {
+      toast({
+        title: "Sélection incomplète",
+        description: "Veuillez sélectionner un template et un patient",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!canSendEmail()) {
+      toast({
+        title: "Envoi email impossible",
+        description: "Le patient n'a pas donné son consentement pour les emails ou n'a pas d'email renseigné",
+        variant: "destructive",
+      });
       return;
     }
 
     try {
+      setIsSending(true);
+
+      // Créer le lien mailto: avec les champs pré-remplis
+      const mailto = `mailto:${encodeURIComponent(selectedPatient.email)}?subject=${encodeURIComponent(editedSubject)}&body=${encodeURIComponent(editedBody)}`;
+
+      // Ouvrir le client mail par défaut
+      window.location.href = mailto;
+
+      // Sauvegarder dans l'historique
       const token = await getAuthToken();
-      
-      const res = await fetch(`${API_BASE}/api/chat/kine/history-administrative`, {
-        method: 'DELETE',
+      await fetch(`${API_BASE}/api/templates/history`, {
+        method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({
+          patientId: selectedPatient.id,
+          templateId: selectedTemplate.id,
+          templateTitle: selectedTemplate.title,
+          subject: editedSubject,
+          body: editedBody,
+          method: 'EMAIL'
+        })
       });
-      
-      if (!res.ok) {
-        console.error('Erreur suppression:', await res.text());
+
+      toast({
+        title: "✉️ Client mail ouvert",
+        description: `Email pré-rempli pour ${selectedPatient.firstName} ${selectedPatient.lastName}`,
+        variant: "default",
+        duration: 4000,
+      });
+
+      // Réinitialiser après un court délai (laisser le temps au mailto de s'ouvrir)
+      setTimeout(() => {
+        setSelectedTemplate(null);
+        setSelectedPatient(null);
+        setPersonalizedData(null);
+        setEditedSubject('');
+        setEditedBody('');
+      }, 500);
+
+    } catch (error) {
+      console.error('Erreur ouverture client mail:', error);
+      toast({
+        title: "❌ Erreur",
+        description: 'Erreur lors de l\'ouverture du client mail',
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!selectedTemplate || !selectedPatient || !personalizedData) {
+      toast({
+        title: "Sélection incomplète",
+        description: "Veuillez sélectionner un template et un patient",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!canSendWhatsApp()) {
+      toast({
+        title: "Envoi WhatsApp impossible",
+        description: "Le patient n'a pas donné son consentement WhatsApp, n'a pas de téléphone renseigné, ou le template n'est pas dans la catégorie \"Communications Patients\"",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSending(true);
+      const token = await getAuthToken();
+
+      // Envoyer via WhatsApp Business API
+      const res = await fetch(`${API_BASE}/api/templates/send-whatsapp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          patientId: selectedPatient.id,
+          templateId: selectedTemplate.id,
+          templateTitle: selectedTemplate.title,
+          subject: editedSubject,
+          body: editedBody
+        })
+      });
+
+      const data = await res.json();
+
+      // Gestion des erreurs de rate limiting (429)
+      if (res.status === 429) {
+        const retryMinutes = data.retryAfter ? Math.ceil(data.retryAfter / 60) : 60;
+        toast({
+          title: "⏱️ Limite d'envoi atteinte",
+          description: data.details || `Vous avez atteint la limite d'envoi WhatsApp. Veuillez patienter ${retryMinutes} minutes avant de réessayer.`,
+          variant: "destructive",
+          duration: 8000, // 8 secondes pour laisser le temps de lire
+        });
         return;
       }
-      
-      setHistory([]);
-      setChatMessages([]);
+
+      if (data.success) {
+        toast({
+          title: "✅ Message envoyé !",
+          description: `Message WhatsApp envoyé avec succès à ${selectedPatient.firstName} ${selectedPatient.lastName}`,
+          variant: "default",
+          duration: 5000,
+        });
+
+        // Réinitialiser le formulaire
+        setSelectedTemplate(null);
+        setSelectedPatient(null);
+        setPersonalizedData(null);
+        setEditedSubject('');
+        setEditedBody('');
+      } else {
+        toast({
+          title: "❌ Erreur d'envoi",
+          description: data.error || 'Erreur lors de l\'envoi WhatsApp',
+          variant: "destructive",
+        });
+      }
+
     } catch (error) {
-      console.error('Erreur suppression historique:', error);
+      console.error('Erreur envoi WhatsApp:', error);
+      toast({
+        title: "❌ Erreur technique",
+        description: 'Une erreur est survenue lors de l\'envoi WhatsApp',
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleAsk();
-    }
-  };
-
-  const formatTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // ✅ Attendre la fin du chargement des permissions avant d'afficher la page
-  if (paywallLoading) {
+  // Attendre la fin du chargement des permissions avant d'afficher la page
+  if (paywallLoading || isLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Vérification de vos permissions...</p>
+            <p className="text-muted-foreground">
+              {paywallLoading ? 'Vérification de vos permissions...' : 'Chargement des templates...'}
+            </p>
           </div>
         </div>
       </AppLayout>
@@ -337,16 +438,16 @@ export default function KineChatbotAdminPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-6xl mx-auto p-4">
-        
+      <div className="max-w-7xl mx-auto p-4">
+
         {/* Header Upgrade si pas d'accès */}
-        <ChatUpgradeHeader 
+        <ChatUpgradeHeader
           assistantType="ADMINISTRATIF"
           canAccessFeature={canAccessFeature}
           isLoading={paywallLoading}
           subscription={subscription}
         />
-        
+
         {/* Header */}
         <div className="mb-6">
           <Card className="shadow-sm">
@@ -358,295 +459,362 @@ export default function KineChatbotAdminPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span className="text-sm text-green-600 font-medium">Connecté</span>
+                  <span className="text-sm text-green-600 font-medium">Système actif</span>
                 </div>
               </CardTitle>
               <CardDescription>
-                Spécialisée en gestion administrative et réglementaire - Nomenclatures, facturation et conformité
+                Sélectionnez un template, choisissez un patient, personnalisez et envoyez par email ou WhatsApp
               </CardDescription>
             </CardHeader>
           </Card>
         </div>
 
-        {/* Zone de chat principale */}
-        <ChatDisabledOverlay 
+        {/* Zone principale */}
+        <ChatDisabledOverlay
           assistantType="ADMINISTRATIF"
           canAccessFeature={canAccessFeature}
           isLoading={paywallLoading}
         >
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            
-            {/* Chat */}
-            <div className="lg:col-span-3">
-            <Card className="shadow-md min-h-[60vh] max-h-[75vh] flex flex-col">
-              
-              <CardContent 
-                ref={messagesContainerRef}
-                className="flex-1 p-6 overflow-y-auto scroll-smooth"
-                style={{ 
-                  scrollBehavior: 'smooth',
-                  overflowAnchor: 'none'
-                }}
-              >
-                {isLoadingHistory ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
-                      <p className="text-muted-foreground">Chargement de votre conversation...</p>
-                    </div>
-                  </div>
-                ) : chatMessages.length === 0 ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <FileText className="w-12 h-12 text-purple-600 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-muted-foreground mb-2">
-                        Gestion Administrative
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        Posez vos questions administratives - Nomenclatures, facturation et réglementation
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {chatMessages.map((msg, index) => {
-                      const isLastBotMessage = msg.role === 'assistant' && 
-                        index === chatMessages.length - 1;
-                      
-                      return (
-                        <div
-                          key={index}
-                          ref={isLastBotMessage ? lastBotMessageRef : undefined}
-                          className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div
-                            className={`max-w-[80%] p-4 rounded-2xl ${
-                              msg.role === 'user'
-                                ? 'bg-primary text-primary-foreground rounded-br-md'
-                                : 'bg-muted text-foreground rounded-bl-md'
-                            }`}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* Sidebar gauche: Patient + Templates */}
+            <div className="lg:col-span-1 space-y-4">
+
+              {/* Recherche patient - EN HAUT */}
+              <Card className="shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Sélectionner un patient
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Patient sélectionné */}
+                  {selectedPatient ? (
+                    <div className="space-y-2">
+                      <div className="p-3 bg-primary/10 border border-primary rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="font-medium text-sm">
+                            {selectedPatient.firstName} {selectedPatient.lastName}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setSelectedPatient(null);
+                              setPersonalizedData(null);
+                              setEditedSubject('');
+                              setEditedBody('');
+                            }}
+                            className="h-6 px-2 text-xs"
                           >
-                            <div className="prose prose-sm max-w-none">
-                              <div 
-                                className="whitespace-pre-wrap"
-                                dangerouslySetInnerHTML={{
-                                  __html: msg.content
-                                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // **texte** -> gras
-                                    .replace(/\*(.*?)\*/g, '<em>$1</em>') // *texte* -> italique
-                                    .replace(/^- (.*$)/gim, '• $1') // - -> •
-                                    .replace(/^\d+\.\s+(.*$)/gim, '<strong>$1</strong>') // 1. -> gras
-                                    .replace(/\n/g, '<br>') // retours à la ligne
-                                }}
-                              />
-                            </div>
-                            
-                            {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
-                              <div className="mt-4 pt-3 border-t border-muted-foreground/20">
-                                <div className="flex items-center gap-2 mb-3">
-                                  <BookOpen className="w-4 h-4 text-muted-foreground" />
-                                  <span className="text-sm font-medium text-muted-foreground">
-                                    Sources consultées ({(() => {
-                                      const grouped = msg.sources.reduce((acc, source) => {
-                                        const baseTitle = source.title.replace(/ - Partie \d+\/\d+$/, '');
-                                        if (!acc[baseTitle]) {
-                                          acc[baseTitle] = [];
-                                        }
-                                        acc[baseTitle].push(source);
-                                        return acc;
-                                      }, {} as Record<string, Source[]>);
-                                      return Object.keys(grouped).length;
-                                    })()} documents) :
-                                  </span>
-                                  {msg.confidence && (
-                                    <Badge variant="outline" className="text-xs">
-                                      Confiance: {Math.round(msg.confidence * 100)}%
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="space-y-2">
-                                  {(() => {
-                                    const grouped = msg.sources.reduce((acc, source) => {
-                                      const baseTitle = source.title.replace(/ - Partie \d+\/\d+$/, '');
-                                      if (!acc[baseTitle]) {
-                                        acc[baseTitle] = [];
-                                      }
-                                      acc[baseTitle].push(source);
-                                      return acc;
-                                    }, {} as Record<string, Source[]>);
-
-                                    const sortedGroups = Object.entries(grouped)
-                                      .map(([baseTitle, sources]) => ({
-                                        baseTitle,
-                                        sources,
-                                        bestConfidence: Math.max(...sources.map(s => s.confidence))
-                                      }))
-                                      .sort((a, b) => b.bestConfidence - a.bestConfidence)
-                                      .slice(0, 3);
-
-                                    return sortedGroups.map(({ baseTitle, sources }, i) => {
-                                      const bestSource = sources.reduce((best, current) => 
-                                        current.confidence > best.confidence ? current : best
-                                      );
-                                      
-                                      return (
-                                        <div key={i} className="text-sm bg-background/50 rounded-lg p-3 border">
-                                          <div className="flex items-center justify-between mb-1">
-                                            <div className="flex items-center gap-2">
-                                              <Badge 
-                                                variant="outline" 
-                                                className={`text-xs ${getConfidenceColor(bestSource.confidence)}`}
-                                              >
-                                                {getConfidenceIcon(bestSource.confidence)}
-                                                {bestSource.similarity}
-                                              </Badge>
-                                              <span className="font-medium text-foreground">{baseTitle}</span>
-                                            </div>
-                                            <Badge variant="secondary" className="text-xs">
-                                              #{i + 1}
-                                            </Badge>
-                                          </div>
-                                          <div className="flex items-center justify-between text-xs">
-                                            <span className="text-muted-foreground">• {bestSource.category}</span>
-                                            <span className="text-muted-foreground">{bestSource.relevanceLevel}</span>
-                                          </div>
-                                        </div>
-                                      );
-                                    });
-                                  })()}
-                                </div>
-                              </div>
-                            )}
-                            
-                            <div className="flex items-center justify-between mt-2">
-                              <p className={`text-xs ${
-                                msg.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                              }`}>
-                                {formatTime(msg.timestamp)}
-                              </p>
-                            </div>
-                          </div>
+                            Changer
+                          </Button>
                         </div>
-                      );
-                    })}
-                    
-                    {isSending && (
-                      <div className="flex justify-start">
-                        <div className="bg-muted p-4 rounded-2xl rounded-bl-md">
-                          <div className="flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span className="text-muted-foreground">Consultation des ressources administratives...</span>
-                          </div>
+                        <p className="text-xs text-muted-foreground mb-2">{selectedPatient.email}</p>
+
+                        {/* Consentements */}
+                        <div className="flex items-center gap-2">
+                          {selectedPatient.emailConsent ? (
+                            <Badge variant="default" className="text-xs">
+                              <Mail className="h-3 w-3 mr-1" />
+                              Email OK
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              <Mail className="h-3 w-3 mr-1" />
+                              Email refusé
+                            </Badge>
+                          )}
+                          {selectedPatient.whatsappConsent ? (
+                            <Badge variant="default" className="text-xs">
+                              <MessageSquare className="h-3 w-3 mr-1" />
+                              WhatsApp OK
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              <MessageSquare className="h-3 w-3 mr-1" />
+                              WhatsApp refusé
+                            </Badge>
+                          )}
                         </div>
                       </div>
-                    )}
-                    
-                    <div ref={messagesEndRef} className="h-1" />
-                  </div>
-                )}
-              </CardContent>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Barre de recherche */}
+                      <Input
+                        placeholder="Rechercher un patient (nom, email, téléphone)..."
+                        value={patientSearch}
+                        onChange={(e) => setPatientSearch(e.target.value)}
+                        className="w-full"
+                      />
 
-              <div className="border-t p-4 bg-background">
-                <div className="flex items-end gap-3">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="Votre question administrative (nomenclatures, facturation, réglementation)..."
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      disabled={isSending}
-                      className="min-h-[44px]"
-                    />
+                      {/* Liste des résultats filtrés */}
+                      {patientSearch && (
+                        <div className="max-h-[250px] overflow-y-auto space-y-1 border rounded-md p-2 bg-background">
+                          {filteredPatients.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-3">
+                              Aucun patient trouvé
+                            </p>
+                          ) : (
+                            filteredPatients.map(patient => (
+                              <div
+                                key={patient.id}
+                                className="p-2 rounded-md hover:bg-muted cursor-pointer transition-colors"
+                                onClick={() => handlePatientSelect(patient)}
+                              >
+                                <p className="font-medium text-sm">
+                                  {patient.firstName} {patient.lastName}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{patient.email}</p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Recherche et filtres */}
+              <Card className="shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Search className="h-4 w-4" />
+                    Rechercher un template
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Input
+                    placeholder="Rechercher..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full"
+                  />
+
+                  {/* Filtres par catégorie */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Catégories</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge
+                        variant={selectedCategory === '' ? 'default' : 'outline'}
+                        className="cursor-pointer hover:bg-primary/80"
+                        onClick={() => setSelectedCategory('')}
+                      >
+                        Toutes ({templates.length})
+                      </Badge>
+                      {categories.map(cat => (
+                        <Badge
+                          key={cat.name}
+                          variant={selectedCategory === cat.name ? 'default' : 'outline'}
+                          className="cursor-pointer hover:bg-primary/80"
+                          onClick={() => setSelectedCategory(cat.name)}
+                        >
+                          {cat.name} ({cat.count})
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
-                  <Button 
-                    onClick={handleAsk} 
-                    disabled={isSending || !message.trim()}
-                    size="icon"
-                    className="min-h-[44px] min-w-[44px]"
-                  >
-                    {isSending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-                
-                <div className="flex justify-between items-center mt-2">
-                  <p className="text-xs text-muted-foreground">
-                    Appuyez sur Entrée pour envoyer • Gestion administrative • Conformité réglementaire
-                  </p>
-                  {chatMessages.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      {Math.floor(chatMessages.length / 2)} questions posées
+                </CardContent>
+              </Card>
+
+              {/* Liste des templates - HAUTEUR OPTIMISÉE */}
+              <Card className="shadow-sm flex-1">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">
+                    Templates ({filteredTemplates.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="max-h-[calc(100vh-600px)] min-h-[300px] overflow-y-auto space-y-2">
+                  {filteredTemplates.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Aucun template trouvé
                     </p>
+                  ) : (
+                    filteredTemplates.map(template => (
+                      <div
+                        key={template.id}
+                        className={`p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                          selectedTemplate?.id === template.id
+                            ? 'bg-primary/10 border-primary'
+                            : 'hover:bg-muted border-border'
+                        }`}
+                        onClick={() => handleTemplateSelect(template)}
+                      >
+                        <p className="font-medium text-sm mb-1">{template.title}</p>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {template.category}
+                          </Badge>
+                          {template.usageCount > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              {template.usageCount}x
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))
                   )}
-                </div>
-              </div>
-            </Card>
-          </div>
+                </CardContent>
+              </Card>
+            </div>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-4">
-            
-            {/* Actions rapides */}
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between text-base">
-                  <div className="flex items-center gap-2">
-                    <History className="h-4 w-4" />
-                    Actions
-                  </div>
-                  {history.length > 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={clearHistory}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+            {/* Zone principale: Aperçu et édition */}
+            <div className="lg:col-span-2">
+              <Card className="shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-lg">
+                    {selectedTemplate ? selectedTemplate.title : 'Sélectionnez un template'}
+                  </CardTitle>
+                  {selectedTemplate && (
+                    <CardDescription>
+                      Catégorie: {selectedTemplate.category}
+                    </CardDescription>
                   )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p>📊 <strong>{history.length}</strong> conversations sauvegardées</p>
-                  <p>📅 Historique sur <strong>5 jours</strong></p>
-                  <p>🔐 Données <strong>sécurisées</strong></p>
-                  <p>📋 Ressources administratives <strong>actives</strong></p>
-                </div>
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent className="space-y-4">
 
-            {/* Conseils d'utilisation */}
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">💡 Conseils Admin</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground space-y-2">
-                  <div>
-                    <p className="font-medium mb-1">Questions administratives :</p>
-                    <ul className="space-y-1 pl-2">
-                      <li>• Nomenclatures et codifications</li>
-                      <li>• Facturation et remboursements</li>
-                      <li>• Réglementation professionnelle</li>
-                      <li>• Procédures administratives</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="font-medium mb-1">Optimisation :</p>
-                    <ul className="space-y-1 pl-2">
-                      <li>• Précisez le type de procédure</li>
-                      <li>• Mentionnez le contexte réglementaire</li>
-                      <li>• Spécifiez la nature administrative</li>
-                      <li>• L'IA consulte les référentiels officiels</li>
-                    </ul>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  {!selectedTemplate || !selectedPatient ? (
+                    <div className="flex items-center justify-center h-[50vh] text-center">
+                      <div>
+                        <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground">
+                          {!selectedTemplate
+                            ? 'Sélectionnez un template à gauche'
+                            : 'Sélectionnez un patient pour personnaliser le template'
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  ) : isPersonalizing ? (
+                    <div className="flex items-center justify-center h-[50vh]">
+                      <div className="text-center">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
+                        <p className="text-muted-foreground">Personnalisation en cours...</p>
+                      </div>
+                    </div>
+                  ) : personalizedData ? (
+                    <>
+                      {/* Alertes */}
+                      {personalizedData.remainingVariables.length > 0 && (
+                        <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-yellow-800">
+                              Variables à compléter manuellement
+                            </p>
+                            <p className="text-xs text-yellow-700 mt-1">
+                              Les variables surlignées en jaune doivent être complétées avant l'envoi
+                            </p>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {personalizedData.remainingVariables.map((variable, index) => (
+                                <Badge key={index} variant="outline" className="bg-yellow-100 border-yellow-300">
+                                  {variable}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
+                      {/* Objet */}
+                      {editedSubject && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Objet</label>
+                          <Input
+                            value={editedSubject}
+                            onChange={(e) => setEditedSubject(e.target.value)}
+                            className="w-full"
+                            placeholder="Objet du message"
+                          />
+                        </div>
+                      )}
+
+                      {/* Corps du message */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Message</label>
+
+                        {/* Aperçu avec variables surlignées */}
+                        <div
+                          className="p-4 bg-muted rounded-lg border text-sm whitespace-pre-wrap mb-2"
+                          dangerouslySetInnerHTML={{ __html: highlightVariables(editedBody) }}
+                        />
+
+                        {/* Zone d'édition */}
+                        <Textarea
+                          value={editedBody}
+                          onChange={(e) => setEditedBody(e.target.value)}
+                          className="min-h-[300px] font-mono text-sm"
+                          placeholder="Personnalisez le message..."
+                        />
+                      </div>
+
+                      {/* Boutons d'envoi */}
+                      <div className="flex items-center gap-3 pt-4 border-t">
+                        <Button
+                          onClick={handleSendEmail}
+                          disabled={!canSendEmail() || isSending}
+                          className="flex-1"
+                          variant={canSendEmail() ? 'default' : 'secondary'}
+                        >
+                          {isSending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Envoi...
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="h-4 w-4 mr-2" />
+                              Envoyer par Email
+                            </>
+                          )}
+                        </Button>
+
+                        <Button
+                          onClick={handleSendWhatsApp}
+                          disabled={!canSendWhatsApp() || isSending}
+                          className="flex-1"
+                          variant={canSendWhatsApp() ? 'default' : 'secondary'}
+                        >
+                          {isSending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Envoi...
+                            </>
+                          ) : (
+                            <>
+                              <MessageSquare className="h-4 w-4 mr-2" />
+                              Envoyer par WhatsApp
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {/* Infos consentement */}
+                      <div className="text-xs text-muted-foreground space-y-1 pt-2">
+                        {!canSendEmail() && (
+                          <p className="text-orange-600">
+                            ⚠️ Email non disponible: patient n'a pas donné son consentement ou email manquant
+                          </p>
+                        )}
+                        {!canSendWhatsApp() && selectedTemplate.category === 'Communications Patients' && (
+                          <p className="text-orange-600">
+                            ⚠️ WhatsApp non disponible: patient n'a pas donné son consentement ou téléphone manquant
+                          </p>
+                        )}
+                        {selectedTemplate.category !== 'Communications Patients' && (
+                          <p className="text-muted-foreground">
+                            ℹ️ WhatsApp uniquement disponible pour la catégorie "Communications Patients"
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  ) : null}
+
+                </CardContent>
+              </Card>
             </div>
           </div>
         </ChatDisabledOverlay>

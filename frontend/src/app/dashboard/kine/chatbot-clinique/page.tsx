@@ -570,8 +570,14 @@ export default function KineChatbotCliniquePage() {
                     )}
                   </Button>
                 </div>
-                
-                <div className="flex justify-between items-center mt-2">
+
+                <div className="mt-3 mb-2">
+                  <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded px-3 py-2">
+                    ⚠️ L'IA peut faire des erreurs, vérifiez les informations importantes.
+                  </p>
+                </div>
+
+                <div className="flex justify-between items-center">
                   <p className="text-xs text-muted-foreground">
                     Appuyez sur Entrée pour envoyer • Raisonnement clinique • Protocoles thérapeutiques
                   </p>
@@ -587,7 +593,42 @@ export default function KineChatbotCliniquePage() {
 
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-4">
-            
+
+            {/* Conseils d'utilisation */}
+            <Card className="shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">💡 Conseils Cliniques</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-xs text-muted-foreground space-y-3">
+                  <div>
+                    <p className="font-medium mb-1">Questions cliniques :</p>
+                    <ul className="space-y-1 pl-2">
+                      <li>• Aide au diagnostic différentiel</li>
+                      <li>• Protocoles thérapeutiques</li>
+                      <li>• Raisonnement clinique complexe</li>
+                      <li>• Cas cliniques et symptomatologie</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium mb-1">Optimisation :</p>
+                    <ul className="space-y-1 pl-2">
+                      <li>• Décrivez les symptômes observés</li>
+                      <li>• Mentionnez le contexte patient</li>
+                      <li>• Précisez votre questionnement</li>
+                      <li>• L'IA suit le raisonnement clinique</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground mb-2">📝 Exemple optimisé :</p>
+                    <p className="text-xs italic bg-muted/50 p-2 rounded border">
+                      "Patient 45 ans, sportif amateur. Douleur épaule antérieure apparue progressivement depuis 3 semaines après reprise tennis. Limitation flexion active 130°, douleur nocturne sur décubitus latéral côté atteint. Pas de traumatisme récent."
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Actions rapides */}
             <Card className="shadow-sm">
               <CardHeader>
@@ -614,35 +655,6 @@ export default function KineChatbotCliniquePage() {
                   <p>📅 Historique sur <strong>5 jours</strong></p>
                   <p>🔐 Données <strong>sécurisées</strong></p>
                   <p>🩺 Raisonnement clinique <strong>actif</strong></p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Conseils d'utilisation */}
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">💡 Conseils Cliniques</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground space-y-2">
-                  <div>
-                    <p className="font-medium mb-1">Questions cliniques :</p>
-                    <ul className="space-y-1 pl-2">
-                      <li>• Aide au diagnostic différentiel</li>
-                      <li>• Protocoles thérapeutiques</li>
-                      <li>• Raisonnement clinique complexe</li>
-                      <li>• Cas cliniques et symptomatologie</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="font-medium mb-1">Optimisation :</p>
-                    <ul className="space-y-1 pl-2">
-                      <li>• Décrivez les symptômes observés</li>
-                      <li>• Mentionnez le contexte patient</li>
-                      <li>• Précisez votre questionnement</li>
-                      <li>• L'IA suit le raisonnement clinique</li>
-                    </ul>
-                  </div>
                 </div>
               </CardContent>
             </Card>

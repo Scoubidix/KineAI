@@ -130,15 +130,16 @@ const createProgramCompletedNotificationsTask = async () => {
             const completionPercentage = Math.round((validatedDays / totalDays) * 100);
 
             // Créer la notification
-            const patientName = `${sanitizeName(programme.patient.firstName)} ${sanitizeName(programme.patient.lastName)}`;
+            const patientName = `${programme.patient.firstName} ${programme.patient.lastName}`;  // ✅ NOM COMPLET pour BDD
             const title = 'Programme terminé';
-            const message = `Le programme "${programme.titre}" de ${patientName} est terminé - Adhérence ${validatedDays}/${totalDays} jours (${completionPercentage}%)`;
+            const message = `Le programme "${programme.titre}" de ${patientName} est terminé`;  // ✅ NOM COMPLET
 
             const metadata = {
               totalDays,
               validatedDays,
               completionPercentage,
               adherenceRatio: `${validatedDays}/${totalDays}`,
+              adherenceText: `${validatedDays}/${totalDays} jours complétés, ${completionPercentage}% d'adhérence`,  // ✅ Ajout adherenceText
               programmeStartDate: programme.dateDebut,
               programmeEndDate: programme.dateFin,
               completedAt: now.toISOString(),

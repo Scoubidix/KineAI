@@ -570,8 +570,14 @@ export default function KineChatbotBiblioPage() {
                     )}
                   </Button>
                 </div>
-                
-                <div className="flex justify-between items-center mt-2">
+
+                <div className="mt-3 mb-2">
+                  <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded px-3 py-2">
+                    ⚠️ L'IA peut faire des erreurs, vérifiez les informations importantes.
+                  </p>
+                </div>
+
+                <div className="flex justify-between items-center">
                   <p className="text-xs text-muted-foreground">
                     Appuyez sur Entrée pour envoyer • Références scientifiques • Publications spécialisées
                   </p>
@@ -587,7 +593,42 @@ export default function KineChatbotBiblioPage() {
 
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-4">
-            
+
+            {/* Conseils d'utilisation */}
+            <Card className="shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">💡 Conseils Biblio</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-xs text-muted-foreground space-y-3">
+                  <div>
+                    <p className="font-medium mb-1">Questions bibliographiques :</p>
+                    <ul className="space-y-1 pl-2">
+                      <li>• Recherche d'études scientifiques</li>
+                      <li>• Méta-analyses et revues systématiques</li>
+                      <li>• Recommandations basées sur l'évidence</li>
+                      <li>• Références et citations pertinentes</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium mb-1">Optimisation :</p>
+                    <ul className="space-y-1 pl-2">
+                      <li>• Utilisez des termes techniques précis</li>
+                      <li>• Mentionnez la pathologie étudiée</li>
+                      <li>• Spécifiez le type d'étude recherché</li>
+                      <li>• L'IA analyse les meilleures sources</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground mb-2">📝 Exemple optimisé :</p>
+                    <p className="text-xs italic bg-muted/50 p-2 rounded border">
+                      "Quelles sont les dernières études sur l'efficacité du renforcement excentrique dans la tendinopathie rotulienne chez le sportif ?"
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Actions rapides */}
             <Card className="shadow-sm">
               <CardHeader>
@@ -614,35 +655,6 @@ export default function KineChatbotBiblioPage() {
                   <p>📅 Historique sur <strong>5 jours</strong></p>
                   <p>🔐 Données <strong>sécurisées</strong></p>
                   <p>📚 Base bibliographique <strong>active</strong></p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Conseils d'utilisation */}
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">💡 Conseils Biblio</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground space-y-2">
-                  <div>
-                    <p className="font-medium mb-1">Questions bibliographiques :</p>
-                    <ul className="space-y-1 pl-2">
-                      <li>• Recherche d'études scientifiques</li>
-                      <li>• Méta-analyses et revues systématiques</li>
-                      <li>• Recommandations basées sur l'évidence</li>
-                      <li>• Références et citations pertinentes</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="font-medium mb-1">Optimisation :</p>
-                    <ul className="space-y-1 pl-2">
-                      <li>• Utilisez des termes techniques précis</li>
-                      <li>• Mentionnez la pathologie étudiée</li>
-                      <li>• Spécifiez le type d'étude recherché</li>
-                      <li>• L'IA analyse les meilleures sources</li>
-                    </ul>
-                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -18,6 +18,8 @@ const {
   generalLimiter,
   authLimiter,
   whatsappSendLimiter,
+  whatsappTemplatesPatientLimiter,
+  whatsappTemplatesKineLimiter,
   documentSearchLimiter,
   rgpdExportLimiter,
   rgpdDeleteLimiter,
@@ -53,6 +55,9 @@ const plansRoutes = require('./routes/plans');
 
 // 🔒 NOUVEAU RGPD : Import des routes RGPD
 const rgpdRoutes = require('./routes/rgpd');
+
+// 📧 NOUVEAU TEMPLATES ADMIN : Import des routes templates administratifs
+const templatesRoutes = require('./routes/templates');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -545,6 +550,21 @@ app.use('/api/rgpd', (req, res, next) => {
   // ✅ Autres routes RGPD (téléchargement, stats) : LIBRES
   next();
 }, rgpdRoutes);
+
+// 📧 TEMPLATES ADMIN : Rate limiting sélectif sur envoi WhatsApp
+app.use('/api/templates', (req, res, next) => {
+  if (req.method === 'POST' && req.path === '/send-whatsapp') {
+    // 🚦 Envoi WhatsApp templates : 2 limiteurs en cascade
+    // 1. Limite par patient (2/heure)
+    return whatsappTemplatesPatientLimiter(req, res, (err) => {
+      if (err) return next(err);
+      // 2. Limite par kiné (10/heure)
+      return whatsappTemplatesKineLimiter(req, res, next);
+    });
+  }
+  // ✅ Autres routes templates (GET, personnalisation, etc.) : LIBRES
+  next();
+}, templatesRoutes);
 
 // ========== ROUTES MÉTIER - RATE LIMITING SÉLECTIF ==========
 

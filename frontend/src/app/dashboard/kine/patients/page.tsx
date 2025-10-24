@@ -37,6 +37,7 @@ export default function PatientsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [patientToDelete, setPatientToDelete] = useState<UserProfileData | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [consentChecked, setConsentChecked] = useState(false);
   const [form, setForm] = useState<UserProfileData>({
     firstName: '',
     lastName: '',
@@ -216,6 +217,7 @@ export default function PatientsPage() {
             // Réinitialiser le formulaire quand le modal se ferme
             if (!open) {
               setForm({ firstName: '', lastName: '', birthDate: '', phone: '', email: '', goals: '' });
+              setConsentChecked(false);
             }
           }}>
             <DialogTrigger asChild>
@@ -346,10 +348,36 @@ export default function PatientsPage() {
 
                 {/* Section validation */}
                 <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-white dark:bg-gray-900">
+                  {/* Checkbox consentement RGPD */}
+                  {!form.id && (
+                    <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <input
+                        type="checkbox"
+                        id="consent-checkbox"
+                        checked={consentChecked}
+                        onChange={(e) => setConsentChecked(e.target.checked)}
+                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                      />
+                      <label htmlFor="consent-checkbox" className="flex-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                        J'ai remis au patient le{' '}
+                        <a
+                          href="/legal/consentement-patient.html"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Formulaire de consentement patient
+                        </a>
+                        {' '}(signature obligatoire)
+                      </label>
+                    </div>
+                  )}
+
                   <div className="flex flex-col sm:flex-row gap-3">
-                    <Button 
+                    <Button
                       type="button"
-                      variant="outline" 
+                      variant="outline"
                       onClick={() => {
                         setDialogOpen(false);
                         // Le formulaire sera automatiquement réinitialisé par onOpenChange
@@ -358,15 +386,15 @@ export default function PatientsPage() {
                     >
                       Annuler
                     </Button>
-                    <Button 
+                    <Button
                       onClick={handleAddOrUpdatePatient}
                       className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
-                      disabled={!form.firstName || !form.lastName || !form.birthDate || !form.phone || !form.email}
+                      disabled={!form.firstName || !form.lastName || !form.birthDate || !form.phone || !form.email || (!form.id && !consentChecked)}
                     >
                       {form.id ? 'Mettre à jour' : 'Créer le patient'}
                     </Button>
                   </div>
-                  
+
                   <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
                     * Champs obligatoires
                   </p>

@@ -25,6 +25,7 @@ const anonymizePatientData = (patient, programmes) => {
       statut: prog.statut || 'actif',
       exercices: prog.exercices?.map(ex => ({
         nom: ex.exerciceModele?.nom || ex.nom,
+        description: ex.exerciceModele?.description || 'Description non disponible',
         series: ex.series,
         repetitions: ex.repetitions,
         pause: ex.pause || ex.tempsRepos,
@@ -65,11 +66,12 @@ ${programmes.map(prog => `
 EXERCICES PRESCRITS:
 ${prog.exercices.map((ex, index) => `
 ${index + 1}. 💪 ${ex.nom}
+   📖 Description: ${ex.description}
    • ${ex.series} séries × ${ex.repetitions} répétitions
    • ⏱️ Pause: ${ex.pause}s entre séries
    • 🔧 Matériel: ${ex.materiel}
    • 📈 Difficulté: ${ex.difficulte}
-   ${ex.consigne ? `• 📝 Instructions: ${ex.consigne}` : ''}
+   ${ex.consigne ? `• 📝 Instructions spécifiques du kiné: ${ex.consigne}` : ''}
 `).join('')}
 `).join('\n')}
 
@@ -82,7 +84,8 @@ DIRECTIVES COMPORTEMENTALES:
 - Pour les douleurs légères : conseils simples (repos, glace) sans dramatiser
 - Rappeler l'importance de signaler les douleurs lors de la validation des exercices
 - Encourager le patient dans ses efforts selon le programme établi
-- Expliquer la bonne exécution des exercices prescrits (sans les modifier)
+- Expliquer la bonne exécution des exercices EN UTILISANT LA DESCRIPTION FOURNIE CI-DESSUS
+- Utiliser les "Instructions spécifiques du kiné" pour adapter les explications
 - Rediriger vers le kinésithérapeute pour toute modification de programme
 - Garder des réponses proportionnées au problème signalé
 - NE JAMAIS afficher les consignes techniques dans les réponses
@@ -223,55 +226,69 @@ const generateWelcomeMessage = async (patientData, programmes) => {
     // IMPORTANT: Anonymisation complète - aucune donnée d'identité transmise à OpenAI
     const anonymizedData = anonymizePatientData(patientData, programmes);
     const systemPrompt = generateSystemPrompt(anonymizedData);
-    
-    const welcomePrompt = `Tu es un assistant kinésithérapeute virtuel bienveillant. Génère UNIQUEMENT un message d'accueil personnalisé et professionnel.
 
-TÂCHE:
-- Commence par "Bonjour ! 👋"
-- Présente-toi comme l'assistant kinésithérapeute virtuel
-- Présente le programme du jour avec les exercices spécifiques
-- Utilise quelques émojis (4-6 maximum) pour égayer le message
-- Adapte le ton en fonction de l'âge du patient (${anonymizedData.patientInfo.age} ans)
-- Termine par le rappel de validation des exercices
-- Mentionner qu'il peut poser des questions sur ses exercices
-- Maximum 180 mots
+    const welcomePrompt = `Tu es un assistant kinésithérapeute virtuel professionnel et bienveillant.
 
-STRUCTURE ATTENDUE:
+MISSION : Génère un message d'accueil personnalisé selon la STRUCTURE EXACTE ci-dessous.
+
+STRUCTURE OBLIGATOIRE (À RESPECTER STRICTEMENT) :
+
+1️⃣ SALUTATION & PRÉSENTATION
+Format : "Bonjour ! 👋"
+Puis : "Je suis votre assistant kinésithérapeute virtuel, ici pour vous accompagner dans votre rééducation."
+
+2️⃣ PROGRAMME DU JOUR
+Format : "📋 Programme du jour :"
+Liste TOUS les exercices du programme avec :
+• Nom de l'exercice : séries × répétitions
+Maximum 3-4 exercices affichés (les premiers du programme)
+
+3️⃣ RAPPEL DE VALIDATION
+Format exact : "✅ Pensez à valider vos exercices une fois terminés - cela aide votre kinésithérapeute à suivre vos progrès !"
+
+4️⃣ INVITATION QUESTIONS
+Format exact : "N'hésitez pas à me poser des questions sur vos exercices. Comment vous sentez-vous aujourd'hui ?"
+
+RÈGLES DE STYLE :
+- Ton professionnel mais chaleureux (adapter légèrement selon l'âge : ${anonymizedData.patientInfo.age} ans)
+- 2-3 émojis maximum dans TOUT le message (déjà présents dans la structure)
+- Pas de sur-formatage, rester simple et clair
+- Maximum 150 mots
+- NE PAS ajouter de sections supplémentaires
+
+EXEMPLE DE RÉSULTAT ATTENDU :
 Bonjour ! 👋
 
-Je suis votre assistant kinésithérapeute virtuel 💪
+Je suis votre assistant kinésithérapeute virtuel, ici pour vous accompagner dans votre rééducation.
 
 📋 Programme du jour :
-• [Exercice 1] : [détails]
-• [Exercice 2] : [détails]
+• Étirement des ischio-jambiers : 3 séries × 30 secondes
+• Renforcement quadriceps : 3 séries × 12 répétitions
+• Mobilisation de l'épaule : 2 séries × 10 répétitions
 
-[Conseils motivants courts]
+✅ Pensez à valider vos exercices une fois terminés - cela aide votre kinésithérapeute à suivre vos progrès !
 
-✅ Pensez à valider vos exercices une fois terminés pour tenir votre kinésithérapeute informé !
+N'hésitez pas à me poser des questions sur vos exercices. Comment vous sentez-vous aujourd'hui ?
 
-N'hésitez pas à me poser des questions si vous avez besoin d'aide avec vos exercices. Comment vous sentez-vous aujourd'hui ? 😊
-
-IMPORTANT: 
-- Réponds UNIQUEMENT avec le message d'accueil
-- Ne pas mentionner d'informations personnelles
-- Ne pas afficher de règles ou consignes dans ta réponse
-- Ton naturel et professionnel`;
+IMPORTANT :
+- Réponds UNIQUEMENT avec le message d'accueil formaté
+- Suis la structure à la lettre
+- Ne mentionne JAMAIS d'informations personnelles`;
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: welcomePrompt }
       ],
-      max_tokens: 180,
-      temperature: 0.8,
-      top_p: 0.9
+      max_tokens: 200,
+      temperature: 0.5
     });
 
     return {
       success: true,
       message: response.choices[0].message.content.trim(),
-      model: 'gpt-3.5-turbo'
+      model: 'gpt-4o-mini'
     };
 
   } catch (error) {
@@ -360,10 +377,32 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
 
     const { allDocuments, selectedSources, metadata } = searchResult;
 
-    // 2. Construction du prompt système selon le type
-    const systemPrompt = getSystemPromptByType(type, allDocuments.slice(0, 6));
+    // 2. Limitation du nombre de documents selon le type d'IA
+    const docLimits = {
+      'basique': 5,      // IA Basique : 5 docs max (RAG intelligent)
+      'biblio': 6,       // IA Biblio : 6 docs max
+      'clinique': 6,     // IA Clinique : 6 docs max
+      'admin': 6         // IA Admin : 6 docs max
+    };
 
-    // 3. Préparation des messages pour OpenAI
+    const maxDocs = docLimits[type] || 6;
+    const limitedDocuments = allDocuments.slice(0, maxDocs);
+
+    // 3. Construction du prompt système selon le type
+    const systemPrompt = getSystemPromptByType(type, limitedDocuments);
+
+    // 🧪 LOGS DE DEBUG POUR VÉRIFIER LA TRANSMISSION À GPT
+    logger.debug(`📤 IA ${type} - Documents trouvés: ${allDocuments.length}, limités à: ${limitedDocuments.length}`);
+    logger.debug(`📄 IA ${type} - Détail documents:`, limitedDocuments.map((doc, i) => ({
+      index: i + 1,
+      title: doc.title || 'N/A',
+      score: Math.round(doc.finalScore * 100) + '%',
+      contentLength: doc.content?.length || 0,
+      contentPreview: doc.content?.substring(0, 100) + '...'
+    })));
+    logger.debug(`📝 IA ${type} - Taille prompt système: ${systemPrompt.length} caractères`);
+
+    // 4. Préparation des messages pour OpenAI
     const limitedHistory = conversationHistory.slice(-6);
 
     const messages = [
@@ -372,41 +411,61 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
       { role: 'user', content: message }
     ];
 
-    // 4. Appel OpenAI
+    // 5. Appel OpenAI avec modèle adapté au type d'IA
+    const modelConfig = {
+      'basique': {
+        model: 'gpt-4o-mini',
+        max_tokens: 750,
+        temperature: 0.5  // Température moyenne pour ton conversationnel
+      },
+      'clinique': {
+        model: 'gpt-4o-mini',
+        max_tokens: 1500,
+        temperature: 0.3  // Température basse pour cohérence maximale
+      },
+      'default': {
+        model: 'gpt-3.5-turbo',
+        max_tokens: 1000,
+        temperature: 0.7
+      }
+    };
+
+    const config = modelConfig[type] || modelConfig['default'];
+
     const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: config.model,
       messages,
-      max_tokens: 1000,
-      temperature: 0.7,
+      max_tokens: config.max_tokens,
+      temperature: config.temperature,
       presence_penalty: 0.1,
       frequency_penalty: 0.1
     });
 
     const aiResponse = completion.choices[0].message.content;
 
-    // 5. Sauvegarde dans la bonne table
+    // 6. Sauvegarde dans la bonne table
     await saveToCorrectTable(type, kineId, message, aiResponse);
     logger.debug(`💾 Conversation IA ${type} sauvegardée`);
 
-    // 6. Calcul de la confiance globale
-    const overallConfidence = knowledgeService.calculateOverallConfidence(allDocuments);
+    // 7. Calcul de la confiance globale (sur documents limités)
+    const overallConfidence = knowledgeService.calculateOverallConfidence(limitedDocuments);
 
-    // 7. Construction de la réponse finale
+    // 8. Construction de la réponse finale
     const response = {
       success: true,
       message: aiResponse,
       sources: knowledgeService.formatSources(selectedSources),
       confidence: overallConfidence,
       metadata: {
-        model: 'gpt-3.5-turbo',
+        model: config.model,  // Modèle dynamique selon le type d'IA
         iaType: type,
         kineId: kineId,
         documentsFound: metadata.totalFound,
-        documentsUsedForAI: Math.min(allDocuments.length, 6),
+        documentsUsedForAI: limitedDocuments.length,  // Utiliser documents limités
         documentsDisplayed: selectedSources.length,
         averageRelevance: Math.round(metadata.averageScore * 100),
         categoriesFound: metadata.categoriesFound,
-        hasHighQualityContext: allDocuments.some(doc => doc.finalScore > 0.8),
+        hasHighQualityContext: limitedDocuments.some(doc => doc.finalScore > 0.8),
         timestamp: new Date().toISOString()
       }
     };
@@ -473,33 +532,109 @@ const saveToCorrectTable = async (type, kineId, message, response) => {
 // ========== PROMPTS SYSTÈME SPÉCIALISÉS ==========
 
 function buildBasiqueSystemPrompt(contextDocuments) {
-  let systemPrompt = `ATTENTION : Tu parles à un KINÉSITHÉRAPEUTE PROFESSIONNEL, PAS à un patient !
+  let systemPrompt = `Tu es un assistant IA conversationnel pour kinésithérapeutes professionnels.
 
-Tu es un assistant IA conversationnel pour AIDER LES KINÉSITHÉRAPEUTES dans leur travail. L'utilisateur qui te parle est un kinésithérapeute diplômé qui traite des patients.
+ATTENTION : L'UTILISATEUR EST UN KINÉSITHÉRAPEUTE DIPLÔMÉ, PAS UN PATIENT !
 
-RÔLE : Assistant conversationnel pour kinésithérapeutes
-UTILISATEUR : Un kinésithérapeute professionnel (pas un patient)
-OBJECTIF : Donner des conseils thérapeutiques professionnels généraux`;
+RÔLE :
+- Assistant conversationnel rapide et direct
+- Réponses courtes et pratiques (format chat, pas de longs développements)
+- Ton professionnel mais décontracté (de kiné à kiné)
 
+TON & STYLE :
+- Utilise "tu" ou "vous" selon le contexte (adresse-toi au kiné)
+- Format conversationnel : quelques paragraphes courts, pas de sur-structuration
+- 2-3 emojis maximum (juste pour la lisibilité)
+- Réponses directes et actionnables
+- Maximum 200-250 mots par réponse
+
+CAPACITÉS :
+✅ Conseils thérapeutiques généraux
+✅ Explications pour éducation patient
+✅ Questions pratiques de cabinet
+✅ Approches cliniques générales
+✅ Organisation et workflow
+
+INTERDICTIONS ABSOLUES :
+❌ JAMAIS poser de diagnostic médical
+❌ JAMAIS inventer ou halluciner des informations
+❌ JAMAIS répondre à des questions hors kinésithérapie
+❌ Si hors scope → "Désolé, je suis spécialisé en kinésithérapie uniquement"
+❌ Si incertain → "Je ne suis pas sûr, je préfère que tu vérifies avec..."
+
+RÈGLE ANTI-HALLUCINATION :
+- Si tu ne sais pas → DIS-LE clairement
+- Ne jamais inventer de chiffres, études, ou faits
+- Rester factuel et honnête sur les limites de tes connaissances
+- Préfère dire "Je n'ai pas cette information" plutôt qu'inventer`;
+
+  // ========== GESTION INTELLIGENTE DU RAG ==========
   if (contextDocuments.length > 0) {
-    systemPrompt += `\n\nDOCUMENTS DE RÉFÉRENCE PROFESSIONNELS :
+    systemPrompt += `\n\n📚 DOCUMENTS DISPONIBLES (${contextDocuments.length} document(s)) :
+
+IMPORTANT : Ces documents ont été trouvés dans notre base. ANALYSE leur pertinence sémantique par rapport à la question du kiné.
+
+➡️ SI les documents sont PERTINENTS pour la question :
+   - Utilise-les comme base de ta réponse
+   - Cite la source : "D'après [titre]" ou "Selon [document]"
+   - Combine avec tes connaissances pour enrichir
+
+➡️ SI les documents sont HORS-SUJET ou PEU PERTINENTS :
+   - IGNORE-les complètement
+   - Réponds avec tes connaissances générales
+   - Mentionne : "Aucun document pertinent dans notre base, voici ce que je peux te dire..."
+
+NE FORCE JAMAIS l'utilisation des documents si ils ne répondent pas à la question !
 `;
 
     contextDocuments.forEach((doc, index) => {
       const score = Math.round(doc.finalScore * 100);
-      
-      systemPrompt += `📄 Document ${index + 1} (Score: ${score}%) - "${doc.title}" [${doc.category || 'Général'}] :
+      const source = doc.metadata?.source_file || doc.title || 'Source non spécifiée';
+      const category = doc.category || doc.metadata?.type_contenu || 'Général';
+
+      systemPrompt += `\n📄 DOCUMENT ${index + 1} (Score: ${score}%)
+SOURCE : ${source}
+TITRE : "${doc.title}"
+CATÉGORIE : ${category}
+
+CONTENU :
 ${doc.content.substring(0, 800)}
 
+---
 `;
     });
+  } else {
+    systemPrompt += `\n\n📄 AUCUN DOCUMENT TROUVÉ :
+Réponds avec tes connaissances générales en kinésithérapie.`;
   }
 
-  systemPrompt += `\n\nINSTRUCTIONS :
-- TOUJOURS s'adresser au kinésithérapeute, jamais au patient
-- Donner des conseils de professionnel à professionnel
-- Utiliser "vos patients", "dans votre pratique", "je vous recommande"
-- Être précis et technique dans tes recommandations`;
+  systemPrompt += `\n\nFORMAT DE RÉPONSE :
+- Réponds DIRECTEMENT à la question (pas de longs préambules)
+- Style conversationnel et fluide
+- 3-5 phrases courtes ou 2-3 paragraphes max
+- Si besoin de structure → quelques bullet points simples
+- Termine par une ouverture si pertinent ("N'hésite pas si...", "Tu peux aussi...")
+
+EXEMPLES DE BONNES RÉPONSES :
+
+Question : "Comment expliquer une tendinopathie à un patient ?"
+Réponse : "Pour vulgariser, je te conseille l'image du câble effiloché 🧵 Explique que le tendon est comme une corde faite de milliers de fibres. Quand il est surmené, certaines fibres s'abîment et le tendon devient sensible et moins solide.
+
+Ajoute que ce n'est pas une déchirure complète, mais plutôt une fatigue du tendon qui a besoin de temps et d'exercices progressifs pour se renforcer. Évite le terme 'inflammation' qui fait peur - parle plutôt de 'réaction du tendon au stress'.
+
+Ça passe bien en général, tu peux même dessiner un schéma simple ! 😊"
+
+Question : "Meilleur exercice pour renforcer le psoas ?"
+Réponse : "Le relevé de jambe tendue en décubitus est un classique, mais attention à la compensation lombaire 💪
+
+Je préfère souvent le 'dead bug' (alternance bras/jambes opposées au sol) : plus fonctionnel, meilleur contrôle du tronc, et moins de compensation. Tu peux aussi faire du travail en chaîne avec des mountain climbers lents.
+
+L'essentiel c'est la qualité : psoas actif SANS creuser les lombaires. Tu vérifies ça comment toi ?"
+
+REDIRECTION VERS AUTRES IA (si pertinent) :
+- Tests cliniques détaillés → "Pour des tests précis, l'IA Clinique est plus adaptée"
+- Études scientifiques → "Pour des données bibliographiques, check l'IA Biblio"
+- Templates administratifs → "L'IA Administrative a des modèles tout prêts pour ça"`;
 
   return systemPrompt;
 }
@@ -626,29 +761,250 @@ ${study.sections.map((section, idx) =>
 }
 
 function buildCliniqueSystemPrompt(contextDocuments) {
-  let systemPrompt = `Tu es un assistant clinique pour un kinésithérapeute professionnel.
+  // Calculer la pertinence moyenne des documents
+  const avgSimilarity = contextDocuments.length > 0
+    ? contextDocuments.reduce((acc, doc) => acc + (doc.finalScore || 0), 0) / contextDocuments.length
+    : 0;
 
-RÔLE : Assistant clinique spécialisé
-UTILISATEUR : Kinésithérapeute en situation clinique
-OBJECTIF : Aide à la prise en charge clinique, diagnostic kinésithérapique, techniques thérapeutiques`;
+  // Déterminer le mode : RAG strict, assisté ou général
+  const hasHighQualityDocs = contextDocuments.length >= 1 && avgSimilarity >= 0.65;
+  const hasLowQualityDocs = contextDocuments.length > 0 && avgSimilarity < 0.65;
 
-  if (contextDocuments.length > 0) {
-    systemPrompt += `\n\nDOCUMENTS CLINIQUES DE RÉFÉRENCE :
+  // ========== MODE RAG STRICT : Documents pertinents ==========
+  if (hasHighQualityDocs) {
+    let systemPrompt = `Tu es un assistant clinique expert en kinésithérapie musculosquelettique.
+
+SOURCES VALIDÉES : Cleland, Cook, Magee, Daniels & Worthingham, Physiopedia, Physiotutors, PubMed, Cochrane, PEDro.
+
+OBJECTIF : Aider le kinésithérapeute à poser les bonnes hypothèses et faire les bons tests, dans le bon ordre, avec des références solides.
+
+MODE RAG STRICT ACTIVÉ : ${contextDocuments.length} documents pertinents trouvés (pertinence moyenne: ${Math.round(avgSimilarity * 100)}%)
+
+RÈGLES ABSOLUES - MODE STRICT UNIQUEMENT DOCUMENTS :
+- Tu dois utiliser EXCLUSIVEMENT les documents fournis ci-dessous
+- INTERDICTION FORMELLE de mentionner des tests, cotations ou procédures NON présents dans les documents
+- INTERDICTION d'inventer des données chiffrées (sensibilité, spécificité, grades) non mentionnées
+- INTERDICTION d'utiliser tes connaissances générales ou la littérature externe
+- Si un test pertinent n'est PAS dans les documents → NE PAS le mentionner du tout
+- Si des informations manquent → indique "Information non disponible dans notre base"
+- CITE obligatoirement la source exacte pour chaque information : "D'après [source document]"
+
+RÈGLES DE CITATION STRICTES :
+- Pour les tests diagnostiques : utilise UNIQUEMENT les données du document (Sensibilité/Spécificité si présentes)
+- Pour les cotations musculaires : utilise UNIQUEMENT l'échelle présente dans le document
+- Pour toute procédure : détaille UNIQUEMENT ce qui est écrit dans le document (position, geste, critères)
+- Ne jamais compléter ou enrichir avec des connaissances externes
+
+LIMITATION VOLONTAIRE :
+- Si tu n'as qu'UN SEUL test documenté → propose UNIQUEMENT ce test
+- Si tu n'as que DEUX tests documentés → propose UNIQUEMENT ces deux tests
+- Ne suggère JAMAIS de tests qui ne sont pas dans les documents fournis
+- Tu peux conclure par : "D'autres tests pourraient être pertinents mais ne sont pas disponibles dans notre base documentaire"
+
+ADAPTABILITÉ DE LA RÉPONSE :
+- Question SIMPLE (ex: cotation, procédure test unique) → Sections essentielles uniquement (test détaillé + résumé)
+- Cas COMPLEXE (diagnostic différentiel) → Structure complète avec arbre décisionnel basé UNIQUEMENT sur les tests disponibles`;
+
+    systemPrompt += `\n\nDOCUMENTS CLINIQUES DE NOTRE BASE :\n`;
+
+    // Grouper par préfixe dans le contenu pour organisation visuelle
+    const cotationDocs = contextDocuments.filter(doc =>
+      doc.content.includes('[COTATION MUSCULAIRE]')
+    );
+    const testDocs = contextDocuments.filter(doc =>
+      doc.content.includes('[TEST DIAGNOSTIQUE]')
+    );
+    const otherDocs = contextDocuments.filter(doc =>
+      !cotationDocs.includes(doc) && !testDocs.includes(doc)
+    );
+
+    // Afficher les documents de cotation en premier
+    if (cotationDocs.length > 0) {
+      systemPrompt += `\nDOCUMENTS DE COTATION MUSCULAIRE (${cotationDocs.length}) :\n`;
+      cotationDocs.forEach((doc, index) => {
+        const score = Math.round(doc.finalScore * 100);
+        const source = doc.metadata?.source_file || doc.title || 'Source non spécifiée';
+
+        systemPrompt += `\nDOCUMENT ${index + 1} (Pertinence: ${score}%) - ${source}
+TITRE : "${doc.title}"
+
+CONTENU :
+${doc.content.substring(0, 1000)}
+
+---
 `;
+      });
+    }
+
+    // Afficher les documents de tests diagnostiques
+    if (testDocs.length > 0) {
+      systemPrompt += `\nDOCUMENTS DE TESTS DIAGNOSTIQUES (${testDocs.length}) :\n`;
+      testDocs.forEach((doc, index) => {
+        const score = Math.round(doc.finalScore * 100);
+        const source = doc.metadata?.source_file || doc.title || 'Source non spécifiée';
+
+        systemPrompt += `\nDOCUMENT ${index + 1} (Pertinence: ${score}%) - ${source}
+TITRE : "${doc.title}"
+
+CONTENU :
+${doc.content.substring(0, 1000)}
+
+---
+`;
+      });
+    }
+
+    // Afficher les autres documents cliniques
+    if (otherDocs.length > 0) {
+      systemPrompt += `\nAUTRES DOCUMENTS CLINIQUES (${otherDocs.length}) :\n`;
+      otherDocs.forEach((doc, index) => {
+        const score = Math.round(doc.finalScore * 100);
+        const source = doc.metadata?.source_file || doc.title || 'Source non spécifiée';
+
+        systemPrompt += `\nDOCUMENT ${index + 1} (Pertinence: ${score}%) - ${source}
+
+        TITRE : "${doc.title}"
+
+CONTENU :
+${doc.content.substring(0, 1000)}
+
+---
+`;
+      });
+    }
+
+    systemPrompt += `\nINSTRUCTIONS D'EXPLOITATION DES DOCUMENTS :
+- Exploite TOUS les documents fournis ci-dessus, quel que soit leur format ou préfixe
+- CITE toujours la source : "D'après [nom document]" ou "Selon [auteur mentionné]"
+- Si une donnée est manquante (ex: pas de sensibilité/spécificité) → indique-le clairement
+- Si plusieurs documents se contredisent → mentionne les deux points de vue avec leurs sources`;
+
+    return systemPrompt + buildResponseStructure();
+  }
+  // ========== MODE ASSISTÉ : Documents peu pertinents ==========
+  else if (hasLowQualityDocs) {
+    let systemPrompt = `Tu es un assistant clinique expert en kinésithérapie musculosquelettique.
+
+MODE ASSISTÉ : ${contextDocuments.length} document(s) trouvé(s) mais pertinence faible (${Math.round(avgSimilarity * 100)}%)
+
+Tu vas répondre en combinant :
+1. Les documents fournis ci-dessous (si pertinents)
+2. Tes connaissances générales en kinésithérapie
+
+RÈGLES D'UTILISATION :
+- Priorise les informations des documents fournis quand elles sont pertinentes
+- Complète avec tes connaissances générales si nécessaire
+- TOUJOURS mentionner : "Informations issues de connaissances générales" quand tu n'utilises pas les documents
+- Pour les données chiffrées sans source : indique "Valeurs approximatives issues de la littérature"
+
+DISCLAIMER À INCLURE DANS TA RÉPONSE :
+Commence ta réponse par :
+"Note : Les documents disponibles dans notre base ont une pertinence limitée pour votre question. Cette réponse combine nos sources disponibles et des connaissances générales de la littérature kinésithérapique."
+
+DOCUMENTS DISPONIBLES (pertinence limitée) :\n`;
 
     contextDocuments.forEach((doc, index) => {
       const score = Math.round(doc.finalScore * 100);
-      
-      systemPrompt += `🏥 Document ${index + 1} (Pertinence: ${score}%) - "${doc.title}" :
+      const source = doc.metadata?.source_file || doc.title || 'Source non spécifiée';
+
+      systemPrompt += `\nDOCUMENT ${index + 1} (Pertinence: ${score}%) - ${source}
+TITRE : "${doc.title}"
+
+CONTENU :
 ${doc.content.substring(0, 800)}
 
+---
 `;
     });
+
+    return systemPrompt + buildResponseStructure();
   }
+  // ========== MODE GÉNÉRAL : Aucun document ==========
+  else {
+    let systemPrompt = `Tu es un assistant clinique expert en kinésithérapie musculosquelettique.
 
-  systemPrompt += `\n\nFOCUS : Diagnostic kinésithérapique, techniques de traitement, protocoles cliniques, évaluation.`;
+MODE GÉNÉRAL : Aucun document de référence trouvé dans notre base pour cette question.
 
-  return systemPrompt;
+Tu vas répondre en utilisant tes connaissances générales en kinésithérapie, basées sur :
+- Ouvrages de référence standard (Cleland, Cook, Magee, Daniels & Worthingham)
+- Littérature scientifique courante (PubMed, Cochrane, PEDro)
+- Pratiques cliniques établies
+
+DISCLAIMER OBLIGATOIRE À INCLURE :
+Commence ta réponse par :
+"**Note importante** : Aucun document de référence spécifique n'est disponible dans notre base pour cette question. Cette réponse est basée sur des connaissances générales de la littérature kinésithérapique. Pour plus de précision, nous vous encourageons à enrichir notre base documentaire avec vos sources de référence."
+
+RÈGLES DE RÉPONSE :
+- Fournis des réponses cliniquement pertinentes et structurées
+- Pour les données chiffrées : TU PEUX donner des valeurs approximatives de sensibilité/spécificité si tu les connais, mais PRÉCISE toujours : "Valeurs approximatives issues de la littérature (non vérifiées dans notre base)"
+- Pour les red flags : soit SPÉCIFIQUE à la zone anatomique concernée (évite les red flags trop génériques)
+- Pour les procédures : donne les grandes lignes mais indique qu'une source précise serait préférable
+- Si cas COMPLEXE (diagnostic différentiel) : inclus un arbre décisionnel même sans documents
+- Encourage l'enrichissement de la base documentaire`;
+
+    return systemPrompt + buildResponseStructure();
+  }
+}
+
+// Fonction helper pour la structure de réponse (commune aux 3 modes)
+function buildResponseStructure() {
+  return `\n\nSTRUCTURE DE RÉPONSE OBLIGATOIRE (adapte selon complexité) :
+
+**1. HYPOTHÈSES DIAGNOSTIQUES**
+- Liste les causes les plus fréquentes ou pertinentes, du plus banal au plus grave
+- Explique le raisonnement clinique pour chaque hypothèse
+- Précise les drapeaux jaunes ou mécanismes aggravants associés
+
+**2. RED FLAGS**
+- Si des red flags sont mentionnés dans les documents → liste-les
+- Si AUCUN red flag n'est présent dans les documents → écris uniquement "Pas de red flag détecté"
+- N'invente JAMAIS de red flags qui ne sont pas dans les documents fournis
+
+**3. TESTS CLINIQUES PRINCIPAUX** (2 à 5 selon complexité)
+Pour chaque test, structure OBLIGATOIRE :
+  - Nom du test
+  - Objectif / pathologie ciblée
+  - Procédure clinique (position, geste, résistance - claire sans jargon)
+  - Critère de positivité
+  - Sensibilité / Spécificité (si disponible dans les documents)
+  - Interprétation clinique (signification test + ou -)
+  - Référence bibliographique (source exacte ou "littérature générale")
+
+**4. ARBRE DÉCISIONNEL** (OBLIGATOIRE si diagnostic différentiel ou cas complexe)
+Propose un enchaînement logique de tests selon les résultats :
+  - Si Test A positif → faire Test X
+  - Si Test A négatif → tester Hypothèse 2
+  - Si incertitude → reconsidérer Hypothèse 3 ou orienter imagerie
+But : guider la prise de décision, comme le ferait un collègue expérimenté
+IMPORTANT : Cette section est OBLIGATOIRE pour les cas complexes avec plusieurs hypothèses
+
+**5. CONSEILS CLINIQUES** (uniquement si utiles)
+  - Astuces terrain (pièges d'interprétation, tests peu fiables seuls, variants)
+  - Tests dépassés ou discutés dans la littérature
+  - Contexte d'interprétation (âge, sport, morphotype)
+
+**6. EXAMENS COMPLÉMENTAIRES** (si justifiés)
+  - Type d'examen (IRM, RX, échographie) seulement si justifié
+  - Indication précise et apport diagnostique
+
+**7. TESTS ANNEXES** (si confirmation nécessaire)
+  - Tests secondaires pour confirmer/infirmer selon résultats précédents
+
+**8. RÉSUMÉ DÉCISIONNEL**
+  - Hypothèse principale
+  - Tests clés avec données chiffrées (si disponibles)
+  - Red flag à vérifier
+  - Prochaine étape logique
+
+RÈGLES DE RÉDACTION :
+- Format professionnel sobre, sans emojis
+- Structure markdown claire avec titres en gras
+- Listes à puces pour lisibilité
+- Si une information est incertaine → indique-le clairement
+- Pour question SIMPLE (ex: cotation, procédure test unique) → sections 3 et 8 suffisent
+- Pour cas COMPLEXE (diagnostic différentiel) → TOUTES les sections pertinentes, y compris l'arbre décisionnel (section 4)
+
+RAPPEL : Tu es un assistant clinique, pas un prescripteur. Reste factuel et basé sur les preuves.`;
 }
 
 function buildAdministrativeSystemPrompt(contextDocuments) {

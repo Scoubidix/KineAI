@@ -557,8 +557,8 @@ export default function KineChatbotPage() {
                       className="min-h-[44px]"
                     />
                   </div>
-                  <Button 
-                    onClick={handleAsk} 
+                  <Button
+                    onClick={handleAsk}
                     disabled={isSending || !message.trim()}
                     size="icon"
                     className="min-h-[44px] min-w-[44px]"
@@ -570,8 +570,14 @@ export default function KineChatbotPage() {
                     )}
                   </Button>
                 </div>
-                
-                <div className="flex justify-between items-center mt-2">
+
+                <div className="mt-3 mb-2">
+                  <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded px-3 py-2">
+                    ⚠️ L'IA peut faire des erreurs, vérifiez les informations importantes.
+                  </p>
+                </div>
+
+                <div className="flex justify-between items-center">
                   <p className="text-xs text-muted-foreground">
                     Appuyez sur Entrée pour envoyer • Conversation sécurisée • Base documentaire active
                   </p>
@@ -587,7 +593,30 @@ export default function KineChatbotPage() {
 
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-4">
-            
+
+            {/* Conseils d'utilisation */}
+            <Card className="shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">💡 Assistant Conversationnel</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-xs text-muted-foreground space-y-3">
+                  <div>
+                    <p className="font-medium text-foreground mb-2">🎯 Idéal pour les questions simples et pratiques</p>
+                    <p className="mb-2">Réponses courtes et directes pour votre pratique quotidienne.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground mb-2">📝 Exemples de questions :</p>
+                    <ul className="space-y-2 pl-2">
+                      <li className="text-xs italic">• "Comment expliquer ce qu'est une tendinopathie à un patient ?"</li>
+                      <li className="text-xs italic">• "Quels exercices simples pour renforcer le psoas ?"</li>
+                      <li className="text-xs italic">• "Comment organiser une séance de rééducation d'épaule ?"</li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Actions rapides */}
             <Card className="shadow-sm">
               <CardHeader>
@@ -614,35 +643,6 @@ export default function KineChatbotPage() {
                   <p>📅 Historique sur <strong>5 jours</strong></p>
                   <p>🔐 Données <strong>sécurisées</strong></p>
                   <p>📚 Base de connaissances <strong>active</strong></p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Conseils d'utilisation */}
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">💡 Conseils d'utilisation</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground space-y-2">
-                  <div>
-                    <p className="font-medium mb-1">Questions spécialisées :</p>
-                    <ul className="space-y-1 pl-2">
-                      <li>• Questions sur les protocoles uploadés</li>
-                      <li>• Détails sur les exercices référencés</li>
-                      <li>• Comparaison avec vos documents</li>
-                      <li>• Conseils basés sur votre base</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="font-medium mb-1">Astuces :</p>
-                    <ul className="space-y-1 pl-2">
-                      <li>• Soyez spécifique dans vos questions</li>
-                      <li>• L'IA garde le contexte de la conversation</li>
-                      <li>• Les sources utilisées sont affichées</li>
-                      <li>• Utilisez Entrée pour envoyer rapidement</li>
-                    </ul>
-                  </div>
                 </div>
               </CardContent>
             </Card>

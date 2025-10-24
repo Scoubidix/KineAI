@@ -247,24 +247,16 @@ function buildMetadataFilters(detectedMetadata, iaType = 'basique') {
   
   switch(iaType) {
     case 'biblio':
-      // IA Biblio : TOUJOURS filtrer sur type_contenu = 'etude' + pathologies si détectées
+      // IA Biblio : TOUJOURS filtrer sur type_contenu = 'etude' UNIQUEMENT (pas de pathologies)
       filters.type_contenu = 'etude';
-      if (detectedMetadata.pathologies && detectedMetadata.pathologies.length > 0) {
-        filters.pathologies = detectedMetadata.pathologies;
-        logger.debug(`🔬 IA Biblio - Filtres: études + pathologies [${detectedMetadata.pathologies.join(', ')}]`);
-      } else {
-        logger.debug(`🔬 IA Biblio - Filtres: études seulement (aucune pathologie détectée)`);
-      }
+      logger.debug(`🔬 IA Biblio - Filtres: études uniquement (pas de filtre pathologies)`);
       logger.debug(`🔬 IA Biblio - Filtres finaux:`, filters);
       break;
       
     case 'clinique':
-      // IA Clinique : Pathologies uniquement pour le moment
-      // TODO: Ajouter filtre type_contenu = 'livre' quand les chunks livres seront créés
-      if (detectedMetadata.pathologies && detectedMetadata.pathologies.length > 0) {
-        filters.pathologies = detectedMetadata.pathologies;
-      }
-      logger.debug(`📚 IA Clinique - Filtres: pathologies seulement (TODO: ajouter livres):`, filters);
+      // IA Clinique : Filtrage géré par la fonction SQL (type_contenu='clinique' hard-codé)
+      // Pas besoin d'envoyer de filtres, la fonction SQL spécialisée gère tout
+      logger.debug(`🩺 IA Clinique - Filtres gérés par search_documents_clinique (type_contenu='clinique' hard-codé)`);
       break;
       
     case 'admin':
@@ -274,11 +266,8 @@ function buildMetadataFilters(detectedMetadata, iaType = 'basique') {
       
     case 'basique':
     default:
-      // IA Basique : Pathologies uniquement (comportement actuel)
-      if (detectedMetadata.pathologies && detectedMetadata.pathologies.length > 0) {
-        filters.pathologies = detectedMetadata.pathologies;
-      }
-      logger.debug(`💬 IA Basique - Filtres: pathologies uniquement:`, filters);
+      // IA Basique : Aucun filtre (recherche vectorielle pure)
+      logger.debug(`💬 IA Basique - Aucun filtre metadata (recherche vectorielle pure)`);
       break;
   }
   
@@ -444,15 +433,23 @@ async function searchDocumentsOptimized(query, options = {}) {
     } = options;
 
     logger.debug(`🔍 Recherche optimisée pour IA ${iaType} avec embedding unique:`, query);
-    
-    // 🆕 OPTIMISATION: Générer l'embedding UNE SEULE FOIS + filtres par IA
-    const detectedMetadata = analyzeQueryForMetadata(query);
-    const metadataFilters = buildMetadataFilters(detectedMetadata, iaType);
-    
+
     // Court-circuit pour IA Admin (pas de RAG)
-    if (metadataFilters === null) {
-      logger.debug('📋 IA Admin - Court-circuit RAG');
+    if (iaType === 'admin') {
+      logger.debug('📋 IA Admin - Court-circuit RAG (pas de recherche)');
       return [];
+    }
+
+    // 🆕 OPTIMISATION: Générer l'embedding UNE SEULE FOIS + filtres par IA
+    // Pour IA Basique, pas d'analyse de métadonnées (recherche vectorielle pure)
+    let metadataFilters = {};
+
+    if (iaType !== 'basique') {
+      const detectedMetadata = analyzeQueryForMetadata(query);
+      metadataFilters = buildMetadataFilters(detectedMetadata, iaType);
+      logger.debug(`🔬 IA ${iaType} - Métadonnées détectées:`, metadataFilters);
+    } else {
+      logger.debug(`💬 IA Basique - Pas d'analyse de métadonnées (recherche vectorielle pure)`);
     }
     
     const queryEmbedding = await generateEmbedding(query);
@@ -526,14 +523,13 @@ async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
       error = result.error;
 
     } else if (iaType === 'clinique') {
-      // TODO: Fonction search_documents_clinique à créer
-      logger.debug(`📚 IA CLINIQUE - Fallback fonction générale (TODO: créer search_documents_clinique)`);
+      logger.debug(`🩺 IA CLINIQUE - Appel fonction spécialisée search_documents_clinique`);
+      logger.debug(`🩺 Metadata filters IA Clinique:`, JSON.stringify(metadataFilters));
 
-      const result = await supabase.rpc('search_documents_with_metadata', {
+      const result = await supabase.rpc('search_documents_clinique', {
         query_embedding: queryEmbedding,
         match_threshold: matchThreshold,
         match_count: matchCount,
-        filter_category: filterCategory,
         metadata_filters: JSON.stringify(metadataFilters)
       });
 
@@ -541,15 +537,13 @@ async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
       error = result.error;
 
     } else {
-      // IA Basique ou autres - fonction générale
-      logger.debug(`💬 IA ${iaType} - Fonction générale search_documents_with_metadata`);
+      // IA Basique - fonction simple sans filtres
+      logger.debug(`💬 IA ${iaType} - Fonction simple search_documents (sans filtres)`);
 
-      const result = await supabase.rpc('search_documents_with_metadata', {
+      const result = await supabase.rpc('search_documents', {
         query_embedding: queryEmbedding,
         match_threshold: matchThreshold,
-        match_count: matchCount,
-        filter_category: filterCategory,
-        metadata_filters: JSON.stringify(metadataFilters)
+        match_count: matchCount
       });
 
       data = result.data;
@@ -558,7 +552,7 @@ async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
 
     if (error) {
       logger.error('❌ Erreur recherche Supabase:', error);
-      logger.debug('⚠️ Fonction search_documents_with_metadata non trouvée. Exécutez la fonction SQL dans Supabase !');
+      logger.debug(`⚠️ Fonction SQL non trouvée pour IA ${iaType}. Vérifiez que la fonction est créée dans Supabase !`);
       return [];
     }
 

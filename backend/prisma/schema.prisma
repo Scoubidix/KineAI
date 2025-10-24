@@ -33,7 +33,7 @@ model Kine {
   patients              Patient[]
   exercicesModeles      ExerciceModele[]
   notifications         Notification[]
-  
+
   // ========== NOUVELLES RELATIONS IA ==========
   chatIaBasique         ChatIaBasique[]
   chatIaBiblio          ChatIaBiblio[]
@@ -44,6 +44,10 @@ model Kine {
   // ========== RELATION RGPD ==========
   rgpdExports           RgpdExport[]
   // ===================================
+
+  // ========== RELATION TEMPLATES ADMIN ==========
+  templatesSentHistory  TemplateSentHistory[]
+  // ==============================================
 }
 
 model Patient {
@@ -62,6 +66,11 @@ model Patient {
   deletedAt  DateTime?
   // ================================
 
+  // ========== CONSENTEMENTS COMMUNICATION ==========
+  emailConsent      Boolean  @default(false)   // Accepte emails admin
+  whatsappConsent   Boolean  @default(false)   // Accepte WhatsApp admin
+  // ================================================
+
   kineId     Int
   kine       Kine         @relation(fields: [kineId], references: [id])
 
@@ -69,6 +78,7 @@ model Patient {
   chatSessions      ChatSession[]
   sessionValidations SessionValidation[]
   notifications     Notification[]
+  templatesSentHistory TemplateSentHistory[]
 }
 
 model ExerciceModele {
@@ -331,6 +341,67 @@ enum ChatRole {
   USER      // Message du patient
   ASSISTANT // Réponse de l'IA
   SYSTEM    // Messages système (bienvenue, etc.)
-  
+
   @@map("chat_role")
 }
+
+// ========== TABLES IA ADMINISTRATIVE ==========
+
+model AdminTemplate {
+  id          Int      @id @default(autoincrement())
+  title       String   @db.VarChar(255)            // Titre du template
+  category    String   @db.VarChar(100)            // Catégorie
+  subject     String?  @db.VarChar(255)            // Objet email suggéré
+  body        String   @db.Text                    // Contenu avec variables [...]
+  tags        String[] @default([])                // Tags pour recherche
+  usageCount  Int      @default(0)                 // Compteur utilisation
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  templatesSentHistory TemplateSentHistory[]
+
+  // Index pour recherche optimisée
+  @@index([category])
+  @@index([tags])
+  @@map("admin_templates")
+}
+
+model TemplateSentHistory {
+  id              Int      @id @default(autoincrement())
+
+  // Relations
+  kineId          Int
+  kine            Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
+  patientId       Int
+  patient         Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  templateId      Int
+  template        AdminTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  // Données de l'envoi
+  templateTitle   String   @db.VarChar(255)        // Titre template (copie pour historique)
+  subject         String   @db.VarChar(255)        // Objet email final
+  body            String   @db.Text                // Contenu final personnalisé
+  patientEmail    String?  @db.VarChar(255)        // Email patient (si email)
+  patientPhone    String?  @db.VarChar(20)         // Téléphone patient (si WhatsApp)
+  method          CommunicationMethod @default(EMAIL) // Méthode d'envoi
+
+  sentAt          DateTime @default(now())
+
+  // Index pour historique
+  @@index([kineId, sentAt])
+  @@index([patientId])
+  @@index([templateId])
+  @@map("templates_sent_history")
+}
+
+enum CommunicationMethod {
+  EMAIL
+  WHATSAPP
+
+  @@map("communication_method")
+}
+
+// =============================================

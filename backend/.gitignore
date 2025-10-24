@@ -23,3 +23,8 @@ firebase.local.*
 
 # 👉 Scripts de preprocessing n8n (ne pas versionner)
 preprocessing*.js
+
+# 👉 Scripts et données de templates (ne pas versionner)
+scripts/importTemplates.js
+data/templates*.csv
+data/*.csv

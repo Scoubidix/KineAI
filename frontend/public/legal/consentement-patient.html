@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulaire de Consentement Patient - Traitement des Données Personnelles</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #f5f5f5;
+        }
+
+        .document {
+            background: white;
+            padding: 40px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2563eb;
+            font-size: 24px;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #1e40af;
+            font-size: 18px;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            border-left: 4px solid #2563eb;
+            padding-left: 10px;
+        }
+
+        h3 {
+            color: #334155;
+            font-size: 16px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        p {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+
+        .intro {
+            background: #eff6ff;
+            padding: 20px;
+            border-left: 4px solid #2563eb;
+            margin-bottom: 25px;
+            font-size: 15px;
+        }
+
+        .form-section {
+            background: #f8fafc;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .form-row {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+
+        .form-row label {
+            font-weight: bold;
+            width: 180px;
+            flex-shrink: 0;
+        }
+
+        .form-row .line {
+            flex: 1;
+            border-bottom: 1px solid #333;
+            min-width: 200px;
+            height: 20px;
+        }
+
+        .checkbox-group {
+            margin: 15px 0;
+            padding-left: 20px;
+        }
+
+        .checkbox-item {
+            margin: 12px 0;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 10px;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+        }
+
+        .important {
+            background: #fef3c7;
+            padding: 15px;
+            border-left: 4px solid #f59e0b;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+
+        .signature-section {
+            margin-top: 40px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .signature-box {
+            border: 2px solid #cbd5e1;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .signature-box p {
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .signature-box .date {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #cbd5e1;
+        }
+
+        .signature-space {
+            height: 100px;
+            border-bottom: 1px solid #333;
+            margin-top: 10px;
+        }
+
+        ul {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        ul li {
+            margin-bottom: 8px;
+        }
+
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #cbd5e1;
+            font-size: 12px;
+            color: #64748b;
+            text-align: center;
+        }
+
+        /* Styles d'impression */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .document {
+                box-shadow: none;
+                padding: 20px;
+            }
+
+            .no-print {
+                display: none;
+            }
+
+            h1 {
+                page-break-after: avoid;
+            }
+
+            h2, h3 {
+                page-break-after: avoid;
+            }
+
+            .form-section {
+                page-break-inside: avoid;
+            }
+
+            .signature-section {
+                page-break-inside: avoid;
+            }
+        }
+
+        .print-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+            transition: background 0.3s;
+        }
+
+        .print-button:hover {
+            background: #1e40af;
+        }
+
+        @media print {
+            .print-button {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="print-button no-print" onclick="window.print()">🖨️ Imprimer</button>
+
+    <div class="document">
+        <h1>FORMULAIRE DE CONSENTEMENT PATIENT</h1>
+        <h1 style="font-size: 18px; border: none; color: #64748b; margin-top: -20px;">Traitement des Données Personnelles et Consentements</h1>
+
+        <div class="intro">
+            <p><strong>Conformément au Règlement Général sur la Protection des Données (RGPD)</strong>, nous vous informons que vos données personnelles font l'objet d'un traitement informatique dans le cadre de votre prise en charge en kinésithérapie.</p>
+            <p>Ce formulaire a pour objectif de recueillir votre consentement éclairé concernant l'utilisation de vos données personnelles et les modalités de communication avec notre cabinet.</p>
+        </div>
+
+        <!-- SECTION 1: INFORMATIONS PATIENT -->
+        <div class="form-section">
+            <h2>1. Informations du Patient</h2>
+
+            <div class="form-row">
+                <label>Nom :</label>
+                <div class="line"></div>
+            </div>
+
+            <div class="form-row">
+                <label>Prénom :</label>
+                <div class="line"></div>
+            </div>
+
+            <div class="form-row">
+                <label>Date de naissance :</label>
+                <div class="line"></div>
+            </div>
+
+            <div class="form-row">
+                <label>Adresse :</label>
+                <div class="line"></div>
+            </div>
+
+            <div class="form-row">
+                <label>Téléphone :</label>
+                <div class="line"></div>
+            </div>
+
+            <div class="form-row">
+                <label>Email :</label>
+                <div class="line"></div>
+            </div>
+        </div>
+
+        <!-- SECTION 2: TRAITEMENT DES DONNÉES -->
+        <h2>2. Traitement des Données Personnelles</h2>
+
+        <h3>2.1 Responsable du traitement</h3>
+        <p>Le responsable du traitement de vos données personnelles est le cabinet de kinésithérapie dans lequel vous êtes pris en charge.</p>
+
+        <h3>2.2 Finalités du traitement</h3>
+        <p>Vos données personnelles sont collectées et traitées pour les finalités suivantes :</p>
+        <ul>
+            <li>Assurer votre prise en charge kinésithérapique (rendez-vous, programmes d'exercices, suivi thérapeutique)</li>
+            <li>Gérer votre dossier patient (historique des séances, bilans, objectifs thérapeutiques)</li>
+            <li>Facturer les actes réalisés et gérer les relations avec l'Assurance Maladie</li>
+            <li>Vous adresser des communications liées à votre traitement (rappels de rendez-vous, consignes, informations administratives)</li>
+            <li>Respecter les obligations légales et réglementaires</li>
+        </ul>
+
+        <h3>2.3 Base légale du traitement</h3>
+        <p>Le traitement de vos données repose sur :</p>
+        <ul>
+            <li>L'exécution d'un contrat de soins (prise en charge thérapeutique)</li>
+            <li>Le respect d'obligations légales (facturation, conservation des dossiers médicaux)</li>
+            <li>Votre consentement pour les communications non strictement nécessaires</li>
+        </ul>
+
+        <h3>2.4 Données collectées</h3>
+        <p>Les données collectées comprennent :</p>
+        <ul>
+            <li><strong>Données d'identification :</strong> nom, prénom, date de naissance, adresse, téléphone, email</li>
+            <li><strong>Données de santé :</strong> antécédents, pathologies, bilans kinésithérapiques, programmes d'exercices, évolution thérapeutique</li>
+            <li><strong>Données administratives :</strong> numéro de sécurité sociale, carte Vitale, ordonnances médicales, factures</li>
+        </ul>
+
+        <h3>2.5 Durée de conservation</h3>
+        <p><strong>Vos données personnelles sont conservées pendant une durée de 10 ans</strong> à compter de la dernière consultation, conformément aux recommandations de l'Ordre des Masseurs-Kinésithérapeutes et aux obligations légales en matière de conservation des dossiers médicaux.</p>
+
+        <h3>2.6 Destinataires des données</h3>
+        <p>Vos données peuvent être communiquées aux destinataires suivants :</p>
+        <ul>
+            <li>Médecins prescripteurs (pour les comptes-rendus de prise en charge)</li>
+            <li>Organismes de sécurité sociale et mutuelles (pour la facturation)</li>
+            <li>Autorités sanitaires (en cas d'obligation légale)</li>
+            <li>Prestataires techniques hébergeurs de l'application (sous engagement de confidentialité)</li>
+        </ul>
+
+        <h3>2.7 Sécurité des données</h3>
+        <p>Le cabinet met en œuvre toutes les mesures techniques et organisationnelles appropriées pour garantir la sécurité et la confidentialité de vos données personnelles (chiffrement, accès sécurisés, sauvegardes régulières, hébergement certifié HDS si applicable).</p>
+
+        <!-- SECTION 3: VOS DROITS -->
+        <h2>3. Vos Droits</h2>
+        <p>Conformément au RGPD, vous disposez des droits suivants concernant vos données personnelles :</p>
+
+        <ul>
+            <li><strong>Droit d'accès :</strong> Vous pouvez obtenir une copie de vos données personnelles</li>
+            <li><strong>Droit de rectification :</strong> Vous pouvez demander la correction de données inexactes ou incomplètes</li>
+            <li><strong>Droit à l'effacement :</strong> Vous pouvez demander la suppression de vos données (sous réserve des obligations légales de conservation)</li>
+            <li><strong>Droit à la limitation :</strong> Vous pouvez demander la limitation du traitement dans certaines conditions</li>
+            <li><strong>Droit à la portabilité :</strong> Vous pouvez recevoir vos données dans un format structuré et les transmettre à un autre responsable</li>
+            <li><strong>Droit d'opposition :</strong> Vous pouvez vous opposer au traitement de vos données pour motif légitime</li>
+            <li><strong>Droit de retrait du consentement :</strong> Vous pouvez retirer votre consentement à tout moment pour les communications non obligatoires</li>
+        </ul>
+
+        <p><strong>Pour exercer vos droits</strong>, vous pouvez contacter le cabinet par email ou courrier postal. Une réponse vous sera apportée dans un délai d'un mois.</p>
+
+        <div class="important">
+            <strong>⚠️ Important :</strong> En cas de difficulté ou de litige, vous avez le droit d'introduire une réclamation auprès de la Commission Nationale de l'Informatique et des Libertés (CNIL) - <a href="https://www.cnil.fr">www.cnil.fr</a>
+        </div>
+
+        <!-- SECTION 4: CONSENTEMENTS SPÉCIFIQUES -->
+        <h2>4. Consentements pour les Communications</h2>
+
+        <p>Dans le cadre de votre prise en charge, le cabinet peut être amené à vous adresser différents types de communications. <strong>Merci de cocher les cases correspondant à vos choix :</strong></p>
+
+        <div class="checkbox-group">
+            <div class="checkbox-item">
+                <input type="checkbox" id="consent-traitement" disabled>
+                <label for="consent-traitement">
+                    <strong>☐ J'accepte</strong> que mes données personnelles et de santé soient collectées et traitées par le cabinet de kinésithérapie dans le cadre de ma prise en charge thérapeutique, conformément aux finalités décrites ci-dessus.
+                    <br><em style="color: #64748b; font-size: 14px;">(Ce consentement est obligatoire pour votre prise en charge)</em>
+                </label>
+            </div>
+
+            <div class="checkbox-item">
+                <input type="checkbox" id="consent-email" disabled>
+                <label for="consent-email">
+                    <strong>☐ J'accepte</strong> de recevoir des communications par <strong>email</strong> liées à mon traitement (rappels de rendez-vous, consignes thérapeutiques, informations administratives, demandes de documents, alertes).
+                </label>
+            </div>
+
+            <div class="checkbox-item">
+                <input type="checkbox" id="consent-whatsapp" disabled>
+                <label for="consent-whatsapp">
+                    <strong>☐ J'accepte</strong> de recevoir des communications par <strong>WhatsApp</strong> liées à mon traitement (rappels de rendez-vous, consignes thérapeutiques, informations administratives).
+                    <br><em style="color: #64748b; font-size: 14px;">Note : Les communications WhatsApp sont réservées aux messages non-médicaux de gestion de rendez-vous et informations pratiques.</em>
+                </label>
+            </div>
+        </div>
+
+        <div class="important">
+            <strong>📌 Précision importante :</strong> Vous pouvez retirer votre consentement pour les communications par email ou WhatsApp à tout moment en contactant le cabinet. Ce retrait n'affectera pas la poursuite de votre prise en charge thérapeutique.
+        </div>
+
+        <!-- SECTION 5: DÉCLARATION ET SIGNATURES -->
+        <h2>5. Déclaration du Patient</h2>
+
+        <p style="margin-top: 20px;">
+            <strong>Je soussigné(e)</strong>, déclare avoir pris connaissance des informations relatives au traitement de mes données personnelles et à mes droits.
+            J'ai été informé(e) de manière claire et transparente sur l'utilisation qui sera faite de mes données dans le cadre de ma prise en charge en kinésithérapie.
+        </p>
+
+        <p>
+            Je consens librement au traitement de mes données personnelles selon les modalités décrites dans ce document et j'ai coché ci-dessus les cases correspondant à mes choix concernant les communications.
+        </p>
+
+        <div class="signature-section">
+            <div class="signature-box">
+                <p>Signature du Patient</p>
+                <p style="font-size: 14px; color: #64748b;">(Précédée de la mention "Lu et approuvé")</p>
+                <div class="signature-space"></div>
+                <div class="date">
+                    <p>Date : ____________________</p>
+                </div>
+            </div>
+
+            <div class="signature-box">
+                <p>Signature du Praticien</p>
+                <p style="font-size: 14px; color: #64748b;">(Masseur-Kinésithérapeute)</p>
+                <div class="signature-space"></div>
+                <div class="date">
+                    <p>Date : ____________________</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Document à conserver :</strong> Le patient conserve un exemplaire de ce formulaire. Un second exemplaire est archivé dans le dossier patient du cabinet.</p>
+            <p style="margin-top: 10px;">Conformément au RGPD (Règlement UE 2016/679) et à la loi Informatique et Libertés modifiée</p>
+        </div>
+    </div>
+
+    <script>
+        // Fonction pour imprimer automatiquement au chargement (optionnel)
+        // window.onload = function() { window.print(); }
+    </script>
+</body>
+</html>

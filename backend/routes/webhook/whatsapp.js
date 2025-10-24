@@ -193,13 +193,85 @@ async function sendWhatsAppMessage(phoneNumber, message, chatLink = null) {
 async function sendProgramLink(phoneNumber, patientName, programLink) {
   logger.debug('📱 Envoi lien programme via TEMPLATE PROGRAMME_KINE pour:', sanitizeName(patientName));
   logger.debug('🔗 Lien à envoyer:', programLink);
-  
+
   // Utilise ton template personnalisé avec le lien
   return await sendWhatsAppMessage(phoneNumber, null, programLink);
+}
+
+// Fonction pour envoyer un message via template MESSAGE_KINE_PATIENT
+async function sendMessageTemplate(phoneNumber, messageContent) {
+  try {
+    logger.debug('🔄 ENVOI TEMPLATE MESSAGE_KINE_PATIENT');
+    logger.debug('📱 Numéro:', phoneNumber);
+    logger.debug('💬 Message (tronqué):', messageContent.substring(0, 100) + '...');
+
+    // WhatsApp Business API ne supporte PAS les sauts de ligne dans les variables de template
+    // Contraintes: pas de \n, \t, ni plus de 4 espaces consécutifs
+    let cleanedMessage = messageContent
+      .replace(/\n\n+/g, '. ')  // Doubles sauts de ligne ou plus → point + espace
+      .replace(/\n/g, ' ')       // Sauts de ligne simples → espace
+      .replace(/\t/g, ' ')       // Tabulations → espace
+      .replace(/\s{5,}/g, '    ') // Plus de 4 espaces consécutifs → 4 espaces max
+      .replace(/\.\s*\./g, '.')  // Nettoyer les doubles points accidentels
+      .trim();
+
+    // Limiter la longueur du message (WhatsApp limite à 1024 caractères par variable)
+    const truncatedMessage = cleanedMessage.length > 1024
+      ? cleanedMessage.substring(0, 1021) + '...'
+      : cleanedMessage;
+
+    if (messageContent.length > 1024) {
+      logger.warn('⚠️ Message tronqué de', messageContent.length, 'à 1024 caractères');
+    }
+
+    const response = await fetch(WHATSAPP_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: phoneNumber,
+        type: 'template',
+        template: {
+          name: 'message_kine_patient', // Nom du template dans Meta Business Manager
+          language: {
+            code: 'fr'
+          },
+          components: [
+            {
+              type: 'BODY',
+              parameters: [
+                {
+                  type: 'TEXT',
+                  text: truncatedMessage
+                }
+              ]
+            }
+          ]
+        }
+      })
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      logger.debug('✅ TEMPLATE MESSAGE_KINE_PATIENT ENVOYÉ:', result);
+      return { success: true, data: result };
+    } else {
+      logger.error('❌ ERREUR TEMPLATE MESSAGE_KINE_PATIENT:', result);
+      return { success: false, error: result };
+    }
+  } catch (error) {
+    logger.error('❌ ERREUR TECHNIQUE TEMPLATE MESSAGE_KINE_PATIENT:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 module.exports = {
   router,
   sendWhatsAppMessage,
-  sendProgramLink
+  sendProgramLink,
+  sendMessageTemplate
 };

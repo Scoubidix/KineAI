@@ -272,6 +272,63 @@ const documentSearchLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter pour l'envoi WhatsApp via templates (par patient)
+ * Protège les patients du spam : max 2 messages/heure par patient
+ */
+const whatsappTemplatesPatientLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 2, // 2 messages max par patient/heure
+  message: {
+    error: 'Limite d\'envoi WhatsApp atteinte pour ce patient',
+    details: 'Maximum 2 messages WhatsApp par heure par patient',
+    retryAfter: 3600
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const { patientId } = req.body;
+    const baseKey = generateSecureKey(req, 'whatsapp_tpl');
+    return `${baseKey}_patient_${patientId}`;
+  },
+  handler: (req, res) => {
+    const { patientId } = req.body;
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - WhatsApp Template Patient - User: ${safeUser} - Patient: ${patientId}`);
+    res.status(429).json({
+      error: 'Limite d\'envoi WhatsApp atteinte pour ce patient',
+      details: 'Maximum 2 messages WhatsApp par heure par patient. Veuillez patienter avant de renvoyer un message à ce patient.',
+      retryAfter: 3600
+    });
+  }
+});
+
+/**
+ * Rate limiter pour l'envoi WhatsApp via templates (par kiné)
+ * Protège contre l'abus massif : max 10 messages/heure tous patients confondus
+ */
+const whatsappTemplatesKineLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 10, // 10 messages max/heure tous patients confondus
+  message: {
+    error: 'Limite d\'envoi WhatsApp atteinte',
+    details: 'Maximum 10 messages WhatsApp par heure',
+    retryAfter: 3600
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'whatsapp_tpl_kine'),
+  handler: (req, res) => {
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - WhatsApp Template Kiné - User: ${safeUser}`);
+    res.status(429).json({
+      error: 'Limite d\'envoi WhatsApp atteinte',
+      details: 'Vous avez atteint la limite de 10 messages WhatsApp par heure. Veuillez patienter avant de renvoyer des messages.',
+      retryAfter: 3600
+    });
+  }
+});
+
+/**
  * Rate limiter pour les exports RGPD (très protégé)
  * 1 export par heure par utilisateur - données sensibles
  */
@@ -347,13 +404,15 @@ const rateLimitLogger = (req, res, next) => {
 
 module.exports = {
   stripePaymentLimiter,
-  stripeSubscriptionLimiter, 
+  stripeSubscriptionLimiter,
   stripeWebhookLimiter,
   gptLimiter,
   gptHeavyLimiter,
   generalLimiter,
   authLimiter,
   whatsappSendLimiter,
+  whatsappTemplatesPatientLimiter,
+  whatsappTemplatesKineLimiter,
   documentSearchLimiter,
   rgpdExportLimiter,
   rgpdDeleteLimiter,

@@ -1,4 +1,5 @@
 const prismaService = require('../services/prismaService');
+const { sanitizeName, sanitizeId } = require('../utils/logSanitizer');
 
 const logger = require('../utils/logger');
 // 🔐 Toutes les routes supposent que req.uid est défini par le middleware authenticate
@@ -71,7 +72,7 @@ exports.createPatient = async (req, res) => {
   try {
     const firebaseUid = req.uid;
     const prisma = prismaService.getInstance();
-    
+
     const kine = await prisma.kine.findUnique({
       where: { uid: firebaseUid },
     });
@@ -98,9 +99,13 @@ exports.createPatient = async (req, res) => {
         phone,
         goals,
         kineId: kine.id,
+        // Consentements activés par défaut (formulaire signé)
+        emailConsent: true,
+        whatsappConsent: true,
       },
     });
 
+    logger.info(`✅ Patient créé avec consentements: ${sanitizeName(firstName)} ${sanitizeName(lastName)} (ID: ${sanitizeId(newPatient.id)})`);
     res.status(201).json(newPatient);
   } catch (err) {
     logger.error("Erreur création patient :", err);
