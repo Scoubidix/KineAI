@@ -183,12 +183,14 @@ export default function KineChatbotAdminPage() {
   const handleTemplateSelect = async (template: Template) => {
     setSelectedTemplate(template);
     setPersonalizedData(null);
-    setEditedSubject('');
-    setEditedBody('');
 
     // Si un patient est déjà sélectionné, personnaliser automatiquement
     if (selectedPatient) {
       await personalizeTemplate(template.id, selectedPatient.id);
+    } else {
+      // Initialiser avec le template brut
+      setEditedSubject(template.subject || '');
+      setEditedBody(template.body);
     }
   };
 
@@ -253,21 +255,18 @@ export default function KineChatbotAdminPage() {
   };
 
   const canSendEmail = () => {
-    if (!selectedPatient) return false;
+    // Si "Communications Patients" → patient obligatoire
+    if (selectedTemplate?.category === 'Communications Patients') {
+      if (!selectedPatient) return false;
+      return selectedPatient.emailConsent && selectedPatient.email;
+    }
 
-    // Patient doit avoir donné son consentement email
-    return selectedPatient.emailConsent && selectedPatient.email;
+    // Autres templates → email toujours possible
+    return true;
   };
 
   const handleSendEmail = async () => {
-    if (!selectedTemplate || !selectedPatient || !personalizedData) {
-      toast({
-        title: "Sélection incomplète",
-        description: "Veuillez sélectionner un template et un patient",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!selectedTemplate) return;
 
     if (!canSendEmail()) {
       toast({
@@ -281,38 +280,51 @@ export default function KineChatbotAdminPage() {
     try {
       setIsSending(true);
 
-      // Créer le lien mailto: avec les champs pré-remplis
-      const mailto = `mailto:${encodeURIComponent(selectedPatient.email)}?subject=${encodeURIComponent(editedSubject)}&body=${encodeURIComponent(editedBody)}`;
+      // CAS 1: Envoi avec patient (personnalisé)
+      if (selectedPatient && personalizedData) {
+        // Créer le lien mailto: avec les champs pré-remplis
+        const mailto = `mailto:${encodeURIComponent(selectedPatient.email)}?subject=${encodeURIComponent(editedSubject)}&body=${encodeURIComponent(editedBody)}`;
+        window.location.href = mailto;
 
-      // Ouvrir le client mail par défaut
-      window.location.href = mailto;
+        // Sauvegarder dans l'historique
+        const token = await getAuthToken();
+        await fetch(`${API_BASE}/api/templates/history`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            patientId: selectedPatient.id,
+            templateId: selectedTemplate.id,
+            templateTitle: selectedTemplate.title,
+            subject: editedSubject,
+            body: editedBody,
+            method: 'EMAIL'
+          })
+        });
 
-      // Sauvegarder dans l'historique
-      const token = await getAuthToken();
-      await fetch(`${API_BASE}/api/templates/history`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          patientId: selectedPatient.id,
-          templateId: selectedTemplate.id,
-          templateTitle: selectedTemplate.title,
-          subject: editedSubject,
-          body: editedBody,
-          method: 'EMAIL'
-        })
-      });
+        toast({
+          title: "✉️ Client mail ouvert",
+          description: `Email pré-rempli pour ${selectedPatient.firstName} ${selectedPatient.lastName}`,
+          variant: "default",
+          duration: 4000,
+        });
+      }
+      // CAS 2: Envoi sans patient (template générique)
+      else {
+        const mailto = `mailto:?subject=${encodeURIComponent(editedSubject)}&body=${encodeURIComponent(editedBody)}`;
+        window.location.href = mailto;
 
-      toast({
-        title: "✉️ Client mail ouvert",
-        description: `Email pré-rempli pour ${selectedPatient.firstName} ${selectedPatient.lastName}`,
-        variant: "default",
-        duration: 4000,
-      });
+        toast({
+          title: "✉️ Client mail ouvert",
+          description: "Template générique prêt à être envoyé",
+          variant: "default",
+          duration: 4000,
+        });
+      }
 
-      // Réinitialiser après un court délai (laisser le temps au mailto de s'ouvrir)
+      // Réinitialiser après un court délai
       setTimeout(() => {
         setSelectedTemplate(null);
         setSelectedPatient(null);
@@ -676,18 +688,110 @@ export default function KineChatbotAdminPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
 
-                  {!selectedTemplate || !selectedPatient ? (
+                  {!selectedTemplate ? (
                     <div className="flex items-center justify-center h-[50vh] text-center">
                       <div>
                         <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                         <p className="text-muted-foreground">
-                          {!selectedTemplate
-                            ? 'Sélectionnez un template à gauche'
-                            : 'Sélectionnez un patient pour personnaliser le template'
-                          }
+                          Sélectionnez un template à gauche
                         </p>
                       </div>
                     </div>
+                  ) : !selectedPatient ? (
+                    <>
+                      {/* Alerte template non personnalisé */}
+                      <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                        <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-blue-800">
+                            Template générique (non personnalisé)
+                          </p>
+                          <p className="text-xs text-blue-700 mt-1">
+                            Vous pouvez modifier et envoyer ce template. Pour personnaliser les variables [...], sélectionnez un patient.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Objet éditable */}
+                      {editedSubject && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Objet</label>
+                          <Input
+                            value={editedSubject}
+                            onChange={(e) => setEditedSubject(e.target.value)}
+                            className="w-full"
+                            placeholder="Objet du message"
+                          />
+                        </div>
+                      )}
+
+                      {/* Corps du message éditable */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Message</label>
+
+                        {/* Aperçu avec variables surlignées */}
+                        <div
+                          className="p-4 bg-muted rounded-lg border text-sm whitespace-pre-wrap mb-2"
+                          dangerouslySetInnerHTML={{ __html: highlightVariables(editedBody) }}
+                        />
+
+                        {/* Zone d'édition */}
+                        <Textarea
+                          value={editedBody}
+                          onChange={(e) => setEditedBody(e.target.value)}
+                          className="min-h-[300px] font-mono text-sm"
+                          placeholder="Personnalisez le message..."
+                        />
+                      </div>
+
+                      {/* Boutons d'envoi */}
+                      <div className="flex items-center gap-3 pt-4 border-t">
+                        <Button
+                          onClick={handleSendEmail}
+                          disabled={!canSendEmail() || isSending}
+                          className="flex-1"
+                          variant={canSendEmail() ? 'default' : 'secondary'}
+                        >
+                          {isSending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Envoi...
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="h-4 w-4 mr-2" />
+                              Envoyer par Email
+                            </>
+                          )}
+                        </Button>
+
+                        <Button
+                          onClick={handleSendWhatsApp}
+                          disabled={!canSendWhatsApp() || isSending}
+                          className="flex-1"
+                          variant={canSendWhatsApp() ? 'default' : 'secondary'}
+                        >
+                          {isSending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Envoi...
+                            </>
+                          ) : (
+                            <>
+                              <MessageSquare className="h-4 w-4 mr-2" />
+                              Envoyer par WhatsApp
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {/* Message pour "Communications Patients" */}
+                      {selectedTemplate.category === 'Communications Patients' && (
+                        <div className="text-xs text-orange-600 text-center pt-2">
+                          ⚠️ Template "Communications Patients" : sélectionnez un patient pour activer l'envoi
+                        </div>
+                      )}
+                    </>
                   ) : isPersonalizing ? (
                     <div className="flex items-center justify-center h-[50vh]">
                       <div className="text-center">

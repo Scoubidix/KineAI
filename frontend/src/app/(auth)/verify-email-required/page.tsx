@@ -302,7 +302,18 @@ export default function VerifyEmailRequiredPage() {
         <div className="text-center text-xs text-muted-foreground space-y-1">
           <p>🔒 <strong>Pourquoi cette vérification ?</strong></p>
           <p>La vérification email garantit la sécurité de votre compte professionnel et la réception des communications importantes.</p>
-          <p className="pt-2">© {new Date().getFullYear()} Mon Assistant Kiné - Plateforme sécurisée</p>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center text-xs text-muted-foreground space-y-1">
+          <p>© {new Date().getFullYear()} Mon Assistant Kiné</p>
+          <p>
+            <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer" className="hover:underline">CGU</a>
+            {" • "}
+            <a href="/legal/politique-confidentialite.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Politique de confidentialité</a>
+            {" • "}
+            <a href="/legal/mentions-legales.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Mentions légales</a>
+          </p>
         </div>
       </div>
     </div>

@@ -642,7 +642,13 @@ export default function AuthActionPage() {
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground space-y-1">
           <p>© {new Date().getFullYear()} Mon Assistant Kiné</p>
-          <p>Plateforme sécurisée - Données de santé protégées</p>
+          <p>
+            <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer" className="hover:underline">CGU</a>
+            {" • "}
+            <a href="/legal/politique-confidentialite.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Politique de confidentialité</a>
+            {" • "}
+            <a href="/legal/mentions-legales.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Mentions légales</a>
+          </p>
         </div>
       </div>
     </div>

@@ -20,6 +20,14 @@ model Kine {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
+  // ========== TRAÇABILITÉ LÉGALE ==========
+  acceptedCguAt                      DateTime?  // Date/heure d'acceptation des CGU
+  acceptedPolitiqueConfidentialiteAt DateTime?  // Date/heure d'acceptation de la politique de confidentialité
+  cguVersion                         String?    // Version des CGU acceptées (ex: "2.0")
+  politiqueConfidentialiteVersion    String?    // Version de la politique de confidentialité acceptée
+  signupIpAddress                    String?    // IP lors de l'inscription (audit trail RGPD)
+  // =========================================
+
   // ========== NOUVEAUX CHAMPS STRIPE ==========
   stripeCustomerId      String?           // ID client Stripe
   subscriptionId        String?           // ID abonnement Stripe actuel

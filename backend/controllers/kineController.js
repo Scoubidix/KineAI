@@ -7,13 +7,27 @@ const logger = require('../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../utils/logSanitizer');
 
 const createKine = async (req, res) => {
-  const { uid, email, firstName, lastName, phone, rpps, adresseCabinet, birthDate } = req.body;
+  const {
+    uid,
+    email,
+    firstName,
+    lastName,
+    phone,
+    rpps,
+    adresseCabinet,
+    birthDate,
+    // Nouveaux champs pour traçabilité légale
+    acceptedCguAt,
+    acceptedPolitiqueConfidentialiteAt,
+    cguVersion,
+    politiqueConfidentialiteVersion
+  } = req.body;
 
   logger.warn("📥 Création kiné - UID:", sanitizeUID(req.body.uid));
 
   try {
     const prisma = prismaService.getInstance();
-    
+
     const existing = await prisma.kine.findUnique({
       where: { uid },
     });
@@ -21,6 +35,13 @@ const createKine = async (req, res) => {
     if (existing) {
       return res.status(409).json({ error: 'Un kiné avec ce UID existe déjà.' });
     }
+
+    // Récupérer l'adresse IP du client (avec support des proxies)
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim()
+                  || req.headers['x-real-ip']
+                  || req.connection.remoteAddress
+                  || req.socket.remoteAddress
+                  || 'unknown';
 
     const newKine = await prisma.kine.create({
       data: {
@@ -32,10 +53,16 @@ const createKine = async (req, res) => {
         rpps,
         adresseCabinet,
         birthDate: new Date(birthDate),
+        // Traçabilité légale
+        acceptedCguAt: acceptedCguAt ? new Date(acceptedCguAt) : null,
+        acceptedPolitiqueConfidentialiteAt: acceptedPolitiqueConfidentialiteAt ? new Date(acceptedPolitiqueConfidentialiteAt) : null,
+        cguVersion: cguVersion || null,
+        politiqueConfidentialiteVersion: politiqueConfidentialiteVersion || null,
+        signupIpAddress: clientIp,
       },
     });
 
-    logger.warn("✅ Kiné créé - ID:", sanitizeId(newKine.id), "Email:", sanitizeEmail(newKine.email));
+    logger.warn("✅ Kiné créé - ID:", sanitizeId(newKine.id), "Email:", sanitizeEmail(newKine.email), "CGU acceptées:", !!acceptedCguAt);
 
     return res.status(201).json(newKine);
   } catch (err) {

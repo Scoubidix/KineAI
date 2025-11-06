@@ -56,6 +56,10 @@ export default function SignupPage() {
   const [signupComplete, setSignupComplete] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+
+  // États pour les acceptations légales
+  const [acceptedCgu, setAcceptedCgu] = useState(false);
+  const [acceptedPolitiqueConfidentialite, setAcceptedPolitiqueConfidentialite] = useState(false);
   
   const router = useRouter();
   const { toast } = useToast();
@@ -192,6 +196,7 @@ export default function SignupPage() {
       const user = userCredential.user;
 
       // 2. Créer l'entrée dans PostgreSQL (source unique de vérité)
+      const now = new Date().toISOString();
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine`, {
         method: "POST",
         headers: {
@@ -207,6 +212,11 @@ export default function SignupPage() {
           email,
           adresseCabinet,
           rpps,
+          // Traçabilité légale
+          acceptedCguAt: acceptedCgu ? now : null,
+          acceptedPolitiqueConfidentialiteAt: acceptedPolitiqueConfidentialite ? now : null,
+          cguVersion: acceptedCgu ? "2.0" : null,
+          politiqueConfidentialiteVersion: acceptedPolitiqueConfidentialite ? "1.0" : null,
         }),
       });
 
@@ -352,7 +362,13 @@ export default function SignupPage() {
           {/* Footer */}
           <div className="text-center text-xs text-muted-foreground space-y-1">
             <p>© {new Date().getFullYear()} Mon Assistant Kiné</p>
-            <p>Plateforme sécurisée - Données de santé protégées</p>
+            <p>
+              <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer" className="hover:underline">CGU</a>
+              {" • "}
+              <a href="/legal/politique-confidentialite.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Politique de confidentialité</a>
+              {" • "}
+              <a href="/legal/mentions-legales.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Mentions légales</a>
+            </p>
           </div>
         </div>
       </div>
@@ -657,14 +673,79 @@ export default function SignupPage() {
                 </div>
               </div>
 
+              {/* Section Documents Légaux */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-foreground border-b pb-2">
+                  Documents légaux
+                </h3>
+
+                <div className="space-y-3 bg-muted/30 p-4 rounded-md">
+                  {/* Checkbox CGU */}
+                  <div className="flex items-start space-x-3">
+                    <input
+                      type="checkbox"
+                      id="acceptCgu"
+                      checked={acceptedCgu}
+                      onChange={(e) => setAcceptedCgu(e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                      required
+                      disabled={loading}
+                    />
+                    <label htmlFor="acceptCgu" className="text-sm text-foreground cursor-pointer flex-1">
+                      J'ai lu et j'accepte les{" "}
+                      <a
+                        href="/legal/cgu.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline hover:text-primary/80"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Conditions Générales d'Utilisation (CGU)
+                      </a>
+                      <span className="text-red-500 ml-1">*</span>
+                    </label>
+                  </div>
+
+                  {/* Checkbox Politique de Confidentialité */}
+                  <div className="flex items-start space-x-3">
+                    <input
+                      type="checkbox"
+                      id="acceptPolitiqueConfidentialite"
+                      checked={acceptedPolitiqueConfidentialite}
+                      onChange={(e) => setAcceptedPolitiqueConfidentialite(e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                      required
+                      disabled={loading}
+                    />
+                    <label htmlFor="acceptPolitiqueConfidentialite" className="text-sm text-foreground cursor-pointer flex-1">
+                      J'ai lu et j'accepte la{" "}
+                      <a
+                        href="/legal/politique-confidentialite.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline hover:text-primary/80"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Politique de Confidentialité
+                      </a>
+                      <span className="text-red-500 ml-1">*</span>
+                    </label>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground mt-2">
+                    En cochant ces cases, vous confirmez avoir lu et accepté ces documents. Un horodatage sera conservé pour des raisons légales.
+                  </p>
+                </div>
+              </div>
+
             </CardContent>
 
             <CardFooter className="flex flex-col space-y-4 pt-6">
-              
+
               {/* Bouton d'inscription */}
-              <Button 
-                type="submit" 
-                disabled={loading || !passwordValidation.isValid} 
+              <Button
+                type="submit"
+                disabled={loading || !passwordValidation.isValid || !acceptedCgu || !acceptedPolitiqueConfidentialite}
                 className="w-full h-12 text-base font-medium"
                 size="lg"
               >
@@ -712,7 +793,13 @@ export default function SignupPage() {
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground space-y-1">
           <p>© {new Date().getFullYear()} Mon Assistant Kiné</p>
-          <p>Plateforme sécurisée - Données de santé protégées</p>
+          <p>
+            <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer" className="hover:underline">CGU</a>
+            {" • "}
+            <a href="/legal/politique-confidentialite.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Politique de confidentialité</a>
+            {" • "}
+            <a href="/legal/mentions-legales.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Mentions légales</a>
+          </p>
         </div>
       </div>
     </div>
