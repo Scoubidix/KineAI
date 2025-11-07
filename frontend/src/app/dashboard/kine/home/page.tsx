@@ -590,6 +590,35 @@ export default function KineHomePage() {
               </Button>
             </CardFooter>
           </Card>
+
+          {/* Bouton Feedback Beta */}
+          <Card className="shadow-md hover:shadow-lg transition-shadow duration-200 ease-in-out border-blue-200 bg-blue-50/50">
+            <CardContent className="pt-6">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-center sm:text-left">
+                  <h3 className="text-lg font-semibold text-primary mb-1">
+                    Votre avis compte !
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Partagez vos remarques, idées ou signalez un bug pour améliorer l'application.
+                  </p>
+                </div>
+                <Button
+                  asChild
+                  className="flex items-center gap-2 whitespace-nowrap"
+                >
+                  <a
+                    href="https://tally.so/r/Np5BJp"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <AlertCircle className="h-4 w-4" />
+                    Remarques/idées/Bug pour la Beta
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </AppLayout>
   );

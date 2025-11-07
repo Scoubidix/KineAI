@@ -589,6 +589,21 @@ export default function KineChatbotBiblioPage() {
                 </div>
               </div>
             </Card>
+
+            {/* Bouton Proposer une étude */}
+            <Button
+              asChild
+              className="flex items-center gap-2 w-full mt-3"
+            >
+              <a
+                href="https://tally.so/r/mV25VJ"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <BookOpen className="h-4 w-4" />
+                Proposer une étude
+              </a>
+            </Button>
           </div>
 
           {/* Sidebar */}

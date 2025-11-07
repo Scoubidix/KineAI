@@ -175,6 +175,7 @@ export default function ProgrammesPage() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
   const [selectedExerciseId, setSelectedExerciseId] = useState<string>('');
+  const [exerciseSearchQuery, setExerciseSearchQuery] = useState<string>('');
   const [creatingProgramme, setCreatingProgramme] = useState(false);
 
   const fetchData = async (token: string) => {
@@ -281,14 +282,14 @@ export default function ProgrammesPage() {
   // Effet pour filtrer les exercices selon les filtres sélectionnés
   useEffect(() => {
     let filtered = [...allExercises];
-    
+
     // Filtre par type (public/privé)
     if (typeFilter === 'public') {
       filtered = filtered.filter(ex => ex.isPublic);
     } else if (typeFilter === 'private') {
       filtered = filtered.filter(ex => !ex.isPublic);
     }
-    
+
     // Filtre par tag
     if (tagFilter !== 'all') {
       filtered = filtered.filter(ex => {
@@ -297,14 +298,23 @@ export default function ProgrammesPage() {
         return exerciseTags.includes(tagFilter);
       });
     }
-    
+
+    // Filtre par recherche textuelle
+    if (exerciseSearchQuery.trim()) {
+      const searchLower = exerciseSearchQuery.toLowerCase().trim();
+      filtered = filtered.filter(ex =>
+        ex.nom.toLowerCase().includes(searchLower) ||
+        (ex.tags && ex.tags.toLowerCase().includes(searchLower))
+      );
+    }
+
     // Exclure les exercices déjà sélectionnés
-    filtered = filtered.filter(ex => 
+    filtered = filtered.filter(ex =>
       !selectedExercises.find(selected => selected.exerciseId === ex.id)
     );
-    
+
     setFilteredExercises(filtered);
-  }, [allExercises, typeFilter, tagFilter, selectedExercises]);
+  }, [allExercises, typeFilter, tagFilter, exerciseSearchQuery, selectedExercises]);
 
   // Filtrage des programmes
   const filteredProgrammes = programmes.filter(programme => {
@@ -378,6 +388,7 @@ export default function ProgrammesPage() {
     setTypeFilter('all');
     setTagFilter('all');
     setSelectedExerciseId('');
+    setExerciseSearchQuery('');
     setSelectedPatient(null);
   };
 
@@ -860,55 +871,69 @@ export default function ProgrammesPage() {
                   </div>
                 </div>
 
-                {/* Sélection d'exercice */}
+                {/* Barre de recherche d'exercices */}
                 <div className="space-y-2">
                   <Label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Ajouter un exercice
+                    Rechercher un exercice à ajouter
                   </Label>
-                  <div className="flex gap-2">
-                    <Select value={selectedExerciseId} onValueChange={setSelectedExerciseId}>
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Choisissez un exercice à ajouter..." />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60">
-                        {filteredExercises.length === 0 ? (
-                          <div className="p-3 text-sm text-gray-500">
-                            Aucun exercice disponible avec ces filtres
-                          </div>
-                        ) : (
-                          filteredExercises.map(exercise => (
-                            <SelectItem key={exercise.id} value={exercise.id.toString()}>
-                              <div className="flex items-center gap-2 w-full">
-                                <span className="flex-1">{exercise.nom}</span>
-                                <div className="flex gap-1">
-                                  <Badge variant={exercise.isPublic ? "default" : "secondary"} className="text-xs">
-                                    {exercise.isPublic ? 'Public' : 'Privé'}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Rechercher par nom ou catégorie..."
+                      value={exerciseSearchQuery}
+                      onChange={(e) => setExerciseSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Liste des exercices filtrés */}
+                <div className="space-y-2">
+                  <div className="max-h-60 overflow-y-auto border rounded-lg">
+                    {filteredExercises.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-gray-500">
+                        {exerciseSearchQuery ? 'Aucun exercice trouvé pour cette recherche' : 'Aucun exercice disponible avec ces filtres'}
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {filteredExercises.slice(0, 10).map(exercise => (
+                          <div
+                            key={exercise.id}
+                            className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-between gap-3"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">
+                                {exercise.nom}
+                              </p>
+                              <div className="flex gap-1 mt-1 flex-wrap">
+                                <Badge variant={exercise.isPublic ? "default" : "secondary"} className="text-xs">
+                                  {exercise.isPublic ? 'Public' : 'Privé'}
+                                </Badge>
+                                {exercise.tags && parseTagsFromString(exercise.tags).slice(0, 2).map(tag => (
+                                  <Badge key={tag} variant="outline" className="text-xs">
+                                    {tag}
                                   </Badge>
-                                  {exercise.tags && parseTagsFromString(exercise.tags).slice(0, 1).map(tag => (
-                                    <Badge key={tag} variant="outline" className="text-xs">
-                                      {tag}
-                                    </Badge>
-                                  ))}
-                                </div>
+                                ))}
                               </div>
-                            </SelectItem>
-                          ))
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleAddExercise(exercise.id.toString())}
+                              className="shrink-0"
+                            >
+                              <Plus className="w-4 h-4 mr-1" />
+                              Ajouter
+                            </Button>
+                          </div>
+                        ))}
+                        {filteredExercises.length > 10 && (
+                          <div className="p-2 text-center text-xs text-gray-500 bg-gray-50 dark:bg-gray-800">
+                            +{filteredExercises.length - 10} exercice(s) supplémentaire(s) - Affinez votre recherche
+                          </div>
                         )}
-                      </SelectContent>
-                    </Select>
-                    <Button 
-                      type="button"
-                      onClick={() => {
-                        if (selectedExerciseId) {
-                          handleAddExercise(selectedExerciseId);
-                        }
-                      }}
-                      disabled={!selectedExerciseId}
-                      className="shrink-0"
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Ajouter
-                    </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
