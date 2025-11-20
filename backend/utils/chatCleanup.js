@@ -292,58 +292,6 @@ const archiveFinishedProgramsTask = async () => {
   }
 };
 
-// Nettoyer l'historique des chats kinés - VERSION CONNEXION DÉDIÉE
-const cleanOldKineChatHistory = async () => {
-  logger.info(`💬 Début nettoyage chat kiné CONNEXION DÉDIÉE`);
-  
-  let dedicatedPrisma = null;
-  
-  try {
-    logger.info(`🔧 Création connexion DÉDIÉE pour nettoyage chat`);
-    
-    const cronDbUrl = new URL(process.env.DATABASE_URL);
-    cronDbUrl.searchParams.set('connection_limit', '1');
-    cronDbUrl.searchParams.set('pool_timeout', '60');
-    cronDbUrl.searchParams.set('connect_timeout', '30');
-    cronDbUrl.searchParams.set('application_name', 'kine_cleanup_chat');
-    
-    dedicatedPrisma = new PrismaClient({
-      log: ['error', 'warn'],
-      datasources: {
-        db: {
-          url: cronDbUrl.toString()
-        }
-      }
-    });
-    
-    const fiveDaysAgo = new Date();
-    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
-    
-    const result = await dedicatedPrisma.chatKine.deleteMany({
-      where: {
-        createdAt: {
-          lt: fiveDaysAgo
-        }
-      }
-    });
-    
-    logger.info(`🗑️ Chat kiné: ${result.count} messages supprimés (> 5 jours)`);
-    return result;
-    
-  } catch (error) {
-    logger.error(`❌ Erreur nettoyage chat:`, error.message);
-    throw error;
-  } finally {
-    if (dedicatedPrisma) {
-      logger.info(`🔌 Fermeture connexion DÉDIÉE nettoyage chat`);
-      try {
-        await dedicatedPrisma.$disconnect();
-      } catch (error) {
-        logger.error(`⚠️ Erreur fermeture:`, error.message);
-      }
-    }
-  }
-};
 
 // Supprimer définitivement les programmes archivés - VERSION CONNEXION DÉDIÉE
 const cleanupOldArchivedProgramsTask = async () => {
@@ -446,7 +394,7 @@ const cleanupOldArchivedProgramsTask = async () => {
 
 // Démarrer les tâches automatiques - PRODUCTION avec backup et notifications
 const startProgramCleanupCron = () => {
-  logger.info('🚀 Démarrage PRODUCTION - Toutes tâches CONNEXION DÉDIÉE avec backup et notifications');
+  logger.info('🚀 Démarrage PRODUCTION - Tâches CONNEXION DÉDIÉE avec backup et notifications');
 
   // 🆕 NOUVEAU: Notifications programmes terminés - 00h01 + backup 00h09
   cron.schedule('1 0 * * *', async () => {
@@ -502,32 +450,6 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  // PRODUCTION: Nettoyage chat kiné - 00h30 + backup 00h38
-  cron.schedule('30 0 * * *', async () => {
-    logger.info(`💬 [00h30] Nettoyage chat kiné PRINCIPAL`);
-    
-    await executeWithTimeout(
-      'nettoyage chat kiné PRINCIPAL (00h30)',
-      cleanOldKineChatHistory,
-      60000
-    );
-  }, {
-    timezone: "Europe/Paris",
-    scheduled: true
-  });
-
-  cron.schedule('38 0 * * *', async () => {
-    logger.info(`💬 [00h38] Nettoyage chat kiné BACKUP`);
-    
-    await executeWithTimeout(
-      'nettoyage chat kiné BACKUP (00h38)',
-      cleanOldKineChatHistory,
-      60000
-    );
-  }, {
-    timezone: "Europe/Paris",
-    scheduled: true
-  });
 
   // PRODUCTION: Nettoyage programmes archivés - Mercredi 01h15 + backup 01h23
   cron.schedule('15 1 * * 3', async () => {
@@ -556,8 +478,8 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  logger.info('✅ PRODUCTION configurée - 8 tâches avec backup automatique + notifications');
-  logger.info('📅 Planning: 00h01+00h09 notifications, 00h10+00h18 archivage, 00h30+00h38 chat, mercredi 01h15+01h23 nettoyage');
+  logger.info('✅ PRODUCTION configurée - 6 tâches avec backup automatique + notifications');
+  logger.info('📅 Planning: 00h01+00h09 notifications, 00h10+00h18 archivage, mercredi 01h15+01h23 nettoyage');
   logger.info('🔒 Toutes les tâches utilisent des connexions dédiées');
 };
 
@@ -578,13 +500,6 @@ const manualCleanupTest = async () => {
   );
 };
 
-const manualKineChatCleanupTest = async () => {
-  return await executeWithTimeout(
-    'test manuel chat kiné',
-    cleanOldKineChatHistory,
-    30000
-  );
-};
 
 // 🆕 NOUVEAU: Test manuel notifications
 const manualNotificationsTest = async () => {
@@ -599,10 +514,8 @@ module.exports = {
   startProgramCleanupCron,
   archiveFinishedProgramsTask,
   cleanupOldArchivedProgramsTask,
-  cleanOldKineChatHistory,
   createProgramCompletedNotificationsTask, // 🆕 NOUVEAU
   manualArchiveTest,
   manualCleanupTest,
-  manualKineChatCleanupTest,
   manualNotificationsTest // 🆕 NOUVEAU
 };
