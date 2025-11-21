@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BookOpen, History, Trash2, Send, Loader2, CheckCircle, Target } from 'lucide-react';
-import { getAuth } from 'firebase/auth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
 import { usePaywall } from '@/hooks/usePaywall';
@@ -55,7 +55,15 @@ export default function KineChatbotBiblioPage() {
   const lastBotMessageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    loadHistory();
+    const auth = getAuth(app);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        await loadHistory();
+      } else {
+        setIsLoadingHistory(false);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {

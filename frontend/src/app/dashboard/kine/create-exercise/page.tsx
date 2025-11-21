@@ -11,6 +11,7 @@ import { Dumbbell, Trash2, Pencil, Plus, Loader2, Eye, Lock, Globe, Search, Filt
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -85,11 +86,21 @@ export default function KineCreateExercisePage() {
   };
 
   useEffect(() => {
-    loadAllTags();
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        await loadAllTags();
+        await loadExercices();
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    loadExercices();
+    const auth = getAuth();
+    if (auth.currentUser) {
+      loadExercices();
+    }
   }, [showPublic, search, selectedTags]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {

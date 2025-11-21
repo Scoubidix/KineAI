@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { getAuth } from 'firebase/auth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 // Types pour les notifications
 interface NotificationData {
@@ -275,8 +275,16 @@ export default function KineNotificationsPage() {
 
   // Effets
   useEffect(() => {
-    loadNotifications();
-    loadStats();
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        await loadNotifications();
+        await loadStats();
+      } else {
+        setLoading(false);
+      }
+    });
+    return () => unsubscribe();
   }, [showOnlyUnread, selectedType]);
 
   // Interface de chargement

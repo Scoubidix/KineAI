@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { FileText, Search, Loader2, CheckCircle, Mail, MessageSquare, AlertCircle, User } from 'lucide-react';
-import { getAuth } from 'firebase/auth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
 import { usePaywall } from '@/hooks/usePaywall';
@@ -79,7 +79,15 @@ export default function KineChatbotAdminPage() {
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
   useEffect(() => {
-    loadData();
+    const auth = getAuth(app);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        await loadData();
+      } else {
+        setIsLoading(false);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAuth } from 'firebase/auth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -14,8 +14,7 @@ export const useSubscription = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchSubscription = async () => {
-    const user = getAuth().currentUser;
+  const fetchSubscription = async (user) => {
     if (!user) {
       setIsLoading(false);
       return;
@@ -60,16 +59,22 @@ export const useSubscription = () => {
   };
 
   useEffect(() => {
-    const user = getAuth().currentUser;
-    if (user) {
-      fetchSubscription();
-    } else {
-      setIsLoading(false);
-    }
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        await fetchSubscription(user);
+      } else {
+        setIsLoading(false);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   const refreshSubscription = () => {
-    fetchSubscription();
+    const user = getAuth().currentUser;
+    if (user) {
+      fetchSubscription(user);
+    }
   };
 
   return {
