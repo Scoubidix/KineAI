@@ -462,7 +462,7 @@ export default function KineChatbotAdminPage() {
 
         {/* Header Upgrade si pas d'accès */}
         <ChatUpgradeHeader
-          assistantType="ADMINISTRATIF"
+          assistantType="TEMPLATES_ADMIN"
           canAccessFeature={canAccessFeature}
           isLoading={paywallLoading}
           subscription={subscription}
@@ -491,7 +491,7 @@ export default function KineChatbotAdminPage() {
 
         {/* Zone principale */}
         <ChatDisabledOverlay
-          assistantType="ADMINISTRATIF"
+          assistantType="TEMPLATES_ADMIN"
           canAccessFeature={canAccessFeature}
           isLoading={paywallLoading}
         >

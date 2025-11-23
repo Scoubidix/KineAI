@@ -111,9 +111,9 @@ const requireAssistant = (assistantType) => {
       const assistantsByPlan = {
         'FREE': [],
         'DECLIC': ['CONVERSATIONNEL'],
-        'PRATIQUE': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE'],
-        'PIONNIER': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF'],
-        'EXPERT': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF']
+        'PRATIQUE': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF'],
+        'PIONNIER': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF', 'TEMPLATES_ADMIN'],
+        'EXPERT': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF', 'TEMPLATES_ADMIN']
       };
 
       const availableAssistants = assistantsByPlan[planType] || [];
@@ -121,9 +121,9 @@ const requireAssistant = (assistantType) => {
       if (!availableAssistants.includes(assistantType)) {
         // Déterminer le plan recommandé
         let recommendedPlan = 'DECLIC';
-        if (['BIBLIOTHEQUE', 'CLINIQUE'].includes(assistantType)) {
+        if (['BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF'].includes(assistantType)) {
           recommendedPlan = 'PRATIQUE';
-        } else if (assistantType === 'ADMINISTRATIF') {
+        } else if (assistantType === 'TEMPLATES_ADMIN') {
           recommendedPlan = 'PIONNIER';
         }
 
@@ -186,6 +186,9 @@ const requireFeature = (feature) => {
 
         case 'AI_ADMINISTRATIF':
           return requireAssistant('ADMINISTRATIF')(req, res, next);
+
+        case 'TEMPLATES_ADMIN':
+          return requireAssistant('TEMPLATES_ADMIN')(req, res, next);
 
         default:
           return res.status(400).json({ 

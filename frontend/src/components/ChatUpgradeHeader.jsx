@@ -16,9 +16,10 @@ export const ChatUpgradeHeader = ({ assistantType, canAccessFeature, isLoading, 
   // Mapping des types d'assistant vers les features
   const featureMap = {
     'CONVERSATIONNEL': 'AI_CONVERSATIONNEL',
-    'BIBLIOTHEQUE': 'AI_BIBLIOTHEQUE', 
+    'BIBLIOTHEQUE': 'AI_BIBLIOTHEQUE',
     'CLINIQUE': 'AI_CLINIQUE',
-    'ADMINISTRATIF': 'AI_ADMINISTRATIF'
+    'ADMINISTRATIF': 'AI_ADMINISTRATIF',
+    'TEMPLATES_ADMIN': 'TEMPLATES_ADMIN'
   };
 
   // Configuration des icônes par assistant
@@ -45,12 +46,19 @@ export const ChatUpgradeHeader = ({ assistantType, canAccessFeature, isLoading, 
         bgColor: 'bg-purple-50',
         borderColor: 'border-purple-200'
       },
-      'ADMINISTRATIF': { 
-        icon: FileText, 
+      'ADMINISTRATIF': {
+        icon: FileText,
         name: 'Administratif',
         color: 'text-amber-600',
         bgColor: 'bg-amber-50',
         borderColor: 'border-amber-200'
+      },
+      'TEMPLATES_ADMIN': {
+        icon: FileText,
+        name: 'Administratif',
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-50',
+        borderColor: 'border-orange-200'
       }
     };
     return configs[type] || configs['CONVERSATIONNEL'];
@@ -123,9 +131,10 @@ export const ChatDisabledOverlay = ({ children, assistantType, canAccessFeature,
 
   const featureMap = {
     'CONVERSATIONNEL': 'AI_CONVERSATIONNEL',
-    'BIBLIOTHEQUE': 'AI_BIBLIOTHEQUE', 
+    'BIBLIOTHEQUE': 'AI_BIBLIOTHEQUE',
     'CLINIQUE': 'AI_CLINIQUE',
-    'ADMINISTRATIF': 'AI_ADMINISTRATIF'
+    'ADMINISTRATIF': 'AI_ADMINISTRATIF',
+    'TEMPLATES_ADMIN': 'TEMPLATES_ADMIN'
   };
 
   const feature = featureMap[assistantType];

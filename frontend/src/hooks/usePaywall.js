@@ -39,6 +39,9 @@ export const usePaywall = () => {
         return ['PRATIQUE', 'PIONNIER', 'EXPERT'].includes(currentPlan);
 
       case 'AI_ADMINISTRATIF':
+        return ['PRATIQUE', 'PIONNIER', 'EXPERT'].includes(currentPlan);
+
+      case 'TEMPLATES_ADMIN':
         return ['PIONNIER', 'EXPERT'].includes(currentPlan);
 
       default:
@@ -57,7 +60,8 @@ export const usePaywall = () => {
       'AI_CONVERSATIONNEL': 'Assistant IA conversationnel nécessite un abonnement',
       'AI_BIBLIOTHEQUE': 'Assistant Bibliothèque disponible à partir du plan Pratique',
       'AI_CLINIQUE': 'Assistant Clinique disponible à partir du plan Pratique',
-      'AI_ADMINISTRATIF': 'Assistant Administratif disponible avec les plans Pionnier ou Expert'
+      'AI_ADMINISTRATIF': 'Assistant Administratif disponible à partir du plan Pratique',
+      'TEMPLATES_ADMIN': 'Templates administratifs disponibles avec les plans Pionnier et Expert'
     };
     
     const message = messages[feature] || 'Fonctionnalité non disponible dans votre plan';
@@ -91,11 +95,12 @@ export const usePaywall = () => {
         
       case 'AI_BIBLIOTHEQUE':
       case 'AI_CLINIQUE':
-        return 'PRATIQUE';
-        
       case 'AI_ADMINISTRATIF':
+        return 'PRATIQUE';
+
+      case 'TEMPLATES_ADMIN':
         return 'PIONNIER';
-        
+
       default:
         return 'DECLIC';
     }
@@ -125,8 +130,11 @@ export const usePaywall = () => {
         return 'L\'assistant Clinique vous accompagne dans l\'analyse de cas complexes et la prise de décision thérapeutique.';
         
       case 'AI_ADMINISTRATIF':
-        return 'L\'assistant Administratif vous aide avec la gestion administrative, les rapports et l\'organisation de votre cabinet.';
-        
+        return 'L\'assistant Administratif vous aide à générer des bilans kinésithérapiques structurés à partir de vos notes cliniques.';
+
+      case 'TEMPLATES_ADMIN':
+        return 'Les templates administratifs vous permettent de gérer facilement vos communications avec les patients (relances, rappels, etc.).';
+
       default:
         return 'Cette fonctionnalité nécessite un plan supérieur.';
     }

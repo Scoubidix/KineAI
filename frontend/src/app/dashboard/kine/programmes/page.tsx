@@ -785,17 +785,24 @@ export default function ProgrammesPage() {
                   <Label htmlFor="programme-duration" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                     Durée (jours) *
                   </Label>
-                  <Input
-                    id="programme-duration"
-                    type="number"
-                    min={1}
-                    max={30}
-                    value={createDuration}
-                    onChange={(e) => setCreateDuration(Number(e.target.value))}
-                    placeholder="Durée en jours (max 30)"
-                    className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="programme-duration"
+                      type="number"
+                      min={1}
+                      max={30}
+                      value={createDuration}
+                      onChange={(e) => setCreateDuration(Number(e.target.value))}
+                      placeholder="Durée en jours (max 30)"
+                      className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      required
+                    />
+                    {createDuration > 30 && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-red-600 font-medium">
+                        max 30j
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Durée recommandée : 7-14 jours
                   </p>
@@ -1026,10 +1033,10 @@ export default function ProgrammesPage() {
                 >
                   Annuler
                 </Button>
-                <Button 
+                <Button
                   onClick={handleCreateProgramme}
                   className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
-                  disabled={!createTitle || !createDescription || selectedExercises.length === 0 || creatingProgramme}
+                  disabled={!createTitle || !createDescription || selectedExercises.length === 0 || creatingProgramme || createDuration <= 0 || createDuration > 30}
                 >
                   {creatingProgramme ? (
                     <>

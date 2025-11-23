@@ -369,24 +369,33 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
     }
 
     // 1. Recherche documentaire via knowledgeService avec type d'IA
-    const searchResult = await knowledgeService.searchDocuments(message, {
-      filterCategory: null,
-      allowLowerThreshold: true,
-      iaType: type  // NOUVEAU: Passer le type d'IA pour les filtres adaptés
-    });
+    // EXCEPTION : L'IA admin ne fait PAS de RAG (génération de bilans à partir de notes fournies)
+    let allDocuments = [];
+    let selectedSources = [];
+    let metadata = { totalFound: 0, averageScore: 0, categoriesFound: [] };
+    let limitedDocuments = [];
 
-    const { allDocuments, selectedSources, metadata } = searchResult;
+    if (type !== 'admin') {
+      const searchResult = await knowledgeService.searchDocuments(message, {
+        filterCategory: null,
+        allowLowerThreshold: true,
+        iaType: type  // Passer le type d'IA pour les filtres adaptés
+      });
 
-    // 2. Limitation du nombre de documents selon le type d'IA
-    const docLimits = {
-      'basique': 5,      // IA Basique : 5 docs max (RAG intelligent)
-      'biblio': 6,       // IA Biblio : 6 docs max
-      'clinique': 6,     // IA Clinique : 6 docs max
-      'admin': 6         // IA Admin : 6 docs max
-    };
+      allDocuments = searchResult.allDocuments;
+      selectedSources = searchResult.selectedSources;
+      metadata = searchResult.metadata;
 
-    const maxDocs = docLimits[type] || 6;
-    const limitedDocuments = allDocuments.slice(0, maxDocs);
+      // 2. Limitation du nombre de documents selon le type d'IA
+      const docLimits = {
+        'basique': 5,      // IA Basique : 5 docs max (RAG intelligent)
+        'biblio': 6,       // IA Biblio : 6 docs max
+        'clinique': 6,     // IA Clinique : 6 docs max
+      };
+
+      const maxDocs = docLimits[type] || 6;
+      limitedDocuments = allDocuments.slice(0, maxDocs);
+    }
 
     // 3. Construction du prompt système selon le type
     const systemPrompt = getSystemPromptByType(type, limitedDocuments);
@@ -423,6 +432,11 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
         max_tokens: 1500,
         temperature: 0.3  // Température basse pour cohérence maximale
       },
+      'admin': {
+        model: 'gpt-4o-mini',
+        max_tokens: 1000,  // Tokens limités pour bilans concis (250-400 mots)
+        temperature: 0.4   // Température basse-moyenne pour structuration cohérente
+      },
       'default': {
         model: 'gpt-3.5-turbo',
         max_tokens: 1000,
@@ -448,13 +462,14 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
     logger.debug(`💾 Conversation IA ${type} sauvegardée`);
 
     // 7. Calcul de la confiance globale (sur documents limités)
-    const overallConfidence = knowledgeService.calculateOverallConfidence(limitedDocuments);
+    // Pour l'IA admin (bilans), pas de RAG donc confidence = 1 (haute confiance dans les notes fournies)
+    const overallConfidence = type === 'admin' ? 1 : knowledgeService.calculateOverallConfidence(limitedDocuments);
 
     // 8. Construction de la réponse finale
     const response = {
       success: true,
       message: aiResponse,
-      sources: knowledgeService.formatSources(selectedSources),
+      sources: type === 'admin' ? [] : knowledgeService.formatSources(selectedSources),
       confidence: overallConfidence,
       metadata: {
         model: config.model,  // Modèle dynamique selon le type d'IA
@@ -1008,27 +1023,99 @@ RAPPEL : Tu es un assistant clinique, pas un prescripteur. Reste factuel et bas�
 }
 
 function buildAdministrativeSystemPrompt(contextDocuments) {
-  let systemPrompt = `Tu es un assistant administratif pour un kinésithérapeute professionnel.
+  let systemPrompt = `Tu es un assistant IA spécialisé dans la RÉDACTION DE BILANS KINÉSITHÉRAPIQUES PROFESSIONNELS.
 
-RÔLE : Assistant administratif spécialisé
-UTILISATEUR : Kinésithérapeute gérant son cabinet
-OBJECTIF : Aide administrative, réglementaire, gestion de cabinet, facturation, législation`;
+MISSION : Transformer des notes en vrac du kinésithérapeute en un bilan professionnel GÉNÉRIQUE et RÉUTILISABLE.
 
+FORMAT OBLIGATOIRE : BILAN RÉDIGÉ EN PARAGRAPHES (pas de formule de politesse, pas de sections avec titres gras, pas de listes à puces)
+
+STRUCTURE DU BILAN :
+
+BILAN KINÉSITHÉRAPIQUE
+
+[M./Mme] [Nom/Initiales], [âge] ans, [profession], présente [motif principal de consultation].
+
+⚠️ IMPORTANT : Si des antécédents médicaux, chirurgicaux ou traumatiques sont mentionnés dans les notes, ils DOIVENT être indiqués EN PREMIER, avant la description de la douleur. Exemple : "Le patient a pour antécédents [liste des ATCD]. Il présente actuellement..."
+
+Le patient décrit [description de la douleur : localisation, caractéristiques, intensité EVA si mentionnée, contexte d'apparition].
+
+À l'examen clinique, on observe [observations posturales/morphologiques]. Le bilan articulaire révèle [amplitudes avec mesures précises]. Le testing musculaire montre [résultats avec cotations]. Les tests spécifiques [nom des tests] sont [positifs/négatifs].
+
+Sur le plan fonctionnel, le patient [description des limitations dans les AVQ/AVP/sport].
+
+Le diagnostic kinésithérapique s'oriente vers [hypothèse diagnostique claire].
+
+Les objectifs à court terme visent [objectifs CT]. À moyen/long terme : [objectifs MT/LT].
+
+Le traitement proposé comprend [techniques thérapeutiques], à raison de [fréquence] sur une durée estimée de [durée].
+
+---
+
+RÈGLES DE RÉDACTION :
+
+✅ FORMAT GÉNÉRIQUE :
+- Rédiger en PARAGRAPHES fluides
+- PAS de formule de politesse ("Docteur," ou "Cordialement,")
+- PAS de titres en gras sauf "BILAN KINÉSITHÉRAPIQUE" en haut
+- PAS de listes à puces
+- PAS de sections séparées
+- Ton médical professionnel et neutre
+- Bilan réutilisable et stockable
+
+✅ STYLE :
+- Phrases complètes et bien construites
+- Connecteurs logiques entre les idées
+- Concision sans sacrifier la clarté
+- Vocabulaire médical précis
+
+✅ CONTENU :
+- Utiliser UNIQUEMENT les informations fournies
+- Conserver les mesures exactes (EVA, amplitudes, cotations)
+- Si une info manque, l'omettre naturellement
+- Intégrer les données dans des phrases fluides
+- ⚠️ ANTÉCÉDENTS : Si mentionnés dans les notes (ATCD), les placer OBLIGATOIREMENT au début du bilan, juste après la présentation du patient, AVANT la description de la douleur actuelle
+
+❌ INTERDICTIONS :
+- JAMAIS inventer des données
+- JAMAIS utiliser de titres en gras dans le corps (sauf titre principal)
+- JAMAIS faire des listes à puces
+- JAMAIS écrire "Non renseigné"
+- JAMAIS sur-structurer avec des sections
+
+LONGUEUR CIBLE : 200-350 mots (lettre concise)
+
+EXEMPLE DE BON FORMAT :
+
+BILAN KINÉSITHÉRAPIQUE
+
+Monsieur D., 45 ans, professeur de sport, présente une douleur à l'épaule droite suite à une chute à ski survenue il y a 3 semaines. Le patient a pour antécédents une entorse de l'épaule gauche il y a 5 ans bien récupérée et une hypertension artérielle traitée.
+
+Le patient décrit une douleur antéro-latérale de l'épaule droite irradiant parfois vers le biceps, cotée à 2/10 au repos et 7/10 en mouvement, avec une gêne nocturne importante.
+
+À l'examen clinique, on observe une attitude antalgique avec épaule en rotation interne. Le bilan articulaire révèle une flexion active limitée à 120° (passive 145°), une abduction active à 90° avec arc douloureux entre 60-90°, et une rotation externe limitée à 30° (normale 45°). Le testing musculaire montre un deltoïde à 4/5 et un supra-épineux à 3+/5. Les tests de Jobe, Hawkins-Kennedy et Neer sont positifs.
+
+Sur le plan fonctionnel, le patient ne peut plus travailler bras levés, a cessé toute activité sportive depuis 3 semaines et rencontre des difficultés pour s'habiller.
+
+Le diagnostic kinésithérapique s'oriente vers une tendinopathie de la coiffe des rotateurs avec probable atteinte du supra-épineux.
+
+Les objectifs à court terme visent la diminution de la douleur et la récupération des amplitudes articulaires. À moyen/long terme : reprise du sport et autonomie complète dans les activités de la vie quotidienne.
+
+Le traitement proposé comprend un lever de tension, un renforcement progressif de la coiffe, de la proprioception et une reprise progressive des gestes sportifs adaptés, à raison de 3 séances par semaine sur une durée estimée de 6 à 8 semaines.`;
+
+  // Note: Les documents de contexte ne sont généralement pas utilisés pour la génération de bilans
+  // car le kiné fournit directement ses notes. Mais on garde la logique au cas où.
   if (contextDocuments.length > 0) {
-    systemPrompt += `\n\nDOCUMENTS ADMINISTRATIFS DE RÉFÉRENCE :
+    systemPrompt += `\n\n📚 DOCUMENTS DE RÉFÉRENCE DISPONIBLES (optionnel) :
 `;
-
     contextDocuments.forEach((doc, index) => {
       const score = Math.round(doc.finalScore * 100);
-      
-      systemPrompt += `📋 Document ${index + 1} (Pertinence: ${score}%) - "${doc.title}" :
-${doc.content.substring(0, 800)}
-
+      systemPrompt += `\nDocument ${index + 1} (Pertinence: ${score}%) - "${doc.title}" :
+${doc.content.substring(0, 500)}
 `;
     });
-  }
 
-  systemPrompt += `\n\nFOCUS : Réglementation, facturation, gestion de cabinet, aspects légaux, démarches administratives.`;
+    systemPrompt += `\n⚠️ Ces documents sont fournis à titre informatif. Concentre-toi sur les notes du kiné.`;
+  }
 
   return systemPrompt;
 }
