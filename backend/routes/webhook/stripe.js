@@ -2,13 +2,13 @@
 // Route pour traiter les webhooks Stripe avec gestion d'erreurs améliorée
 
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const prismaService = require('../../services/prismaService');
 const stripeService = require('../../services/StripeService');
 const logger = require('../../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../../utils/logSanitizer');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = prismaService.getInstance();
 
 // IPs autorisées de Stripe (liste officielle)
 const STRIPE_IPS = [

@@ -1,10 +1,10 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prismaService = require('../services/prismaService');
 const { authenticate } = require('../middleware/authenticate');
 
-const prisma = new PrismaClient();
+const prisma = prismaService.getInstance();
 
 // GET /kine/subscription - Récupérer les infos d'abonnement du kiné
 router.get('/subscription', authenticate, async (req, res) => {

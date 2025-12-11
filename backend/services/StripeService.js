@@ -3,6 +3,7 @@
 
 const Stripe = require('stripe');
 const logger = require('../utils/logger');
+const prismaService = require('./prismaService');
 
 class StripeService {
   constructor() {
@@ -21,9 +22,8 @@ class StripeService {
   async createCheckoutSession(kineId, planType, successUrl, cancelUrl) {
     try {
       // Récupérer le kiné pour créer/récupérer le customer
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
-      
+      const prisma = prismaService.getInstance();
+
       const kine = await prisma.kine.findUnique({
         where: { id: kineId }
       });
@@ -108,7 +108,6 @@ class StripeService {
         automatic_tax: { enabled: true }  // Taxes automatiques activées avec adresse auto
       });
 
-      await prisma.$disconnect();
       return session;
 
     } catch (error) {
@@ -160,15 +159,12 @@ class StripeService {
         return { available: true, remaining: null };
       }
 
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
-      
+      const prisma = prismaService.getInstance();
+
       // Compter TOUS les kinés qui ont/ont eu le plan Pionnier
       const totalPionnierUsers = await prisma.kine.count({
         where: { planType: 'PIONNIER' }
       });
-      
-      await prisma.$disconnect();
       
       const maxSlots = 100; // Limite absolue
       const remaining = Math.max(0, maxSlots - totalPionnierUsers);
@@ -194,9 +190,8 @@ class StripeService {
    */
   async createPortalSession(kineId, returnUrl) {
     try {
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
-      
+      const prisma = prismaService.getInstance();
+
       const kine = await prisma.kine.findUnique({
         where: { id: kineId },
         select: { stripeCustomerId: true }
@@ -211,7 +206,6 @@ class StripeService {
         return_url: returnUrl || `${process.env.FRONTEND_URL}/dashboard/kine`,
       });
 
-      await prisma.$disconnect();
       return session;
 
     } catch (error) {
@@ -268,9 +262,8 @@ class StripeService {
    */
   async changePlan(kineId, newPlanType) {
     try {
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
-      
+      const prisma = prismaService.getInstance();
+
       const kine = await prisma.kine.findUnique({
         where: { id: kineId },
         select: { subscriptionId: true }
@@ -295,7 +288,7 @@ class StripeService {
 
       // Récupérer l'abonnement actuel
       const subscription = await this.stripe.subscriptions.retrieve(kine.subscriptionId);
-      
+
       // Préparer les données de mise à jour
       const updateData = {
         items: [{
@@ -304,17 +297,16 @@ class StripeService {
         }],
         proration_behavior: 'create_prorations',
       };
-      
+
       // 🔧 SÉCURISÉ : Réactiver seulement si résiliation programmée
       if (subscription.cancel_at_period_end === true) {
         updateData.cancel_at_period_end = false;
         logger.info(`🔄 Réactivation de l'abonnement ${kine.subscriptionId} lors du changement de plan`);
       }
-      
+
       // Modifier l'abonnement
       const updatedSubscription = await this.stripe.subscriptions.update(kine.subscriptionId, updateData);
-      
-      await prisma.$disconnect();
+
       return updatedSubscription;
 
     } catch (error) {
@@ -331,9 +323,8 @@ class StripeService {
    */
   async cancelSubscription(kineId, cancelAtPeriodEnd = true) {
     try {
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
-      
+      const prisma = prismaService.getInstance();
+
       const kine = await prisma.kine.findUnique({
         where: { id: kineId },
         select: { subscriptionId: true }
@@ -351,8 +342,7 @@ class StripeService {
       } else {
         subscription = await this.stripe.subscriptions.cancel(kine.subscriptionId);
       }
-      
-      await prisma.$disconnect();
+
       return subscription;
 
     } catch (error) {
@@ -368,9 +358,8 @@ class StripeService {
    */
   async reactivateSubscription(kineId) {
     try {
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
-      
+      const prisma = prismaService.getInstance();
+
       const kine = await prisma.kine.findUnique({
         where: { id: kineId },
         select: { subscriptionId: true }
@@ -383,8 +372,7 @@ class StripeService {
       const subscription = await this.stripe.subscriptions.update(kine.subscriptionId, {
         cancel_at_period_end: false
       });
-      
-      await prisma.$disconnect();
+
       return subscription;
 
     } catch (error) {
@@ -401,9 +389,8 @@ class StripeService {
    */
   async getCustomerInvoices(kineId, limit = 10) {
     try {
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
-      
+      const prisma = prismaService.getInstance();
+
       const kine = await prisma.kine.findUnique({
         where: { id: kineId },
         select: { stripeCustomerId: true }
@@ -417,8 +404,7 @@ class StripeService {
         customer: kine.stripeCustomerId,
         limit
       });
-      
-      await prisma.$disconnect();
+
       return invoices;
 
     } catch (error) {
