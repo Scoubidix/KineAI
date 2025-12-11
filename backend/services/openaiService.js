@@ -167,9 +167,9 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
       { role: 'user', content: userMessage }
     ];
 
-    // Appel à OpenAI avec GPT-3.5-turbo
+    // Appel à OpenAI avec GPT-4o-mini
     const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4o-mini',
       messages: messages,
       max_tokens: 400,
       temperature: 0.7,
@@ -186,7 +186,7 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
         completion_tokens: response.usage.completion_tokens,
         total_tokens: response.usage.total_tokens
       },
-      model: 'gpt-3.5-turbo'
+      model: 'gpt-4o-mini'
     };
 
   } catch (error) {
@@ -207,7 +207,7 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
       success: false,
       error: errorMessage,
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      model: 'gpt-3.5-turbo'
+      model: 'gpt-4o-mini'
     };
   }
 };
@@ -266,6 +266,8 @@ Je suis votre assistant kinésithérapeute virtuel, ici pour vous accompagner da
 • Renforcement quadriceps : 3 séries × 12 répétitions
 • Mobilisation de l'épaule : 2 séries × 10 répétitions
 
+![Exercice de démonstration](https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/giphy.gif)
+
 ✅ Pensez à valider vos exercices une fois terminés - cela aide votre kinésithérapeute à suivre vos progrès !
 
 N'hésitez pas à me poser des questions sur vos exercices. Comment vous sentez-vous aujourd'hui ?
@@ -273,7 +275,8 @@ N'hésitez pas à me poser des questions sur vos exercices. Comment vous sentez-
 IMPORTANT :
 - Réponds UNIQUEMENT avec le message d'accueil formaté
 - Suis la structure à la lettre
-- Ne mentionne JAMAIS d'informations personnelles`;
+- Ne mentionne JAMAIS d'informations personnelles
+- INCLUS un GIF de démonstration avec la syntaxe markdown ![texte](url) après la liste des exercices`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -285,6 +288,8 @@ IMPORTANT :
       temperature: 0.5
     });
 
+    // 🎬 POC: GPT doit inclure le GIF lui-même (pas d'injection automatique)
+    // On fait confiance au prompt pour que GPT suive l'exemple
     return {
       success: true,
       message: response.choices[0].message.content.trim(),
@@ -312,6 +317,9 @@ IMPORTANT :
       }
       fallbackMessage += '\nMaintenez une bonne posture et écoutez votre corps pendant vos exercices.\n\n';
     }
+
+    // 🎬 POC: Ajout d'un GIF de démonstration
+    fallbackMessage += '![Exercice de démonstration](https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/giphy.gif)\n\n';
 
     fallbackMessage += '✅ Pensez à valider vos exercices une fois terminés pour tenir votre kinésithérapeute informé de vos progrès !\n\n';
     fallbackMessage += 'N\'hésitez pas à me poser des questions si vous avez besoin d\'aide avec vos exercices. Comment vous sentez-vous aujourd\'hui ? 😊';
@@ -438,7 +446,7 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
         temperature: 0.4   // Température basse-moyenne pour structuration cohérente
       },
       'default': {
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         max_tokens: 1000,
         temperature: 0.7
       }

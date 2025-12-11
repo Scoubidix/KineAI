@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Send, Loader2, AlertCircle, CheckCircle, Trophy, X, Check, ChevronDown } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -588,9 +590,28 @@ export default function PatientChatPage() {
                     }
                   `}
                 >
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+                  <div className="text-sm leading-relaxed">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        img: ({ src, alt }) => (
+                          <img
+                            src={src}
+                            alt={alt || 'Image'}
+                            className="max-w-[300px] rounded-lg my-2 shadow-sm"
+                            loading="lazy"
+                          />
+                        ),
+                        p: ({ children }) => (
+                          <p className="whitespace-pre-wrap mb-2 last:mb-0">{children}</p>
+                        ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
                   <p className={`
-                    text-xs mt-1 
+                    text-xs mt-1
                     ${message.role === 'user' ? 'text-white/70' : 'text-gray-500'}
                   `}>
                     {formatTime(message.timestamp)}
