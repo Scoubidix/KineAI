@@ -598,8 +598,9 @@ export default function PatientChatPage() {
                           <img
                             src={src}
                             alt={alt || 'Image'}
-                            className="max-w-[300px] rounded-lg my-2 shadow-sm"
+                            className="w-full max-w-[280px] rounded-lg my-2 shadow-sm"
                             loading="lazy"
+                            style={{ height: 'auto' }}
                           />
                         ),
                         p: ({ children }) => (
