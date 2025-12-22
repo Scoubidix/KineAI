@@ -1,9 +1,10 @@
-// utils/chatCleanup.js - Version finale avec connexions dédiées, backup et notifications
+// utils/chatCleanup.js - Version finale avec singleton prismaService
 const cron = require('node-cron');
-const { PrismaClient } = require('@prisma/client');
+const prismaService = require('../services/prismaService');
 const notificationService = require('../services/notificationService');
 const logger = require('./logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('./logSanitizer');
+const admin = require('firebase-admin');
 
 // Wrapper avec timeout et retry pour les tâches CRON
 const executeWithTimeout = async (taskName, taskFunction, timeoutMs = 120000) => {
@@ -51,31 +52,12 @@ const executeWithTimeout = async (taskName, taskFunction, timeoutMs = 120000) =>
 // 🆕 NOUVELLE TÂCHE : Créer notifications pour programmes terminés
 const createProgramCompletedNotificationsTask = async () => {
   const now = new Date();
-  logger.info(`🔔 Début création notifications programmes terminés CONNEXION DÉDIÉE`);
-  
-  let dedicatedPrisma = null;
-  
+  logger.info(`🔔 Début création notifications programmes terminés`);
+
   try {
-    logger.info(`🔧 Création connexion DÉDIÉE pour notifications programmes`);
-    
-    const cronDbUrl = new URL(process.env.DATABASE_URL);
-    cronDbUrl.searchParams.set('connection_limit', '1');
-    cronDbUrl.searchParams.set('pool_timeout', '60');
-    cronDbUrl.searchParams.set('connect_timeout', '30');
-    cronDbUrl.searchParams.set('application_name', 'kine_program_notifications');
-    
-    dedicatedPrisma = new PrismaClient({
-      log: ['error', 'warn'],
-      datasources: {
-        db: {
-          url: cronDbUrl.toString()
-        }
-      }
-    });
-    
-    logger.info(`✅ Connexion DÉDIÉE établie - recherche programmes terminés`);
-    
-    const result = await dedicatedPrisma.$transaction(async (tx) => {
+    const prisma = prismaService.getInstance();
+
+    const result = await prisma.$transaction(async (tx) => {
       // Trouver les programmes terminés (dateFin <= aujourd'hui) et pas encore archivés
       const completedPrograms = await tx.programme.findMany({
         where: {
@@ -188,50 +170,22 @@ const createProgramCompletedNotificationsTask = async () => {
     });
 
     return result;
-    
+
   } catch (error) {
     logger.error(`❌ Erreur création notifications:`, error.message);
     throw error;
-  } finally {
-    if (dedicatedPrisma) {
-      logger.info(`🔌 Fermeture connexion DÉDIÉE notifications`);
-      try {
-        await dedicatedPrisma.$disconnect();
-      } catch (error) {
-        logger.error(`⚠️ Erreur fermeture:`, error.message);
-      }
-    }
   }
 };
 
-// Archiver les programmes terminés - VERSION CONNEXION DÉDIÉE
+// Archiver les programmes terminés
 const archiveFinishedProgramsTask = async () => {
   const now = new Date();
-  logger.info(`📊 Début archivage CONNEXION DÉDIÉE`);
-  
-  let dedicatedPrisma = null;
-  
+  logger.info(`📊 Début archivage`);
+
   try {
-    logger.info(`🔧 Création connexion Prisma DÉDIÉE pour archivage`);
-    
-    const cronDbUrl = new URL(process.env.DATABASE_URL);
-    cronDbUrl.searchParams.set('connection_limit', '1');
-    cronDbUrl.searchParams.set('pool_timeout', '60');
-    cronDbUrl.searchParams.set('connect_timeout', '30');
-    cronDbUrl.searchParams.set('application_name', 'kine_archive');
-    
-    dedicatedPrisma = new PrismaClient({
-      log: ['error', 'warn'],
-      datasources: {
-        db: {
-          url: cronDbUrl.toString()
-        }
-      }
-    });
-    
-    logger.info(`✅ Connexion DÉDIÉE établie - recherche programmes terminés`);
-    
-    const result = await dedicatedPrisma.$transaction(async (tx) => {
+    const prisma = prismaService.getInstance();
+
+    const result = await prisma.$transaction(async (tx) => {
       const finishedPrograms = await tx.programme.findMany({
         where: {
           dateFin: { lte: now },
@@ -276,48 +230,22 @@ const archiveFinishedProgramsTask = async () => {
     });
 
     return result;
-    
+
   } catch (error) {
     logger.error(`❌ Erreur archivage:`, error.message);
     throw error;
-  } finally {
-    if (dedicatedPrisma) {
-      logger.info(`🔌 Fermeture connexion DÉDIÉE archivage`);
-      try {
-        await dedicatedPrisma.$disconnect();
-      } catch (error) {
-        logger.error(`⚠️ Erreur fermeture:`, error.message);
-      }
-    }
   }
 };
 
 
-// Supprimer définitivement les programmes archivés - VERSION CONNEXION DÉDIÉE
+// Supprimer définitivement les programmes archivés
 const cleanupOldArchivedProgramsTask = async () => {
-  logger.info(`🗑️ Début nettoyage programmes archivés CONNEXION DÉDIÉE`);
-  
-  let dedicatedPrisma = null;
-  
-  try {
-    logger.info(`🔧 Création connexion DÉDIÉE pour nettoyage programmes`);
-    
-    const cronDbUrl = new URL(process.env.DATABASE_URL);
-    cronDbUrl.searchParams.set('connection_limit', '1');
-    cronDbUrl.searchParams.set('pool_timeout', '60');
-    cronDbUrl.searchParams.set('connect_timeout', '30');
-    cronDbUrl.searchParams.set('application_name', 'kine_cleanup_programs');
-    
-    dedicatedPrisma = new PrismaClient({
-      log: ['error', 'warn'],
-      datasources: {
-        db: {
-          url: cronDbUrl.toString()
-        }
-      }
-    });
+  logger.info(`🗑️ Début nettoyage programmes archivés`);
 
-    const result = await dedicatedPrisma.$transaction(async (tx) => {
+  try {
+    const prisma = prismaService.getInstance();
+
+    const result = await prisma.$transaction(async (tx) => {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
@@ -376,25 +304,120 @@ const cleanupOldArchivedProgramsTask = async () => {
     });
 
     return result;
-    
+
   } catch (error) {
     logger.error(`❌ Erreur nettoyage programmes:`, error.message);
     throw error;
-  } finally {
-    if (dedicatedPrisma) {
-      logger.info(`🔌 Fermeture connexion DÉDIÉE nettoyage programmes`);
+  }
+};
+
+// Supprimer les GIFs orphelins de Firebase Storage
+const cleanupOrphanGifsTask = async () => {
+  logger.info(`🗑️ Début nettoyage GIFs orphelins`);
+
+  try {
+    const prisma = prismaService.getInstance();
+
+    // 1. Récupérer tous les GIFs de Firebase Storage
+    const bucket = admin.storage().bucket();
+    const [files] = await bucket.getFiles({ prefix: 'exercices/' });
+
+    const firebaseGifs = files
+      .filter(file => file.name.endsWith('.gif'))
+      .map(file => {
+        const encodedPath = encodeURIComponent(file.name);
+        return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media`;
+      });
+
+    logger.info(`📂 ${firebaseGifs.length} GIFs trouvés dans Firebase Storage`);
+
+    if (firebaseGifs.length === 0) {
+      logger.info('🧹 Aucun GIF dans Firebase Storage');
+      return { gifsChecked: 0, gifsDeleted: 0 };
+    }
+
+    // 2. Récupérer tous les gifUrl de la base de données
+    const exercicesWithGifs = await prisma.exerciceModele.findMany({
+      where: {
+        gifUrl: { not: null }
+      },
+      select: { gifUrl: true }
+    });
+
+    const dbGifUrls = new Set(exercicesWithGifs.map(ex => ex.gifUrl));
+    logger.info(`📋 ${dbGifUrls.size} GIFs référencés dans la base de données`);
+
+    // 3. Identifier les GIFs orphelins
+    const orphanGifs = firebaseGifs.filter(gifUrl => !dbGifUrls.has(gifUrl));
+    logger.info(`🔍 ${orphanGifs.length} GIFs orphelins détectés`);
+
+    if (orphanGifs.length === 0) {
+      logger.info('✅ Aucun GIF orphelin à supprimer');
+      return { gifsChecked: firebaseGifs.length, gifsDeleted: 0 };
+    }
+
+    // 4. Filtrer les GIFs orphelins > 24h (via métadonnées)
+    const oneDayAgo = new Date();
+    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+
+    let deletedCount = 0;
+    const deletedDetails = [];
+
+    for (const gifUrl of orphanGifs) {
       try {
-        await dedicatedPrisma.$disconnect();
-      } catch (error) {
-        logger.error(`⚠️ Erreur fermeture:`, error.message);
+        // Extraire le chemin du fichier depuis l'URL
+        const match = gifUrl.match(/\/o\/([^?]+)\?/);
+        if (!match) {
+          logger.warn(`⚠️ Format URL invalide: ${gifUrl}`);
+          continue;
+        }
+
+        const filePath = decodeURIComponent(match[1]);
+        const file = bucket.file(filePath);
+
+        // Vérifier l'âge du fichier
+        const [metadata] = await file.getMetadata();
+        const createdAt = new Date(metadata.timeCreated);
+
+        if (createdAt < oneDayAgo) {
+          // Supprimer le GIF orphelin de plus de 24h
+          await file.delete();
+          deletedCount++;
+
+          deletedDetails.push({
+            url: gifUrl,
+            path: filePath,
+            createdAt: metadata.timeCreated,
+            age: Math.round((Date.now() - createdAt.getTime()) / (1000 * 60 * 60)) + 'h'
+          });
+
+          logger.info(`🗑️ GIF orphelin supprimé: ${filePath} (créé ${Math.round((Date.now() - createdAt.getTime()) / (1000 * 60 * 60))}h ago)`);
+        } else {
+          logger.info(`⏳ GIF orphelin récent ignoré: ${filePath} (créé ${Math.round((Date.now() - createdAt.getTime()) / (1000 * 60 * 60))}h ago)`);
+        }
+      } catch (deleteError) {
+        logger.error(`❌ Erreur suppression GIF ${gifUrl}:`, deleteError.message);
       }
     }
+
+    logger.info(`🗑️ Nettoyage terminé: ${deletedCount} GIFs orphelins supprimés sur ${orphanGifs.length} détectés`);
+
+    return {
+      gifsChecked: firebaseGifs.length,
+      orphansDetected: orphanGifs.length,
+      gifsDeleted: deletedCount,
+      details: deletedDetails
+    };
+
+  } catch (error) {
+    logger.error(`❌ Erreur nettoyage GIFs:`, error.message);
+    throw error;
   }
 };
 
 // Démarrer les tâches automatiques - PRODUCTION avec backup et notifications
 const startProgramCleanupCron = () => {
-  logger.info('🚀 Démarrage PRODUCTION - Tâches CONNEXION DÉDIÉE avec backup et notifications');
+  logger.info('🚀 Démarrage PRODUCTION - Tâches cron avec singleton prismaService');
 
   // 🆕 NOUVEAU: Notifications programmes terminés - 00h01 + backup 00h09
   cron.schedule('1 0 * * *', async () => {
@@ -467,7 +490,7 @@ const startProgramCleanupCron = () => {
 
   cron.schedule('23 1 * * 3', async () => {
     logger.info(`🗑️ [Mercredi 01h23] Nettoyage programmes archivés BACKUP`);
-    
+
     await executeWithTimeout(
       'nettoyage programmes archivés BACKUP (01h23)',
       cleanupOldArchivedProgramsTask,
@@ -478,9 +501,36 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  logger.info('✅ PRODUCTION configurée - 6 tâches avec backup automatique + notifications');
-  logger.info('📅 Planning: 00h01+00h09 notifications, 00h10+00h18 archivage, mercredi 01h15+01h23 nettoyage');
-  logger.info('🔒 Toutes les tâches utilisent des connexions dédiées');
+  // PRODUCTION: Nettoyage GIFs orphelins - Mercredi 01h30 + backup 01h38
+  cron.schedule('30 1 * * 3', async () => {
+    logger.info(`🗑️ [Mercredi 01h30] Nettoyage GIFs orphelins PRINCIPAL`);
+
+    await executeWithTimeout(
+      'nettoyage GIFs orphelins PRINCIPAL (01h30)',
+      cleanupOrphanGifsTask,
+      120000
+    );
+  }, {
+    timezone: "Europe/Paris",
+    scheduled: true
+  });
+
+  cron.schedule('38 1 * * 3', async () => {
+    logger.info(`🗑️ [Mercredi 01h38] Nettoyage GIFs orphelins BACKUP`);
+
+    await executeWithTimeout(
+      'nettoyage GIFs orphelins BACKUP (01h38)',
+      cleanupOrphanGifsTask,
+      120000
+    );
+  }, {
+    timezone: "Europe/Paris",
+    scheduled: true
+  });
+
+  logger.info('✅ PRODUCTION configurée - 8 tâches avec backup automatique + notifications');
+  logger.info('📅 Planning: 00h01+00h09 notifications, 00h10+00h18 archivage, mercredi 01h15+01h23 nettoyage programmes, mercredi 01h30+01h38 nettoyage GIFs');
+  logger.info('🔒 Toutes les tâches utilisent le singleton prismaService');
 };
 
 // Fonctions de test manuel
@@ -510,12 +560,23 @@ const manualNotificationsTest = async () => {
   );
 };
 
+// 🆕 NOUVEAU: Test manuel nettoyage GIFs orphelins
+const manualGifCleanupTest = async () => {
+  return await executeWithTimeout(
+    'test manuel nettoyage GIFs orphelins',
+    cleanupOrphanGifsTask,
+    120000
+  );
+};
+
 module.exports = {
   startProgramCleanupCron,
   archiveFinishedProgramsTask,
   cleanupOldArchivedProgramsTask,
   createProgramCompletedNotificationsTask, // 🆕 NOUVEAU
+  cleanupOrphanGifsTask, // 🆕 NOUVEAU
   manualArchiveTest,
   manualCleanupTest,
-  manualNotificationsTest // 🆕 NOUVEAU
+  manualNotificationsTest, // 🆕 NOUVEAU
+  manualGifCleanupTest // 🆕 NOUVEAU
 };

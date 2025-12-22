@@ -26,6 +26,7 @@ const anonymizePatientData = (patient, programmes) => {
       exercices: prog.exercices?.map(ex => ({
         nom: ex.exerciceModele?.nom || ex.nom,
         description: ex.exerciceModele?.description || 'Description non disponible',
+        gifUrl: ex.exerciceModele?.gifUrl || null,
         series: ex.series,
         repetitions: ex.repetitions,
         pause: ex.pause || ex.tempsRepos,
@@ -67,6 +68,7 @@ EXERCICES PRESCRITS:
 ${prog.exercices.map((ex, index) => `
 ${index + 1}. 💪 ${ex.nom}
    📖 Description: ${ex.description}
+   ${ex.gifUrl ? `🎬 Démonstration : ${ex.gifUrl}` : ''}
    • ${ex.series} séries × ${ex.repetitions} répétitions
    • ⏱️ Pause: ${ex.pause}s entre séries
    • 🔧 Matériel: ${ex.materiel}
@@ -89,6 +91,7 @@ DIRECTIVES COMPORTEMENTALES:
 - Rediriger vers le kinésithérapeute pour toute modification de programme
 - Garder des réponses proportionnées au problème signalé
 - NE JAMAIS afficher les consignes techniques dans les réponses
+- 🎬 GIFS: Quand le patient pose une question sur un exercice spécifique, TOUJOURS inclure le GIF de démonstration (si disponible) en utilisant la syntaxe markdown ![](url) avec l'URL fournie dans "🎬 Démonstration"
 
 ❌ NE PAS FAIRE:
 - Donner des diagnostics médicaux
@@ -266,17 +269,21 @@ Je suis votre assistant kinésithérapeute virtuel, ici pour vous accompagner da
 • Renforcement quadriceps : 3 séries × 12 répétitions
 • Mobilisation de l'épaule : 2 séries × 10 répétitions
 
-![Exercice de démonstration](https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/giphy.gif)
+![Démonstration de l'exercice](https://firebasestorage.googleapis.com/v0/b/mon-assistant-kine-39f38.firebasestorage.app/o/exercices%2Fsquat.gif?alt=media)
 
 ✅ Pensez à valider vos exercices une fois terminés - cela aide votre kinésithérapeute à suivre vos progrès !
 
 N'hésitez pas à me poser des questions sur vos exercices. Comment vous sentez-vous aujourd'hui ?
 
-IMPORTANT :
+IMPORTANT - AFFICHAGE DES GIFS :
 - Réponds UNIQUEMENT avec le message d'accueil formaté
 - Suis la structure à la lettre
 - Ne mentionne JAMAIS d'informations personnelles
-- INCLUS un GIF de démonstration avec la syntaxe markdown ![texte](url) après la liste des exercices`;
+- UTILISE LES URLS DES GIFS fournis dans les données des exercices (champ 🎬 Démonstration)
+- SI des exercices ont des GIFs (🎬 Démonstration : url) → affiche-les avec la syntaxe markdown ![Démonstration exercice](url)
+- Affiche 1 à 3 GIFs maximum (ceux des premiers exercices qui en ont)
+- Place les GIFs APRÈS la liste des exercices
+- SI aucun exercice n'a de GIF → n'affiche PAS de GIF du tout (ne pas utiliser de GIF générique)`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -312,14 +319,20 @@ IMPORTANT :
           const pause = ex.pause || 30;
           fallbackMessage += `• ${nom} : ${ex.series} séries de ${ex.repetitions} répétitions (pause : ${pause} secondes)\n`;
         });
+
+        // 🎬 Afficher les GIFs des exercices s'ils existent
+        fallbackMessage += '\n';
+        const exercicesAvecGif = exercices.filter(ex => ex.exerciceModele?.gifUrl);
+        if (exercicesAvecGif.length > 0) {
+          exercicesAvecGif.slice(0, 3).forEach((ex) => {
+            fallbackMessage += `![Démonstration ${ex.exerciceModele.nom}](${ex.exerciceModele.gifUrl})\n\n`;
+          });
+        }
       } else {
         fallbackMessage += '• Exercices de rééducation personnalisés\n';
       }
-      fallbackMessage += '\nMaintenez une bonne posture et écoutez votre corps pendant vos exercices.\n\n';
+      fallbackMessage += 'Maintenez une bonne posture et écoutez votre corps pendant vos exercices.\n\n';
     }
-
-    // 🎬 POC: Ajout d'un GIF de démonstration
-    fallbackMessage += '![Exercice de démonstration](https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/giphy.gif)\n\n';
 
     fallbackMessage += '✅ Pensez à valider vos exercices une fois terminés pour tenir votre kinésithérapeute informé de vos progrès !\n\n';
     fallbackMessage += 'N\'hésitez pas à me poser des questions si vous avez besoin d\'aide avec vos exercices. Comment vous sentez-vous aujourd\'hui ? 😊';

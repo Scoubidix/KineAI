@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from '@/components/ui/checkbox';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import VideoUpload from '@/components/VideoUpload';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -32,6 +33,7 @@ interface ExerciceModele {
   nom: string;
   description: string;
   tags?: string;
+  gifUrl?: string | null;
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
@@ -49,11 +51,12 @@ export default function KineCreateExercisePage() {
   const [exerciceToDelete, setExerciceToDelete] = useState<ExerciceModele | null>(null);
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
-  const [form, setForm] = useState({ 
-    id: null as number | null, 
-    nom: '', 
+  const [form, setForm] = useState({
+    id: null as number | null,
+    nom: '',
     description: '',
-    tags: [] as string[]
+    tags: [] as string[],
+    gifUrl: null as string | null
   });
 
   // Charger tous les tags disponibles
@@ -151,12 +154,13 @@ export default function KineCreateExercisePage() {
           nom: form.nom,
           description: form.description,
           tags: form.tags.length > 0 ? form.tags.join(', ') : null,
+          gifUrl: form.gifUrl,
           isPublic: false,
         }),
       });
 
       if (res.ok) {
-        setForm({ id: null, nom: '', description: '', tags: [] });
+        setForm({ id: null, nom: '', description: '', tags: [], gifUrl: null });
         setDialogOpen(false);
         loadExercices();
         loadAllTags();
@@ -196,11 +200,12 @@ export default function KineCreateExercisePage() {
   };
 
   const handleEdit = (exercice: ExerciceModele) => {
-    setForm({ 
-      id: exercice.id, 
-      nom: exercice.nom, 
+    setForm({
+      id: exercice.id,
+      nom: exercice.nom,
       description: exercice.description,
-      tags: exercice.tags ? exercice.tags.split(', ').map(tag => tag.trim()) : []
+      tags: exercice.tags ? exercice.tags.split(', ').map(tag => tag.trim()) : [],
+      gifUrl: exercice.gifUrl || null
     });
     setDialogOpen(true);
   };
@@ -330,7 +335,7 @@ export default function KineCreateExercisePage() {
               <Dialog open={dialogOpen} onOpenChange={(open) => {
                 setDialogOpen(open);
                 if (!open) {
-                  setForm({ id: null, nom: '', description: '', tags: [] });
+                  setForm({ id: null, nom: '', description: '', tags: [], gifUrl: null });
                 }
               }}>
                 <DialogTrigger asChild>
@@ -426,6 +431,12 @@ export default function KineCreateExercisePage() {
                             Sélectionnez les catégories qui correspondent à cet exercice
                           </p>
                         </div>
+
+                        {/* Section Vidéo de démonstration */}
+                        <VideoUpload
+                          gifUrl={form.gifUrl}
+                          onGifUrlChange={(url) => setForm(prev => ({ ...prev, gifUrl: url }))}
+                        />
                       </div>
                     </div>
 

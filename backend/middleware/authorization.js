@@ -1,16 +1,15 @@
 // middleware/authorization.js
 const logger = require('../utils/logger');
 const { sanitizeEmail } = require('../utils/logSanitizer');
+const prismaService = require('../services/prismaService');
 // Middleware pour vérifier les autorisations selon le plan d'abonnement
-
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
 
 /**
  * Middleware pour vérifier si le kiné peut créer un nouveau programme
  */
 const canCreateProgramme = async (req, res, next) => {
   try {
+    const prisma = prismaService.getInstance();
     const kine = await prisma.kine.findUnique({
       where: { uid: req.uid },
       select: { id: true, planType: true }
@@ -96,6 +95,7 @@ const canCreateProgramme = async (req, res, next) => {
 const requireAssistant = (assistantType) => {
   return async (req, res, next) => {
     try {
+      const prisma = prismaService.getInstance();
       const kine = await prisma.kine.findUnique({
         where: { uid: req.uid },
         select: { id: true, planType: true }
@@ -158,6 +158,7 @@ const requireAssistant = (assistantType) => {
 const requireFeature = (feature) => {
   return async (req, res, next) => {
     try {
+      const prisma = prismaService.getInstance();
       const kine = await prisma.kine.findUnique({
         where: { uid: req.uid },
         select: { id: true, planType: true }
@@ -209,6 +210,7 @@ const requireFeature = (feature) => {
  */
 const getPlanInfo = async (req, res, next) => {
   try {
+    const prisma = prismaService.getInstance();
     const kine = await prisma.kine.findUnique({
       where: { uid: req.uid },
       select: { id: true, planType: true }
@@ -234,6 +236,7 @@ const getPlanInfo = async (req, res, next) => {
  */
 const requireAdmin = async (req, res, next) => {
   try {
+    const prisma = prismaService.getInstance();
     // Récupérer l'utilisateur depuis son UID Firebase
     const kine = await prisma.kine.findUnique({
       where: { uid: req.uid },

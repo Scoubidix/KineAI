@@ -95,6 +95,7 @@ model ExerciceModele {
   kineId      Int
   nom         String
   description String
+  gifUrl      String?  // URL du GIF de démonstration (Firebase Storage)
   tags        String?  // tags séparés par virgules
   isPublic    Boolean  @default(false)
   createdAt   DateTime @default(now())

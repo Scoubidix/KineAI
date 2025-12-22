@@ -16,12 +16,20 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
 
   const idToken = await user.getIdToken();
 
+  // Construire les headers de base
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string> || {}),
+    Authorization: `Bearer ${idToken}`,
+  };
+
+  // N'ajouter Content-Type que si ce n'est pas du FormData
+  // (FormData nécessite que le navigateur génère automatiquement le Content-Type avec boundary)
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   return fetch(url, {
     ...options,
-    headers: {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${idToken}`,
-      "Content-Type": "application/json",
-    },
+    headers,
   });
 };

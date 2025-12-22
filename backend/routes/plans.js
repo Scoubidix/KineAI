@@ -1,9 +1,7 @@
 const express = require('express');
 const logger = require('../utils/logger');
+const prismaService = require('../services/prismaService');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
 
 // Limite absolue pour le plan Pionnier
 const PIONNIER_MAX_SLOTS = 100;
@@ -11,6 +9,7 @@ const PIONNIER_MAX_SLOTS = 100;
 // GET /api/plans/:planType/availability - Vérifier la disponibilité d'un plan
 router.get('/:planType/availability', async (req, res) => {
   try {
+    const prisma = prismaService.getInstance();
     const { planType } = req.params;
 
     // Seul le plan PIONNIER a des limitations
@@ -62,6 +61,7 @@ router.get('/:planType/availability', async (req, res) => {
 // GET /api/plans/:planType/remaining-slots - Récupérer uniquement le nombre de places restantes
 router.get('/:planType/remaining-slots', async (req, res) => {
   try {
+    const prisma = prismaService.getInstance();
     const { planType } = req.params;
 
     if (planType !== 'PIONNIER') {
@@ -97,6 +97,7 @@ router.get('/:planType/remaining-slots', async (req, res) => {
 // GET /api/plans/stats - Statistiques globales des plans
 router.get('/stats', async (req, res) => {
   try {
+    const prisma = prismaService.getInstance();
     // Compter les utilisateurs par plan
     const planStats = await prisma.kine.groupBy({
       by: ['planType'],
@@ -146,6 +147,7 @@ router.get('/stats', async (req, res) => {
 // POST /api/plans/check-pionnier-eligibility - Vérifier si un utilisateur peut prendre le plan Pionnier
 router.post('/check-pionnier-eligibility', async (req, res) => {
   try {
+    const prisma = prismaService.getInstance();
     const { email, kineId } = req.body;
 
     if (!email && !kineId) {

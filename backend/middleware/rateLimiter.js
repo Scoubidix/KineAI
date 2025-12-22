@@ -383,6 +383,32 @@ const rgpdDeleteLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter pour l'upload de vidéos exercices
+ * 3 uploads par minute max - empêche saturation CPU/disque
+ */
+const videoUploadLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 3, // 3 uploads max/minute
+  message: {
+    error: 'Trop d\'uploads de vidéos',
+    details: 'Maximum 3 vidéos par minute. Veuillez patienter avant de réessayer.',
+    retryAfter: 60
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'video_upload'),
+  handler: (req, res) => {
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Upload vidéo - User: ${safeUser}`);
+    res.status(429).json({
+      error: 'Trop d\'uploads de vidéos',
+      details: 'Maximum 3 vidéos par minute. Veuillez patienter avant de réessayer.',
+      retryAfter: 60
+    });
+  }
+});
+
+/**
  * Middleware pour afficher les informations de rate limiting
  * Utile pour le debugging
  */
@@ -416,5 +442,6 @@ module.exports = {
   documentSearchLimiter,
   rgpdExportLimiter,
   rgpdDeleteLimiter,
+  videoUploadLimiter,
   rateLimitLogger
 };

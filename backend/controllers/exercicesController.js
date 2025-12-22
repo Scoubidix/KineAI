@@ -120,12 +120,12 @@ exports.getAllTags = async (req, res) => {
 };
 
 exports.createExercice = async (req, res) => {
-  const { nom, description, tags } = req.body;
+  const { nom, description, tags, gifUrl } = req.body;
 
   try {
     const firebaseUid = req.uid;
     const prisma = prismaService.getInstance();
-    
+
     const kine = await prisma.kine.findUnique({
       where: { uid: firebaseUid },
     });
@@ -139,6 +139,7 @@ exports.createExercice = async (req, res) => {
         nom,
         description,
         tags: tags || null, // Stocker les tags sous forme de string séparée par virgules
+        gifUrl: gifUrl || null, // URL du GIF de démonstration
         isPublic: false,
         kineId: kine.id,
       },
@@ -153,12 +154,13 @@ exports.createExercice = async (req, res) => {
 
 exports.updateExercice = async (req, res) => {
   const { id } = req.params;
-  const { nom, description, tags } = req.body;
+  const { nom, description, tags, gifUrl } = req.body;
+  const firebaseStorageService = require('../services/firebaseStorageService');
 
   try {
     const firebaseUid = req.uid;
     const prisma = prismaService.getInstance();
-    
+
     const kine = await prisma.kine.findUnique({
       where: { uid: firebaseUid },
     });
@@ -175,12 +177,24 @@ exports.updateExercice = async (req, res) => {
       return res.status(403).json({ error: "Non autorisé à modifier cet exercice" });
     }
 
+    // Si un nouveau gifUrl est fourni et différent de l'ancien, supprimer l'ancien GIF
+    if (gifUrl !== undefined && exercice.gifUrl && gifUrl !== exercice.gifUrl) {
+      try {
+        await firebaseStorageService.deleteGif(exercice.gifUrl);
+        logger.info(`Ancien GIF supprimé: ${exercice.gifUrl}`);
+      } catch (error) {
+        logger.warn('Erreur lors de la suppression de l\'ancien GIF:', error);
+        // On continue quand même l'update
+      }
+    }
+
     const updated = await prisma.exerciceModele.update({
       where: { id: parseInt(id) },
-      data: { 
-        nom, 
-        description, 
-        tags: tags || null 
+      data: {
+        nom,
+        description,
+        tags: tags || null,
+        gifUrl: gifUrl !== undefined ? (gifUrl || null) : exercice.gifUrl
       },
     });
 
@@ -193,11 +207,12 @@ exports.updateExercice = async (req, res) => {
 
 exports.deleteExercice = async (req, res) => {
   const { id } = req.params;
+  const firebaseStorageService = require('../services/firebaseStorageService');
 
   try {
     const firebaseUid = req.uid;
     const prisma = prismaService.getInstance();
-    
+
     const kine = await prisma.kine.findUnique({
       where: { uid: firebaseUid },
     });
@@ -235,6 +250,17 @@ exports.deleteExercice = async (req, res) => {
       });
     }
 
+    // Supprimer le GIF associé de Firebase Storage s'il existe
+    if (exercice.gifUrl) {
+      try {
+        await firebaseStorageService.deleteGif(exercice.gifUrl);
+        logger.info(`GIF supprimé de Firebase Storage: ${exercice.gifUrl}`);
+      } catch (error) {
+        logger.warn('Erreur lors de la suppression du GIF de Firebase Storage:', error);
+        // On continue quand même la suppression de l'exercice
+      }
+    }
+
     await prisma.exerciceModele.delete({
       where: { id: parseInt(id) },
     });
@@ -243,5 +269,71 @@ exports.deleteExercice = async (req, res) => {
   } catch (err) {
     logger.error("Erreur suppression exercice :", err);
     res.status(500).json({ error: "Erreur suppression exercice" });
+  }
+};
+
+exports.uploadVideoAndConvert = async (req, res) => {
+  const videoConversionService = require('../services/videoConversionService');
+  const firebaseStorageService = require('../services/firebaseStorageService');
+  const fs = require('fs').promises;
+
+  try {
+    // Vérifier qu'un fichier a été uploadé
+    if (!req.file) {
+      return res.status(400).json({ error: "Aucun fichier vidéo fourni" });
+    }
+
+    // Valider le fichier vidéo
+    const validation = await videoConversionService.validateVideoFile(req.file, 30);
+    if (!validation.valid) {
+      // Nettoyer le fichier uploadé
+      await fs.unlink(req.file.path).catch(err =>
+        logger.warn('Erreur lors de la suppression du fichier temporaire:', err)
+      );
+      return res.status(400).json({ error: validation.error });
+    }
+
+    logger.info(`Upload vidéo reçu: ${req.file.originalname} (${(req.file.size / 1024 / 1024).toFixed(2)} MB)`);
+
+    // Convertir la vidéo en GIF
+    const { buffer: gifBuffer, fileName: gifFileName, sizeInMB } =
+      await videoConversionService.convertVideoToGif(
+        req.file.path,
+        `exercice_${Date.now()}`
+      );
+
+    logger.info(`GIF généré: ${gifFileName} (${sizeInMB} MB)`);
+
+    // Upload le GIF sur Firebase Storage
+    const gifUrl = await firebaseStorageService.uploadGif(gifBuffer, gifFileName);
+
+    // Nettoyer le fichier vidéo temporaire
+    await fs.unlink(req.file.path).catch(err =>
+      logger.warn('Erreur lors de la suppression de la vidéo temporaire:', err)
+    );
+
+    logger.info(`Upload complet. URL du GIF: ${gifUrl}`);
+
+    res.status(200).json({
+      success: true,
+      gifUrl,
+      fileName: gifFileName,
+      sizeInMB
+    });
+
+  } catch (err) {
+    logger.error("Erreur lors de l'upload et conversion vidéo:", err);
+
+    // Nettoyer le fichier temporaire en cas d'erreur
+    if (req.file && req.file.path) {
+      await fs.unlink(req.file.path).catch(err =>
+        logger.warn('Erreur lors de la suppression du fichier temporaire:', err)
+      );
+    }
+
+    res.status(500).json({
+      error: "Erreur lors de la conversion de la vidéo",
+      details: err.message
+    });
   }
 };
