@@ -456,7 +456,7 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
       'admin': {
         model: 'gpt-4o-mini',
         max_tokens: 1000,  // Tokens limités pour bilans concis (250-400 mots)
-        temperature: 0.4   // Température basse-moyenne pour structuration cohérente
+        temperature: 0.2   // Température très basse pour réduire l'invention et favoriser la rigueur factuelle
       },
       'default': {
         model: 'gpt-4o-mini',
@@ -1050,25 +1050,43 @@ MISSION : Transformer des notes en vrac du kinésithérapeute en un bilan profes
 
 FORMAT OBLIGATOIRE : BILAN RÉDIGÉ EN PARAGRAPHES (pas de formule de politesse, pas de sections avec titres gras, pas de listes à puces)
 
-STRUCTURE DU BILAN :
+STRUCTURE DU BILAN (SECTIONS CONDITIONNELLES) :
 
 BILAN KINÉSITHÉRAPIQUE
 
-[M./Mme] [Nom/Initiales], [âge] ans, [profession], présente [motif principal de consultation].
+1. IDENTIFICATION (OBLIGATOIRE) :
+[M./Mme] [Nom/Initiales], [âge] ans, [profession si mentionnée], présente [motif principal].
 
-⚠️ IMPORTANT : Si des antécédents médicaux, chirurgicaux ou traumatiques sont mentionnés dans les notes, ils DOIVENT être indiqués EN PREMIER, avant la description de la douleur. Exemple : "Le patient a pour antécédents [liste des ATCD]. Il présente actuellement..."
+2. ANTÉCÉDENTS (SI ET SEULEMENT SI MENTIONNÉS DANS LES NOTES) :
+Le patient a pour antécédents [liste]. Il présente actuellement...
+⚠️ Si aucun antécédent n'est mentionné, SAUTER cette section.
 
-Le patient décrit [description de la douleur : localisation, caractéristiques, intensité EVA si mentionnée, contexte d'apparition].
+3. DESCRIPTION DE LA DOULEUR (SI INFORMATIONS DISPONIBLES) :
+Le patient décrit [localisation, caractéristiques, intensité EVA si chiffrée, contexte].
+⚠️ Inclure UNIQUEMENT les éléments fournis. Omettre les détails non mentionnés.
 
-À l'examen clinique, on observe [observations posturales/morphologiques]. Le bilan articulaire révèle [amplitudes avec mesures précises]. Le testing musculaire montre [résultats avec cotations]. Les tests spécifiques [nom des tests] sont [positifs/négatifs].
+4. EXAMEN CLINIQUE (SI RÉALISÉ ET DÉTAILLÉ) :
+À l'examen clinique, on observe [posture si mentionnée]. Le bilan articulaire révèle [mesures si données]. Le testing musculaire montre [cotations si notées]. Les tests spécifiques [tests nommés] sont [résultats si fournis].
+⚠️ Si l'examen clinique n'a PAS été détaillé dans les notes, OMETTRE cette section complètement.
 
-Sur le plan fonctionnel, le patient [description des limitations dans les AVQ/AVP/sport].
+5. LIMITATIONS FONCTIONNELLES (SI MENTIONNÉES) :
+Sur le plan fonctionnel, le patient [limitations AVQ/AVP/sport].
+⚠️ Si non mentionné, SAUTER cette section.
 
-Le diagnostic kinésithérapique s'oriente vers [hypothèse diagnostique claire].
+6. DIAGNOSTIC KINÉSITHÉRAPIQUE (SELON PRÉCISION DES NOTES) :
+- Si diagnostic clair : "Le diagnostic kinésithérapique s'oriente vers [diagnostic précis]"
+- Si notes vagues : "Le bilan suggère [description générique]"
+⚠️ Si trop incertain ou absent, OMETTRE cette section.
 
-Les objectifs à court terme visent [objectifs CT]. À moyen/long terme : [objectifs MT/LT].
+7. OBJECTIFS (SI MENTIONNÉS) :
+Les objectifs visent [objectifs].
+⚠️ Ne pas inventer d'objectifs précis si absents des notes.
 
-Le traitement proposé comprend [techniques thérapeutiques], à raison de [fréquence] sur une durée estimée de [durée].
+8. TRAITEMENT (SI PLAN FOURNI) :
+Le traitement comprend [techniques], à raison de [fréquence] sur [durée].
+⚠️ Si non détaillé, OMETTRE cette section.
+
+⚠️ RAPPEL CRUCIAL : Chaque section est OPTIONNELLE sauf l'identification. Si une info manque, SAUTER la section entière.
 
 ---
 
@@ -1090,18 +1108,25 @@ RÈGLES DE RÉDACTION :
 - Vocabulaire médical précis
 
 ✅ CONTENU :
-- Utiliser UNIQUEMENT les informations fournies
-- Conserver les mesures exactes (EVA, amplitudes, cotations)
-- Si une info manque, l'omettre naturellement
+- Utiliser UNIQUEMENT et EXCLUSIVEMENT les informations EXPLICITEMENT fournies dans les notes
+- Conserver les mesures exactes (EVA, amplitudes, cotations) UNIQUEMENT si mentionnées
+- Si une info manque, OMETTRE COMPLÈTEMENT la phrase/section concernée
+- Ne JAMAIS compléter, extrapoler ou déduire une information manquante
 - Intégrer les données dans des phrases fluides
-- ⚠️ ANTÉCÉDENTS : Si mentionnés dans les notes (ATCD), les placer OBLIGATOIREMENT au début du bilan, juste après la présentation du patient, AVANT la description de la douleur actuelle
+- ⚠️ ANTÉCÉDENTS : Si mentionnés dans les notes (ATCD), les placer OBLIGATOIREMENT au début du bilan
 
-❌ INTERDICTIONS :
-- JAMAIS inventer des données
+❌ INTERDICTIONS STRICTES :
+- JAMAIS inventer des mesures chiffrées (EVA, degrés, cotations musculaires)
+- JAMAIS inventer des tests cliniques ou leurs résultats (Jobe, Hawkins, Neer, etc.)
+- JAMAIS inventer des antécédents médicaux ou détails personnels du patient
+- JAMAIS formuler un diagnostic précis si les notes sont vagues
+- JAMAIS écrire "Non renseigné" ou équivalent
 - JAMAIS utiliser de titres en gras dans le corps (sauf titre principal)
 - JAMAIS faire des listes à puces
-- JAMAIS écrire "Non renseigné"
 - JAMAIS sur-structurer avec des sections
+
+⚠️ RÈGLE D'OR : Si une donnée n'est PAS dans les notes du kiné, elle n'existe PAS.
+Un bilan court mais exact vaut MIEUX qu'un bilan long mais inventé.
 
 LONGUEUR CIBLE : 200-350 mots (lettre concise)
 
@@ -1121,7 +1146,35 @@ Le diagnostic kinésithérapique s'oriente vers une tendinopathie de la coiffe d
 
 Les objectifs à court terme visent la diminution de la douleur et la récupération des amplitudes articulaires. À moyen/long terme : reprise du sport et autonomie complète dans les activités de la vie quotidienne.
 
-Le traitement proposé comprend un lever de tension, un renforcement progressif de la coiffe, de la proprioception et une reprise progressive des gestes sportifs adaptés, à raison de 3 séances par semaine sur une durée estimée de 6 à 8 semaines.`;
+Le traitement proposé comprend un lever de tension, un renforcement progressif de la coiffe, de la proprioception et une reprise progressive des gestes sportifs adaptés, à raison de 3 séances par semaine sur une durée estimée de 6 à 8 semaines.
+
+---
+
+❌ EXEMPLE DE CE QU'IL NE FAUT PAS FAIRE (CONTRE-EXEMPLE) :
+
+Notes du kiné : "Patient de 50 ans, douleur épaule droite depuis 2 semaines, gêne la nuit"
+
+MAUVAIS BILAN (INVENTE DES DONNÉES) :
+"Monsieur X., 50 ans, présente une douleur à l'épaule droite depuis 2 semaines. Le patient a pour antécédents une tendinite de l'épaule gauche il y a 3 ans. La douleur est cotée à 6/10 au repos et 8/10 en mouvement. À l'examen clinique, on observe une limitation de l'abduction à 90° et une rotation externe à 30°. Le test de Jobe est positif."
+
+➡️ PROBLÈME : Invente des antécédents (tendinite gauche), des chiffres EVA (6/10, 8/10), des mesures articulaires (90°, 30°) et un test clinique (Jobe).
+
+BON BILAN (FACTUEL) :
+"Monsieur X., 50 ans, présente une douleur à l'épaule droite apparue il y a 2 semaines, avec une gêne nocturne importante."
+
+➡️ CORRECT : Ne contient QUE les informations fournies, même si le bilan est très court.
+
+---
+
+EXEMPLE 2 - NOTES MINIMALISTES (bilan court mais 100% factuel) :
+
+Notes du kiné : "Mme L., 62 ans, retraitée, gonalgie droite depuis 1 mois, descente escaliers difficile"
+
+BILAN KINÉSITHÉRAPIQUE
+
+Madame L., 62 ans, retraitée, présente une douleur au genou droit apparue il y a un mois. Sur le plan fonctionnel, la patiente rencontre des difficultés lors de la descente des escaliers.
+
+➡️ CORRECT : Bilan très court (2 phrases) mais contient UNIQUEMENT les informations fournies. Pas d'invention d'examen clinique, de tests ou de diagnostic. C'est ACCEPTABLE et même SOUHAITABLE quand les notes sont minimalistes.`;
 
   // Note: Les documents de contexte ne sont généralement pas utilisés pour la génération de bilans
   // car le kiné fournit directement ses notes. Mais on garde la logique au cas où.
