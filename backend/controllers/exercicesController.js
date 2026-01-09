@@ -17,9 +17,9 @@ const filterExercices = (exercices, search = '', selectedTags = []) => {
       ex.description.toLowerCase().includes(search.toLowerCase()) ||
       (ex.tags && ex.tags.toLowerCase().includes(search.toLowerCase()));
 
-    // Filtrage par tags
-    const matchesTags = selectedTags.length === 0 || 
-      (ex.tags && selectedTags.some(tag => ex.tags.includes(tag)));
+    // Filtrage par tags (intersection AND - tous les tags doivent être présents)
+    const matchesTags = selectedTags.length === 0 ||
+      (ex.tags && selectedTags.every(tag => ex.tags.includes(tag)));
 
     return matchesSearch && matchesTags;
   });

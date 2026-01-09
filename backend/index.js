@@ -59,6 +59,9 @@ const rgpdRoutes = require('./routes/rgpd');
 // 📧 NOUVEAU TEMPLATES ADMIN : Import des routes templates administratifs
 const templatesRoutes = require('./routes/templates');
 
+// 🏋️ NOUVEAU TEMPLATES EXERCICES : Import des routes templates d'exercices
+const exerciceTemplatesRoutes = require('./routes/exerciceTemplates');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -587,6 +590,7 @@ app.use('/programmes', (req, res, next) => {
 
 app.use('/admin/programmes', programmeAdminRoutes);  // Admin - LIBRES
 app.use('/exercices', exerciceRoutes);               // CRUD exercices - LIBRES
+app.use('/exercice-templates', exerciceTemplatesRoutes); // CRUD templates d'exercices - LIBRES
 app.use('/api/test', testOpenAIRoutes);             // Tests - LIBRES
 
 // ========== ROUTES IA/CHAT - RATE LIMITED ==========

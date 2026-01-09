@@ -113,7 +113,7 @@ async function convertVideoToGif(videoPath, outputFileName) {
             const sizeInMB = gifBuffer.length / (1024 * 1024);
             logger.info(`Taille du GIF: ${sizeInMB.toFixed(2)} MB`);
 
-            const MAX_GIF_SIZE_MB = 5;
+            const MAX_GIF_SIZE_MB = 8;
             if (sizeInMB > MAX_GIF_SIZE_MB) {
               await fs.unlink(outputPath).catch(() => {}); // Cleanup
               throw new Error(`GIF trop volumineux: ${sizeInMB.toFixed(2)}MB (max ${MAX_GIF_SIZE_MB}MB). Réduisez la durée ou la qualité de votre vidéo.`);

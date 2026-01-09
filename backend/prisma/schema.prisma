@@ -40,6 +40,7 @@ model Kine {
 
   patients              Patient[]
   exercicesModeles      ExerciceModele[]
+  exerciceTemplates     ExerciceTemplate[]
   notifications         Notification[]
 
   // ========== NOUVELLES RELATIONS IA ==========
@@ -102,7 +103,46 @@ model ExerciceModele {
   updatedAt   DateTime @updatedAt
 
   exercicesProgramme ExerciceProgramme[]
+  templateItems      ExerciceTemplateItem[]
 }
+
+// ========== TEMPLATES D'EXERCICES ==========
+model ExerciceTemplate {
+  id          Int      @id @default(autoincrement())
+  nom         String   @db.VarChar(255)
+  description String?  @db.Text
+  isPublic    Boolean  @default(false)
+  kineId      Int
+  kine        Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items       ExerciceTemplateItem[]
+
+  @@index([kineId])
+  @@index([isPublic])
+  @@map("exercice_templates")
+}
+
+model ExerciceTemplateItem {
+  id                  Int                @id @default(autoincrement())
+  templateId          Int
+  template            ExerciceTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  exerciceModeleId    Int
+  exerciceModele      ExerciceModele     @relation(fields: [exerciceModeleId], references: [id])
+  ordre               Int                // Préserver l'ordre des exercices
+  series              Int                @default(3)
+  repetitions         Int                @default(10)
+  tempsRepos          Int                @default(30)  // en secondes
+  instructions        String?            @db.Text
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([templateId])
+  @@index([exerciceModeleId])
+  @@map("exercice_template_items")
+}
+// ===========================================
 
 model Programme {
   id          Int       @id @default(autoincrement())
