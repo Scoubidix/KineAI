@@ -55,8 +55,8 @@ async function getVideoDuration(filePath) {
  * Configuration pour la conversion vidéo → GIF
  */
 const GIF_CONFIG = {
-  width: 480,           // Résolution: 480p
-  fps: 10,              // 10 frames par seconde
+  width: 320,           // Résolution: 320p (optimisé pour taille fichier)
+  fps: 8,               // 8 frames par seconde (fluide mais léger)
   maxSizeMB: 3,         // Taille max du GIF: ~3MB
   quality: 'medium',    // Qualité: medium pour équilibrer taille/qualité
 };
@@ -191,13 +191,13 @@ async function validateVideoFile(file, maxSizeMB = 30) {
     };
   }
 
-  // Vérifier la durée de la vidéo (max 20 secondes)
+  // Vérifier la durée de la vidéo (max 10 secondes)
   try {
     const duration = await getVideoDuration(file.path);
-    if (duration > 20) {
+    if (duration > 10) {
       return {
         valid: false,
-        error: `Vidéo trop longue: ${Math.round(duration)}s. Maximum 20 secondes pour un exercice.`
+        error: `Vidéo trop longue: ${Math.round(duration)}s. Maximum 10 secondes pour un exercice.`
       };
     }
   } catch (error) {

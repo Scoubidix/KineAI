@@ -9,8 +9,13 @@ const admin = require('firebase-admin');
 // Wrapper avec timeout et retry pour les tâches CRON
 const executeWithTimeout = async (taskName, taskFunction, timeoutMs = 120000) => {
   const startTime = Date.now();
-  logger.info(`🚀 Démarrage ${taskName}...`);
-  
+
+  // État du pool avant la tâche (sans healthCheck - min_instance=1)
+  const statsBefore = prismaService.getConnectionStats();
+  logger.info(`🚀 Démarrage ${taskName}...`, {
+    poolStats: statsBefore
+  });
+
   try {
     // Promise avec timeout
     const timeoutPromise = new Promise((_, reject) => 
@@ -49,127 +54,130 @@ const executeWithTimeout = async (taskName, taskFunction, timeoutMs = 120000) =>
   }
 };
 
-// 🆕 NOUVELLE TÂCHE : Créer notifications pour programmes terminés
+// 🆕 TÂCHE BATCH : Créer notifications pour programmes terminés
+// Version optimisée sans transaction interactive (évite blocage connexion)
 const createProgramCompletedNotificationsTask = async () => {
   const now = new Date();
+
   logger.info(`🔔 Début création notifications programmes terminés`);
 
   try {
     const prisma = prismaService.getInstance();
 
-    const result = await prisma.$transaction(async (tx) => {
-      // Trouver les programmes terminés (dateFin <= aujourd'hui) et pas encore archivés
-      const completedPrograms = await tx.programme.findMany({
-        where: {
-          dateFin: { lte: now },
-          isArchived: false
-        },
-        include: {
-          patient: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              kineId: true
-            }
-          },
-          sessionValidations: {
-            where: { isValidated: true },
-            select: { id: true }
+    // Query 1 : Récupérer les programmes terminés (connexion libérée après)
+    const completedPrograms = await prisma.programme.findMany({
+      where: {
+        dateFin: { lte: now },
+        isArchived: false
+      },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            kineId: true
           }
         },
-        orderBy: { dateFin: 'asc' },
-        take: 100
-      });
-
-      logger.info(`📋 ${completedPrograms.length} programmes terminés trouvés`);
-
-      if (completedPrograms.length === 0) {
-        return { programmesTraites: 0, notificationsCreees: 0 };
-      }
-
-      let notificationsCreees = 0;
-      const details = [];
-
-      for (const programme of completedPrograms) {
-        try {
-          // Vérifier si une notification PROGRAM_COMPLETED existe déjà
-          const existingNotification = await tx.notification.findFirst({
-            where: {
-              type: 'PROGRAM_COMPLETED',
-              kineId: programme.patient.kineId,
-              patientId: programme.patient.id,
-              programmeId: programme.id
-            }
-          });
-
-          if (!existingNotification) {
-            // Calculer les statistiques de completion
-            const totalDays = Math.ceil(
-              (new Date(programme.dateFin) - new Date(programme.dateDebut)) / (1000 * 60 * 60 * 24)
-            ) + 1;
-            const validatedDays = programme.sessionValidations.length;
-            const completionPercentage = Math.round((validatedDays / totalDays) * 100);
-
-            // Créer la notification
-            const patientName = `${programme.patient.firstName} ${programme.patient.lastName}`;  // ✅ NOM COMPLET pour BDD
-            const title = 'Programme terminé';
-            const message = `Le programme "${programme.titre}" de ${patientName} est terminé`;  // ✅ NOM COMPLET
-
-            const metadata = {
-              totalDays,
-              validatedDays,
-              completionPercentage,
-              adherenceRatio: `${validatedDays}/${totalDays}`,
-              adherenceText: `${validatedDays}/${totalDays} jours complétés, ${completionPercentage}% d'adhérence`,  // ✅ Ajout adherenceText
-              programmeStartDate: programme.dateDebut,
-              programmeEndDate: programme.dateFin,
-              completedAt: now.toISOString(),
-              trigger: 'cron_daily_check'
-            };
-
-            await tx.notification.create({
-              data: {
-                type: 'PROGRAM_COMPLETED',
-                title,
-                message,
-                kineId: programme.patient.kineId,
-                patientId: programme.patient.id,
-                programmeId: programme.id,
-                metadata: JSON.stringify(metadata),
-                isRead: false
-              }
-            });
-
-            notificationsCreees++;
-            details.push({
-              programmeId: programme.id,
-              titre: programme.titre,
-              patient: patientName,
-              adherence: `${validatedDays}/${totalDays} jours (${completionPercentage}%)`
-            });
-
-            logger.info(`🔔 Notification créée: ${sanitizeName(patientName)} - ${programme.titre} - Adhérence ${validatedDays}/${totalDays} (${completionPercentage}%)`);
-          } else {
-            logger.info(`⏭️ Notification déjà existante pour programme ${programme.id}`);
-          }
-        } catch (notifError) {
-          logger.error(`❌ Erreur création notification programme ${programme.id}:`, notifError.message);
+        sessionValidations: {
+          where: { isValidated: true },
+          select: { id: true }
         }
-      }
-
-      logger.info(`🔔 ${notificationsCreees} notifications créées pour programmes terminés`);
-
-      return {
-        programmesTraites: completedPrograms.length,
-        notificationsCreees,
-        details
-      };
-    }, {
-      timeout: 60000
+      },
+      orderBy: { dateFin: 'asc' },
+      take: 100
     });
 
-    return result;
+    logger.info(`📋 ${completedPrograms.length} programmes terminés trouvés`);
+
+    if (completedPrograms.length === 0) {
+      return { programmesTraites: 0, notificationsCreees: 0 };
+    }
+
+    // Query 2 : Récupérer TOUTES les notifications existantes en une seule query
+    const existingNotifications = await prisma.notification.findMany({
+      where: {
+        type: 'PROGRAM_COMPLETED',
+        programmeId: { in: completedPrograms.map(p => p.id) }
+      },
+      select: { programmeId: true }
+    });
+
+    // Traitement JS (aucune connexion DB utilisée)
+    const existingProgramIds = new Set(existingNotifications.map(n => n.programmeId));
+    const programmesToNotify = completedPrograms.filter(p => !existingProgramIds.has(p.id));
+
+    logger.info(`📋 ${programmesToNotify.length} programmes sans notification`);
+
+    if (programmesToNotify.length === 0) {
+      return { programmesTraites: completedPrograms.length, notificationsCreees: 0 };
+    }
+
+    // Préparer les données pour batch insert (aucune connexion DB)
+    const notificationsData = programmesToNotify.map(programme => {
+      const totalDays = Math.ceil(
+        (new Date(programme.dateFin) - new Date(programme.dateDebut)) / (1000 * 60 * 60 * 24)
+      ) + 1;
+      const validatedDays = programme.sessionValidations.length;
+      const completionPercentage = Math.round((validatedDays / totalDays) * 100);
+      const patientName = `${programme.patient.firstName} ${programme.patient.lastName}`;
+
+      const metadata = {
+        totalDays,
+        validatedDays,
+        completionPercentage,
+        adherenceRatio: `${validatedDays}/${totalDays}`,
+        adherenceText: `${validatedDays}/${totalDays} jours complétés, ${completionPercentage}% d'adhérence`,
+        programmeStartDate: programme.dateDebut,
+        programmeEndDate: programme.dateFin,
+        completedAt: now.toISOString(),
+        trigger: 'cron_daily_check'
+      };
+
+      return {
+        type: 'PROGRAM_COMPLETED',
+        title: 'Programme terminé',
+        message: `Le programme "${programme.titre}" de ${patientName} est terminé`,
+        kineId: programme.patient.kineId,
+        patientId: programme.patient.id,
+        programmeId: programme.id,
+        metadata: JSON.stringify(metadata),
+        isRead: false
+      };
+    });
+
+    // Query 3 : INSERT BATCH en une seule query (connexion libérée après)
+    const result = await prisma.notification.createMany({
+      data: notificationsData,
+      skipDuplicates: true  // Sécurité si doublon
+    });
+
+    // Log des détails
+    const details = programmesToNotify.map(programme => {
+      const totalDays = Math.ceil(
+        (new Date(programme.dateFin) - new Date(programme.dateDebut)) / (1000 * 60 * 60 * 24)
+      ) + 1;
+      const validatedDays = programme.sessionValidations.length;
+      const completionPercentage = Math.round((validatedDays / totalDays) * 100);
+      const patientName = `${programme.patient.firstName} ${programme.patient.lastName}`;
+
+      logger.info(`🔔 Notification créée: ${sanitizeName(patientName)} - ${programme.titre} - Adhérence ${validatedDays}/${totalDays} (${completionPercentage}%)`);
+
+      return {
+        programmeId: programme.id,
+        titre: programme.titre,
+        patient: patientName,
+        adherence: `${validatedDays}/${totalDays} jours (${completionPercentage}%)`
+      };
+    });
+
+    logger.info(`🔔 ${result.count} notifications créées pour programmes terminés`);
+
+    return {
+      programmesTraites: completedPrograms.length,
+      notificationsCreees: result.count,
+      details
+    };
 
   } catch (error) {
     logger.error(`❌ Erreur création notifications:`, error.message);
@@ -418,6 +426,19 @@ const cleanupOrphanGifsTask = async () => {
 // Démarrer les tâches automatiques - PRODUCTION avec backup et notifications
 const startProgramCleanupCron = () => {
   logger.info('🚀 Démarrage PRODUCTION - Tâches cron avec singleton prismaService');
+
+  // 🔍 DIAGNOSTIC: Afficher les paramètres du pool de connexions
+  try {
+    const dbUrl = new URL(process.env.DATABASE_URL);
+    logger.info('🔍 DATABASE_URL pool config:', {
+      connection_limit: dbUrl.searchParams.get('connection_limit') || 'default',
+      pool_timeout: dbUrl.searchParams.get('pool_timeout') || 'default',
+      connect_timeout: dbUrl.searchParams.get('connect_timeout') || 'default',
+      host: dbUrl.hostname
+    });
+  } catch (e) {
+    logger.warn('⚠️ Impossible de parser DATABASE_URL pour diagnostic');
+  }
 
   // 🆕 NOUVEAU: Notifications programmes terminés - 00h01 + backup 00h09
   cron.schedule('1 0 * * *', async () => {

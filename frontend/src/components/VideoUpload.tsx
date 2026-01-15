@@ -233,7 +233,7 @@ export default function VideoUpload({ gifUrl, onGifUrlChange }: VideoUploadProps
       )}
 
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        La vidéo sera automatiquement convertie en GIF optimisé (480p, ~2-3MB)
+        La vidéo sera convertie en GIF optimisé (320p). Durée max : 10 secondes.
       </p>
     </div>
   );

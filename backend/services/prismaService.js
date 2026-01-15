@@ -6,7 +6,6 @@ const logger = require('../utils/logger');
 let prismaInstance = null;
 let isConnected = false;
 let lastActivity = null;
-let cleanupInterval = null;
 let totalCreations = 0;  // Total depuis démarrage serveur
 let currentConnectionId = null;  // ID de la connexion actuelle
 
@@ -29,7 +28,7 @@ class PrismaService {
       }
       
       const dbUrl = new URL(process.env.DATABASE_URL);
-      dbUrl.searchParams.set('connection_limit', '1');
+      dbUrl.searchParams.set('connection_limit', '2');  // 2 connexions pour gérer reconnexion GCP
       dbUrl.searchParams.set('pool_timeout', '20');
       dbUrl.searchParams.set('connect_timeout', '15');
       
@@ -44,7 +43,6 @@ class PrismaService {
 
       isConnected = true;
       lastActivity = Date.now();
-      this.startCleanupTimer();
 
       // Event listeners pour fermeture propre
       ['SIGINT', 'SIGTERM', 'SIGQUIT', 'beforeExit'].forEach(event => {
@@ -73,43 +71,13 @@ class PrismaService {
     }
   }
 
-  startCleanupTimer() {
-    if (cleanupInterval) return;
-
-    cleanupInterval = setInterval(async () => {
-      const inactiveTime = Date.now() - (lastActivity || 0);
-      const maxInactiveTime = 5 * 60 * 1000; // 5 minutes
-
-      // Log check seulement en debug
-      if (DEBUG_LOGS) {
-        logger.debug(`⏰ Inactivité: ${Math.round(inactiveTime/1000)}s / ${maxInactiveTime/1000}s max`);
-      }
-
-      if (inactiveTime > maxInactiveTime && isConnected) {
-        logger.info(`🧹 Fermeture automatique connexion DB`);
-        await this.forceDisconnect();
-      }
-    }, 2 * 60 * 1000); // Check toutes les 2 minutes
-
-    if (DEBUG_LOGS) {
-      logger.debug('⏰ Timer de nettoyage démarré');
-    }
-  }
-
-  stopCleanupTimer() {
-    if (cleanupInterval) {
-      clearInterval(cleanupInterval);
-      cleanupInterval = null;
-    }
-  }
+  // Timer de cleanup supprimé - GCP Cloud SQL gère les connexions zombies via TCP keepalives
 
   isConnected() {
     return isConnected && prismaInstance !== null;
   }
 
   async forceDisconnect() {
-    this.stopCleanupTimer();
-
     if (prismaInstance && isConnected) {
       logger.info(`🔌 Fermeture connexion DB...`);
       try {
@@ -205,7 +173,7 @@ class PrismaService {
   getConnectionStats() {
     const now = Date.now();
     const inactiveTime = lastActivity ? now - lastActivity : 0;
-    
+
     return {
       isConnected: this.isConnected(),
       hasInstance: prismaInstance !== null,
@@ -213,7 +181,6 @@ class PrismaService {
       currentConnectionId: currentConnectionId,
       lastActivity: lastActivity ? new Date(lastActivity).toISOString() : null,
       inactiveTime: Math.round(inactiveTime / 1000) + 's',
-      hasCleanupTimer: cleanupInterval !== null,
       timestamp: new Date().toISOString()
     };
   }

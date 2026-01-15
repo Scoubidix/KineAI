@@ -236,36 +236,7 @@ export default function BilanKinePage() {
 
   const placeholderText = `Exemple de notes en vrac :
 
-Patient 45 ans, homme, professeur de sport
-Douleur épaule droite depuis 3 semaines après chute ski
-
-ATCD: rien signaler
-Douleur antéro-latérale épaule, irradiant parfois vers biceps
-EVA repos 2/10, mouvement 7/10
-Gêne nocturne ++
-
-Observation: attitude antalgique, épaule en rotation interne
-Testing:
-- Flexion active limitée 120° (douleur), passive 145°
-- Abduction active 90° (douleur arc douloureux 60-90°)
-- Rotations: RE limitée 30° (N=45°), RI normale
-Force: deltoïde 4/5, supra-épineux 3+/5
-Jobe test: positif, douleur
-Hawkins-Kennedy: positif
-Neer: positif
-
-Fonctionnel:
-Impossible travail bras levés
-Arrêt sport depuis 3 semaines
-Habillage difficile (mettre veste)
-
-Hypothèse: tendinopathie coiffe rotateurs (supra-épineux probablement)
-
-Objectif CT: diminuer douleur, récupérer amplitudes
-Objectif MT: reprise sport, autonomie complète ADL
-
-Traitement: lever tension, renfo progressif coiffe, proprio, reprise gestes sportifs adaptés
-3x/semaine, durée 6-8 semaines`;
+patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. ATCD : hernie discale L4-L5 opérée 2018. Douleur bas du dos irradiant fesse droite, EVA 5/10 repos 7/10 effort. Flexion lombaire limitée 40°, Lasègue négatif, paravertébraux contracturés. Difficulté à se pencher, ne peut plus porter charges >10kg. Objectif : retour au travail. Traitement prévu : massages décontracturants, McKenzie, renforcement, 2x/semaine 6 semaines.`;
 
   // Fonction pour convertir le markdown en HTML
   const renderMarkdown = (text: string) => {
