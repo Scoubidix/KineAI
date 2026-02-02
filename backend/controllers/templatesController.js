@@ -234,6 +234,7 @@ exports.createTemplate = async (req, res) => {
             series: ex.series || 3,
             repetitions: ex.repetitions || 10,
             tempsRepos: ex.tempsRepos || 30,
+            tempsTravail: ex.tempsTravail || 0,
             instructions: ex.instructions || null
           }))
         }
@@ -317,6 +318,7 @@ exports.updateTemplate = async (req, res) => {
               series: ex.series || 3,
               repetitions: ex.repetitions || 10,
               tempsRepos: ex.tempsRepos || 30,
+              tempsTravail: ex.tempsTravail || 0,
               instructions: ex.instructions || null
             }))
           }

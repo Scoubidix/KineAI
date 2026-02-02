@@ -78,6 +78,7 @@ interface ProgrammeExercise {
   series: number;
   repetitions: number;
   restTime: number;
+  tempsTravail: number;
   instructions: string;
 }
 
@@ -92,6 +93,7 @@ interface ExerciceTemplate {
     series: number;
     repetitions: number;
     tempsRepos: number;
+    tempsTravail?: number;
     instructions?: string;
     exerciceModele: {
       id: number;
@@ -418,6 +420,7 @@ export default function ProgrammesPage() {
         series: 3,
         repetitions: 10,
         restTime: 30,
+        tempsTravail: 0,
         instructions: '',
       };
     });
@@ -439,6 +442,7 @@ export default function ProgrammesPage() {
         series: 3,
         repetitions: 10,
         restTime: 30,
+        tempsTravail: 0,
         instructions: '',
       },
     ]);
@@ -468,6 +472,7 @@ export default function ProgrammesPage() {
               series: item.series,
               repetitions: item.repetitions,
               restTime: item.tempsRepos,
+              tempsTravail: item.tempsTravail || 0,
               instructions: item.instructions || '',
             });
           }
@@ -544,6 +549,7 @@ export default function ProgrammesPage() {
             series: ex.series,
             repetitions: ex.repetitions,
             tempsRepos: ex.restTime,
+            tempsTravail: ex.tempsTravail || 0,
             instructions: ex.instructions || ''
           }))
         })
@@ -1182,7 +1188,7 @@ export default function ProgrammesPage() {
                           {ex.nom}
                         </h4>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs font-medium text-gray-600">Séries</Label>
                             <Input
@@ -1201,6 +1207,17 @@ export default function ProgrammesPage() {
                               value={ex.repetitions}
                               onChange={(e) => handleInputChange(index, 'repetitions', Number(e.target.value))}
                               className="text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs font-medium text-gray-600">Travail (sec)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={ex.tempsTravail}
+                              onChange={(e) => handleInputChange(index, 'tempsTravail', Number(e.target.value))}
+                              className="text-sm"
+                              placeholder="0"
                             />
                           </div>
                           <div className="space-y-1">

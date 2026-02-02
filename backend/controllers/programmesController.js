@@ -125,6 +125,7 @@ exports.createProgramme = async (req, res) => {
             series: ex.series,
             repetitions: ex.repetitions,
             pause: ex.tempsRepos,
+            tempsTravail: ex.tempsTravail || 0,
             consigne: ex.instructions || '',
           }))
         }
@@ -297,14 +298,15 @@ exports.updateProgramme = async (req, res) => {
             series: ex.series,
             repetitions: ex.repetitions,
             pause: ex.tempsRepos,
+            tempsTravail: ex.tempsTravail || 0,
             consigne: ex.instructions || '',
           }))
         }
       },
-      include: { 
-        exercices: { 
-          include: { exerciceModele: true } 
-        } 
+      include: {
+        exercices: {
+          include: { exerciceModele: true }
+        }
       }
     });
 

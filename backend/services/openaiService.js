@@ -30,6 +30,7 @@ const anonymizePatientData = (patient, programmes) => {
         series: ex.series,
         repetitions: ex.repetitions,
         pause: ex.pause || ex.tempsRepos,
+        tempsTravail: ex.tempsTravail || null,
         consigne: ex.consigne || ex.instructions,
         difficulte: ex.difficulte || 'modérée',
         materiel: ex.materiel || 'aucun'
@@ -70,6 +71,7 @@ ${index + 1}. 💪 ${ex.nom}
    📖 Description: ${ex.description}
    ${ex.gifUrl ? `🎬 Démonstration : ${ex.gifUrl}` : ''}
    • ${ex.series} séries × ${ex.repetitions} répétitions
+   ${ex.tempsTravail && ex.tempsTravail > 0 ? `• 🕐 Temps de travail: ${ex.tempsTravail}s par répétition` : ''}
    • ⏱️ Pause: ${ex.pause}s entre séries
    • 🔧 Matériel: ${ex.materiel}
    • 📈 Difficulté: ${ex.difficulte}
@@ -242,9 +244,12 @@ Puis : "Je suis votre assistant kinésithérapeute virtuel, ici pour vous accomp
 
 2️⃣ PROGRAMME DU JOUR
 Format : "📋 Programme du jour :"
-Liste TOUS les exercices du programme avec :
-• Nom de l'exercice : séries × répétitions
+Pour CHAQUE exercice du programme :
+• Nom de l'exercice : séries × répétitions (+ temps de travail si > 0)
+• Immédiatement après : le GIF de démonstration si disponible (syntaxe markdown ![](url))
 Maximum 3-4 exercices affichés (les premiers du programme)
+IMPORTANT: Si un exercice a un temps de travail > 0 secondes, l'afficher après les répétitions
+IMPORTANT: Chaque GIF doit être placé JUSTE APRÈS son exercice correspondant, pas à la fin
 
 3️⃣ RAPPEL DE VALIDATION
 Format exact : "✅ Pensez à valider vos exercices une fois terminés - cela aide votre kinésithérapeute à suivre vos progrès !"
@@ -265,11 +270,15 @@ Bonjour ! 👋
 Je suis votre assistant kinésithérapeute virtuel, ici pour vous accompagner dans votre rééducation.
 
 📋 Programme du jour :
-• Étirement des ischio-jambiers : 3 séries × 30 secondes
-• Renforcement quadriceps : 3 séries × 12 répétitions
-• Mobilisation de l'épaule : 2 séries × 10 répétitions
 
-![Démonstration de l'exercice](https://firebasestorage.googleapis.com/v0/b/mon-assistant-kine-39f38.firebasestorage.app/o/exercices%2Fsquat.gif?alt=media)
+• Étirement des ischio-jambiers : 3 séries × 30 secondes (maintien 20s)
+![Démonstration](url_gif_etirement)
+
+• Renforcement quadriceps : 3 séries × 12 répétitions
+![Démonstration](url_gif_quadriceps)
+
+• Gainage : 3 séries × 1 répétition (maintien 45s)
+![Démonstration](url_gif_gainage)
 
 ✅ Pensez à valider vos exercices une fois terminés - cela aide votre kinésithérapeute à suivre vos progrès !
 
@@ -280,9 +289,9 @@ IMPORTANT - AFFICHAGE DES GIFS :
 - Suis la structure à la lettre
 - Ne mentionne JAMAIS d'informations personnelles
 - UTILISE LES URLS DES GIFS fournis dans les données des exercices (champ 🎬 Démonstration)
-- SI des exercices ont des GIFs (🎬 Démonstration : url) → affiche-les avec la syntaxe markdown ![Démonstration exercice](url)
+- SI un exercice a un GIF (🎬 Démonstration : url) → affiche-le IMMÉDIATEMENT après cet exercice avec la syntaxe markdown ![Démonstration](url)
+- Chaque GIF doit être placé JUSTE APRÈS son exercice correspondant (pas groupés à la fin)
 - Affiche 1 à 3 GIFs maximum (ceux des premiers exercices qui en ont)
-- Place les GIFs APRÈS la liste des exercices
 - SI aucun exercice n'a de GIF → n'affiche PAS de GIF du tout (ne pas utiliser de GIF générique)`;
 
     const response = await openai.chat.completions.create({
@@ -291,7 +300,7 @@ IMPORTANT - AFFICHAGE DES GIFS :
         { role: 'system', content: systemPrompt },
         { role: 'user', content: welcomePrompt }
       ],
-      max_tokens: 200,
+      max_tokens: 400,
       temperature: 0.5
     });
 
@@ -311,23 +320,24 @@ IMPORTANT - AFFICHAGE DES GIFS :
     fallbackMessage += 'Je suis votre assistant kinésithérapeute virtuel 💪 Je suis là pour vous accompagner dans votre programme de rééducation.\n\n';
 
     if (programmes.length > 0) {
-      fallbackMessage += '📋 Programme du jour :\n';
+      fallbackMessage += '📋 Programme du jour :\n\n';
       const exercices = programmes[0]?.exercices?.slice(0, 3) || [];
       if (exercices.length > 0) {
         exercices.forEach((ex) => {
           const nom = ex.exerciceModele?.nom || ex.nom;
-          const pause = ex.pause || 30;
-          fallbackMessage += `• ${nom} : ${ex.series} séries de ${ex.repetitions} répétitions (pause : ${pause} secondes)\n`;
-        });
+          const tempsTravail = ex.tempsTravail || 0;
+          let exerciceLine = `• ${nom} : ${ex.series} séries de ${ex.repetitions} répétitions`;
+          if (tempsTravail > 0) {
+            exerciceLine += ` (maintien ${tempsTravail}s)`;
+          }
+          exerciceLine += `\n`;
+          fallbackMessage += exerciceLine;
 
-        // 🎬 Afficher les GIFs des exercices s'ils existent
-        fallbackMessage += '\n';
-        const exercicesAvecGif = exercices.filter(ex => ex.exerciceModele?.gifUrl);
-        if (exercicesAvecGif.length > 0) {
-          exercicesAvecGif.slice(0, 3).forEach((ex) => {
-            fallbackMessage += `![Démonstration ${ex.exerciceModele.nom}](${ex.exerciceModele.gifUrl})\n\n`;
-          });
-        }
+          // 🎬 Afficher le GIF immédiatement après l'exercice
+          if (ex.exerciceModele?.gifUrl) {
+            fallbackMessage += `![Démonstration](${ex.exerciceModele.gifUrl})\n\n`;
+          }
+        });
       } else {
         fallbackMessage += '• Exercices de rééducation personnalisés\n';
       }
@@ -806,6 +816,17 @@ function buildCliniqueSystemPrompt(contextDocuments) {
   const hasHighQualityDocs = contextDocuments.length >= 1 && avgSimilarity >= 0.65;
   const hasLowQualityDocs = contextDocuments.length > 0 && avgSimilarity < 0.65;
 
+  // Instructions communes pour la détection des tests déjà réalisés
+  const testsDejaRealises = `
+DÉTECTION DES TESTS DÉJÀ RÉALISÉS :
+- ANALYSE le message du kinésithérapeute pour identifier les tests DÉJÀ EFFECTUÉS (ex: "Neer positif", "Jobe négatif", "test de Hawkins +")
+- Si des tests sont mentionnés avec leurs résultats :
+  1. COMMENCE ta section "HYPOTHÈSES DIAGNOSTIQUES" par : "Les tests réalisés orientent vers [hypothèse basée sur les résultats]..."
+  2. N'INCLUS PAS ces tests dans la section "TESTS CLINIQUES PRINCIPAUX" (ils sont déjà faits)
+  3. Propose UNIQUEMENT des tests COMPLÉMENTAIRES pour affiner le diagnostic
+- Si AUCUN test n'est mentionné dans le message → procède normalement avec les tests recommandés
+`;
+
   // ========== MODE RAG STRICT : Documents pertinents ==========
   if (hasHighQualityDocs) {
     let systemPrompt = `Tu es un assistant clinique expert en kinésithérapie musculosquelettique.
@@ -813,7 +834,7 @@ function buildCliniqueSystemPrompt(contextDocuments) {
 SOURCES VALIDÉES : Cleland, Cook, Magee, Daniels & Worthingham, Physiopedia, Physiotutors, PubMed, Cochrane, PEDro.
 
 OBJECTIF : Aider le kinésithérapeute à poser les bonnes hypothèses et faire les bons tests, dans le bon ordre, avec des références solides.
-
+${testsDejaRealises}
 MODE RAG STRICT ACTIVÉ : ${contextDocuments.length} documents pertinents trouvés (pertinence moyenne: ${Math.round(avgSimilarity * 100)}%)
 
 RÈGLES ABSOLUES - MODE STRICT UNIQUEMENT DOCUMENTS :
@@ -920,7 +941,7 @@ ${doc.content.substring(0, 1000)}
   // ========== MODE ASSISTÉ : Documents peu pertinents ==========
   else if (hasLowQualityDocs) {
     let systemPrompt = `Tu es un assistant clinique expert en kinésithérapie musculosquelettique.
-
+${testsDejaRealises}
 MODE ASSISTÉ : ${contextDocuments.length} document(s) trouvé(s) mais pertinence faible (${Math.round(avgSimilarity * 100)}%)
 
 Tu vas répondre en combinant :
@@ -958,7 +979,7 @@ ${doc.content.substring(0, 800)}
   // ========== MODE GÉNÉRAL : Aucun document ==========
   else {
     let systemPrompt = `Tu es un assistant clinique expert en kinésithérapie musculosquelettique.
-
+${testsDejaRealises}
 MODE GÉNÉRAL : Aucun document de référence trouvé dans notre base pour cette question.
 
 Tu vas répondre en utilisant tes connaissances générales en kinésithérapie, basées sur :

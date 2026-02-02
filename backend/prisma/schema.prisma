@@ -134,6 +134,7 @@ model ExerciceTemplateItem {
   series              Int                @default(3)
   repetitions         Int                @default(10)
   tempsRepos          Int                @default(30)  // en secondes
+  tempsTravail        Int?               @default(0)   // temps de travail en secondes (optionnel)
   instructions        String?            @db.Text
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
@@ -180,6 +181,7 @@ model ExerciceProgramme {
   series           Int
   repetitions      Int
   pause            Int         // en secondes
+  tempsTravail     Int?        @default(0)  // temps de travail en secondes (optionnel)
   consigne         String
 
   createdAt        DateTime    @default(now())

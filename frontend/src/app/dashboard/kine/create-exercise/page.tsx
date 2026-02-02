@@ -45,6 +45,7 @@ interface TemplateExercise {
   series: number;
   repetitions: number;
   tempsRepos: number;
+  tempsTravail: number;
   instructions: string;
 }
 
@@ -61,6 +62,7 @@ interface ExerciceTemplate {
     series: number;
     repetitions: number;
     tempsRepos: number;
+    tempsTravail?: number;
     instructions?: string;
     exerciceModele: {
       id: number;
@@ -260,6 +262,7 @@ export default function KineCreateExercisePage() {
             series: ex.series,
             repetitions: ex.repetitions,
             tempsRepos: ex.tempsRepos,
+            tempsTravail: ex.tempsTravail || 0,
             instructions: ex.instructions || ''
           }))
         }),
@@ -312,6 +315,7 @@ export default function KineCreateExercisePage() {
       series: item.series,
       repetitions: item.repetitions,
       tempsRepos: item.tempsRepos,
+      tempsTravail: item.tempsTravail || 0,
       instructions: item.instructions || ''
     })));
     setTemplateDialogOpen(true);
@@ -832,6 +836,7 @@ export default function KineCreateExercisePage() {
                     {categoryExercices.map((ex) => {
                       const isExpanded = expandedCards.has(ex.id);
                       const shouldTruncate = ex.description.length > 150;
+                      const hasExpandableContent = shouldTruncate || !!ex.gifUrl;
                       const exerciceTags = parseTagsFromString(ex.tags);
                       
                       return (
@@ -907,10 +912,18 @@ export default function KineCreateExercisePage() {
                                 : `${ex.description.substring(0, 150)}...`
                               }
                             </p>
-                            {shouldTruncate && (
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
+                            {isExpanded && ex.gifUrl && (
+                              <img
+                                src={ex.gifUrl}
+                                alt={ex.nom}
+                                loading="lazy"
+                                className="max-w-[280px] rounded-lg mt-2"
+                              />
+                            )}
+                            {hasExpandableContent && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 className="mt-2 p-0 h-auto text-blue-600 hover:text-blue-800 transition-colors"
                                 onClick={() => toggleCardExpansion(ex.id)}
                               >
@@ -1188,6 +1201,7 @@ export default function KineCreateExercisePage() {
                                   series: 3,
                                   repetitions: 10,
                                   tempsRepos: 30,
+                                  tempsTravail: 0,
                                   instructions: ''
                                 }]);
                               }}
@@ -1240,7 +1254,7 @@ export default function KineCreateExercisePage() {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div className="space-y-1">
                               <Label className="text-xs">Séries</Label>
                               <Input
@@ -1267,6 +1281,21 @@ export default function KineCreateExercisePage() {
                                   setSelectedTemplateExercises(newExercises);
                                 }}
                                 className="text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Travail (sec)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={ex.tempsTravail}
+                                onChange={(e) => {
+                                  const newExercises = [...selectedTemplateExercises];
+                                  newExercises[index].tempsTravail = Number(e.target.value);
+                                  setSelectedTemplateExercises(newExercises);
+                                }}
+                                className="text-sm"
+                                placeholder="0"
                               />
                             </div>
                             <div className="space-y-1">

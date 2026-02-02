@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Target, Filter, Dumbbell, Clock, Activity, MessageCircle, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Target, Filter, Dumbbell, Clock, Activity, MessageCircle, CheckCircle, AlertCircle, Search } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
 import { handleProgrammeCreationError } from '@/utils/handleProgrammeError';
@@ -40,6 +41,7 @@ interface ProgrammeExercise {
   series: number;
   repetitions: number;
   restTime: number;
+  tempsTravail: number;
   instructions: string;
 }
 
@@ -50,6 +52,26 @@ interface Programme {
   duree: number;
   dateFin: string;
   exercices: any[];
+}
+
+interface ExerciceTemplate {
+  id: number;
+  nom: string;
+  description?: string;
+  isPublic: boolean;
+  items: Array<{
+    id: number;
+    ordre: number;
+    series: number;
+    repetitions: number;
+    tempsRepos: number;
+    tempsTravail?: number;
+    instructions?: string;
+    exerciceModele: {
+      id: number;
+      nom: string;
+    };
+  }>;
 }
 
 // Type pour le statut WhatsApp
@@ -99,11 +121,16 @@ export default function PatientDetailPage() {
   const [filteredExercises, setFilteredExercises] = useState<ExerciseOption[]>([]);
   const [selectedExercises, setSelectedExercises] = useState<ProgrammeExercise[]>([]);
   
-  // Nouveaux états pour les filtres
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [tagFilter, setTagFilter] = useState<string>('all');
+  // États pour les filtres (nouvelle UI chips)
+  const [typeFilters, setTypeFilters] = useState<string[]>([]);
+  const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
-  const [selectedExerciseId, setSelectedExerciseId] = useState<string>('');
+  const [exerciseSearchQuery, setExerciseSearchQuery] = useState<string>('');
+  const [checkedExerciseIds, setCheckedExerciseIds] = useState<number[]>([]);
+
+  // États pour les templates
+  const [allTemplates, setAllTemplates] = useState<ExerciceTemplate[]>([]);
+  const [checkedTemplateIds, setCheckedTemplateIds] = useState<number[]>([]);
   
   // États pour génération de lien et WhatsApp
   const [generatingLink, setGeneratingLink] = useState<number | null>(null);
@@ -146,15 +173,16 @@ export default function PatientDetailPage() {
   }, [patientId]);
 
   useEffect(() => {
-    const fetchExercises = async () => {
+    const fetchExercisesAndTemplates = async () => {
       try {
+        // Charger exercices
         const [priv, pub] = await Promise.all([
           fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/exercices/private`).then(r => r.json()),
           fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/exercices/public`).then(r => r.json())
         ]);
         const combined = [...priv, ...pub];
         setAllExercises(combined);
-        
+
         // Extraire tous les tags uniques
         const allTags = new Set<string>();
         combined.forEach(exercise => {
@@ -163,58 +191,143 @@ export default function PatientDetailPage() {
           }
         });
         setAvailableTags(Array.from(allTags).sort());
-        
+
+        // Charger templates
+        const templates = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/exercice-templates/all`).then(r => r.json());
+        setAllTemplates(templates);
+
       } catch (err) {
-        console.error('Erreur chargement exercices', err);
+        console.error('Erreur chargement exercices/templates', err);
       }
     };
-    if (openCreateModal || openEditModal) fetchExercises();
+    if (openCreateModal || openEditModal) fetchExercisesAndTemplates();
   }, [openCreateModal, openEditModal]);
 
   // Effet pour filtrer les exercices selon les filtres sélectionnés
   useEffect(() => {
     let filtered = [...allExercises];
-    
-    // Filtre par type (public/privé)
-    if (typeFilter === 'public') {
-      filtered = filtered.filter(ex => ex.isPublic);
-    } else if (typeFilter === 'private') {
-      filtered = filtered.filter(ex => !ex.isPublic);
+
+    // Filtre par type (multi-select)
+    if (typeFilters.length > 0 && !typeFilters.includes('templates')) {
+      filtered = filtered.filter(ex => {
+        if (typeFilters.includes('public') && ex.isPublic) return true;
+        if (typeFilters.includes('private') && !ex.isPublic) return true;
+        return false;
+      });
     }
-    
-    // Filtre par tag
-    if (tagFilter !== 'all') {
+
+    // Filtre par tags (multi-select - AND logic)
+    if (tagFilters.length > 0) {
       filtered = filtered.filter(ex => {
         if (!ex.tags) return false;
         const exerciseTags = parseTagsFromString(ex.tags);
-        return exerciseTags.includes(tagFilter);
+        return tagFilters.every(selectedTag => exerciseTags.includes(selectedTag));
       });
     }
-    
-    // Exclure les exercices déjà sélectionnés
-    filtered = filtered.filter(ex => 
+
+    // Filtre par recherche textuelle
+    if (exerciseSearchQuery.trim()) {
+      const searchLower = exerciseSearchQuery.toLowerCase().trim();
+      filtered = filtered.filter(ex =>
+        ex.nom.toLowerCase().includes(searchLower) ||
+        (ex.tags && ex.tags.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Exclure les exercices déjà configurés
+    filtered = filtered.filter(ex =>
       !selectedExercises.find(selected => selected.exerciseId === ex.id)
     );
-    
-    setFilteredExercises(filtered);
-  }, [allExercises, typeFilter, tagFilter, selectedExercises]);
 
-  const handleAddExercise = (exerciseId: string) => {
-    const exercise = allExercises.find(ex => ex.id === parseInt(exerciseId));
-    if (!exercise || selectedExercises.find(e => e.exerciseId === exercise.id)) return;
-    
-    setSelectedExercises([
-      ...selectedExercises,
-      {
-        exerciseId: exercise.id,
-        nom: exercise.nom,
-        series: 1,
+    setFilteredExercises(filtered);
+  }, [allExercises, typeFilters, tagFilters, exerciseSearchQuery, selectedExercises]);
+
+  // Fonctions de gestion des filtres chips
+  const toggleTypeFilter = (type: string) => {
+    setTypeFilters(prev =>
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
+  };
+
+  const toggleTagFilter = (tag: string) => {
+    setTagFilters(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const clearAllFilters = () => {
+    setTypeFilters([]);
+    setTagFilters([]);
+    setExerciseSearchQuery('');
+  };
+
+  // Fonctions de gestion des checkboxes exercices
+  const toggleExerciseCheck = (exerciseId: number) => {
+    setCheckedExerciseIds(prev =>
+      prev.includes(exerciseId) ? prev.filter(id => id !== exerciseId) : [...prev, exerciseId]
+    );
+  };
+
+  const handleCheckAll = () => {
+    const allIds = filteredExercises.map(ex => ex.id);
+    setCheckedExerciseIds(allIds);
+  };
+
+  const handleUncheckAll = () => {
+    setCheckedExerciseIds([]);
+  };
+
+  // Confirmer la sélection d'exercices et les ajouter
+  const handleConfirmSelection = () => {
+    const newExercises = checkedExerciseIds.map(id => {
+      const exercise = allExercises.find(ex => ex.id === id);
+      return {
+        exerciseId: id,
+        nom: exercise?.nom || '',
+        series: 3,
         repetitions: 10,
         restTime: 30,
+        tempsTravail: 0,
         instructions: '',
-      },
-    ]);
-    setSelectedExerciseId(''); // Reset la sélection
+      };
+    });
+    setSelectedExercises([...selectedExercises, ...newExercises]);
+    setCheckedExerciseIds([]);
+  };
+
+  // Fonctions de gestion des templates
+  const toggleTemplateCheck = (templateId: number) => {
+    setCheckedTemplateIds(prev =>
+      prev.includes(templateId) ? prev.filter(id => id !== templateId) : [...prev, templateId]
+    );
+  };
+
+  const handleConfirmTemplateSelection = () => {
+    const newExercises: ProgrammeExercise[] = [];
+
+    checkedTemplateIds.forEach(templateId => {
+      const template = allTemplates.find(t => t.id === templateId);
+      if (template) {
+        template.items.forEach(item => {
+          // Vérifier que l'exercice n'est pas déjà dans la liste
+          if (!selectedExercises.find(e => e.exerciseId === item.exerciceModele.id) &&
+              !newExercises.find(e => e.exerciseId === item.exerciceModele.id)) {
+            newExercises.push({
+              exerciseId: item.exerciceModele.id,
+              nom: item.exerciceModele.nom,
+              series: item.series,
+              repetitions: item.repetitions,
+              restTime: item.tempsRepos,
+              tempsTravail: item.tempsTravail || 0,
+              instructions: item.instructions || '',
+            });
+          }
+        });
+      }
+    });
+
+    setSelectedExercises([...selectedExercises, ...newExercises]);
+    setCheckedTemplateIds([]);
   };
 
   const handleInputChange = (index: number, field: keyof ProgrammeExercise, value: string | number) => {
@@ -244,9 +357,11 @@ export default function PatientDetailPage() {
     setCreateDescription('');
     setCreateDuration(1);
     setSelectedExercises([]);
-    setTypeFilter('all');
-    setTagFilter('all');
-    setSelectedExerciseId('');
+    setTypeFilters([]);
+    setTagFilters([]);
+    setExerciseSearchQuery('');
+    setCheckedExerciseIds([]);
+    setCheckedTemplateIds([]);
   };
 
   const resetEditForm = () => {
@@ -254,9 +369,11 @@ export default function PatientDetailPage() {
     setEditDescription('');
     setEditDuration(1);
     setSelectedExercises([]);
-    setTypeFilter('all');
-    setTagFilter('all');
-    setSelectedExerciseId('');
+    setTypeFilters([]);
+    setTagFilters([]);
+    setExerciseSearchQuery('');
+    setCheckedExerciseIds([]);
+    setCheckedTemplateIds([]);
     setEditingProgramme(null);
   };
 
@@ -281,6 +398,7 @@ export default function PatientDetailPage() {
             series: ex.series,
             repetitions: ex.repetitions,
             tempsRepos: ex.restTime,
+            tempsTravail: ex.tempsTravail || 0,
             instructions: ex.instructions || ''
           }))
         })
@@ -308,6 +426,7 @@ export default function PatientDetailPage() {
       series: ex.series,
       repetitions: ex.repetitions,
       restTime: ex.pause || ex.tempsRepos || ex.restTime || 30,
+      tempsTravail: ex.tempsTravail || 0,
       instructions: ex.consigne || ex.instructions || '',
     }));
     
@@ -333,11 +452,12 @@ export default function PatientDetailPage() {
             series: ex.series,
             repetitions: ex.repetitions,
             tempsRepos: ex.restTime,
+            tempsTravail: ex.tempsTravail || 0,
             instructions: ex.instructions || ''
           }))
         })
       });
-      
+
       if (!res.ok) throw new Error("Erreur mise à jour programme");
       
       setOpenEditModal(false);
@@ -445,7 +565,7 @@ export default function PatientDetailPage() {
     const buttonText = isEdit ? "Mettre à jour le programme" : "Créer le programme";
 
     return (
-      <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
+      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
         <DialogHeader className="space-y-3 sticky top-0 bg-white dark:bg-gray-900 pb-4 border-b border-gray-200 dark:border-gray-700">
           <DialogTitle className="text-lg sm:text-xl font-semibold">
             {modalTitle}
@@ -526,118 +646,219 @@ export default function PatientDetailPage() {
               <div className="w-1 h-5 sm:h-6 bg-green-500 rounded-full"></div>
               Exercices du programme
             </h3>
-            
-            <div className="space-y-4">
-              {/* Filtres */}
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border">
-                <div className="flex items-center gap-2 mb-3">
-                  <Filter className="w-4 h-4 text-gray-600" />
-                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Filtres de sélection
-                  </Label>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Filtre par type */}
-                  <div className="space-y-2">
-                    <Label className="text-xs font-medium text-gray-600">Type d'exercice</Label>
-                    <Select value={typeFilter} onValueChange={setTypeFilter}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Sélectionner le type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tous les exercices</SelectItem>
-                        <SelectItem value="public">Exercices publics</SelectItem>
-                        <SelectItem value="private">Mes exercices privés</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
 
-                  {/* Filtre par tag */}
-                  <div className="space-y-2">
-                    <Label className="text-xs font-medium text-gray-600">Catégorie</Label>
-                    <Select value={tagFilter} onValueChange={setTagFilter}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Sélectionner une catégorie" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Toutes les catégories</SelectItem>
-                        {availableTags.map(tag => (
-                          <SelectItem key={tag} value={tag}>{tag}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+            <div className="space-y-4">
+              {/* Filtres par chips cliquables */}
+              <div className="space-y-3">
+                {/* Barre de recherche en premier */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher par nom d'exercice..."
+                    value={exerciseSearchQuery}
+                    onChange={(e) => setExerciseSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+
+                {/* Filtres Type */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-gray-600 dark:text-gray-400">Type</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge
+                      variant={typeFilters.includes('public') ? 'default' : 'outline'}
+                      className="cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => toggleTypeFilter('public')}
+                    >
+                      Exercices Publics
+                    </Badge>
+                    <Badge
+                      variant={typeFilters.includes('private') ? 'default' : 'outline'}
+                      className="cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => toggleTypeFilter('private')}
+                    >
+                      Mes exercices
+                    </Badge>
+                    <Badge
+                      variant={typeFilters.includes('templates') ? 'default' : 'outline'}
+                      className="cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => toggleTypeFilter('templates')}
+                    >
+                      📋 Templates
+                    </Badge>
                   </div>
                 </div>
-                
-                {/* Résumé des filtres */}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {typeFilter !== 'all' && (
-                    <Badge variant="secondary" className="text-xs">
-                      {typeFilter === 'public' ? 'Publics' : 'Privés'}
-                    </Badge>
-                  )}
-                  {tagFilter !== 'all' && (
-                    <Badge variant="secondary" className="text-xs">
-                      {tagFilter}
-                    </Badge>
-                  )}
-                  <span className="text-xs text-gray-500">
+
+                {/* Filtres Tags */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-gray-600 dark:text-gray-400">Catégories</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableTags.map(tag => (
+                      <Badge
+                        key={tag}
+                        variant={tagFilters.includes(tag) ? 'default' : 'outline'}
+                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => toggleTagFilter(tag)}
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Résumé + Actions */}
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>
                     {filteredExercises.length} exercice{filteredExercises.length > 1 ? 's' : ''} disponible{filteredExercises.length > 1 ? 's' : ''}
                   </span>
+                  {(typeFilters.length > 0 || tagFilters.length > 0 || exerciseSearchQuery) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearAllFilters}
+                      className="h-6 text-xs"
+                    >
+                      <X className="w-3 h-3 mr-1" />
+                      Réinitialiser
+                    </Button>
+                  )}
                 </div>
               </div>
 
-              {/* Sélection d'exercice */}
-              <div className="space-y-2">
-                <Label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Ajouter un exercice
-                </Label>
-                <div className="flex gap-2">
-                  <Select value={selectedExerciseId} onValueChange={setSelectedExerciseId}>
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Choisissez un exercice à ajouter..." />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      {filteredExercises.length === 0 ? (
-                        <div className="p-3 text-sm text-gray-500">
-                          Aucun exercice disponible avec ces filtres
-                        </div>
-                      ) : (
-                        filteredExercises.map(exercise => (
-                          <SelectItem key={exercise.id} value={exercise.id.toString()}>
-                            <div className="flex items-center gap-2 w-full">
-                              <span className="flex-1">{exercise.nom}</span>
-                              <div className="flex gap-1">
+              {/* Liste des exercices/templates avec checkboxes - Hauteur fixe pour stabilité UX */}
+              <div className="flex flex-col h-[480px] border rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between p-3 border-b bg-gray-50 dark:bg-gray-800 flex-shrink-0">
+                  <Label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {typeFilters.includes('templates') ? 'Sélectionner des templates' : 'Sélectionner des exercices'}
+                  </Label>
+                  {(typeFilters.includes('templates') ? allTemplates.length > 0 : filteredExercises.length > 0) && (
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={typeFilters.includes('templates') ? () => setCheckedTemplateIds(allTemplates.map(t => t.id)) : handleCheckAll}
+                        className="h-7 text-xs"
+                      >
+                        Tout sélectionner
+                      </Button>
+                      {(typeFilters.includes('templates') ? checkedTemplateIds.length > 0 : checkedExerciseIds.length > 0) && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={typeFilters.includes('templates') ? () => setCheckedTemplateIds([]) : handleUncheckAll}
+                          className="h-7 text-xs"
+                        >
+                          Tout désélectionner
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 overflow-y-auto">
+                  {typeFilters.includes('templates') ? (
+                    // AFFICHAGE DES TEMPLATES
+                    allTemplates.length === 0 ? (
+                      <div className="flex items-center justify-center h-full p-4 text-center text-sm text-gray-500">
+                        Aucun template disponible
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {allTemplates.map(template => (
+                          <div
+                            key={template.id}
+                            className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-start gap-3 cursor-pointer"
+                            onClick={() => toggleTemplateCheck(template.id)}
+                          >
+                            <Checkbox
+                              checked={checkedTemplateIds.includes(template.id)}
+                              className="mt-0.5 pointer-events-none"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                {template.nom}
+                              </p>
+                              {template.description && (
+                                <p className="text-xs text-gray-500 mt-0.5">{template.description}</p>
+                              )}
+                              <div className="flex gap-1 mt-1 flex-wrap">
+                                <Badge variant={template.isPublic ? "default" : "secondary"} className="text-xs">
+                                  {template.isPublic ? 'Public' : 'Privé'}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {template.items.length} exercice{template.items.length > 1 ? 's' : ''}
+                                </Badge>
+                              </div>
+                              <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                {template.items.slice(0, 2).map(item => item.exerciceModele.nom).join(', ')}
+                                {template.items.length > 2 && ` +${template.items.length - 2} autre${template.items.length - 2 > 1 ? 's' : ''}`}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    // AFFICHAGE DES EXERCICES
+                    filteredExercises.length === 0 ? (
+                      <div className="flex items-center justify-center h-full p-4 text-center text-sm text-gray-500">
+                        {exerciseSearchQuery || typeFilters.length > 0 || tagFilters.length > 0
+                          ? 'Aucun exercice trouvé pour ces filtres'
+                          : 'Aucun exercice disponible'}
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {filteredExercises.map(exercise => (
+                          <div
+                            key={exercise.id}
+                            className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-start gap-3 cursor-pointer"
+                            onClick={() => toggleExerciseCheck(exercise.id)}
+                          >
+                            <Checkbox
+                              checked={checkedExerciseIds.includes(exercise.id)}
+                              className="mt-0.5 pointer-events-none"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                {exercise.nom}
+                              </p>
+                              <div className="flex gap-1 mt-1 flex-wrap">
                                 <Badge variant={exercise.isPublic ? "default" : "secondary"} className="text-xs">
                                   {exercise.isPublic ? 'Public' : 'Privé'}
                                 </Badge>
-                                {exercise.tags && parseTagsFromString(exercise.tags).slice(0, 1).map(tag => (
+                                {exercise.tags && parseTagsFromString(exercise.tags).slice(0, 3).map(tag => (
                                   <Badge key={tag} variant="outline" className="text-xs">
                                     {tag}
                                   </Badge>
                                 ))}
                               </div>
                             </div>
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <Button 
-                    type="button"
-                    onClick={() => {
-                      if (selectedExerciseId) {
-                        handleAddExercise(selectedExerciseId);
-                      }
-                    }}
-                    disabled={!selectedExerciseId}
-                    className="shrink-0"
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Ajouter
-                  </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  )}
                 </div>
+
+                {/* Bouton sticky en bas de la zone fixe */}
+                {(typeFilters.includes('templates') ? checkedTemplateIds.length > 0 : checkedExerciseIds.length > 0) && (
+                  <div className="border-t bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 p-3 flex-shrink-0">
+                    <Button
+                      type="button"
+                      onClick={typeFilters.includes('templates') ? handleConfirmTemplateSelection : handleConfirmSelection}
+                      className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white shadow-lg"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      {typeFilters.includes('templates')
+                        ? `Ajouter ${checkedTemplateIds.length} template${checkedTemplateIds.length > 1 ? 's' : ''} sélectionné${checkedTemplateIds.length > 1 ? 's' : ''}`
+                        : `Ajouter ${checkedExerciseIds.length} exercice${checkedExerciseIds.length > 1 ? 's' : ''} sélectionné${checkedExerciseIds.length > 1 ? 's' : ''}`
+                      }
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Exercices sélectionnés */}
@@ -664,7 +885,7 @@ export default function PatientDetailPage() {
                         {ex.nom}
                       </h4>
                       
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div className="space-y-1">
                           <Label className="text-xs font-medium text-gray-600">Séries</Label>
                           <Input
@@ -683,6 +904,17 @@ export default function PatientDetailPage() {
                             value={ex.repetitions}
                             onChange={(e) => handleInputChange(index, 'repetitions', Number(e.target.value))}
                             className="text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs font-medium text-gray-600">Travail (sec)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={ex.tempsTravail}
+                            onChange={(e) => handleInputChange(index, 'tempsTravail', Number(e.target.value))}
+                            className="text-sm"
+                            placeholder="0"
                           />
                         </div>
                         <div className="space-y-1">
@@ -963,13 +1195,18 @@ export default function PatientDetailPage() {
                                     <h5 className="font-medium text-gray-900 mb-2">
                                       {exercise.exerciceModele?.nom || exercise.nom}
                                     </h5>
-                                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
+                                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-2 flex-wrap">
                                       <Badge variant="outline" className="text-xs">
                                         {exercise.series} série{exercise.series > 1 ? 's' : ''}
                                       </Badge>
                                       <Badge variant="outline" className="text-xs">
                                         {exercise.repetitions} rép.
                                       </Badge>
+                                      {exercise.tempsTravail > 0 && (
+                                        <Badge variant="outline" className="text-xs bg-blue-50">
+                                          {exercise.tempsTravail}s travail
+                                        </Badge>
+                                      )}
                                       <Badge variant="outline" className="text-xs">
                                         {exercise.pause || exercise.tempsRepos || exercise.restTime}s repos
                                       </Badge>

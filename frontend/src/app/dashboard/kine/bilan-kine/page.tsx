@@ -373,6 +373,7 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                       <li>• Incluez : anamnèse, tests, mesures, observations</li>
                       <li>• L'IA organisera tout selon la structure professionnelle</li>
                       <li>• Plus vos notes sont détaillées, meilleur sera le bilan</li>
+                      <li>• Utilisez votre messagerie cryptée pour transmettre votre bilan au médecin</li>
                     </ul>
                   </div>
 

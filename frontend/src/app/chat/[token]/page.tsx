@@ -512,29 +512,8 @@ export default function PatientChatPage() {
       <div className="bg-white text-gray-800 shadow-lg border-b z-30">
         <div className="px-4 py-3">
           <div className="max-w-4xl mx-auto">
-            <div className="flex items-center justify-center relative">
+            <div className="flex items-center justify-center">
               <h1 className="font-semibold text-lg text-gray-800">Mon Assistant Kiné</h1>
-              
-              {/* Bouton validation séance - aligné avec bordure droite des bulles */}
-              <div className="absolute right-0">
-                {isValidatedToday ? (
-                  <button
-                    disabled
-                    className="px-3 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium cursor-not-allowed flex items-center gap-2 border border-red-200"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    Validée
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setShowValidationModal(true)}
-                    className="px-3 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                  >
-                    <Trophy className="w-4 h-4" />
-                    Valider
-                  </button>
-                )}
-              </div>
             </div>
             
             {/* Info programme - aligné avec bordure gauche des bulles */}
@@ -652,6 +631,26 @@ export default function PatientChatPage() {
             <div ref={messagesEndRef} />
           </div>
         )}
+      </div>
+
+      {/* Barre validation séance - sticky au-dessus de l'input */}
+      <div className="bg-white border-t px-4 py-2 shadow-sm">
+        <div className="max-w-4xl mx-auto">
+          {isValidatedToday ? (
+            <div className="flex items-center justify-center gap-2 py-1 text-sm text-green-700">
+              <CheckCircle className="w-4 h-4" />
+              <span className="font-medium">Séance validée aujourd&apos;hui</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowValidationModal(true)}
+              className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-base font-semibold transition-colors flex items-center justify-center gap-2 active:scale-[0.98]"
+            >
+              <Trophy className="w-5 h-5" />
+              Valider ma séance
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Zone de saisie - style WhatsApp */}
