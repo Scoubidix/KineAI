@@ -630,11 +630,14 @@ async function handleSubscriptionDeleted(subscription, eventId) {
  */
 async function handlePaymentSucceeded(invoice, eventId) {
   try {
-    logger.info(`💰 [${eventId}] Paiement réussi pour invoice: ${invoice.id} - billing_reason: ${invoice.billing_reason}`);
+    // Support ancien et nouveau format API Stripe
+    const subscriptionId = invoice.subscription || invoice.parent?.subscription_details?.subscription;
 
-    if (invoice.subscription) {
+    logger.info(`💰 [${eventId}] Paiement réussi pour invoice: ${invoice.id} - billing_reason: ${invoice.billing_reason} - subscription: ${subscriptionId || 'none'}`);
+
+    if (subscriptionId) {
       const kine = await prisma.kine.findFirst({
-        where: { subscriptionId: invoice.subscription },
+        where: { subscriptionId: subscriptionId },
         select: { id: true, stripeCustomerId: true, email: true }
       });
 
@@ -661,13 +664,13 @@ async function handlePaymentSucceeded(invoice, eventId) {
         const message = `Paiement traité pour kiné ${kine.id}`;
         return { success: true, message };
       } else {
-        const message = `Kiné non trouvé pour subscription: ${invoice.subscription}`;
+        const message = `Kiné non trouvé pour subscription: ${subscriptionId}`;
         logger.warn(`⚠️ [${eventId}] ${message}`);
         return { success: true, message }; // Pas critique
       }
     }
 
-    return { success: true, message: 'Invoice sans subscription, ignorée' };
+    return { success: true, message: 'Invoice sans subscription (one-time payment), ignorée' };
 
   } catch (error) {
     const errorMessage = `Erreur handlePaymentSucceeded: ${error.message}`;

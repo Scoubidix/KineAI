@@ -440,10 +440,10 @@ class StripeService {
    */
   getPlanPriceInCents(planType) {
     const priceMap = {
-      'DECLIC': 999,      // 9.99€
-      'PRATIQUE': 1999,   // 19.99€
-      'PIONNIER': 2000,   // 20.00€
-      'EXPERT': 5999      // 59.99€
+      'DECLIC': 900,      // 9€
+      'PRATIQUE': 2900,   // 29€
+      'PIONNIER': 2000,   // 20€
+      'EXPERT': 5900      // 59€
     };
     return priceMap[planType] || 0;
   }
