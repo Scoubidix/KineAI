@@ -28,9 +28,9 @@ class PrismaService {
       }
       
       const dbUrl = new URL(process.env.DATABASE_URL);
-      dbUrl.searchParams.set('connection_limit', '2');  // 2 connexions pour gérer reconnexion GCP
-      dbUrl.searchParams.set('pool_timeout', '20');
-      dbUrl.searchParams.set('connect_timeout', '15');
+      dbUrl.searchParams.set('connection_limit', '5');  // 5 connexions pour gérer cron + requêtes users
+      dbUrl.searchParams.set('pool_timeout', '30');     // 30s pour obtenir une connexion du pool
+      dbUrl.searchParams.set('connect_timeout', '20');  // 20s pour établir la connexion
       
       prismaInstance = new PrismaClient({
         log: ['error', 'warn'], // Seulement erreurs et warnings
@@ -106,11 +106,11 @@ class PrismaService {
   async executeInTransaction(callback, options = {}) {
     const prisma = this.getInstance();
     this.markActivity();
-    
+
     try {
       const result = await prisma.$transaction(callback, {
-        maxWait: 5000,
-        timeout: 10000,
+        maxWait: 10000,  // 10s pour obtenir une connexion
+        timeout: 30000,  // 30s pour exécuter la transaction
         ...options
       });
       this.markActivity();
@@ -118,6 +118,40 @@ class PrismaService {
     } catch (error) {
       logger.error('❌ Erreur transaction:', error.message);
       throw error;
+    }
+  }
+
+  // Transaction spéciale pour les tâches CRON (timeouts plus longs + retry)
+  async executeInTransactionForCron(callback, options = {}) {
+    const prisma = this.getInstance();
+    this.markActivity();
+
+    const maxRetries = options.maxRetries || 3;
+    const retryDelay = options.retryDelay || 5000; // 5s entre les retries
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await prisma.$transaction(callback, {
+          maxWait: 20000,   // 20s pour obtenir une connexion (cron peut attendre)
+          timeout: 60000,   // 60s pour exécuter (opérations batch)
+          ...options
+        });
+        this.markActivity();
+        return result;
+      } catch (error) {
+        const isRetryable = error.message.includes('Unable to start a transaction') ||
+                           error.message.includes('pool') ||
+                           error.message.includes('timeout');
+
+        if (isRetryable && attempt < maxRetries) {
+          logger.warn(`⚠️ Transaction CRON échouée (tentative ${attempt}/${maxRetries}), retry dans ${retryDelay/1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        }
+
+        logger.error(`❌ Erreur transaction CRON (tentative ${attempt}/${maxRetries}):`, error.message);
+        throw error;
+      }
     }
   }
 

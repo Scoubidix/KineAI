@@ -33,7 +33,8 @@ interface ExerciceModele {
   nom: string;
   description: string;
   tags?: string;
-  gifUrl?: string | null;
+  gifUrl?: string | null;   // URL signée temporaire (générée par le backend)
+  gifPath?: string | null;  // Chemin GCS stocké en DB
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
@@ -99,7 +100,8 @@ export default function KineCreateExercisePage() {
     nom: '',
     description: '',
     tags: [] as string[],
-    gifUrl: null as string | null
+    gifUrl: null as string | null,   // URL signée pour affichage
+    gifPath: null as string | null   // Chemin GCS pour stockage DB
   });
 
   // États pour templates
@@ -388,13 +390,13 @@ export default function KineCreateExercisePage() {
           nom: form.nom,
           description: form.description,
           tags: form.tags.length > 0 ? form.tags.join(', ') : null,
-          gifUrl: form.gifUrl,
+          gifPath: form.gifPath,  // Envoyer le chemin GCS au lieu de l'URL
           isPublic: false,
         }),
       });
 
       if (res.ok) {
-        setForm({ id: null, nom: '', description: '', tags: [], gifUrl: null });
+        setForm({ id: null, nom: '', description: '', tags: [], gifUrl: null, gifPath: null });
         setDialogOpen(false);
         loadExercices();
         loadAllTags();
@@ -439,7 +441,8 @@ export default function KineCreateExercisePage() {
       nom: exercice.nom,
       description: exercice.description,
       tags: exercice.tags ? exercice.tags.split(', ').map(tag => tag.trim()) : [],
-      gifUrl: exercice.gifUrl || null
+      gifUrl: exercice.gifUrl || null,
+      gifPath: exercice.gifPath || null
     });
     setDialogOpen(true);
   };
@@ -590,7 +593,7 @@ export default function KineCreateExercisePage() {
               <Dialog open={dialogOpen} onOpenChange={(open) => {
                 setDialogOpen(open);
                 if (!open) {
-                  setForm({ id: null, nom: '', description: '', tags: [], gifUrl: null });
+                  setForm({ id: null, nom: '', description: '', tags: [], gifUrl: null, gifPath: null });
                 }
               }}>
                 <DialogTrigger asChild>
@@ -690,7 +693,8 @@ export default function KineCreateExercisePage() {
                         {/* Section Vidéo de démonstration */}
                         <VideoUpload
                           gifUrl={form.gifUrl}
-                          onGifUrlChange={(url) => setForm(prev => ({ ...prev, gifUrl: url }))}
+                          gifPath={form.gifPath}
+                          onGifChange={({ gifUrl, gifPath }) => setForm(prev => ({ ...prev, gifUrl, gifPath }))}
                         />
                       </div>
                     </div>

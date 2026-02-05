@@ -332,16 +332,29 @@ async function handleCheckoutCompleted(session, eventId) {
       
       const duration = Date.now() - startTime;
       const successMessage = `Kiné ${kineId} (${sanitizeEmail(kine.email)}) mis à jour: ${planType} - Customer: ${session.customer} - Subscription: ${session.subscription} (${duration}ms)`;
-      
+
       logger.info(`🎉 [${eventId}] ${successMessage}`);
+
+      // ========== TRAITEMENT PARRAINAGE ==========
+      const referralCode = session.metadata?.referralCode;
+      if (referralCode) {
+        try {
+          await handleReferralAtCheckout(kineId, kine.email, referralCode, planType, eventId);
+        } catch (refError) {
+          // Ne pas bloquer le checkout si le parrainage échoue
+          logger.error(`⚠️ [${eventId}] Erreur parrainage (non bloquante):`, refError.message);
+        }
+      }
+      // ============================================
+
       return { success: true, message: successMessage };
-      
+
     } catch (updateError) {
       const error = `Échec mise à jour kiné ${kineId}: ${updateError.message}`;
       logger.error(`💥 [${eventId}] ${error}`, updateError);
       return { success: false, message: error };
     }
-    
+
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMessage = `Erreur générale handleCheckoutCompleted: ${error.message} (${duration}ms)`;
@@ -352,6 +365,72 @@ async function handleCheckoutCompleted(session, eventId) {
     });
     return { success: false, message: errorMessage };
   }
+}
+
+/**
+ * Traitement du parrainage lors du checkout
+ * Crée un Referral en status PENDING (crédits appliqués au 1er renouvellement)
+ */
+async function handleReferralAtCheckout(refereeKineId, refereeEmail, referralCode, planType, eventId) {
+  logger.info(`🎁 [${eventId}] Traitement parrainage: code=${referralCode}, filleul=${refereeKineId}`);
+
+  // Vérifier si le filleul n'a pas déjà été parrainé
+  const existingReferral = await prisma.referral.findUnique({
+    where: { refereeId: refereeKineId }
+  });
+
+  if (existingReferral) {
+    logger.warn(`⚠️ [${eventId}] Kiné ${refereeKineId} déjà parrainé (referral #${existingReferral.id})`);
+    return;
+  }
+
+  // Trouver le parrain
+  const referrer = await prisma.kine.findFirst({
+    where: { referralCode: referralCode },
+    select: { id: true, email: true, stripeCustomerId: true }
+  });
+
+  if (!referrer) {
+    logger.warn(`⚠️ [${eventId}] Parrain non trouvé pour code: ${referralCode}`);
+    return;
+  }
+
+  // Vérification anti-fraude : emails suspects
+  if (stripeService.areEmailsSuspicious(referrer.email, refereeEmail)) {
+    logger.error(`🚨 [${eventId}] Auto-parrainage détecté ! Parrain: ${sanitizeEmail(referrer.email)}, Filleul: ${sanitizeEmail(refereeEmail)}`);
+
+    // Créer un referral marqué comme fraude
+    await prisma.referral.create({
+      data: {
+        referrerId: referrer.id,
+        refereeId: refereeKineId,
+        planSubscribed: planType,
+        creditAmount: stripeService.getPlanPriceInCents(planType) / 100,
+        status: 'FRAUD',
+        refereeEmail: refereeEmail
+      }
+    });
+    return;
+  }
+
+  // Calculer le montant du crédit (prix du plan du filleul)
+  const creditAmountCents = stripeService.getPlanPriceInCents(planType);
+  const creditAmountEuros = creditAmountCents / 100;
+
+  // Créer le referral en status PENDING
+  const referral = await prisma.referral.create({
+    data: {
+      referrerId: referrer.id,
+      refereeId: refereeKineId,
+      planSubscribed: planType,
+      creditAmount: creditAmountEuros,
+      status: 'PENDING',
+      refereeEmail: refereeEmail
+    }
+  });
+
+  logger.info(`✅ [${eventId}] Referral #${referral.id} créé: parrain=${referrer.id}, filleul=${refereeKineId}, crédit=${creditAmountEuros}€, status=PENDING`);
+  logger.info(`📅 [${eventId}] Crédits seront appliqués au 1er renouvellement du filleul`);
 }
 
 /**
@@ -511,7 +590,29 @@ async function handleSubscriptionDeleted(subscription, eventId) {
         planType: 'FREE', // Reset vers plan gratuit
       }
     });
-    
+
+    // ========== ANNULER PARRAINAGE PENDING SI FILLEUL ==========
+    // Si ce kiné était un filleul avec un parrainage PENDING, le marquer comme CANCELED
+    try {
+      const pendingReferral = await prisma.referral.findFirst({
+        where: {
+          refereeId: kine.id,
+          status: 'PENDING'
+        }
+      });
+
+      if (pendingReferral) {
+        await prisma.referral.update({
+          where: { id: pendingReferral.id },
+          data: { status: 'CANCELED' }
+        });
+        logger.info(`🚫 [${eventId}] Parrainage #${pendingReferral.id} annulé (filleul a résilié avant renouvellement)`);
+      }
+    } catch (refError) {
+      logger.error(`⚠️ [${eventId}] Erreur annulation parrainage (non bloquante):`, refError.message);
+    }
+    // ===========================================================
+
     const message = `Abonnement supprimé pour kiné ${kine.id} - retour vers plan FREE`;
     logger.info(`🗑️ [${eventId}] ${message}`);
     return { success: true, message };
@@ -525,24 +626,39 @@ async function handleSubscriptionDeleted(subscription, eventId) {
 
 /**
  * Gestion paiement réussi
+ * Inclut le traitement des crédits de parrainage au 1er renouvellement
  */
 async function handlePaymentSucceeded(invoice, eventId) {
   try {
-    logger.info(`💰 [${eventId}] Paiement réussi pour invoice: ${invoice.id}`);
-    
+    logger.info(`💰 [${eventId}] Paiement réussi pour invoice: ${invoice.id} - billing_reason: ${invoice.billing_reason}`);
+
     if (invoice.subscription) {
       const kine = await prisma.kine.findFirst({
-        where: { subscriptionId: invoice.subscription }
+        where: { subscriptionId: invoice.subscription },
+        select: { id: true, stripeCustomerId: true, email: true }
       });
-      
+
       if (kine) {
         await prisma.kine.update({
           where: { id: kine.id },
           data: { subscriptionStatus: 'ACTIVE' }
         });
-        
-        const message = `Statut mis à jour vers ACTIVE pour kiné ${kine.id}`;
-        logger.info(`✅ [${eventId}] ${message}`);
+
+        logger.info(`✅ [${eventId}] Statut mis à jour vers ACTIVE pour kiné ${kine.id}`);
+
+        // ========== TRAITEMENT CRÉDIT PARRAINAGE AU RENOUVELLEMENT ==========
+        // billing_reason: 'subscription_create' = 1er paiement
+        // billing_reason: 'subscription_cycle' = renouvellement (2ème paiement+)
+        if (invoice.billing_reason === 'subscription_cycle') {
+          try {
+            await handleReferralCreditOnRenewal(kine.id, kine.stripeCustomerId, eventId);
+          } catch (refError) {
+            logger.error(`⚠️ [${eventId}] Erreur crédit parrainage (non bloquante):`, refError.message);
+          }
+        }
+        // ====================================================================
+
+        const message = `Paiement traité pour kiné ${kine.id}`;
         return { success: true, message };
       } else {
         const message = `Kiné non trouvé pour subscription: ${invoice.subscription}`;
@@ -550,14 +666,115 @@ async function handlePaymentSucceeded(invoice, eventId) {
         return { success: true, message }; // Pas critique
       }
     }
-    
+
     return { success: true, message: 'Invoice sans subscription, ignorée' };
-    
+
   } catch (error) {
     const errorMessage = `Erreur handlePaymentSucceeded: ${error.message}`;
     logger.error(`💥 [${eventId}] ${errorMessage}`, { invoiceId: invoice.id });
     return { success: false, message: errorMessage };
   }
+}
+
+/**
+ * Applique les crédits de parrainage au 1er renouvellement du filleul
+ */
+async function handleReferralCreditOnRenewal(refereeKineId, refereeStripeCustomerId, eventId) {
+  // Chercher un referral PENDING pour ce filleul
+  const referral = await prisma.referral.findFirst({
+    where: {
+      refereeId: refereeKineId,
+      status: 'PENDING'
+    },
+    include: {
+      referrer: {
+        select: { id: true, stripeCustomerId: true, firstName: true, email: true }
+      }
+    }
+  });
+
+  if (!referral) {
+    logger.debug(`[${eventId}] Pas de parrainage PENDING pour kiné ${refereeKineId}`);
+    return;
+  }
+
+  logger.info(`🎁 [${eventId}] Traitement crédit parrainage: referral #${referral.id}`);
+
+  const creditAmountCents = Math.round(referral.creditAmount * 100);
+
+  // Vérifier les limites mensuelles du parrain
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const referralsThisMonth = await prisma.referral.count({
+    where: {
+      referrerId: referral.referrerId,
+      status: 'COMPLETED',
+      creditedAt: { gte: startOfMonth }
+    }
+  });
+
+  if (referralsThisMonth >= 5) { // MAX_REFERRALS_PER_MONTH
+    logger.warn(`⚠️ [${eventId}] Parrain ${referral.referrerId} a atteint la limite mensuelle`);
+    await prisma.referral.update({
+      where: { id: referral.id },
+      data: { status: 'EXPIRED' }
+    });
+    return;
+  }
+
+  let referrerCredited = false;
+  let refereeCredited = false;
+
+  // 1. Créditer le PARRAIN
+  if (referral.referrer.stripeCustomerId) {
+    try {
+      await stripeService.applyReferralCredit(
+        referral.referrer.stripeCustomerId,
+        creditAmountCents,
+        `Crédit parrainage - Filleul abonné (${referral.planSubscribed})`
+      );
+      referrerCredited = true;
+      logger.info(`💰 [${eventId}] Crédit ${referral.creditAmount}€ appliqué au parrain ${referral.referrer.id}`);
+    } catch (error) {
+      logger.error(`❌ [${eventId}] Erreur crédit parrain:`, error.message);
+    }
+  } else {
+    logger.warn(`⚠️ [${eventId}] Parrain ${referral.referrer.id} sans stripeCustomerId`);
+  }
+
+  // 2. Créditer le FILLEUL
+  if (refereeStripeCustomerId) {
+    try {
+      await stripeService.applyReferralCredit(
+        refereeStripeCustomerId,
+        creditAmountCents,
+        `Crédit parrainage - Bienvenue chez Mon Assistant Kiné !`
+      );
+      refereeCredited = true;
+      logger.info(`💰 [${eventId}] Crédit ${referral.creditAmount}€ appliqué au filleul ${refereeKineId}`);
+    } catch (error) {
+      logger.error(`❌ [${eventId}] Erreur crédit filleul:`, error.message);
+    }
+  } else {
+    logger.warn(`⚠️ [${eventId}] Filleul ${refereeKineId} sans stripeCustomerId`);
+  }
+
+  // Mettre à jour le referral
+  const newStatus = (referrerCredited || refereeCredited) ? 'COMPLETED' : 'PENDING';
+
+  await prisma.referral.update({
+    where: { id: referral.id },
+    data: {
+      status: newStatus,
+      referrerCredited,
+      refereeCredited,
+      creditedAt: newStatus === 'COMPLETED' ? new Date() : null
+    }
+  });
+
+  logger.info(`✅ [${eventId}] Referral #${referral.id} mis à jour: status=${newStatus}, parrain=${referrerCredited}, filleul=${refereeCredited}`);
 }
 
 /**

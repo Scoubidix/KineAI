@@ -2,6 +2,7 @@
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@ffprobe-installer/ffprobe": "^2.1.2",
+    "@google-cloud/storage": "^7.18.0",
     "@prisma/client": "^6.19.0",
     "@supabase/supabase-js": "^2.50.0",
     "archiver": "^7.0.1",

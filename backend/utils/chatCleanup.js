@@ -4,7 +4,6 @@ const prismaService = require('../services/prismaService');
 const notificationService = require('../services/notificationService');
 const logger = require('./logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('./logSanitizer');
-const admin = require('firebase-admin');
 
 // Wrapper avec timeout et retry pour les tâches CRON
 const executeWithTimeout = async (taskName, taskFunction, timeoutMs = 120000) => {
@@ -191,9 +190,7 @@ const archiveFinishedProgramsTask = async () => {
   logger.info(`📊 Début archivage`);
 
   try {
-    const prisma = prismaService.getInstance();
-
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prismaService.executeInTransactionForCron(async (tx) => {
       const finishedPrograms = await tx.programme.findMany({
         where: {
           dateFin: { lte: now },
@@ -233,8 +230,6 @@ const archiveFinishedProgramsTask = async () => {
         messages: messageCount,
         details: finishedPrograms
       };
-    }, {
-      timeout: 45000
     });
 
     return result;
@@ -251,9 +246,7 @@ const cleanupOldArchivedProgramsTask = async () => {
   logger.info(`🗑️ Début nettoyage programmes archivés`);
 
   try {
-    const prisma = prismaService.getInstance();
-
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prismaService.executeInTransactionForCron(async (tx) => {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
@@ -288,7 +281,7 @@ const cleanupOldArchivedProgramsTask = async () => {
           await tx.programme.delete({
             where: { id: program.id }
           });
-          
+
           deletedPrograms++;
           deletedDetails.push({
             id: program.id,
@@ -301,124 +294,18 @@ const cleanupOldArchivedProgramsTask = async () => {
       }
 
       logger.info(`🗑️ Suppression: ${deletedPrograms} programmes et ${messageCount} messages`);
-      
+
       return {
         programs: deletedPrograms,
         messages: messageCount,
         details: deletedDetails
       };
-    }, {
-      timeout: 60000
     });
 
     return result;
 
   } catch (error) {
     logger.error(`❌ Erreur nettoyage programmes:`, error.message);
-    throw error;
-  }
-};
-
-// Supprimer les GIFs orphelins de Firebase Storage
-const cleanupOrphanGifsTask = async () => {
-  logger.info(`🗑️ Début nettoyage GIFs orphelins`);
-
-  try {
-    const prisma = prismaService.getInstance();
-
-    // 1. Récupérer tous les GIFs de Firebase Storage
-    const bucket = admin.storage().bucket();
-    const [files] = await bucket.getFiles({ prefix: 'exercices/' });
-
-    const firebaseGifs = files
-      .filter(file => file.name.endsWith('.gif'))
-      .map(file => {
-        const encodedPath = encodeURIComponent(file.name);
-        return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media`;
-      });
-
-    logger.info(`📂 ${firebaseGifs.length} GIFs trouvés dans Firebase Storage`);
-
-    if (firebaseGifs.length === 0) {
-      logger.info('🧹 Aucun GIF dans Firebase Storage');
-      return { gifsChecked: 0, gifsDeleted: 0 };
-    }
-
-    // 2. Récupérer tous les gifUrl de la base de données
-    const exercicesWithGifs = await prisma.exerciceModele.findMany({
-      where: {
-        gifUrl: { not: null }
-      },
-      select: { gifUrl: true }
-    });
-
-    const dbGifUrls = new Set(exercicesWithGifs.map(ex => ex.gifUrl));
-    logger.info(`📋 ${dbGifUrls.size} GIFs référencés dans la base de données`);
-
-    // 3. Identifier les GIFs orphelins
-    const orphanGifs = firebaseGifs.filter(gifUrl => !dbGifUrls.has(gifUrl));
-    logger.info(`🔍 ${orphanGifs.length} GIFs orphelins détectés`);
-
-    if (orphanGifs.length === 0) {
-      logger.info('✅ Aucun GIF orphelin à supprimer');
-      return { gifsChecked: firebaseGifs.length, gifsDeleted: 0 };
-    }
-
-    // 4. Filtrer les GIFs orphelins > 24h (via métadonnées)
-    const oneDayAgo = new Date();
-    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
-
-    let deletedCount = 0;
-    const deletedDetails = [];
-
-    for (const gifUrl of orphanGifs) {
-      try {
-        // Extraire le chemin du fichier depuis l'URL
-        const match = gifUrl.match(/\/o\/([^?]+)\?/);
-        if (!match) {
-          logger.warn(`⚠️ Format URL invalide: ${gifUrl}`);
-          continue;
-        }
-
-        const filePath = decodeURIComponent(match[1]);
-        const file = bucket.file(filePath);
-
-        // Vérifier l'âge du fichier
-        const [metadata] = await file.getMetadata();
-        const createdAt = new Date(metadata.timeCreated);
-
-        if (createdAt < oneDayAgo) {
-          // Supprimer le GIF orphelin de plus de 24h
-          await file.delete();
-          deletedCount++;
-
-          deletedDetails.push({
-            url: gifUrl,
-            path: filePath,
-            createdAt: metadata.timeCreated,
-            age: Math.round((Date.now() - createdAt.getTime()) / (1000 * 60 * 60)) + 'h'
-          });
-
-          logger.info(`🗑️ GIF orphelin supprimé: ${filePath} (créé ${Math.round((Date.now() - createdAt.getTime()) / (1000 * 60 * 60))}h ago)`);
-        } else {
-          logger.info(`⏳ GIF orphelin récent ignoré: ${filePath} (créé ${Math.round((Date.now() - createdAt.getTime()) / (1000 * 60 * 60))}h ago)`);
-        }
-      } catch (deleteError) {
-        logger.error(`❌ Erreur suppression GIF ${gifUrl}:`, deleteError.message);
-      }
-    }
-
-    logger.info(`🗑️ Nettoyage terminé: ${deletedCount} GIFs orphelins supprimés sur ${orphanGifs.length} détectés`);
-
-    return {
-      gifsChecked: firebaseGifs.length,
-      orphansDetected: orphanGifs.length,
-      gifsDeleted: deletedCount,
-      details: deletedDetails
-    };
-
-  } catch (error) {
-    logger.error(`❌ Erreur nettoyage GIFs:`, error.message);
     throw error;
   }
 };
@@ -522,35 +409,8 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  // PRODUCTION: Nettoyage GIFs orphelins - Mercredi 01h30 + backup 01h38
-  cron.schedule('30 1 * * 3', async () => {
-    logger.info(`🗑️ [Mercredi 01h30] Nettoyage GIFs orphelins PRINCIPAL`);
-
-    await executeWithTimeout(
-      'nettoyage GIFs orphelins PRINCIPAL (01h30)',
-      cleanupOrphanGifsTask,
-      120000
-    );
-  }, {
-    timezone: "Europe/Paris",
-    scheduled: true
-  });
-
-  cron.schedule('38 1 * * 3', async () => {
-    logger.info(`🗑️ [Mercredi 01h38] Nettoyage GIFs orphelins BACKUP`);
-
-    await executeWithTimeout(
-      'nettoyage GIFs orphelins BACKUP (01h38)',
-      cleanupOrphanGifsTask,
-      120000
-    );
-  }, {
-    timezone: "Europe/Paris",
-    scheduled: true
-  });
-
-  logger.info('✅ PRODUCTION configurée - 8 tâches avec backup automatique + notifications');
-  logger.info('📅 Planning: 00h01+00h09 notifications, 00h10+00h18 archivage, mercredi 01h15+01h23 nettoyage programmes, mercredi 01h30+01h38 nettoyage GIFs');
+  logger.info('✅ PRODUCTION configurée - 6 tâches avec backup automatique + notifications');
+  logger.info('📅 Planning: 00h01+00h09 notifications, 00h10+00h18 archivage, mercredi 01h15+01h23 nettoyage programmes');
   logger.info('🔒 Toutes les tâches utilisent le singleton prismaService');
 };
 
@@ -581,23 +441,12 @@ const manualNotificationsTest = async () => {
   );
 };
 
-// 🆕 NOUVEAU: Test manuel nettoyage GIFs orphelins
-const manualGifCleanupTest = async () => {
-  return await executeWithTimeout(
-    'test manuel nettoyage GIFs orphelins',
-    cleanupOrphanGifsTask,
-    120000
-  );
-};
-
 module.exports = {
   startProgramCleanupCron,
   archiveFinishedProgramsTask,
   cleanupOldArchivedProgramsTask,
-  createProgramCompletedNotificationsTask, // 🆕 NOUVEAU
-  cleanupOrphanGifsTask, // 🆕 NOUVEAU
+  createProgramCompletedNotificationsTask,
   manualArchiveTest,
   manualCleanupTest,
-  manualNotificationsTest, // 🆕 NOUVEAU
-  manualGifCleanupTest // 🆕 NOUVEAU
+  manualNotificationsTest
 };

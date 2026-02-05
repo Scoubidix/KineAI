@@ -9,7 +9,7 @@ const logger = require('../utils/logger');
 router.post('/create-checkout', authenticate, async (req, res) => {
   try {
     const prisma = prismaService.getInstance();
-    const { planType, successUrl, cancelUrl } = req.body;
+    const { planType, successUrl, cancelUrl, referralCode } = req.body;
 
     // Récupérer le kiné avec ses infos d'abonnement
     const kine = await prisma.kine.findUnique({
@@ -84,7 +84,43 @@ router.post('/create-checkout', authenticate, async (req, res) => {
     }
     
     // Nouveau checkout pour utilisateurs sans abonnement actif
-    logger.log(`🆕 Nouveau checkout pour utilisateur ${kine.planType || 'FREE'}`);
+    logger.warn(`🆕 Nouveau checkout pour utilisateur ${kine.planType || 'FREE'}`);
+    logger.warn(`🎁 Code parrainage reçu du frontend: "${referralCode || 'AUCUN'}"`);
+
+    // Valider le code de parrainage si fourni
+    let validatedReferralCode = null;
+    if (referralCode) {
+      const referrer = await prisma.kine.findFirst({
+        where: { referralCode: referralCode.toUpperCase() },
+        select: { id: true, email: true, planType: true, subscriptionStatus: true }
+      });
+
+      if (referrer) {
+        // Vérifier que le parrain est actif
+        const isReferrerActive = referrer.planType &&
+          referrer.planType !== 'FREE' &&
+          ['ACTIVE', 'TRIALING'].includes(referrer.subscriptionStatus);
+
+        // Vérifier que ce n'est pas un auto-parrainage (même kiné)
+        const kineDetails = await prisma.kine.findUnique({
+          where: { id: kineId },
+          select: { email: true }
+        });
+
+        const isSelfReferral = StripeService.areEmailsSuspicious(referrer.email, kineDetails.email);
+
+        if (isReferrerActive && !isSelfReferral) {
+          validatedReferralCode = referralCode.toUpperCase();
+          logger.info(`✅ Code parrainage validé: ${validatedReferralCode} pour kiné ${kineId}`);
+        } else if (isSelfReferral) {
+          logger.warn(`⚠️ Auto-parrainage détecté: ${kineDetails.email} / ${referrer.email}`);
+        } else {
+          logger.warn(`⚠️ Parrain inactif pour code: ${referralCode}`);
+        }
+      } else {
+        logger.warn(`⚠️ Code parrainage non trouvé: ${referralCode}`);
+      }
+    }
 
     try {
       // Créer la session via le service Stripe
@@ -92,7 +128,8 @@ router.post('/create-checkout', authenticate, async (req, res) => {
         kineId,
         planType,
         defaultSuccessUrl,
-        defaultCancelUrl
+        defaultCancelUrl,
+        validatedReferralCode
       );
 
       res.json({

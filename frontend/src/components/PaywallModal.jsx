@@ -9,13 +9,15 @@ import {
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { getAuth } from 'firebase/auth';
-import { 
-  Crown, 
-  Check, 
-  Zap, 
-  Users, 
-  X, 
+import {
+  Crown,
+  Check,
+  Zap,
+  Users,
+  X,
   MessageSquare,
   BookOpen,
   Stethoscope,
@@ -25,7 +27,8 @@ import {
   CreditCard,
   Calendar,
   Shield,
-  Loader2
+  Loader2,
+  Gift
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { plans } from '../config/plans';
@@ -35,10 +38,13 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 export const PaywallModal = ({ isOpen, onClose, subscription }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [pioneerSlotsRemaining, setPioneerSlotsRemaining] = useState(null);
-  
+
   // États pour le système d'étapes
   const [currentStep, setCurrentStep] = useState('selection'); // 'selection' | 'confirmation'
   const [pendingUpgrade, setPendingUpgrade] = useState(null); // {planType, planData, currentPlan}
+
+  // État pour le code de parrainage
+  const [referralCode, setReferralCode] = useState('');
 
 
   // Récupérer les places restantes pour le plan Pionnier (optimisé)
@@ -61,52 +67,10 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
 
   // Vérifier si c'est un changement de plan ou un nouvel abonnement
   const isUpgrade = subscription && subscription.planType && subscription.planType !== 'FREE';
-  
-  // Gérer le clic sur un plan (avec confirmation si nécessaire)
-  const handlePlanClick = useCallback((planType) => {
-    const selectedPlan = plans[planType];
-    
-    if (isUpgrade) {
-      // Abonnement existant → passer à l'étape de confirmation
-      setPendingUpgrade({
-        planType,
-        planData: selectedPlan,
-        currentPlan: subscription.planType
-      });
-      setCurrentStep('confirmation');
-    } else {
-      // Nouvel abonnement → checkout direct
-      handleUpgrade(planType);
-    }
-  }, [isUpgrade, subscription]);
 
-  // Confirmation du changement de plan
-  const handleConfirmUpgrade = useCallback(async () => {
-    if (pendingUpgrade) {
-      await handleUpgrade(pendingUpgrade.planType);
-      // Reset après succès
-      setPendingUpgrade(null);
-      setCurrentStep('selection');
-    }
-  }, [pendingUpgrade]);
-
-  // Annuler la confirmation
-  const handleCancelUpgrade = useCallback(() => {
-    setPendingUpgrade(null);
-    setCurrentStep('selection');
-  }, []);
-
-  // Gérer la fermeture de la modal avec reset
-  const handleModalClose = useCallback(() => {
-    // Reset tous les états
-    setPendingUpgrade(null);
-    setCurrentStep('selection');
-    onClose();
-  }, [onClose]);
-
-  // Créer une session de checkout (optimisé)
+  // Créer une session de checkout (défini en premier car utilisé par handlePlanClick)
   const handleUpgrade = useCallback(async (planType) => {
-    
+
     const user = getAuth().currentUser;
     if (!user) {
       toast({
@@ -118,21 +82,25 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
     }
 
     setIsLoading(true);
-    
+
     try {
       const token = await user.getIdToken();
-      
+
+      const payload = {
+        planType,
+        successUrl: `${window.location.origin}/dashboard/kine/upgrade/success?upgrade=success`,
+        cancelUrl: `${window.location.origin}/dashboard/kine?upgrade=cancel`,
+        ...(referralCode.trim() && { referralCode: referralCode.trim().toUpperCase() })
+      };
+      console.log('🎁 Checkout payload:', payload);
+
       const response = await fetch(`${API_URL}/api/stripe/create-checkout`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ 
-          planType,
-          successUrl: `${window.location.origin}/dashboard/kine/upgrade/success?upgrade=success`,
-          cancelUrl: `${window.location.origin}/dashboard/kine?upgrade=cancel`
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
@@ -150,12 +118,12 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
             className: "bg-green-50 border-green-200 text-green-800",
             duration: 6000
           });
-          
+
           // Fermer la modal - l'utilisateur reste dans l'app
           onClose();
-          
+
           // ✅ PAS de redirection pour les changements de plan
-          
+
         } else {
           // Nouveau checkout classique → redirection Stripe
           window.location.href = data.url;
@@ -173,7 +141,50 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
     } finally {
       setIsLoading(false);
     }
-  }, []); // Pas de dépendances car utilise seulement des APIs externes
+  }, [referralCode, onClose]);
+
+  // Gérer le clic sur un plan (avec confirmation si nécessaire)
+  const handlePlanClick = useCallback((planType) => {
+    const selectedPlan = plans[planType];
+
+    if (isUpgrade) {
+      // Abonnement existant → passer à l'étape de confirmation
+      setPendingUpgrade({
+        planType,
+        planData: selectedPlan,
+        currentPlan: subscription.planType
+      });
+      setCurrentStep('confirmation');
+    } else {
+      // Nouvel abonnement → checkout direct
+      handleUpgrade(planType);
+    }
+  }, [isUpgrade, subscription, handleUpgrade]);
+
+  // Confirmation du changement de plan
+  const handleConfirmUpgrade = useCallback(async () => {
+    if (pendingUpgrade) {
+      await handleUpgrade(pendingUpgrade.planType);
+      // Reset après succès
+      setPendingUpgrade(null);
+      setCurrentStep('selection');
+    }
+  }, [pendingUpgrade, handleUpgrade]);
+
+  // Annuler la confirmation
+  const handleCancelUpgrade = useCallback(() => {
+    setPendingUpgrade(null);
+    setCurrentStep('selection');
+  }, []);
+
+  // Gérer la fermeture de la modal avec reset
+  const handleModalClose = useCallback(() => {
+    // Reset tous les états
+    setPendingUpgrade(null);
+    setCurrentStep('selection');
+    setReferralCode('');
+    onClose();
+  }, [onClose]);
 
   // Vérifier si le plan est disponible
   const isPlanAvailable = (planType) => {
@@ -388,6 +399,31 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                         </p>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Champ Code de parrainage - Seulement pour nouveaux abonnements */}
+              {!isUpgrade && (
+                <Card className="border-dashed border-primary/30 bg-primary/5">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Gift className="h-5 w-5 text-primary" />
+                      <Label htmlFor="referralCode" className="font-medium">Code de parrainage (optionnel)</Label>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        id="referralCode"
+                        placeholder="Ex: ABC123"
+                        value={referralCode}
+                        onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                        className="font-mono tracking-wider uppercase"
+                        maxLength={10}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Vous avez un code de parrainage ? Entrez-le pour recevoir 1 mois offert après votre premier renouvellement.
+                    </p>
                   </CardContent>
                 </Card>
               )}

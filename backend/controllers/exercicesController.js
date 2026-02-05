@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 const prismaService = require('../services/prismaService');
+const gcsStorageService = require('../services/gcsStorageService');
 
 // 🔐 Toutes les routes supposent que req.uid est défini par le middleware authenticate
 
@@ -39,7 +40,10 @@ exports.getPublicExercices = async (req, res) => {
     const filteredExercices = filterExercices(exercices, search, selectedTags);
     const sortedExercices = sortExercicesAlphabetically(filteredExercices);
 
-    res.json(sortedExercices);
+    // Enrichir avec URLs signées GCS (ou fallback Firebase pour migration)
+    const enrichedExercices = await gcsStorageService.enrichExercicesWithSignedUrls(sortedExercices);
+
+    res.json(enrichedExercices);
   } catch (err) {
     logger.error("Erreur récupération exercices publics :", err);
     res.status(500).json({ error: "Erreur récupération exercices publics" });
@@ -72,7 +76,10 @@ exports.getPrivateExercices = async (req, res) => {
     const filteredExercices = filterExercices(exercices, search, selectedTags);
     const sortedExercices = sortExercicesAlphabetically(filteredExercices);
 
-    res.json(sortedExercices);
+    // Enrichir avec URLs signées GCS (ou fallback Firebase pour migration)
+    const enrichedExercices = await gcsStorageService.enrichExercicesWithSignedUrls(sortedExercices);
+
+    res.json(enrichedExercices);
   } catch (err) {
     logger.error("Erreur récupération exercices privés :", err);
     res.status(500).json({ error: "Erreur récupération exercices privés" });
@@ -120,7 +127,7 @@ exports.getAllTags = async (req, res) => {
 };
 
 exports.createExercice = async (req, res) => {
-  const { nom, description, tags, gifUrl } = req.body;
+  const { nom, description, tags, gifPath } = req.body;
 
   try {
     const firebaseUid = req.uid;
@@ -138,12 +145,17 @@ exports.createExercice = async (req, res) => {
       data: {
         nom,
         description,
-        tags: tags || null, // Stocker les tags sous forme de string séparée par virgules
-        gifUrl: gifUrl || null, // URL du GIF de démonstration
+        tags: tags || null,
+        gifPath: gifPath || null, // Chemin GCS du GIF (ex: "exercices/123_demo.gif")
         isPublic: false,
         kineId: kine.id,
       },
     });
+
+    // Générer URL signée si gifPath existe
+    if (newExercice.gifPath) {
+      newExercice.gifUrl = await gcsStorageService.generateSignedUrl(newExercice.gifPath);
+    }
 
     res.status(201).json(newExercice);
   } catch (err) {
@@ -154,8 +166,7 @@ exports.createExercice = async (req, res) => {
 
 exports.updateExercice = async (req, res) => {
   const { id } = req.params;
-  const { nom, description, tags, gifUrl } = req.body;
-  const firebaseStorageService = require('../services/firebaseStorageService');
+  const { nom, description, tags, gifPath } = req.body;
 
   try {
     const firebaseUid = req.uid;
@@ -177,11 +188,11 @@ exports.updateExercice = async (req, res) => {
       return res.status(403).json({ error: "Non autorisé à modifier cet exercice" });
     }
 
-    // Si un nouveau gifUrl est fourni et différent de l'ancien, supprimer l'ancien GIF
-    if (gifUrl !== undefined && exercice.gifUrl && gifUrl !== exercice.gifUrl) {
+    // Si un nouveau gifPath est fourni et différent de l'ancien, supprimer l'ancien GIF de GCS
+    if (gifPath !== undefined && exercice.gifPath && gifPath !== exercice.gifPath) {
       try {
-        await firebaseStorageService.deleteGif(exercice.gifUrl);
-        logger.info(`Ancien GIF supprimé: ${exercice.gifUrl}`);
+        await gcsStorageService.deleteGif(exercice.gifPath);
+        logger.info(`Ancien GIF supprimé de GCS: ${exercice.gifPath}`);
       } catch (error) {
         logger.warn('Erreur lors de la suppression de l\'ancien GIF:', error);
         // On continue quand même l'update
@@ -194,9 +205,14 @@ exports.updateExercice = async (req, res) => {
         nom,
         description,
         tags: tags || null,
-        gifUrl: gifUrl !== undefined ? (gifUrl || null) : exercice.gifUrl
+        gifPath: gifPath !== undefined ? (gifPath || null) : exercice.gifPath
       },
     });
+
+    // Générer URL signée pour la réponse
+    if (updated.gifPath) {
+      updated.gifUrl = await gcsStorageService.generateSignedUrl(updated.gifPath);
+    }
 
     res.json(updated);
   } catch (err) {
@@ -207,7 +223,6 @@ exports.updateExercice = async (req, res) => {
 
 exports.deleteExercice = async (req, res) => {
   const { id } = req.params;
-  const firebaseStorageService = require('../services/firebaseStorageService');
 
   try {
     const firebaseUid = req.uid;
@@ -250,13 +265,13 @@ exports.deleteExercice = async (req, res) => {
       });
     }
 
-    // Supprimer le GIF associé de Firebase Storage s'il existe
-    if (exercice.gifUrl) {
+    // Supprimer le GIF associé de GCS s'il existe
+    if (exercice.gifPath) {
       try {
-        await firebaseStorageService.deleteGif(exercice.gifUrl);
-        logger.info(`GIF supprimé de Firebase Storage: ${exercice.gifUrl}`);
+        await gcsStorageService.deleteGif(exercice.gifPath);
+        logger.info(`GIF supprimé de GCS: ${exercice.gifPath}`);
       } catch (error) {
-        logger.warn('Erreur lors de la suppression du GIF de Firebase Storage:', error);
+        logger.warn('Erreur lors de la suppression du GIF de GCS:', error);
         // On continue quand même la suppression de l'exercice
       }
     }
@@ -274,7 +289,6 @@ exports.deleteExercice = async (req, res) => {
 
 exports.uploadVideoAndConvert = async (req, res) => {
   const videoConversionService = require('../services/videoConversionService');
-  const firebaseStorageService = require('../services/firebaseStorageService');
   const fs = require('fs').promises;
 
   try {
@@ -304,19 +318,23 @@ exports.uploadVideoAndConvert = async (req, res) => {
 
     logger.info(`GIF généré: ${gifFileName} (${sizeInMB} MB)`);
 
-    // Upload le GIF sur Firebase Storage
-    const gifUrl = await firebaseStorageService.uploadGif(gifBuffer, gifFileName);
+    // Upload le GIF sur GCS (retourne le path, pas l'URL)
+    const gifPath = await gcsStorageService.uploadGif(gifBuffer, gifFileName);
+
+    // Générer une URL signée pour l'affichage immédiat
+    const gifUrl = await gcsStorageService.generateSignedUrl(gifPath);
 
     // Nettoyer le fichier vidéo temporaire
     await fs.unlink(req.file.path).catch(err =>
       logger.warn('Erreur lors de la suppression de la vidéo temporaire:', err)
     );
 
-    logger.info(`Upload complet. URL du GIF: ${gifUrl}`);
+    logger.info(`Upload GCS complet. Path: ${gifPath}`);
 
     res.status(200).json({
       success: true,
-      gifUrl,
+      gifPath,     // Chemin GCS à stocker en DB
+      gifUrl,      // URL signée temporaire pour affichage immédiat
       fileName: gifFileName,
       sizeInMB
     });

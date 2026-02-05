@@ -9,11 +9,12 @@ import { fetchWithAuth } from '@/utils/fetchWithAuth';
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
 interface VideoUploadProps {
-  gifUrl: string | null;
-  onGifUrlChange: (url: string | null) => void;
+  gifUrl: string | null;      // URL signée pour affichage (preview)
+  gifPath: string | null;     // Chemin GCS pour stockage DB
+  onGifChange: (data: { gifUrl: string | null; gifPath: string | null }) => void;
 }
 
-export default function VideoUpload({ gifUrl, onGifUrlChange }: VideoUploadProps) {
+export default function VideoUpload({ gifUrl, gifPath, onGifChange }: VideoUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
@@ -68,7 +69,8 @@ export default function VideoUpload({ gifUrl, onGifUrlChange }: VideoUploadProps
 
       const data = await res.json();
       setUploadProgress('GIF généré avec succès !');
-      onGifUrlChange(data.gifUrl);
+      // Retourne gifPath (pour DB) et gifUrl (URL signée pour affichage)
+      onGifChange({ gifPath: data.gifPath, gifUrl: data.gifUrl });
 
       setTimeout(() => {
         setUploadProgress('');
@@ -111,7 +113,7 @@ export default function VideoUpload({ gifUrl, onGifUrlChange }: VideoUploadProps
   };
 
   const handleRemoveGif = () => {
-    onGifUrlChange(null);
+    onGifChange({ gifUrl: null, gifPath: null });
     setVideoFile(null);
     setError(null);
     setUploadProgress('');

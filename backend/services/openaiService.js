@@ -1,6 +1,7 @@
 const { OpenAI } = require('openai');
 const knowledgeService = require('./knowledgeService');
 const prismaService = require('./prismaService');
+const gcsStorageService = require('./gcsStorageService');
 const logger = require('../utils/logger');
 const { sanitizeUID, sanitizeName } = require('../utils/logSanitizer');
 
@@ -8,8 +9,47 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Fonction pour anonymiser les données patient
-const anonymizePatientData = (patient, programmes) => {
+// Fonction pour anonymiser les données patient (async pour génération URLs signées GCS)
+const anonymizePatientData = async (patient, programmes) => {
+  // Traiter les programmes avec génération d'URLs signées pour les GIFs
+  const programmesWithSignedUrls = await Promise.all(
+    programmes.map(async (prog) => {
+      // Traiter les exercices de ce programme
+      const exercicesWithUrls = await Promise.all(
+        (prog.exercices || []).map(async (ex) => {
+          // GCS uniquement - générer URL signée (2h pour session chat patient)
+          const gifPath = ex.exerciceModele?.gifPath;
+          let gifUrl = null;
+          if (gifPath) {
+            gifUrl = await gcsStorageService.generateSignedUrl(gifPath, 2 * 60 * 60 * 1000);
+          }
+
+          return {
+            nom: ex.exerciceModele?.nom || ex.nom,
+            description: ex.exerciceModele?.description || 'Description non disponible',
+            gifUrl: gifUrl,
+            series: ex.series,
+            repetitions: ex.repetitions,
+            pause: ex.pause || ex.tempsRepos,
+            tempsTravail: ex.tempsTravail || null,
+            consigne: ex.consigne || ex.instructions,
+            difficulte: ex.difficulte || 'modérée',
+            materiel: ex.materiel || 'aucun'
+          };
+        })
+      );
+
+      return {
+        titre: prog.titre,
+        description: prog.description,
+        duree: prog.duree,
+        dateDebut: prog.dateDebut,
+        statut: prog.statut || 'actif',
+        exercices: exercicesWithUrls
+      };
+    })
+  );
+
   return {
     patientInfo: {
       age: calculateAge(patient.birthDate),
@@ -17,25 +57,7 @@ const anonymizePatientData = (patient, programmes) => {
       goals: patient.goals || 'Objectifs non spécifiés'
       // Aucune donnée d'identité (nom, prénom, email, téléphone, etc.)
     },
-    programmes: programmes.map(prog => ({
-      titre: prog.titre,
-      description: prog.description,
-      duree: prog.duree,
-      dateDebut: prog.dateDebut,
-      statut: prog.statut || 'actif',
-      exercices: prog.exercices?.map(ex => ({
-        nom: ex.exerciceModele?.nom || ex.nom,
-        description: ex.exerciceModele?.description || 'Description non disponible',
-        gifUrl: ex.exerciceModele?.gifUrl || null,
-        series: ex.series,
-        repetitions: ex.repetitions,
-        pause: ex.pause || ex.tempsRepos,
-        tempsTravail: ex.tempsTravail || null,
-        consigne: ex.consigne || ex.instructions,
-        difficulte: ex.difficulte || 'modérée',
-        materiel: ex.materiel || 'aucun'
-      })) || []
-    }))
+    programmes: programmesWithSignedUrls
   };
 };
 
@@ -153,9 +175,9 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
       throw new Error('Données manquantes pour générer la réponse');
     }
 
-    // Anonymiser les données
-    const anonymizedData = anonymizePatientData(patientData, programmes);
-    
+    // Anonymiser les données (async pour génération URLs signées GCS)
+    const anonymizedData = await anonymizePatientData(patientData, programmes);
+
     // Générer le prompt système
     const systemPrompt = generateSystemPrompt(anonymizedData);
     
@@ -176,7 +198,7 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: messages,
-      max_tokens: 400,
+      max_tokens: 800, // Augmenté pour accommoder les URLs signées GCS si GPT inclut un GIF
       temperature: 0.7,
       presence_penalty: 0.2,
       frequency_penalty: 0.1,
@@ -229,7 +251,7 @@ const generateWelcomeMessage = async (patientData, programmes) => {
     }
 
     // IMPORTANT: Anonymisation complète - aucune donnée d'identité transmise à OpenAI
-    const anonymizedData = anonymizePatientData(patientData, programmes);
+    const anonymizedData = await anonymizePatientData(patientData, programmes);
     const systemPrompt = generateSystemPrompt(anonymizedData);
 
     const welcomePrompt = `Tu es un assistant kinésithérapeute virtuel professionnel et bienveillant.
@@ -300,7 +322,7 @@ IMPORTANT - AFFICHAGE DES GIFS :
         { role: 'system', content: systemPrompt },
         { role: 'user', content: welcomePrompt }
       ],
-      max_tokens: 400,
+      max_tokens: 1500, // Augmenté pour accommoder les URLs signées GCS (~200 tokens/URL)
       temperature: 0.5
     });
 
@@ -332,11 +354,7 @@ IMPORTANT - AFFICHAGE DES GIFS :
           }
           exerciceLine += `\n`;
           fallbackMessage += exerciceLine;
-
-          // 🎬 Afficher le GIF immédiatement après l'exercice
-          if (ex.exerciceModele?.gifUrl) {
-            fallbackMessage += `![Démonstration](${ex.exerciceModele.gifUrl})\n\n`;
-          }
+          // Note: GIFs non affichés dans le fallback (URLs signées GCS nécessitent async)
         });
       } else {
         fallbackMessage += '• Exercices de rééducation personnalisés\n';

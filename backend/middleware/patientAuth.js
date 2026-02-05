@@ -102,7 +102,17 @@ const authenticatePatient = async (req, res, next) => {
       });
     }
 
-    // 6. Vérifier que le programme n'est pas archivé
+    // 6. Vérifier que le programme n'est pas supprimé (soft delete)
+    if (!programme.isActive) {
+      logger.warn(`⚠️ PATIENT_AUTH: Tentative accès programme supprimé - ID: ${programme.id}`);
+      return res.status(410).json({
+        success: false,
+        error: 'Programme supprimé, chat non disponible',
+        code: 'PROGRAMME_DELETED'
+      });
+    }
+
+    // 7. Vérifier que le programme n'est pas archivé
     if (programme.isArchived) {
       logger.warn(`⚠️ PATIENT_AUTH: Tentative accès programme archivé - ID: ${programme.id}`);
       return res.status(410).json({

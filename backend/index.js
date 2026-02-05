@@ -62,6 +62,9 @@ const templatesRoutes = require('./routes/templates');
 // 🏋️ NOUVEAU TEMPLATES EXERCICES : Import des routes templates d'exercices
 const exerciceTemplatesRoutes = require('./routes/exerciceTemplates');
 
+// 🎁 NOUVEAU PARRAINAGE : Import des routes parrainage
+const referralRoutes = require('./routes/referral');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -554,6 +557,9 @@ app.use('/api/rgpd', (req, res, next) => {
   next();
 }, rgpdRoutes);
 
+// 🎁 PARRAINAGE : Routes de parrainage (LIBRES - navigation)
+app.use('/api/referral', referralRoutes);
+
 // 📧 TEMPLATES ADMIN : Rate limiting sélectif sur envoi WhatsApp
 app.use('/api/templates', (req, res, next) => {
   if (req.method === 'POST' && req.path === '/send-whatsapp') {
@@ -595,8 +601,19 @@ app.use('/api/test', testOpenAIRoutes);             // Tests - LIBRES
 
 // ========== ROUTES IA/CHAT - RATE LIMITED ==========
 
-// 🚦 Patient chat : Même limite que les kinés IA (10/min)
-app.use('/api/patient', gptLimiter, patientChatRoutes);
+// 🚦 Patient chat : Rate limiting sélectif
+app.use('/api/patient', (req, res, next) => {
+  // POST /chat/:token → appelle GPT systématiquement (5/min)
+  if (req.method === 'POST' && req.path.includes('/chat/')) {
+    return gptLimiter(req, res, next);
+  }
+  // GET /welcome/:token → GPT appelé 1 seule fois, mais rate limit anti-spam (5/min)
+  if (req.method === 'GET' && req.path.includes('/welcome/')) {
+    return gptLimiter(req, res, next);
+  }
+  // ✅ Autres routes (validate, session-status, etc.) : LIBRES
+  next();
+}, patientChatRoutes);
 
 // 🚦 IA Kinés : Rate limiting sélectif (POST seulement)
 app.use('/api/chat/kine', (req, res, next) => {

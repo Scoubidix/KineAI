@@ -8,85 +8,91 @@ datasource db {
 }
 
 model Kine {
-  id             Int              @id @default(autoincrement())
-  uid            String           @unique
-  email          String           @unique
+  id             Int      @id @default(autoincrement())
+  uid            String   @unique
+  email          String   @unique
   firstName      String
   lastName       String
   phone          String
-  rpps           String           @unique
+  rpps           String   @unique
   birthDate      DateTime
   adresseCabinet String
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // ========== TRAÇABILITÉ LÉGALE ==========
-  acceptedCguAt                      DateTime?  // Date/heure d'acceptation des CGU
-  acceptedPolitiqueConfidentialiteAt DateTime?  // Date/heure d'acceptation de la politique de confidentialité
-  cguVersion                         String?    // Version des CGU acceptées (ex: "2.0")
-  politiqueConfidentialiteVersion    String?    // Version de la politique de confidentialité acceptée
-  signupIpAddress                    String?    // IP lors de l'inscription (audit trail RGPD)
+  acceptedCguAt                      DateTime? // Date/heure d'acceptation des CGU
+  acceptedPolitiqueConfidentialiteAt DateTime? // Date/heure d'acceptation de la politique de confidentialité
+  cguVersion                         String? // Version des CGU acceptées (ex: "2.0")
+  politiqueConfidentialiteVersion    String? // Version de la politique de confidentialité acceptée
+  signupIpAddress                    String? // IP lors de l'inscription (audit trail RGPD)
   // =========================================
 
   // ========== NOUVEAUX CHAMPS STRIPE ==========
-  stripeCustomerId      String?           // ID client Stripe
-  subscriptionId        String?           // ID abonnement Stripe actuel
-  planType              PlanType?         // Type de plan actuel
+  stripeCustomerId      String? // ID client Stripe
+  subscriptionId        String? // ID abonnement Stripe actuel
+  planType              PlanType? // Type de plan actuel
   subscriptionStatus    SubscriptionStatus? // Statut de l'abonnement
-  subscriptionStartDate DateTime?         // Date début abonnement
-  subscriptionEndDate   DateTime?         // Date fin abonnement
-  trialEndDate          DateTime?         // Date fin période d'essai (si applicable)
+  subscriptionStartDate DateTime? // Date début abonnement
+  subscriptionEndDate   DateTime? // Date fin abonnement
+  trialEndDate          DateTime? // Date fin période d'essai (si applicable)
   // ===============================================
 
-  patients              Patient[]
-  exercicesModeles      ExerciceModele[]
-  exerciceTemplates     ExerciceTemplate[]
-  notifications         Notification[]
+  // ========== PARRAINAGE ==========
+  referralCode        String?    @unique // Code unique de parrainage (ex: "ABC123")
+  referralsAsReferrer Referral[] @relation("ReferrerReferrals") // Parrainages effectués
+  referralAsReferee   Referral?  @relation("RefereeReferral") // Parrainage reçu (unique)
+  // ================================
+
+  patients          Patient[]
+  exercicesModeles  ExerciceModele[]
+  exerciceTemplates ExerciceTemplate[]
+  notifications     Notification[]
 
   // ========== NOUVELLES RELATIONS IA ==========
-  chatIaBasique         ChatIaBasique[]
-  chatIaBiblio          ChatIaBiblio[]
-  chatIaClinique        ChatIaClinique[]
-  chatIaAdministrative  ChatIaAdministrative[]
+  chatIaBasique        ChatIaBasique[]
+  chatIaBiblio         ChatIaBiblio[]
+  chatIaClinique       ChatIaClinique[]
+  chatIaAdministrative ChatIaAdministrative[]
   // =============================================
 
   // ========== RELATION RGPD ==========
-  rgpdExports           RgpdExport[]
+  rgpdExports RgpdExport[]
   // ===================================
 
   // ========== RELATION TEMPLATES ADMIN ==========
-  templatesSentHistory  TemplateSentHistory[]
+  templatesSentHistory TemplateSentHistory[]
   // ==============================================
 }
 
 model Patient {
-  id         Int         @id @default(autoincrement())
-  firstName  String
-  lastName   String
-  birthDate  DateTime
-  phone      String
-  email      String
-  goals      String
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id        Int      @id @default(autoincrement())
+  firstName String
+  lastName  String
+  birthDate DateTime
+  phone     String
+  email     String
+  goals     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // ========== SOFT DELETE ==========
-  isActive   Boolean     @default(true)
-  deletedAt  DateTime?
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
   // ================================
 
   // ========== CONSENTEMENTS COMMUNICATION ==========
-  emailConsent      Boolean  @default(false)   // Accepte emails admin
-  whatsappConsent   Boolean  @default(false)   // Accepte WhatsApp admin
+  emailConsent    Boolean @default(false) // Accepte emails admin
+  whatsappConsent Boolean @default(false) // Accepte WhatsApp admin
   // ================================================
 
-  kineId     Int
-  kine       Kine         @relation(fields: [kineId], references: [id])
+  kineId Int
+  kine   Kine @relation(fields: [kineId], references: [id])
 
-  programmes        Programme[]
-  chatSessions      ChatSession[]
-  sessionValidations SessionValidation[]
-  notifications     Notification[]
+  programmes           Programme[]
+  chatSessions         ChatSession[]
+  sessionValidations   SessionValidation[]
+  notifications        Notification[]
   templatesSentHistory TemplateSentHistory[]
 }
 
@@ -96,8 +102,9 @@ model ExerciceModele {
   kineId      Int
   nom         String
   description String
-  gifUrl      String?  // URL du GIF de démonstration (Firebase Storage)
-  tags        String?  // tags séparés par virgules
+  gifUrl      String? // DEPRECATED: Ancienne URL Firebase (pour migration)
+  gifPath     String? // NOUVEAU: Chemin GCS (ex: "exercices/123_demo.gif") - HDS compliant
+  tags        String? // tags séparés par virgules
   isPublic    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -117,7 +124,7 @@ model ExerciceTemplate {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  items       ExerciceTemplateItem[]
+  items ExerciceTemplateItem[]
 
   @@index([kineId])
   @@index([isPublic])
@@ -125,31 +132,32 @@ model ExerciceTemplate {
 }
 
 model ExerciceTemplateItem {
-  id                  Int                @id @default(autoincrement())
-  templateId          Int
-  template            ExerciceTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  exerciceModeleId    Int
-  exerciceModele      ExerciceModele     @relation(fields: [exerciceModeleId], references: [id])
-  ordre               Int                // Préserver l'ordre des exercices
-  series              Int                @default(3)
-  repetitions         Int                @default(10)
-  tempsRepos          Int                @default(30)  // en secondes
-  tempsTravail        Int?               @default(0)   // temps de travail en secondes (optionnel)
-  instructions        String?            @db.Text
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  id               Int              @id @default(autoincrement())
+  templateId       Int
+  template         ExerciceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  exerciceModeleId Int
+  exerciceModele   ExerciceModele   @relation(fields: [exerciceModeleId], references: [id])
+  ordre            Int // Préserver l'ordre des exercices
+  series           Int              @default(3)
+  repetitions      Int              @default(10)
+  tempsRepos       Int              @default(30) // en secondes
+  tempsTravail     Int?             @default(0) // temps de travail en secondes (optionnel)
+  instructions     String?          @db.Text
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@index([templateId])
   @@index([exerciceModeleId])
   @@map("exercice_template_items")
 }
+
 // ===========================================
 
 model Programme {
   id          Int       @id @default(autoincrement())
   titre       String
   description String
-  duree       Int       // en jours
+  duree       Int // en jours
   dateDebut   DateTime  @default(now())
   dateFin     DateTime
   isArchived  Boolean   @default(false)
@@ -158,12 +166,12 @@ model Programme {
   updatedAt   DateTime  @updatedAt
 
   // ========== SOFT DELETE ==========
-  isActive    Boolean   @default(true)
-  deletedAt   DateTime?
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
   // ================================
 
-  patientId   Int
-  patient     Patient   @relation(fields: [patientId], references: [id])
+  patientId Int
+  patient   Patient @relation(fields: [patientId], references: [id])
 
   exercices          ExerciceProgramme[]
   chatSessions       ChatSession[]
@@ -172,35 +180,35 @@ model Programme {
 }
 
 model ExerciceProgramme {
-  id               Int             @id @default(autoincrement())
-  programme        Programme       @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  id               Int            @id @default(autoincrement())
+  programme        Programme      @relation(fields: [programmeId], references: [id], onDelete: Cascade)
   programmeId      Int
   exerciceModele   ExerciceModele @relation(fields: [exerciceModeleId], references: [id])
   exerciceModeleId Int
 
-  series           Int
-  repetitions      Int
-  pause            Int         // en secondes
-  tempsTravail     Int?        @default(0)  // temps de travail en secondes (optionnel)
-  consigne         String
+  series       Int
+  repetitions  Int
+  pause        Int // en secondes
+  tempsTravail Int?   @default(0) // temps de travail en secondes (optionnel)
+  consigne     String
 
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ChatSession {
-  id          Int      @id @default(autoincrement())
-  message     String   // Le contenu du message
-  role        ChatRole // Qui a envoyé le message
-  createdAt   DateTime @default(now())
-  
+  id        Int      @id @default(autoincrement())
+  message   String // Le contenu du message
+  role      ChatRole // Qui a envoyé le message
+  createdAt DateTime @default(now())
+
   // Relations avec le patient ET le programme
-  patientId   Int
-  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  
+  patientId Int
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
   programmeId Int
   programme   Programme @relation(fields: [programmeId], references: [id], onDelete: Cascade)
-  
+
   // Index pour optimiser les requêtes
   @@index([patientId, programmeId])
   @@index([programmeId])
@@ -208,93 +216,91 @@ model ChatSession {
 }
 
 model SessionValidation {
-  id           Int       @id @default(autoincrement())
-  date         DateTime  @db.Date // Date de la séance (YYYY-MM-DD)
-  isValidated  Boolean   @default(false)
-  validatedAt  DateTime? // Moment exact de la validation
-  
+  id          Int       @id @default(autoincrement())
+  date        DateTime  @db.Date // Date de la séance (YYYY-MM-DD)
+  isValidated Boolean   @default(false)
+  validatedAt DateTime? // Moment exact de la validation
+
   // Métriques
-  painLevel       Int?    // Douleur de 0 à 10 (null si pas encore validé)
-  difficultyLevel Int?    // Difficulté de 0 à 10 (null si pas encore validé)
-  
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  
+  painLevel       Int? // Douleur de 0 à 10 (null si pas encore validé)
+  difficultyLevel Int? // Difficulté de 0 à 10 (null si pas encore validé)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  patientId    Int
-  patient      Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  
-  programmeId  Int
-  programme    Programme @relation(fields: [programmeId], references: [id], onDelete: Cascade)
-  
+  patientId Int
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  programmeId Int
+  programme   Programme @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+
   // Contraintes : Un patient ne peut valider qu'une fois par jour pour un programme donné
   @@unique([patientId, programmeId, date])
-  
   // Index pour optimiser les requêtes
   @@index([date, programmeId]) // Pour récupérer l'adhérence par date/programme
-  @@index([patientId, date])   // Pour récupérer l'historique d'un patient
-  @@index([programmeId])       // Pour stats globales d'un programme
-  
+  @@index([patientId, date]) // Pour récupérer l'historique d'un patient
+  @@index([programmeId]) // Pour stats globales d'un programme
   @@map("session_validations")
 }
 
 // ========== NOUVELLES TABLES IA ==========
 
 model ChatIaBasique {
-  id          Int      @id @default(autoincrement())
-  message     String   // Question du kiné
-  response    String   // Réponse de l'IA
-  createdAt   DateTime @default(now())
-  
+  id        Int      @id @default(autoincrement())
+  message   String // Question du kiné
+  response  String // Réponse de l'IA
+  createdAt DateTime @default(now())
+
   // Relation avec le kiné
-  kineId      Int
-  kine        Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
-  
+  kineId Int
+  kine   Kine @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
   // Index pour optimiser les requêtes par kiné et date
   @@index([kineId, createdAt])
   @@map("chat_ia_basique")
 }
 
 model ChatIaBiblio {
-  id          Int      @id @default(autoincrement())
-  message     String   // Question du kiné
-  response    String   // Réponse de l'IA
-  createdAt   DateTime @default(now())
-  
+  id        Int      @id @default(autoincrement())
+  message   String // Question du kiné
+  response  String // Réponse de l'IA
+  createdAt DateTime @default(now())
+
   // Relation avec le kiné
-  kineId      Int
-  kine        Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
-  
+  kineId Int
+  kine   Kine @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
   // Index pour optimiser les requêtes par kiné et date
   @@index([kineId, createdAt])
   @@map("chat_ia_biblio")
 }
 
 model ChatIaClinique {
-  id          Int      @id @default(autoincrement())
-  message     String   // Question du kiné
-  response    String   // Réponse de l'IA
-  createdAt   DateTime @default(now())
-  
+  id        Int      @id @default(autoincrement())
+  message   String // Question du kiné
+  response  String // Réponse de l'IA
+  createdAt DateTime @default(now())
+
   // Relation avec le kiné
-  kineId      Int
-  kine        Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
-  
+  kineId Int
+  kine   Kine @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
   // Index pour optimiser les requêtes par kiné et date
   @@index([kineId, createdAt])
   @@map("chat_ia_clinique")
 }
 
 model ChatIaAdministrative {
-  id          Int      @id @default(autoincrement())
-  message     String   // Question du kiné
-  response    String   // Réponse de l'IA
-  createdAt   DateTime @default(now())
-  
+  id        Int      @id @default(autoincrement())
+  message   String // Question du kiné
+  response  String // Réponse de l'IA
+  createdAt DateTime @default(now())
+
   // Relation avec le kiné
-  kineId      Int
-  kine        Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
-  
+  kineId Int
+  kine   Kine @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
   // Index pour optimiser les requêtes par kiné et date
   @@index([kineId, createdAt])
   @@map("chat_ia_administrative")
@@ -303,95 +309,94 @@ model ChatIaAdministrative {
 // ==========================================
 
 model Notification {
-  id          Int              @id @default(autoincrement())
-  type        NotificationType // Type de notification
-  title       String           // Titre court
-  message     String           // Message descriptif
-  isRead      Boolean          @default(false)
-  createdAt   DateTime         @default(now())
-  
+  id        Int              @id @default(autoincrement())
+  type      NotificationType // Type de notification
+  title     String // Titre court
+  message   String // Message descriptif
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
   // Relation obligatoire avec le kiné
-  kineId      Int
-  kine        Kine             @relation(fields: [kineId], references: [id], onDelete: Cascade)
-  
+  kineId Int
+  kine   Kine @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
   // Relations optionnelles pour le contexte
-  patientId   Int?
-  patient     Patient?         @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  
+  patientId Int?
+  patient   Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
   programmeId Int?
-  programme   Programme?       @relation(fields: [programmeId], references: [id], onDelete: Cascade)
-  
+  programme   Programme? @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+
   // Métadonnées JSON pour infos supplémentaires
-  metadata    Json?            // Ex: { "painLevel": 8, "difficultyLevel": 7, "validationDate": "2025-01-15" }
-  
+  metadata Json? // Ex: { "painLevel": 8, "difficultyLevel": 7, "validationDate": "2025-01-15" }
+
   // Index pour optimiser les requêtes
-  @@index([kineId, isRead])    // Pour récupérer les notifications d'un kiné par statut
+  @@index([kineId, isRead]) // Pour récupérer les notifications d'un kiné par statut
   @@index([kineId, createdAt]) // Pour trier par date
-  @@index([type])              // Pour filtrer par type
-  
+  @@index([type]) // Pour filtrer par type
   @@map("notifications")
 }
 
 // ========== NOUVEAUX ENUMS STRIPE ==========
 enum PlanType {
   FREE
-  DECLIC    // 9€/mois - 1 chatbot + IA conversationnel
-  PRATIQUE  // 19€/mois - 3 chatbots + IA conversationnel + biblio + clinique
-  PIONNIER  // 20€/mois - Plan Expert à prix réduit (limité à 100 places)
-  EXPERT    // 59€/mois - Chatbots illimités + tous les assistants
-  
+  DECLIC // 9€/mois - 1 chatbot + IA conversationnel
+  PRATIQUE // 19€/mois - 3 chatbots + IA conversationnel + biblio + clinique
+  PIONNIER // 20€/mois - Plan Expert à prix réduit (limité à 100 places)
+  EXPERT // 59€/mois - Chatbots illimités + tous les assistants
+
   @@map("plan_type")
 }
 
 enum SubscriptionStatus {
-  ACTIVE              // Abonnement actif
-  CANCELED            // Annulé (mais encore actif jusqu'à la fin de période)
-  PAST_DUE           // Impayé
-  UNPAID             // Non payé
-  INCOMPLETE         // Paiement incomplet
+  ACTIVE // Abonnement actif
+  CANCELED // Annulé (mais encore actif jusqu'à la fin de période)
+  PAST_DUE // Impayé
+  UNPAID // Non payé
+  INCOMPLETE // Paiement incomplet
   INCOMPLETE_EXPIRED // Paiement incomplet expiré
-  TRIALING           // En période d'essai
-  PAUSED             // Suspendu
-  
+  TRIALING // En période d'essai
+  PAUSED // Suspendu
+
   @@map("subscription_status")
 }
+
 // ==========================================
 
 model RgpdExport {
-  id           Int      @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   kineId       Int
-  kine         Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
-  exportToken  String   @unique
-  generatedAt  DateTime @default(now())
+  kine         Kine      @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  exportToken  String    @unique
+  generatedAt  DateTime  @default(now())
   downloadedAt DateTime?
   expiresAt    DateTime
-  fileSize     Int?     // Taille du fichier en bytes
-  isValid      Boolean  @default(true)
-  
+  fileSize     Int? // Taille du fichier en bytes
+  isValid      Boolean   @default(true)
+
   // Métadonnées pour audit
-  ipAddress    String?
-  userAgent    String?
-  
+  ipAddress String?
+  userAgent String?
+
   // Index pour optimiser les requêtes
   @@index([kineId, generatedAt])
   @@index([exportToken])
   @@index([expiresAt])
-  
   @@map("rgpd_exports")
 }
 
 enum NotificationType {
-  DAILY_VALIDATION    // Patient valide une journée
-  PROGRAM_COMPLETED   // Programme terminé
-  PAIN_ALERT         // Niveau douleur élevé (≥7)
-  
+  DAILY_VALIDATION // Patient valide une journée
+  PROGRAM_COMPLETED // Programme terminé
+  PAIN_ALERT // Niveau douleur élevé (≥7)
+
   @@map("notification_type")
 }
 
 enum ChatRole {
-  USER      // Message du patient
+  USER // Message du patient
   ASSISTANT // Réponse de l'IA
-  SYSTEM    // Messages système (bienvenue, etc.)
+  SYSTEM // Messages système (bienvenue, etc.)
 
   @@map("chat_role")
 }
@@ -399,15 +404,15 @@ enum ChatRole {
 // ========== TABLES IA ADMINISTRATIVE ==========
 
 model AdminTemplate {
-  id          Int      @id @default(autoincrement())
-  title       String   @db.VarChar(255)            // Titre du template
-  category    String   @db.VarChar(100)            // Catégorie
-  subject     String?  @db.VarChar(255)            // Objet email suggéré
-  body        String   @db.Text                    // Contenu avec variables [...]
-  tags        String[] @default([])                // Tags pour recherche
-  usageCount  Int      @default(0)                 // Compteur utilisation
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  title      String   @db.VarChar(255) // Titre du template
+  category   String   @db.VarChar(100) // Catégorie
+  subject    String?  @db.VarChar(255) // Objet email suggéré
+  body       String   @db.Text // Contenu avec variables [...]
+  tags       String[] @default([]) // Tags pour recherche
+  usageCount Int      @default(0) // Compteur utilisation
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   // Relations
   templatesSentHistory TemplateSentHistory[]
@@ -419,27 +424,27 @@ model AdminTemplate {
 }
 
 model TemplateSentHistory {
-  id              Int      @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
   // Relations
-  kineId          Int
-  kine            Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  kineId Int
+  kine   Kine @relation(fields: [kineId], references: [id], onDelete: Cascade)
 
-  patientId       Int
-  patient         Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId Int
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
-  templateId      Int
-  template        AdminTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId Int
+  template   AdminTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   // Données de l'envoi
-  templateTitle   String   @db.VarChar(255)        // Titre template (copie pour historique)
-  subject         String   @db.VarChar(255)        // Objet email final
-  body            String   @db.Text                // Contenu final personnalisé
-  patientEmail    String?  @db.VarChar(255)        // Email patient (si email)
-  patientPhone    String?  @db.VarChar(20)         // Téléphone patient (si WhatsApp)
-  method          CommunicationMethod @default(EMAIL) // Méthode d'envoi
+  templateTitle String              @db.VarChar(255) // Titre template (copie pour historique)
+  subject       String              @db.VarChar(255) // Objet email final
+  body          String              @db.Text // Contenu final personnalisé
+  patientEmail  String?             @db.VarChar(255) // Email patient (si email)
+  patientPhone  String?             @db.VarChar(20) // Téléphone patient (si WhatsApp)
+  method        CommunicationMethod @default(EMAIL) // Méthode d'envoi
 
-  sentAt          DateTime @default(now())
+  sentAt DateTime @default(now())
 
   // Index pour historique
   @@index([kineId, sentAt])
@@ -456,3 +461,54 @@ enum CommunicationMethod {
 }
 
 // =============================================
+
+// ========== SYSTÈME DE PARRAINAGE ==========
+
+model Referral {
+  id Int @id @default(autoincrement())
+
+  // Parrain (celui qui parraine)
+  referrerId Int
+  referrer   Kine @relation("ReferrerReferrals", fields: [referrerId], references: [id], onDelete: Cascade)
+
+  // Filleul (celui qui est parrainé) - unique car on ne peut être parrainé qu'une fois
+  refereeId Int  @unique
+  referee   Kine @relation("RefereeReferral", fields: [refereeId], references: [id], onDelete: Cascade)
+
+  // Détails du parrainage
+  planSubscribed PlanType // Plan souscrit par le filleul
+  creditAmount   Float // Montant du crédit en euros (prix du plan)
+
+  // Statut du parrainage
+  status ReferralStatus @default(PENDING)
+
+  // Tracking des crédits appliqués
+  referrerCredited Boolean   @default(false) // Parrain a reçu son crédit
+  refereeCredited  Boolean   @default(false) // Filleul a reçu son crédit
+  creditedAt       DateTime? // Date d'application des crédits
+
+  // Métadonnées anti-fraude
+  refereeEmail String // Email du filleul au moment du parrainage
+  refereeIp    String? // IP du filleul (optionnel)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Index pour optimiser les requêtes
+  @@index([referrerId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("referrals")
+}
+
+enum ReferralStatus {
+  PENDING // En attente du 1er renouvellement du filleul
+  COMPLETED // Crédits appliqués aux deux parties
+  CANCELED // Filleul a annulé avant le renouvellement
+  EXPIRED // Délai dépassé sans renouvellement
+  FRAUD // Marqué comme fraude (auto-parrainage détecté)
+
+  @@map("referral_status")
+}
+
+// ============================================

@@ -17,9 +17,10 @@ class StripeService {
    * @param {string} planType - Type de plan (DECLIC, PRATIQUE, etc.)
    * @param {string} successUrl - URL de succès
    * @param {string} cancelUrl - URL d'annulation
+   * @param {string} referralCode - Code de parrainage (optionnel)
    * @returns {Promise<Object>} - Session de checkout
    */
-  async createCheckoutSession(kineId, planType, successUrl, cancelUrl) {
+  async createCheckoutSession(kineId, planType, successUrl, cancelUrl, referralCode = null) {
     try {
       // Récupérer le kiné pour créer/récupérer le customer
       const prisma = prismaService.getInstance();
@@ -95,13 +96,15 @@ class StripeService {
         metadata: {
           kineId: kineId.toString(),
           planType: planType,
-          source: 'kineai_paywall'
+          source: 'kineai_paywall',
+          ...(referralCode && { referralCode: referralCode }) // Code parrainage si présent
         },
         subscription_data: {
           metadata: {
             kineId: kineId.toString(),
             planType: planType,
-            source: 'kineai_paywall'
+            source: 'kineai_paywall',
+            ...(referralCode && { referralCode: referralCode })
           }
         },
         allow_promotion_codes: true,
@@ -427,6 +430,130 @@ class StripeService {
       throw new Error('Impossible de récupérer l\'abonnement');
     }
   }
+
+  // ========== MÉTHODES PARRAINAGE ==========
+
+  /**
+   * Obtenir le prix d'un plan en centimes
+   * @param {string} planType - Type de plan
+   * @returns {number} - Prix en centimes (ex: 999 pour 9.99€)
+   */
+  getPlanPriceInCents(planType) {
+    const priceMap = {
+      'DECLIC': 999,      // 9.99€
+      'PRATIQUE': 1999,   // 19.99€
+      'PIONNIER': 2000,   // 20.00€
+      'EXPERT': 5999      // 59.99€
+    };
+    return priceMap[planType] || 0;
+  }
+
+  /**
+   * Appliquer un crédit de parrainage sur le compte client Stripe
+   * Le crédit sera automatiquement déduit de la prochaine facture
+   * @param {string} customerId - ID client Stripe
+   * @param {number} amountInCents - Montant en centimes (négatif = crédit)
+   * @param {string} description - Description du crédit
+   * @returns {Promise<Object>} - Transaction de balance
+   */
+  async applyReferralCredit(customerId, amountInCents, description) {
+    try {
+      if (!customerId) {
+        throw new Error('Customer ID requis');
+      }
+
+      if (amountInCents <= 0) {
+        throw new Error('Le montant doit être positif');
+      }
+
+      // Créer une transaction de crédit (montant négatif = crédit pour le client)
+      const balanceTransaction = await this.stripe.customers.createBalanceTransaction(
+        customerId,
+        {
+          amount: -amountInCents, // Négatif pour créditer le client
+          currency: 'eur',
+          description: description
+        }
+      );
+
+      logger.info(`💰 Crédit parrainage appliqué: ${amountInCents / 100}€ pour customer ${customerId}`);
+      return balanceTransaction;
+
+    } catch (error) {
+      logger.error('Erreur application crédit parrainage:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupérer le solde créditeur d'un client
+   * @param {string} customerId - ID client Stripe
+   * @returns {Promise<number>} - Solde en centimes (négatif = crédit disponible)
+   */
+  async getCustomerBalance(customerId) {
+    try {
+      const customer = await this.stripe.customers.retrieve(customerId);
+      return customer.balance; // Négatif = crédit disponible
+    } catch (error) {
+      logger.error('Erreur récupération balance client:', error.message);
+      return 0;
+    }
+  }
+
+  /**
+   * Vérifier si un email est un email jetable/temporaire
+   * @param {string} email - Email à vérifier
+   * @returns {boolean} - true si email jetable
+   */
+  isDisposableEmail(email) {
+    const disposableDomains = [
+      'tempmail.com', 'guerrillamail.com', 'mailinator.com', 'throwaway.email',
+      'temp-mail.org', 'fakeinbox.com', 'getnada.com', 'maildrop.cc',
+      'yopmail.com', 'trashmail.com', '10minutemail.com', 'mohmal.com',
+      'tempail.com', 'emailondeck.com', 'tempr.email', 'dispostable.com',
+      'mailnesia.com', 'spamgourmet.com', 'mytrashmail.com', 'mt2009.com',
+      'thankyou2010.com', 'trash2009.com', 'sharklasers.com', 'grr.la',
+      'guerrillamailblock.com', 'pokemail.net', 'spam4.me'
+    ];
+
+    const domain = email.split('@')[1]?.toLowerCase();
+    return disposableDomains.includes(domain);
+  }
+
+  /**
+   * Vérifier si deux emails sont potentiellement de la même personne
+   * (alias Gmail, même domaine pro, etc.)
+   * @param {string} email1 - Premier email
+   * @param {string} email2 - Deuxième email
+   * @returns {boolean} - true si potentiellement même personne
+   */
+  areEmailsSuspicious(email1, email2) {
+    const e1 = email1.toLowerCase();
+    const e2 = email2.toLowerCase();
+
+    // Même email exact
+    if (e1 === e2) return true;
+
+    const [local1, domain1] = e1.split('@');
+    const [local2, domain2] = e2.split('@');
+
+    // Alias Gmail (jean.dupont+ref@gmail.com === jeandupont@gmail.com)
+    const freeProviders = ['gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'yahoo.com'];
+    if (freeProviders.includes(domain1) && domain1 === domain2) {
+      // Normaliser les locaux Gmail (supprimer les points et les +tag)
+      const normalize = (local) => local.split('+')[0].replace(/\./g, '');
+      if (normalize(local1) === normalize(local2)) return true;
+    }
+
+    // Même domaine professionnel (pas les providers gratuits)
+    if (!freeProviders.includes(domain1) && domain1 === domain2) {
+      return true; // Même entreprise = suspect
+    }
+
+    return false;
+  }
+
+  // ==========================================
 
   /**
    * Valider une IP Stripe avec debug détaillé

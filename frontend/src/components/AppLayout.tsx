@@ -1078,7 +1078,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { href: '/dashboard/kine/chatbot-biblio', label: 'IA Bibliographique', icon: BookOpen, disabled: false },
         { href: '/dashboard/kine/chatbot-clinique', label: 'IA Clinique', icon: Stethoscope, disabled: false },
         { href: '/dashboard/kine/chatbot-admin', label: 'IA Administrative', icon: FileText, disabled: false },
-        { href: '/dashboard/kine/analytics', label: 'Statistiques', icon: BarChart2, disabled: false },
+        { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, disabled: false },
         { href: '/dashboard/kine/public-programs', label: 'Programmes Publics (Bientôt)', icon: Share2, disabled: false },
         { href: '/dashboard/kine/blog', label: 'Blog Pro (Bientôt)', icon: Library, disabled: false },
         { href: '/dashboard/kine/jobs', label: 'Annonces Emploi (Bientôt)', icon: Briefcase, disabled: false },

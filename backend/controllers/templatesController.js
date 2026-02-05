@@ -1,7 +1,66 @@
 const logger = require('../utils/logger');
 const prismaService = require('../services/prismaService');
+const gcsStorageService = require('../services/gcsStorageService');
 
 // 🔐 Toutes les routes supposent que req.uid est défini par le middleware authenticate
+
+// Helper pour enrichir les exercices des templates avec URLs signées GCS
+const enrichTemplatesWithSignedUrls = async (templates) => {
+  if (!templates || !Array.isArray(templates)) return templates;
+
+  return await Promise.all(templates.map(async (template) => {
+    if (!template.items) return template;
+
+    const enrichedItems = await Promise.all(template.items.map(async (item) => {
+      if (item.exerciceModele?.gifPath) {
+        const gifUrl = await gcsStorageService.generateSignedUrl(item.exerciceModele.gifPath);
+        return {
+          ...item,
+          exerciceModele: {
+            ...item.exerciceModele,
+            gifUrl
+          }
+        };
+      }
+      return {
+        ...item,
+        exerciceModele: {
+          ...item.exerciceModele,
+          gifUrl: null
+        }
+      };
+    }));
+
+    return { ...template, items: enrichedItems };
+  }));
+};
+
+// Helper pour enrichir un seul template
+const enrichTemplateWithSignedUrls = async (template) => {
+  if (!template || !template.items) return template;
+
+  const enrichedItems = await Promise.all(template.items.map(async (item) => {
+    if (item.exerciceModele?.gifPath) {
+      const gifUrl = await gcsStorageService.generateSignedUrl(item.exerciceModele.gifPath);
+      return {
+        ...item,
+        exerciceModele: {
+          ...item.exerciceModele,
+          gifUrl
+        }
+      };
+    }
+    return {
+      ...item,
+      exerciceModele: {
+        ...item.exerciceModele,
+        gifUrl: null
+      }
+    };
+  }));
+
+  return { ...template, items: enrichedItems };
+};
 
 // Récupérer tous les templates (publics + privés du kiné)
 exports.getAllTemplates = async (req, res) => {
@@ -34,7 +93,7 @@ exports.getAllTemplates = async (req, res) => {
                 nom: true,
                 description: true,
                 tags: true,
-                gifUrl: true,
+                gifPath: true,
                 isPublic: true
               }
             }
@@ -49,7 +108,9 @@ exports.getAllTemplates = async (req, res) => {
       }
     });
 
-    res.json(templates);
+    // Enrichir avec URLs signées GCS
+    const enrichedTemplates = await enrichTemplatesWithSignedUrls(templates);
+    res.json(enrichedTemplates);
   } catch (err) {
     logger.error("Erreur récupération templates :", err);
     res.status(500).json({ error: "Erreur récupération templates" });
@@ -72,7 +133,7 @@ exports.getPublicTemplates = async (req, res) => {
                 nom: true,
                 description: true,
                 tags: true,
-                gifUrl: true,
+                gifPath: true,
                 isPublic: true
               }
             }
@@ -87,7 +148,9 @@ exports.getPublicTemplates = async (req, res) => {
       }
     });
 
-    res.json(templates);
+    // Enrichir avec URLs signées GCS
+    const enrichedTemplates = await enrichTemplatesWithSignedUrls(templates);
+    res.json(enrichedTemplates);
   } catch (err) {
     logger.error("Erreur récupération templates publics :", err);
     res.status(500).json({ error: "Erreur récupération templates publics" });
@@ -122,7 +185,7 @@ exports.getPrivateTemplates = async (req, res) => {
                 nom: true,
                 description: true,
                 tags: true,
-                gifUrl: true,
+                gifPath: true,
                 isPublic: true
               }
             }
@@ -137,7 +200,9 @@ exports.getPrivateTemplates = async (req, res) => {
       }
     });
 
-    res.json(templates);
+    // Enrichir avec URLs signées GCS
+    const enrichedTemplates = await enrichTemplatesWithSignedUrls(templates);
+    res.json(enrichedTemplates);
   } catch (err) {
     logger.error("Erreur récupération templates privés :", err);
     res.status(500).json({ error: "Erreur récupération templates privés" });
@@ -171,7 +236,7 @@ exports.getTemplateById = async (req, res) => {
                 nom: true,
                 description: true,
                 tags: true,
-                gifUrl: true,
+                gifPath: true,
                 isPublic: true
               }
             }
@@ -192,7 +257,9 @@ exports.getTemplateById = async (req, res) => {
       return res.status(403).json({ error: "Non autorisé à accéder à ce template" });
     }
 
-    res.json(template);
+    // Enrichir avec URLs signées GCS
+    const enrichedTemplate = await enrichTemplateWithSignedUrls(template);
+    res.json(enrichedTemplate);
   } catch (err) {
     logger.error("Erreur récupération template :", err);
     res.status(500).json({ error: "Erreur récupération template" });
@@ -248,7 +315,7 @@ exports.createTemplate = async (req, res) => {
                 nom: true,
                 description: true,
                 tags: true,
-                gifUrl: true,
+                gifPath: true,
                 isPublic: true
               }
             }
@@ -260,8 +327,10 @@ exports.createTemplate = async (req, res) => {
       }
     });
 
+    // Enrichir avec URLs signées GCS
+    const enrichedTemplate = await enrichTemplateWithSignedUrls(newTemplate);
     logger.info(`Template créé: ${newTemplate.id} par kiné ${kine.id}`);
-    res.status(201).json(newTemplate);
+    res.status(201).json(enrichedTemplate);
   } catch (err) {
     logger.error("Erreur création template :", err);
     res.status(500).json({ error: "Erreur création template" });
@@ -332,7 +401,7 @@ exports.updateTemplate = async (req, res) => {
                   nom: true,
                   description: true,
                   tags: true,
-                  gifUrl: true,
+                  gifPath: true,
                   isPublic: true
                 }
               }
@@ -345,8 +414,10 @@ exports.updateTemplate = async (req, res) => {
       });
     });
 
+    // Enrichir avec URLs signées GCS
+    const enrichedTemplate = await enrichTemplateWithSignedUrls(updated);
     logger.info(`Template modifié: ${id} par kiné ${kine.id}`);
-    res.json(updated);
+    res.json(enrichedTemplate);
   } catch (err) {
     logger.error("Erreur modification template :", err);
     res.status(500).json({ error: "Erreur modification template" });
