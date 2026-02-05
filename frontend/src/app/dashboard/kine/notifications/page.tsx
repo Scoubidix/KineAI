@@ -408,10 +408,10 @@ export default function KineNotificationsPage() {
                     className={`p-4 rounded-md border transition-colors ${
                       notification.type === 'PROGRAM_COMPLETED'
                         ? notification.isRead
-                          ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 shadow-sm'
-                          : 'bg-gradient-to-r from-green-100 to-emerald-100 border-green-400 shadow-md font-medium'
-                        : notification.isRead 
-                          ? 'bg-card border-border' 
+                          ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-300 dark:border-green-700 shadow-sm'
+                          : 'bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40 border-green-400 dark:border-green-600 shadow-md font-medium'
+                        : notification.isRead
+                          ? 'bg-card border-border'
                           : 'bg-accent/10 border-accent font-medium'
                     }`}
                   >
@@ -419,9 +419,9 @@ export default function KineNotificationsPage() {
                       <div className="flex items-center gap-2">
                         <span className={`text-sm font-semibold ${
                           notification.type === 'PROGRAM_COMPLETED'
-                            ? 'text-green-700'
-                            : notification.isRead 
-                              ? 'text-foreground' 
+                            ? 'text-green-700 dark:text-green-400'
+                            : notification.isRead
+                              ? 'text-foreground'
                               : 'text-accent'
                         }`}>
                           {getNotificationIcon(notification.type)}
@@ -470,15 +470,15 @@ export default function KineNotificationsPage() {
                       
                       {/* 🔧 FIX: Nouvelle version pour PROGRAM_COMPLETED avec style amélioré */}
                       {notification.type === 'PROGRAM_COMPLETED' && notification.metadata?.adherenceText && (
-                        <div className="bg-gradient-to-r from-green-100 to-emerald-100 p-3 rounded-md border border-green-300 shadow-sm">
-                          <p className="text-green-800 font-semibold text-base">
+                        <div className="bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 p-3 rounded-md border border-green-300 dark:border-green-700 shadow-sm">
+                          <p className="text-green-800 dark:text-green-300 font-semibold text-base">
                             🎉 {notification.metadata.adherenceText}
                           </p>
                         </div>
                       )}
                       
                       {notification.type === 'DAILY_VALIDATION' && notification.metadata && (
-                        <div className="bg-blue-50 p-2 rounded border border-blue-200">
+                        <div className="bg-blue-50 dark:bg-blue-900/30 p-2 rounded border border-blue-200 dark:border-blue-700">
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             {notification.metadata.painLevel !== undefined && (
                               <span>Douleur: {notification.metadata.painLevel}/10</span>

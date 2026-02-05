@@ -24,7 +24,7 @@ export default function TestToken() {
     <div className="p-4">
       <h1 className="text-xl font-bold mb-2">Firebase ID Token</h1>
       {token ? (
-        <pre className="bg-gray-100 p-2 text-sm break-all">{token}</pre>
+        <pre className="bg-gray-100 dark:bg-gray-800 p-2 text-sm break-all">{token}</pre>
       ) : (
         <p className="text-red-500">Aucun utilisateur connecté.</p>
       )}

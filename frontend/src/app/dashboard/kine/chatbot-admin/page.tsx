@@ -469,24 +469,20 @@ export default function KineChatbotAdminPage() {
         />
 
         {/* Header */}
-        <div className="mb-6">
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FileText className="text-purple-600 h-6 w-6" />
-                  IA Administrative
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span className="text-sm text-green-600 font-medium">Système actif</span>
-                </div>
-              </CardTitle>
-              <CardDescription>
-                Sélectionnez un template, choisissez un patient, personnalisez et envoyez par email ou WhatsApp
-              </CardDescription>
-            </CardHeader>
-          </Card>
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FileText className="text-white h-7 w-7" />
+              <div>
+                <h2 className="text-xl font-semibold text-white">IA Administrative</h2>
+                <p className="text-blue-100 text-sm">Sélectionnez un template, choisissez un patient, personnalisez et envoyez par email ou WhatsApp</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1">
+              <CheckCircle className="w-4 h-4 text-green-300" />
+              <span className="text-sm text-white font-medium">Système actif</span>
+            </div>
+          </div>
         </div>
 
         {/* Zone principale */}

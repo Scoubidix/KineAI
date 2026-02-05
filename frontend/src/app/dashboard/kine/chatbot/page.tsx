@@ -357,23 +357,21 @@ export default function KineChatbotPage() {
         
         {/* Header */}
         <div className="mb-6">
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Wand2 className="text-accent h-6 w-6" />
-                  Assistant IA Personnel
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-sm p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Wand2 className="text-white h-7 w-7" />
+                <div>
+                  <h2 className="text-xl font-semibold text-white">Assistant IA Personnel</h2>
+                  <p className="text-blue-100 text-sm">Assistant IA avec base de connaissances spécialisée - Historique conservé 5 jours</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span className="text-sm text-green-600 font-medium">Connecté</span>
-                </div>
-              </CardTitle>
-              <CardDescription>
-                Assistant IA avec base de connaissances spécialisée - Historique conservé 5 jours
-              </CardDescription>
-            </CardHeader>
-          </Card>
+              </div>
+              <div className="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1">
+                <CheckCircle className="w-4 h-4 text-green-300" />
+                <span className="text-sm text-white font-medium">Connecté</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Zone de chat principale */}

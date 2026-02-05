@@ -386,11 +386,11 @@ export default function KineHomePage() {
 
           {/* Notifications urgentes - Version simplifiée */}
           {unreadCount > 0 && (
-            <Card className="shadow-md bg-red-50 border-red-200 hover:shadow-lg transition-shadow duration-200 ease-in-out">
+            <Card className="shadow-md bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700 hover:shadow-lg transition-shadow duration-200 ease-in-out">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="flex items-center gap-2 text-red-700 text-lg">
-                  <AlertCircle size={20} /> 
-                  Notifications Urgentes 
+                <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-300 text-lg">
+                  <AlertCircle size={20} />
+                  Notifications Urgentes
                   <Badge variant="destructive" className="ml-2">
                     {unreadCount}
                   </Badge>
@@ -402,7 +402,7 @@ export default function KineHomePage() {
                 </Link>
               </CardHeader>
               <CardContent className="pt-0 pb-4">
-                <p className="text-sm text-red-700">
+                <p className="text-sm text-red-700 dark:text-red-300">
                   {unreadCount === 1
                     ? `Vous avez 1 notification non lue nécessitant votre attention.`
                     : `Vous avez ${unreadCount} notifications non lues nécessitant votre attention.`
@@ -592,7 +592,7 @@ export default function KineHomePage() {
           </Card>
 
           {/* Bouton Feedback Beta */}
-          <Card className="shadow-md hover:shadow-lg transition-shadow duration-200 ease-in-out border-blue-200 bg-blue-50/50">
+          <Card className="shadow-md hover:shadow-lg transition-shadow duration-200 ease-in-out border-blue-200 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/30">
             <CardContent className="pt-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-center sm:text-left">

@@ -279,37 +279,33 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
         />
 
         {/* Header */}
-        <div className="mb-6">
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FileText className="text-purple-600 h-6 w-6" />
-                  Bilan Kiné
-                </div>
-                <div className="flex items-center gap-3">
-                  {(rawNotes || structuredBilan) && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleReset}
-                      className="h-8"
-                    >
-                      <RotateCcw className="h-3 w-3 mr-1" />
-                      Réinitialiser
-                    </Button>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm text-green-600 font-medium">IA Active</span>
-                  </div>
-                </div>
-              </CardTitle>
-              <CardDescription>
-                Transformez vos notes cliniques en vrac en un bilan structuré professionnel
-              </CardDescription>
-            </CardHeader>
-          </Card>
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FileText className="text-white h-7 w-7" />
+              <div>
+                <h2 className="text-xl font-semibold text-white">Bilan Kiné</h2>
+                <p className="text-blue-100 text-sm">Transformez vos notes cliniques en vrac en un bilan structuré professionnel</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {(rawNotes || structuredBilan) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReset}
+                  className="h-8 bg-white/20 border-white/30 text-white hover:bg-white/30"
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Réinitialiser
+                </Button>
+              )}
+              <div className="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1">
+                <CheckCircle className="w-4 h-4 text-green-300" />
+                <span className="text-sm text-white font-medium">IA Active</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Zone principale */}
@@ -366,9 +362,9 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                     </Button>
                   </div>
 
-                  <div className="text-xs text-muted-foreground bg-blue-50 border border-blue-200 rounded p-3">
-                    <p className="font-medium text-blue-800 mb-1">💡 Conseils :</p>
-                    <ul className="space-y-1 text-blue-700">
+                  <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded p-3">
+                    <p className="font-medium text-blue-800 dark:text-blue-300 mb-1">💡 Conseils :</p>
+                    <ul className="space-y-1 text-blue-700 dark:text-blue-300">
                       <li>• Notez vos observations sans vous soucier de la structure</li>
                       <li>• Incluez : anamnèse, tests, mesures, observations</li>
                       <li>• L'IA organisera tout selon la structure professionnelle</li>
@@ -464,9 +460,9 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
 
         {/* Avertissement */}
         <div className="mt-6">
-          <Card className="bg-red-50 border-red-200">
+          <Card className="bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700">
             <CardContent className="p-4">
-              <p className="text-xs text-red-600 font-medium">
+              <p className="text-xs text-red-600 dark:text-red-400 font-medium">
                 ⚠️ L'IA peut faire des erreurs. Vérifiez et complétez le bilan avant utilisation. Ce bilan est généré automatiquement et doit être relu par le kinésithérapeute.
               </p>
             </CardContent>

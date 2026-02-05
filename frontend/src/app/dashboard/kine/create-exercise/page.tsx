@@ -603,11 +603,10 @@ export default function KineCreateExercisePage() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
-                  <DialogHeader className="space-y-3 sticky top-0 bg-white dark:bg-gray-900 pb-4 border-b border-gray-200 dark:border-gray-700">
-                    <DialogTitle className="text-lg sm:text-xl font-semibold">
+                  <DialogHeader className="bg-gradient-to-r from-blue-600 to-purple-600 -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+                    <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
                       {form.id ? 'Modifier l\'exercice' : 'Créer un nouvel exercice'}
                     </DialogTitle>
-                    <div className="h-px bg-gradient-to-r from-blue-500 to-purple-500"></div>
                   </DialogHeader>
                   
                   <div className="space-y-4 sm:space-y-6 py-4">
@@ -644,7 +643,7 @@ export default function KineCreateExercisePage() {
                             value={form.description}
                             onChange={handleInputChange}
                             placeholder="Décrivez l'exercice en détail : position de départ, mouvement, répétitions recommandées, points d'attention..."
-                            className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100 transition-all duration-200 resize-none"
+                            className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-all duration-200 resize-none"
                             rows={6}
                             required
                           />
@@ -700,7 +699,7 @@ export default function KineCreateExercisePage() {
                     </div>
 
                     {/* Section validation */}
-                    <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-white dark:bg-gray-900">
+                    <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
                       <div className="flex flex-col sm:flex-row gap-3">
                         <Button 
                           type="button"
@@ -1074,8 +1073,8 @@ export default function KineCreateExercisePage() {
           }
         }}>
           <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
-            <DialogHeader className="space-y-3 sticky top-0 bg-white dark:bg-gray-900 pb-4 border-b">
-              <DialogTitle className="text-lg sm:text-xl font-semibold">
+            <DialogHeader className="bg-gradient-to-r from-blue-600 to-purple-600 -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+              <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
                 {templateForm.id ? 'Modifier le template' : 'Créer un template'}
               </DialogTitle>
             </DialogHeader>
@@ -1327,7 +1326,7 @@ export default function KineCreateExercisePage() {
                                 setSelectedTemplateExercises(newExercises);
                               }}
                               placeholder="Instructions particulières..."
-                              className="w-full px-3 py-2 text-sm border rounded-md resize-none"
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 resize-none"
                               rows={2}
                             />
                           </div>

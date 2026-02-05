@@ -226,11 +226,10 @@ export default function PatientsPage() {
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
-              <DialogHeader className="space-y-3 sticky top-0 bg-white dark:bg-gray-900 pb-4 border-b border-gray-200 dark:border-gray-700">
-                <DialogTitle className="text-lg sm:text-xl font-semibold">
+              <DialogHeader className="bg-gradient-to-r from-blue-600 to-purple-600 -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+                <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
                   {form.id ? 'Modifier le patient' : 'Créer un nouveau patient'}
                 </DialogTitle>
-                <div className="h-px bg-gradient-to-r from-blue-500 to-purple-500"></div>
               </DialogHeader>
               
               <div className="space-y-4 sm:space-y-6 py-4">
@@ -337,7 +336,7 @@ export default function PatientsPage() {
                       value={form.goals}
                       onChange={(e) => setForm({ ...form, goals: e.target.value })}
                       placeholder="Décrivez les objectifs thérapeutiques, pathologies, zones à traiter..."
-                      className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100 transition-all duration-200 resize-none"
+                      className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-all duration-200 resize-none"
                       rows={3}
                     />
                     <p className="text-xs text-gray-500 dark:text-gray-400">

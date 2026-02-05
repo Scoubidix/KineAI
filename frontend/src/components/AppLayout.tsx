@@ -378,7 +378,7 @@ function SettingsModal() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <SidebarMenuButton tooltip="Paramètres" className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+        <SidebarMenuButton tooltip="Paramètres" className="text-white/90 hover:bg-white/20 hover:text-white">
           <Settings className="h-4 w-4 shrink-0" />
           <span>Paramètres</span>
         </SidebarMenuButton>
@@ -1129,17 +1129,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <Sidebar collapsible="icon" side="left" variant="sidebar" className="bg-sidebar text-sidebar-foreground">
-        <SidebarHeader className="items-center gap-2 border-b border-sidebar-border">
-          <img 
-            src="/logo.jpg" 
-            alt="Mon Assistant Kiné" 
-            className="h-7 w-7 rounded-md object-contain group-data-[state=collapsed]:h-7 group-data-[state=collapsed]:w-7" 
+      <Sidebar collapsible="icon" side="left" variant="sidebar" className="bg-gradient-to-b from-blue-600 to-purple-600 text-white">
+        <SidebarHeader className="items-center gap-2 border-b border-white/20">
+          <img
+            src="/logo.jpg"
+            alt="Mon Assistant Kiné"
+            className="h-7 w-7 rounded-md object-contain group-data-[state=collapsed]:h-7 group-data-[state=collapsed]:w-7"
           />
-          <span className="text-lg font-semibold text-primary group-data-[state=collapsed]:hidden">
+          <span className="text-lg font-semibold text-white group-data-[state=collapsed]:hidden">
             Mon Assistant Kiné
           </span>
-          <SidebarTrigger className="ml-auto" />
+          <SidebarTrigger className="ml-auto text-white hover:bg-white/20" />
         </SidebarHeader>
         <SidebarContent className="p-2">
           <SidebarMenu>
@@ -1155,7 +1155,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   }
                   disabled={item.disabled && item.label.includes('(Bientôt)')}
                   aria-disabled={item.disabled && !item.label.includes('(Bientôt)')}
-                  className={item.disabled && !item.label.includes('(Bientôt)') ? "text-muted-foreground cursor-not-allowed opacity-60" : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"}
+                  className={item.disabled && !item.label.includes('(Bientôt)') ? "text-white/50 cursor-not-allowed opacity-60" : "text-white/90 hover:bg-white/20 hover:text-white data-[active=true]:bg-white/30 data-[active=true]:text-white"}
                 >
                   <Link href={item.href}>
                     <item.icon className="h-4 w-4 shrink-0" />
@@ -1166,13 +1166,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
             ))}
           </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter className="border-t border-sidebar-border p-2">
+        <SidebarFooter className="border-t border-white/20 p-2">
           <SidebarMenu>
             <SidebarMenuItem>
               <SettingsModal />
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Déconnexion" onClick={handleLogout} className="text-destructive hover:bg-destructive/10 hover:text-destructive">
+              <SidebarMenuButton tooltip="Déconnexion" onClick={handleLogout} className="text-red-200 hover:bg-red-500/20 hover:text-red-100">
                 <LogOut className="h-4 w-4 shrink-0" />
                 <span>Déconnexion</span>
               </SidebarMenuButton>

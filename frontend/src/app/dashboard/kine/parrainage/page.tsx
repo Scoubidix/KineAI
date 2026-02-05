@@ -163,15 +163,15 @@ export default function ParrainagePage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PENDING':
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200"><Clock className="h-3 w-3 mr-1" />En attente</Badge>;
+        return <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700"><Clock className="h-3 w-3 mr-1" />En attente</Badge>;
       case 'COMPLETED':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200"><CheckCircle className="h-3 w-3 mr-1" />Validé</Badge>;
+        return <Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700"><CheckCircle className="h-3 w-3 mr-1" />Validé</Badge>;
       case 'CANCELED':
-        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200"><XCircle className="h-3 w-3 mr-1" />Annulé</Badge>;
+        return <Badge variant="outline" className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700"><XCircle className="h-3 w-3 mr-1" />Annulé</Badge>;
       case 'EXPIRED':
-        return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200"><Clock className="h-3 w-3 mr-1" />Expiré</Badge>;
+        return <Badge variant="outline" className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600"><Clock className="h-3 w-3 mr-1" />Expiré</Badge>;
       case 'FRAUD':
-        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200"><AlertCircle className="h-3 w-3 mr-1" />Rejeté</Badge>;
+        return <Badge variant="outline" className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700"><AlertCircle className="h-3 w-3 mr-1" />Rejeté</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -213,13 +213,13 @@ export default function ParrainagePage() {
 
         {/* Erreur d'abonnement */}
         {error && error.includes('abonnement') && (
-          <Card className="border-orange-200 bg-orange-50">
+          <Card className="border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/30">
             <CardContent className="pt-6">
               <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5" />
+                <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5" />
                 <div>
-                  <p className="font-medium text-orange-900">Abonnement requis</p>
-                  <p className="text-sm text-orange-700 mt-1">
+                  <p className="font-medium text-orange-900 dark:text-orange-300">Abonnement requis</p>
+                  <p className="text-sm text-orange-700 dark:text-orange-400 mt-1">
                     Vous devez avoir un abonnement actif pour pouvoir parrainer des confrères.
                   </p>
                 </div>
@@ -342,8 +342,8 @@ export default function ParrainagePage() {
 
             <Separator className="my-4" />
 
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-300">
                 <strong>Le filleul doit entrer le code manuellement</strong> dans le champ "Code de parrainage" lors du checkout (page de paiement Stripe).
               </p>
             </div>
@@ -356,8 +356,8 @@ export default function ParrainagePage() {
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                    <Users className="h-5 w-5 text-blue-600" />
+                  <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{stats.stats.total}</p>
@@ -370,8 +370,8 @@ export default function ParrainagePage() {
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{stats.stats.completed}</p>
@@ -384,8 +384,8 @@ export default function ParrainagePage() {
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
-                    <Euro className="h-5 w-5 text-amber-600" />
+                  <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+                    <Euro className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{stats.stats.totalCreditsEarned}€</p>

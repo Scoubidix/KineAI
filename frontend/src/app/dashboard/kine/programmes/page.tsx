@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -200,6 +200,9 @@ export default function ProgrammesPage() {
   const [selectedExerciseId, setSelectedExerciseId] = useState<string>('');
   const [exerciseSearchQuery, setExerciseSearchQuery] = useState<string>('');
   const [creatingProgramme, setCreatingProgramme] = useState(false);
+
+  // Ref pour scroll automatique vers exercices sélectionnés
+  const selectedExercisesRef = useRef<HTMLDivElement>(null);
 
   // États pour les templates
   const [allTemplates, setAllTemplates] = useState<ExerciceTemplate[]>([]);
@@ -427,6 +430,10 @@ export default function ProgrammesPage() {
     setSelectedExercises([...selectedExercises, ...newExercises]);
     setCheckedExerciseIds([]);
     setShowConfigSection(true);
+    // Scroll vers la section des exercices sélectionnés
+    setTimeout(() => {
+      selectedExercisesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   // Ancienne fonction pour compatibilité (gardée au cas où)
@@ -482,6 +489,10 @@ export default function ProgrammesPage() {
 
     setSelectedExercises([...selectedExercises, ...newExercises]);
     setCheckedTemplateIds([]);
+    // Scroll vers la section des exercices sélectionnés
+    setTimeout(() => {
+      selectedExercisesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const handleInputChange = (index: number, field: keyof ProgrammeExercise, value: string | number) => {
@@ -825,11 +836,11 @@ export default function ProgrammesPage() {
                   const hasActiveProgram = patient.hasActiveProgram;
                   
                   return (
-                    <Card 
-                      key={patient.id} 
+                    <Card
+                      key={patient.id}
                       className={`p-3 transition-colors ${
-                        hasActiveProgram 
-                          ? 'bg-gray-100 cursor-not-allowed opacity-60' 
+                        hasActiveProgram
+                          ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60'
                           : 'cursor-pointer hover:bg-accent'
                       }`}
                       onClick={() => !hasActiveProgram && handleSelectPatient(patient)}
@@ -840,16 +851,16 @@ export default function ProgrammesPage() {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <p className={`font-medium text-sm ${hasActiveProgram ? 'text-gray-500' : ''}`}>
+                            <p className={`font-medium text-sm ${hasActiveProgram ? 'text-gray-500 dark:text-gray-400' : ''}`}>
                               {patient.lastName.toUpperCase()} {patient.firstName}
                             </p>
                             {hasActiveProgram && (
-                              <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
+                              <Badge variant="secondary" className="text-xs bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300">
                                 Programme en cours
                               </Badge>
                             )}
                           </div>
-                          <p className={`text-xs text-muted-foreground ${hasActiveProgram ? 'text-gray-400' : ''}`}>
+                          <p className={`text-xs text-muted-foreground ${hasActiveProgram ? 'text-gray-400 dark:text-gray-500' : ''}`}>
                             {patient.email}
                           </p>
                         </div>
@@ -869,11 +880,10 @@ export default function ProgrammesPage() {
         if (!open) resetCreateForm();
       }}>
         <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
-          <DialogHeader className="space-y-3 sticky top-0 bg-white dark:bg-gray-900 pb-4 border-b border-gray-200 dark:border-gray-700">
-            <DialogTitle className="text-lg sm:text-xl font-semibold">
+          <DialogHeader className="bg-gradient-to-r from-blue-600 to-purple-600 -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+            <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
               Créer un programme pour {selectedPatient?.firstName} {selectedPatient?.lastName}
             </DialogTitle>
-            <div className="h-px bg-gradient-to-r from-blue-500 to-purple-500"></div>
           </DialogHeader>
 
           <div className="space-y-4 sm:space-y-6 py-4">
@@ -901,7 +911,7 @@ export default function ProgrammesPage() {
                 
                 <div className="space-y-2">
                   <Label htmlFor="programme-description" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Description *
+                    Objectifs du programme *
                   </Label>
                   <Textarea
                     id="programme-description"
@@ -1031,34 +1041,50 @@ export default function ProgrammesPage() {
 
                 {/* Liste des exercices/templates avec checkboxes - Hauteur fixe pour stabilité UX */}
                 <div className="flex flex-col h-[480px] border rounded-lg overflow-hidden">
-                  <div className="flex items-center justify-between p-3 border-b bg-gray-50 dark:bg-gray-800 flex-shrink-0">
-                    <Label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <div className="flex items-center justify-between p-3 border-b bg-gray-50 dark:bg-gray-800 flex-shrink-0 gap-2">
+                    <Label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 flex-shrink-0">
                       {typeFilters.includes('templates') ? 'Sélectionner des templates' : 'Sélectionner des exercices'}
                     </Label>
-                    {(typeFilters.includes('templates') ? allTemplates.length > 0 : filteredExercises.length > 0) && (
-                      <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap justify-end">
+                      {(typeFilters.includes('templates') ? checkedTemplateIds.length > 0 : checkedExerciseIds.length > 0) && (
                         <Button
                           type="button"
-                          variant="ghost"
                           size="sm"
-                          onClick={typeFilters.includes('templates') ? () => setCheckedTemplateIds(allTemplates.map(t => t.id)) : handleCheckAll}
-                          className="h-7 text-xs"
+                          onClick={typeFilters.includes('templates') ? handleConfirmTemplateSelection : handleConfirmSelection}
+                          className="h-7 text-xs bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white"
                         >
-                          Tout sélectionner
+                          <Plus className="w-3 h-3 mr-1" />
+                          {typeFilters.includes('templates')
+                            ? `Ajouter (${checkedTemplateIds.length})`
+                            : `Ajouter (${checkedExerciseIds.length})`
+                          }
                         </Button>
-                        {(typeFilters.includes('templates') ? checkedTemplateIds.length > 0 : checkedExerciseIds.length > 0) && (
+                      )}
+                      {(typeFilters.includes('templates') ? allTemplates.length > 0 : filteredExercises.length > 0) && (
+                        <>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={typeFilters.includes('templates') ? () => setCheckedTemplateIds([]) : handleUncheckAll}
+                            onClick={typeFilters.includes('templates') ? () => setCheckedTemplateIds(allTemplates.map(t => t.id)) : handleCheckAll}
                             className="h-7 text-xs"
                           >
-                            Tout désélectionner
+                            Tout sélectionner
                           </Button>
-                        )}
-                      </div>
-                    )}
+                          {(typeFilters.includes('templates') ? checkedTemplateIds.length > 0 : checkedExerciseIds.length > 0) && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={typeFilters.includes('templates') ? () => setCheckedTemplateIds([]) : handleUncheckAll}
+                              className="h-7 text-xs"
+                            >
+                              Tout désélectionner
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex-1 overflow-y-auto">
@@ -1146,27 +1172,11 @@ export default function ProgrammesPage() {
                     )}
                   </div>
 
-                  {/* Bouton sticky en bas de la zone fixe */}
-                  {(typeFilters.includes('templates') ? checkedTemplateIds.length > 0 : checkedExerciseIds.length > 0) && (
-                    <div className="border-t bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 p-3 flex-shrink-0">
-                      <Button
-                        type="button"
-                        onClick={typeFilters.includes('templates') ? handleConfirmTemplateSelection : handleConfirmSelection}
-                        className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white shadow-lg"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        {typeFilters.includes('templates')
-                          ? `Ajouter ${checkedTemplateIds.length} template${checkedTemplateIds.length > 1 ? 's' : ''} sélectionné${checkedTemplateIds.length > 1 ? 's' : ''}`
-                          : `Ajouter ${checkedExerciseIds.length} exercice${checkedExerciseIds.length > 1 ? 's' : ''} sélectionné${checkedExerciseIds.length > 1 ? 's' : ''}`
-                        }
-                      </Button>
-                    </div>
-                  )}
                 </div>
 
                 {/* Exercices sélectionnés */}
                 {selectedExercises.length > 0 && (
-                  <div className="space-y-3">
+                  <div ref={selectedExercisesRef} className="space-y-3">
                     <div className="flex items-center gap-2">
                       <Dumbbell className="w-4 h-4 text-blue-600" />
                       <span className="text-sm font-medium">
@@ -1250,7 +1260,12 @@ export default function ProgrammesPage() {
             </div>
 
             {/* Section validation */}
-            <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-white dark:bg-gray-900">
+            <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
+              {selectedExercises.length > 5 && (
+                <p className="text-sm text-red-500 text-center">
+                  Maximum 5 exercices par programme ({selectedExercises.length} sélectionnés)
+                </p>
+              )}
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button
                   type="button"
@@ -1267,7 +1282,7 @@ export default function ProgrammesPage() {
                 <Button
                   onClick={handleCreateProgramme}
                   className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
-                  disabled={!createTitle || !createDescription || selectedExercises.length === 0 || creatingProgramme || createDuration <= 0 || createDuration > 30}
+                  disabled={!createTitle || !createDescription || selectedExercises.length === 0 || selectedExercises.length > 5 || creatingProgramme || createDuration <= 0 || createDuration > 30}
                 >
                   {creatingProgramme ? (
                     <>

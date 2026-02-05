@@ -356,24 +356,20 @@ export default function KineChatbotCliniquePage() {
         />
         
         {/* Header */}
-        <div className="mb-6">
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Stethoscope className="text-green-600 h-6 w-6" />
-                  IA Clinique
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span className="text-sm text-green-600 font-medium">Connecté</span>
-                </div>
-              </CardTitle>
-              <CardDescription>
-                Spécialisée en raisonnement clinique et aide au diagnostic - Cas cliniques et protocoles thérapeutiques
-              </CardDescription>
-            </CardHeader>
-          </Card>
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Stethoscope className="text-white h-7 w-7" />
+              <div>
+                <h2 className="text-xl font-semibold text-white">IA Clinique</h2>
+                <p className="text-blue-100 text-sm">Spécialisée en raisonnement clinique et aide au diagnostic - Cas cliniques et protocoles thérapeutiques</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1">
+              <CheckCircle className="w-4 h-4 text-green-300" />
+              <span className="text-sm text-white font-medium">Connecté</span>
+            </div>
+          </div>
         </div>
 
         {/* Zone de chat principale */}

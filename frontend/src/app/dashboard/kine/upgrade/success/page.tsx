@@ -132,10 +132,10 @@ function UpgradeSuccessContent() {
   // Couleurs du plan
   const getPlanColors = (planType: string) => {
     const colors = {
-      'DECLIC': { bg: 'bg-gray-50', border: 'border-gray-200', accent: 'text-gray-600' },
-      'PRATIQUE': { bg: 'bg-blue-50', border: 'border-blue-200', accent: 'text-blue-600' },
-      'PIONNIER': { bg: 'bg-purple-50', border: 'border-purple-200', accent: 'text-purple-600' },
-      'EXPERT': { bg: 'bg-amber-50', border: 'border-amber-200', accent: 'text-amber-600' }
+      'DECLIC': { bg: 'bg-gray-50 dark:bg-gray-800', border: 'border-gray-200 dark:border-gray-700', accent: 'text-gray-600 dark:text-gray-400' },
+      'PRATIQUE': { bg: 'bg-blue-50 dark:bg-blue-900/30', border: 'border-blue-200 dark:border-blue-700', accent: 'text-blue-600 dark:text-blue-400' },
+      'PIONNIER': { bg: 'bg-purple-50 dark:bg-purple-900/30', border: 'border-purple-200 dark:border-purple-700', accent: 'text-purple-600 dark:text-purple-400' },
+      'EXPERT': { bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-amber-200 dark:border-amber-700', accent: 'text-amber-600 dark:text-amber-400' }
     };
     return colors[planType as keyof typeof colors] || colors['DECLIC'];
   };
@@ -159,18 +159,18 @@ function UpgradeSuccessContent() {
       <AppLayout>
         <AuthGuard role="kine" />
         <div className="flex items-center justify-center min-h-[400px]">
-          <Card className="max-w-md mx-auto text-center border-red-200 bg-red-50">
+          <Card className="max-w-md mx-auto text-center border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/30">
             <CardHeader>
-              <div className="mx-auto mb-4 p-3 bg-red-100 rounded-full w-fit">
-                <AlertCircle className="h-8 w-8 text-red-600" />
+              <div className="mx-auto mb-4 p-3 bg-red-100 dark:bg-red-900/50 rounded-full w-fit">
+                <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
               </div>
-              <CardTitle className="text-red-900">Erreur de vérification</CardTitle>
-              <CardDescription className="text-red-700">
+              <CardTitle className="text-red-900 dark:text-red-300">Erreur de vérification</CardTitle>
+              <CardDescription className="text-red-700 dark:text-red-400">
                 Une erreur s'est produite lors de la vérification de votre paiement.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-red-700 mb-4">{error}</p>
+              <p className="text-sm text-red-700 dark:text-red-400 mb-4">{error}</p>
               <div className="space-y-2">
                 <Button asChild className="w-full">
                   <Link href="/dashboard/kine/home">
@@ -277,7 +277,7 @@ function UpgradeSuccessContent() {
             <CardContent className="space-y-6">
               {/* Informations de facturation */}
               <div className="flex flex-col items-center gap-6">
-                <div className="w-full flex flex-col items-center text-center gap-3 p-6 bg-white/50 rounded-lg">
+                <div className="w-full flex flex-col items-center text-center gap-3 p-6 bg-white/50 dark:bg-gray-800/50 rounded-lg">
                   <CreditCard className="h-6 w-6 text-accent" />
                   <div>
                     <p className="font-semibold">Montant facturé</p>
@@ -285,7 +285,7 @@ function UpgradeSuccessContent() {
                   </div>
                 </div>
                 
-                <div className="w-full flex items-center justify-center gap-3 p-4 bg-white/50 rounded-lg">
+                <div className="w-full flex items-center justify-center gap-3 p-4 bg-white/50 dark:bg-gray-800/50 rounded-lg">
                   <Calendar className="h-6 w-6 text-accent" />
                   <div>
                     <p className="font-semibold">Prochaine facturation</p>
@@ -300,7 +300,7 @@ function UpgradeSuccessContent() {
               </div>
 
               {/* Fonctionnalités débloquées */}
-              <div className="bg-white/50 rounded-lg p-6">
+              <div className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-6">
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-accent" />
                   Fonctionnalités débloquées
@@ -341,13 +341,13 @@ function UpgradeSuccessContent() {
           </Card>
         ) : (
           // Fallback si l'abonnement n'est pas encore chargé
-          <Card className="border-amber-200 bg-amber-50 shadow-lg mb-8">
+          <Card className="border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/30 shadow-lg mb-8">
             <CardHeader className="text-center">
-              <div className="mx-auto mb-4 p-3 bg-amber-100 rounded-full w-fit">
-                <RefreshCw className="h-8 w-8 text-amber-600 animate-spin" />
+              <div className="mx-auto mb-4 p-3 bg-amber-100 dark:bg-amber-900/50 rounded-full w-fit">
+                <RefreshCw className="h-8 w-8 text-amber-600 dark:text-amber-400 animate-spin" />
               </div>
-              <CardTitle className="text-amber-900">Activation en cours</CardTitle>
-              <CardDescription className="text-amber-700">
+              <CardTitle className="text-amber-900 dark:text-amber-300">Activation en cours</CardTitle>
+              <CardDescription className="text-amber-700 dark:text-amber-400">
                 Votre abonnement est en cours d'activation. Cela peut prendre quelques secondes.
               </CardDescription>
             </CardHeader>
@@ -367,7 +367,7 @@ function UpgradeSuccessContent() {
 
         {/* Informations de session (développement) */}
         {sessionId && process.env.NODE_ENV === 'development' && (
-          <Card className="mt-6 border-gray-200 bg-gray-50">
+          <Card className="mt-6 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
             <CardHeader>
               <CardTitle className="text-sm font-mono">Debug Info</CardTitle>
             </CardHeader>

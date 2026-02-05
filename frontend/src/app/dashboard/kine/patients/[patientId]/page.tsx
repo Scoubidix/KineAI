@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import AppLayout from '@/components/AppLayout';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
@@ -127,6 +127,9 @@ export default function PatientDetailPage() {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [exerciseSearchQuery, setExerciseSearchQuery] = useState<string>('');
   const [checkedExerciseIds, setCheckedExerciseIds] = useState<number[]>([]);
+
+  // Ref pour scroll automatique vers exercices sélectionnés
+  const selectedExercisesRef = useRef<HTMLDivElement>(null);
 
   // États pour les templates
   const [allTemplates, setAllTemplates] = useState<ExerciceTemplate[]>([]);
@@ -293,6 +296,10 @@ export default function PatientDetailPage() {
     });
     setSelectedExercises([...selectedExercises, ...newExercises]);
     setCheckedExerciseIds([]);
+    // Scroll vers la section des exercices sélectionnés
+    setTimeout(() => {
+      selectedExercisesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   // Fonctions de gestion des templates
@@ -328,6 +335,10 @@ export default function PatientDetailPage() {
 
     setSelectedExercises([...selectedExercises, ...newExercises]);
     setCheckedTemplateIds([]);
+    // Scroll vers la section des exercices sélectionnés
+    setTimeout(() => {
+      selectedExercisesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const handleInputChange = (index: number, field: keyof ProgrammeExercise, value: string | number) => {
@@ -566,11 +577,10 @@ export default function PatientDetailPage() {
 
     return (
       <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
-        <DialogHeader className="space-y-3 sticky top-0 bg-white dark:bg-gray-900 pb-4 border-b border-gray-200 dark:border-gray-700">
-          <DialogTitle className="text-lg sm:text-xl font-semibold">
+        <DialogHeader className="bg-gradient-to-r from-blue-600 to-purple-600 -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+          <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
             {modalTitle}
           </DialogTitle>
-          <div className="h-px bg-gradient-to-r from-blue-500 to-purple-500"></div>
         </DialogHeader>
 
         <div className="space-y-4 sm:space-y-6 py-4">
@@ -598,7 +608,7 @@ export default function PatientDetailPage() {
               
               <div className="space-y-2">
                 <Label htmlFor="programme-description" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Description *
+                  Objectifs du programme *
                 </Label>
                 <Textarea
                   id="programme-description"
@@ -728,34 +738,50 @@ export default function PatientDetailPage() {
 
               {/* Liste des exercices/templates avec checkboxes - Hauteur fixe pour stabilité UX */}
               <div className="flex flex-col h-[480px] border rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between p-3 border-b bg-gray-50 dark:bg-gray-800 flex-shrink-0">
-                  <Label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                <div className="flex items-center justify-between p-3 border-b bg-gray-50 dark:bg-gray-800 flex-shrink-0 gap-2">
+                  <Label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 flex-shrink-0">
                     {typeFilters.includes('templates') ? 'Sélectionner des templates' : 'Sélectionner des exercices'}
                   </Label>
-                  {(typeFilters.includes('templates') ? allTemplates.length > 0 : filteredExercises.length > 0) && (
-                    <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap justify-end">
+                    {(typeFilters.includes('templates') ? checkedTemplateIds.length > 0 : checkedExerciseIds.length > 0) && (
                       <Button
                         type="button"
-                        variant="ghost"
                         size="sm"
-                        onClick={typeFilters.includes('templates') ? () => setCheckedTemplateIds(allTemplates.map(t => t.id)) : handleCheckAll}
-                        className="h-7 text-xs"
+                        onClick={typeFilters.includes('templates') ? handleConfirmTemplateSelection : handleConfirmSelection}
+                        className="h-7 text-xs bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white"
                       >
-                        Tout sélectionner
+                        <Plus className="w-3 h-3 mr-1" />
+                        {typeFilters.includes('templates')
+                          ? `Ajouter (${checkedTemplateIds.length})`
+                          : `Ajouter (${checkedExerciseIds.length})`
+                        }
                       </Button>
-                      {(typeFilters.includes('templates') ? checkedTemplateIds.length > 0 : checkedExerciseIds.length > 0) && (
+                    )}
+                    {(typeFilters.includes('templates') ? allTemplates.length > 0 : filteredExercises.length > 0) && (
+                      <>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={typeFilters.includes('templates') ? () => setCheckedTemplateIds([]) : handleUncheckAll}
+                          onClick={typeFilters.includes('templates') ? () => setCheckedTemplateIds(allTemplates.map(t => t.id)) : handleCheckAll}
                           className="h-7 text-xs"
                         >
-                          Tout désélectionner
+                          Tout sélectionner
                         </Button>
-                      )}
-                    </div>
-                  )}
+                        {(typeFilters.includes('templates') ? checkedTemplateIds.length > 0 : checkedExerciseIds.length > 0) && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={typeFilters.includes('templates') ? () => setCheckedTemplateIds([]) : handleUncheckAll}
+                            className="h-7 text-xs"
+                          >
+                            Tout désélectionner
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
@@ -843,27 +869,11 @@ export default function PatientDetailPage() {
                   )}
                 </div>
 
-                {/* Bouton sticky en bas de la zone fixe */}
-                {(typeFilters.includes('templates') ? checkedTemplateIds.length > 0 : checkedExerciseIds.length > 0) && (
-                  <div className="border-t bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 p-3 flex-shrink-0">
-                    <Button
-                      type="button"
-                      onClick={typeFilters.includes('templates') ? handleConfirmTemplateSelection : handleConfirmSelection}
-                      className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white shadow-lg"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      {typeFilters.includes('templates')
-                        ? `Ajouter ${checkedTemplateIds.length} template${checkedTemplateIds.length > 1 ? 's' : ''} sélectionné${checkedTemplateIds.length > 1 ? 's' : ''}`
-                        : `Ajouter ${checkedExerciseIds.length} exercice${checkedExerciseIds.length > 1 ? 's' : ''} sélectionné${checkedExerciseIds.length > 1 ? 's' : ''}`
-                      }
-                    </Button>
-                  </div>
-                )}
               </div>
 
               {/* Exercices sélectionnés */}
               {selectedExercises.length > 0 && (
-                <div className="space-y-3">
+                <div ref={selectedExercisesRef} className="space-y-3">
                   <div className="flex items-center gap-2">
                     <Dumbbell className="w-4 h-4 text-blue-600" />
                     <span className="text-sm font-medium">
@@ -947,7 +957,12 @@ export default function PatientDetailPage() {
           </div>
 
           {/* Section validation */}
-          <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-white dark:bg-gray-900">
+          <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
+            {selectedExercises.length > 5 && (
+              <p className="text-sm text-red-500 text-center">
+                Maximum 5 exercices par programme ({selectedExercises.length} sélectionnés)
+              </p>
+            )}
             <div className="flex flex-col sm:flex-row gap-3">
               <Button 
                 type="button"
@@ -968,7 +983,7 @@ export default function PatientDetailPage() {
               <Button
                 onClick={handleSubmit}
                 className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
-                disabled={!title || !description || selectedExercises.length === 0 || duration <= 0 || duration > 30}
+                disabled={!title || !description || selectedExercises.length === 0 || selectedExercises.length > 5 || duration <= 0 || duration > 30}
               >
                 {buttonText}
               </Button>
@@ -1144,7 +1159,7 @@ export default function PatientDetailPage() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleEditProgramme(programme)}
-                                className="hover:bg-blue-50 hover:border-blue-200"
+                                className="hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-200 dark:hover:border-blue-700"
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
@@ -1154,7 +1169,7 @@ export default function PatientDetailPage() {
                           
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200">
+                              <Button size="sm" variant="outline" className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-200 dark:hover:border-red-700">
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </AlertDialogTrigger>
@@ -1183,19 +1198,19 @@ export default function PatientDetailPage() {
                       {/* Liste des exercices */}
                       {programme.exercices && programme.exercices.length > 0 && (
                         <div className="mb-6">
-                          <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                            <Dumbbell className="w-4 h-4 text-blue-600" />
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+                            <Dumbbell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                             Exercices du programme
                           </h4>
                           <div className="grid gap-3">
                             {programme.exercices.map((exercise: any, exIndex: number) => (
-                              <div key={exercise.id || exIndex} className="p-4 bg-gray-50 border rounded-lg">
+                              <div key={exercise.id || exIndex} className="p-4 bg-gray-50 dark:bg-gray-800 border rounded-lg">
                                 <div className="flex items-start justify-between">
                                   <div className="flex-1">
-                                    <h5 className="font-medium text-gray-900 mb-2">
+                                    <h5 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
                                       {exercise.exerciceModele?.nom || exercise.nom}
                                     </h5>
-                                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-2 flex-wrap">
+                                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-2 flex-wrap">
                                       <Badge variant="outline" className="text-xs">
                                         {exercise.series} série{exercise.series > 1 ? 's' : ''}
                                       </Badge>
@@ -1203,7 +1218,7 @@ export default function PatientDetailPage() {
                                         {exercise.repetitions} rép.
                                       </Badge>
                                       {exercise.tempsTravail > 0 && (
-                                        <Badge variant="outline" className="text-xs bg-blue-50">
+                                        <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-900/30">
                                           {exercise.tempsTravail}s travail
                                         </Badge>
                                       )}
@@ -1212,7 +1227,7 @@ export default function PatientDetailPage() {
                                       </Badge>
                                     </div>
                                     {(exercise.consigne || exercise.instructions) && (
-                                      <p className="text-sm text-gray-700 italic bg-blue-50 p-2 rounded border-l-2 border-blue-200">
+                                      <p className="text-sm text-gray-700 dark:text-gray-300 italic bg-blue-50 dark:bg-blue-900/30 p-2 rounded border-l-2 border-blue-200 dark:border-blue-700">
                                         💡 {exercise.consigne || exercise.instructions}
                                       </p>
                                     )}
@@ -1226,19 +1241,19 @@ export default function PatientDetailPage() {
 
                       {/* Bouton d'envoi du programme */}
                       <div className="border-t pt-4">
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-4">
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
-                              <h4 className="font-medium text-green-800 mb-1">
+                              <h4 className="font-medium text-green-800 dark:text-green-300 mb-1">
                                 Partager avec le patient
                               </h4>
-                              <p className="text-sm text-green-700">
+                              <p className="text-sm text-green-700 dark:text-green-400">
                                 Générez un lien sécurisé pour que votre patient accède à son programme via chat
                               </p>
                             </div>
                             <Button
                               variant="outline"
-                              className="text-green-700 hover:text-green-800 border-green-300 hover:border-green-400 bg-white hover:bg-green-50"
+                              className="text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 border-green-300 dark:border-green-600 hover:border-green-400 dark:hover:border-green-500 bg-white dark:bg-green-900/20 hover:bg-green-50 dark:hover:bg-green-900/40"
                               onClick={() => handleGenerateLink(programme.id)}
                               disabled={generatingLink === programme.id}
                             >
@@ -1270,11 +1285,11 @@ export default function PatientDetailPage() {
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <p className="text-sm text-green-800 mb-3">
+              <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-4">
+                <p className="text-sm text-green-800 dark:text-green-300 mb-3">
                   ✅ Lien sécurisé généré avec succès !
                 </p>
-                <p className="text-xs text-green-700">
+                <p className="text-xs text-green-700 dark:text-green-400">
                   Votre patient pourra accéder à son programme personnalisé et poser ses questions via ce lien.
                 </p>
               </div>
@@ -1288,8 +1303,8 @@ export default function PatientDetailPage() {
                 
                 {/* Statut WhatsApp */}
                 {whatsappStatus === 'idle' && patient?.phone && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm text-blue-800 mb-2">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
+                    <p className="text-sm text-blue-800 dark:text-blue-300 mb-2">
                       📱 Prêt à envoyer à : <strong>{patient.phone}</strong>
                     </p>
                     <Button 
@@ -1313,10 +1328,10 @@ export default function PatientDetailPage() {
                 )}
                 
                 {whatsappStatus === 'sending' && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
                     <div className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                      <p className="text-sm text-blue-800">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+                      <p className="text-sm text-blue-800 dark:text-blue-300">
                         Envoi du message WhatsApp en cours...
                       </p>
                     </div>
@@ -1324,36 +1339,36 @@ export default function PatientDetailPage() {
                 )}
                 
                 {whatsappStatus === 'success' && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                      <p className="text-sm text-green-800 font-medium">
+                      <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <p className="text-sm text-green-800 dark:text-green-300 font-medium">
                         Message WhatsApp envoyé avec succès ! 📱
                       </p>
                     </div>
-                    <p className="text-xs text-green-700">
+                    <p className="text-xs text-green-700 dark:text-green-400">
                       Votre patient va recevoir le lien sur WhatsApp dans quelques instants.
                     </p>
                   </div>
                 )}
                 
                 {whatsappStatus === 'error' && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <AlertCircle className="w-4 h-4 text-red-600" />
-                      <p className="text-sm text-red-800 font-medium">
+                      <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                      <p className="text-sm text-red-800 dark:text-red-300 font-medium">
                         Erreur lors de l'envoi WhatsApp
                       </p>
                     </div>
-                    <p className="text-xs text-red-700 mb-3">
+                    <p className="text-xs text-red-700 dark:text-red-400 mb-3">
                       {whatsappError || 'Une erreur est survenue lors de l\'envoi.'}
                     </p>
-                    <Button 
+                    <Button
                       onClick={handleSendWhatsApp}
                       disabled={sendingWhatsApp}
                       size="sm"
                       variant="outline"
-                      className="text-red-600 border-red-300 hover:bg-red-50"
+                      className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
                     >
                       <MessageCircle className="w-4 h-4 mr-2" />
                       Réessayer
@@ -1362,10 +1377,10 @@ export default function PatientDetailPage() {
                 )}
                 
                 {!patient?.phone && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-700 rounded-lg p-3">
                     <div className="flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-orange-600" />
-                      <p className="text-sm text-orange-800">
+                      <AlertCircle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                      <p className="text-sm text-orange-800 dark:text-orange-300">
                         Numéro de téléphone manquant - WhatsApp indisponible
                       </p>
                     </div>
@@ -1376,7 +1391,7 @@ export default function PatientDetailPage() {
               {/* Section lien manuel */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Lien à partager manuellement :</Label>
-                <div className="p-3 bg-gray-100 rounded-lg border text-sm break-all font-mono">
+                <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg border text-sm break-all font-mono">
                   {generatedLink}
                 </div>
                 <Button 
