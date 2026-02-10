@@ -89,7 +89,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
       const payload = {
         planType,
         successUrl: `${window.location.origin}/dashboard/kine/upgrade/success?upgrade=success`,
-        cancelUrl: `${window.location.origin}/dashboard/kine?upgrade=cancel`,
+        cancelUrl: `${window.location.origin}/dashboard/kine/home`,
         ...(referralCode.trim() && { referralCode: referralCode.trim().toUpperCase() })
       };
       console.log('🎁 Checkout payload:', payload);
@@ -347,6 +347,13 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                             <div className="flex items-center gap-2">
                               <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
                               <span>IA Administrative</span>
+                            </div>
+                          )}
+
+                          {plan.features.bilanKine && (
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
+                              <span>Bilan kiné</span>
                             </div>
                           )}
                         </div>

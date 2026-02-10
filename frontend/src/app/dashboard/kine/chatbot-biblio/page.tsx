@@ -4,9 +4,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, History, Trash2, Send, Loader2, CheckCircle, Target } from 'lucide-react';
+import { BookOpen, History, Trash2, Send, Loader2, CheckCircle, Target, Search, X } from 'lucide-react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
@@ -44,7 +45,10 @@ export default function KineChatbotBiblioPage() {
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [chatMessages, setChatMessages] = useState<HistoryMessage[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-  
+  const [phase, setPhase] = useState<'initial' | 'conversation'>('initial');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [researchQuery, setResearchQuery] = useState('');
+
   // Hook paywall pour vérifier les permissions
   const { isLoading: paywallLoading, canAccessFeature, subscription } = usePaywall();
   
@@ -187,6 +191,9 @@ export default function KineChatbotBiblioPage() {
             });
           });
           setChatMessages(chatHistory);
+          if (chatHistory.length > 0) {
+            setPhase('conversation');
+          }
         }
       }
     } catch (error) {
@@ -213,18 +220,20 @@ export default function KineChatbotBiblioPage() {
     try {
       const token = await getAuthToken();
       
-      const res = await fetch(`${API_BASE}/api/chat/kine/ia-biblio`, {
+      // Follow-ups via ia-followup (conversationnel sans RAG, sauvegarde dans table biblio)
+      const res = await fetch(`${API_BASE}/api/chat/kine/ia-followup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           message: currentMessage,
-          conversationHistory: chatMessages.slice(-6).map(msg => ({
+          conversationHistory: chatMessages.slice(-10).map(msg => ({
             role: msg.role,
             content: msg.content
-          }))
+          })),
+          sourceIa: 'biblio'
         })
       });
 
@@ -288,6 +297,108 @@ export default function KineChatbotBiblioPage() {
     }
   };
 
+  const handleResearch = async () => {
+    if (!researchQuery.trim() || isSending) return;
+
+    // Effacer l'historique precedent si existant (nouvelle recherche)
+    if (chatMessages.length > 0) {
+      try {
+        const deleteToken = await getAuthToken();
+        await fetch(`${API_BASE}/api/chat/kine/history-biblio`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${deleteToken}` }
+        });
+      } catch (error) {
+        console.error('Erreur suppression historique:', error);
+      }
+      setHistory([]);
+      setChatMessages([]);
+    }
+
+    const userMessage: HistoryMessage = {
+      role: 'user',
+      content: researchQuery.trim(),
+      timestamp: new Date().toISOString()
+    };
+
+    setChatMessages([userMessage]);
+    const currentQuery = researchQuery;
+    setResearchQuery('');
+    setIsModalOpen(false);
+    setPhase('conversation');
+    setIsSending(true);
+
+    try {
+      const token = await getAuthToken();
+
+      const res = await fetch(`${API_BASE}/api/chat/kine/ia-biblio`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          message: currentQuery,
+          conversationHistory: []
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setIsSending(false);
+
+        const assistantMessage: HistoryMessage = {
+          role: 'assistant',
+          content: data.message,
+          timestamp: new Date().toISOString(),
+          sources: data.sources && areSourcesRelevant(data.sources, currentQuery) ? data.sources : [],
+          enhanced: data.metadata?.enhanced,
+          confidence: data.confidence
+        };
+        setChatMessages(prev => [...prev, assistantMessage]);
+
+        setTimeout(() => {
+          scrollToBotMessage();
+        }, 100);
+
+        const token2 = await getAuthToken();
+        const histRes = await fetch(`${API_BASE}/api/chat/kine/history-biblio?days=5`, {
+          headers: { Authorization: `Bearer ${token2}` }
+        });
+        const historyData = await histRes.json();
+        if (historyData.success) {
+          setHistory(historyData.history);
+        }
+      } else {
+        setIsSending(false);
+        const errorMessage: HistoryMessage = {
+          role: 'assistant',
+          content: data.error || 'Erreur lors de la génération de la réponse',
+          timestamp: new Date().toISOString()
+        };
+        setChatMessages(prev => [...prev, errorMessage]);
+        setTimeout(() => { scrollToBotMessage(); }, 100);
+      }
+    } catch (error) {
+      console.error('Erreur recherche biblio:', error);
+      setIsSending(false);
+      const errorMessage: HistoryMessage = {
+        role: 'assistant',
+        content: "Erreur lors de l'appel à l'assistant bibliographique.",
+        timestamp: new Date().toISOString()
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+      setTimeout(() => { scrollToBotMessage(); }, 100);
+    }
+  };
+
+  const handleNewResearch = () => {
+    if (isSending) return;
+    setResearchQuery('');
+    setIsModalOpen(true);
+  };
+
   const clearHistory = async () => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer tout l\'historique ?')) {
       return;
@@ -295,21 +406,22 @@ export default function KineChatbotBiblioPage() {
 
     try {
       const token = await getAuthToken();
-      
+
       const res = await fetch(`${API_BASE}/api/chat/kine/history-biblio`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
-      
+
       if (!res.ok) {
         console.error('Erreur suppression:', await res.text());
         return;
       }
-      
+
       setHistory([]);
       setChatMessages([]);
+      setPhase('initial');
     } catch (error) {
       console.error('Erreur suppression historique:', error);
     }
@@ -402,13 +514,22 @@ export default function KineChatbotBiblioPage() {
                 ) : chatMessages.length === 0 ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
-                      <BookOpen className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+                      <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-6" />
                       <h3 className="text-lg font-medium text-muted-foreground mb-2">
                         Recherche Bibliographique
                       </h3>
-                      <p className="text-sm text-muted-foreground">
-                        Posez vos questions pour accéder aux références et publications scientifiques
+                      <p className="text-sm text-muted-foreground mb-6 max-w-md">
+                        Lancez une recherche pour accéder aux références et publications scientifiques.
+                        Vous pourrez ensuite poser des questions de suivi.
                       </p>
+                      <Button
+                        onClick={() => setIsModalOpen(true)}
+                        size="lg"
+                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
+                      >
+                        <Search className="h-5 w-5 mr-2" />
+                        Lancer une recherche
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -435,6 +556,9 @@ export default function KineChatbotBiblioPage() {
                                 className="whitespace-pre-wrap"
                                 dangerouslySetInnerHTML={{
                                   __html: msg.content
+                                    .replace(/^### (.*$)/gim, '<strong class="text-base">$1</strong>') // ### -> heading
+                                    .replace(/^## (.*$)/gim, '<strong class="text-base">$1</strong>') // ## -> heading
+                                    .replace(/^# (.*$)/gim, '<strong class="text-lg">$1</strong>') // # -> heading
                                     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // **texte** -> gras
                                     .replace(/\*(.*?)\*/g, '<em>$1</em>') // *texte* -> italique
                                     .replace(/^- (.*$)/gim, '• $1') // - -> •
@@ -538,7 +662,12 @@ export default function KineChatbotBiblioPage() {
                         <div className="bg-muted p-4 rounded-2xl rounded-bl-md">
                           <div className="flex items-center gap-2">
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            <span className="text-muted-foreground">Recherche dans les références scientifiques...</span>
+                            <span className="text-muted-foreground">
+                              {chatMessages.length <= 1
+                                ? 'Recherche dans les références scientifiques...'
+                                : 'Réflexion en cours...'
+                              }
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -550,47 +679,79 @@ export default function KineChatbotBiblioPage() {
               </CardContent>
 
               <div className="border-t p-4 bg-background">
-                <div className="flex items-end gap-3">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="Votre question bibliographique (recherche scientifique et publications)..."
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      disabled={isSending}
-                      className="min-h-[44px]"
-                    />
-                  </div>
-                  <Button 
-                    onClick={handleAsk} 
-                    disabled={isSending || !message.trim()}
-                    size="icon"
-                    className="min-h-[44px] min-w-[44px]"
-                  >
-                    {isSending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
+                {phase === 'conversation' ? (
+                  <>
+                    <div className="flex items-center gap-3 mb-3">
+                      <Button
+                        onClick={handleNewResearch}
+                        disabled={isSending}
+                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-sm"
+                      >
+                        <Search className="h-4 w-4 mr-2" />
+                        Nouvelle recherche
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        ou posez une question de suivi ci-dessous
+                      </span>
+                    </div>
 
-                <div className="mt-3 mb-2">
-                  <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded px-3 py-2">
-                    ⚠️ L'IA peut faire des erreurs, vérifiez les informations importantes.
-                  </p>
-                </div>
+                    <div className="flex items-end gap-3">
+                      <div className="flex-1">
+                        <Input
+                          placeholder="Question de suivi sur les résultats..."
+                          value={message}
+                          onChange={(e) => setMessage(e.target.value)}
+                          onKeyPress={handleKeyPress}
+                          disabled={isSending}
+                          className="min-h-[44px]"
+                        />
+                      </div>
+                      <Button
+                        onClick={handleAsk}
+                        disabled={isSending || !message.trim()}
+                        size="icon"
+                        className="min-h-[44px] min-w-[44px]"
+                      >
+                        {isSending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
 
-                <div className="flex justify-between items-center">
-                  <p className="text-xs text-muted-foreground">
-                    Appuyez sur Entrée pour envoyer • Références scientifiques • Publications spécialisées
-                  </p>
-                  {chatMessages.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      {Math.floor(chatMessages.length / 2)} questions posées
+                    <div className="mt-3 mb-2">
+                      <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded px-3 py-2">
+                        L'IA peut faire des erreurs, vérifiez les informations importantes.
+                      </p>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs text-muted-foreground">
+                        Entrée pour envoyer - Questions de suivi en mode conversationnel
+                      </p>
+                      {chatMessages.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {Math.floor(chatMessages.length / 2)} échanges
+                        </p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Commencez par lancer une recherche bibliographique
                     </p>
-                  )}
-                </div>
+                    <Button
+                      onClick={() => setIsModalOpen(true)}
+                      variant="outline"
+                      className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                    >
+                      <Search className="h-4 w-4 mr-2" />
+                      Lancer une recherche
+                    </Button>
+                  </div>
+                )}
               </div>
             </Card>
 
@@ -682,6 +843,71 @@ export default function KineChatbotBiblioPage() {
           </div>
         </ChatDisabledOverlay>
       </div>
+
+      {/* Modal de recherche bibliographique */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-background rounded-lg shadow-xl border w-full max-w-lg mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Search className="h-5 w-5 text-blue-600" />
+                <h3 className="text-lg font-semibold">Nouvelle recherche bibliographique</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setResearchQuery('');
+                }}
+                className="p-1 rounded-md hover:bg-muted transition-colors"
+              >
+                <X className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-4">
+              Posez votre question de recherche bibliographique. L'IA analysera les publications et références scientifiques disponibles.
+            </p>
+
+            <Textarea
+              placeholder="Ex: Quelles sont les dernières études sur l'efficacité du renforcement excentrique dans la tendinopathie rotulienne ?"
+              value={researchQuery}
+              onChange={(e) => setResearchQuery(e.target.value)}
+              className="min-h-[120px] mb-4 resize-none"
+              disabled={isSending}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleResearch();
+                }
+              }}
+              autoFocus
+            />
+
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Entrée pour envoyer - Shift+Entrée pour retour à la ligne
+              </p>
+              <Button
+                onClick={handleResearch}
+                disabled={!researchQuery.trim() || isSending}
+                className="min-w-[140px]"
+              >
+                {isSending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Recherche...
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-4 w-4 mr-2" />
+                    Rechercher
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

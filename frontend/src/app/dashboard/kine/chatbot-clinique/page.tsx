@@ -435,6 +435,9 @@ export default function KineChatbotCliniquePage() {
                                 className="whitespace-pre-wrap"
                                 dangerouslySetInnerHTML={{
                                   __html: msg.content
+                                    .replace(/^### (.*$)/gim, '<strong class="text-base">$1</strong>') // ### -> heading
+                                    .replace(/^## (.*$)/gim, '<strong class="text-base">$1</strong>') // ## -> heading
+                                    .replace(/^# (.*$)/gim, '<strong class="text-lg">$1</strong>') // # -> heading
                                     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // **texte** -> gras
                                     .replace(/\*(.*?)\*/g, '<em>$1</em>') // *texte* -> italique
                                     .replace(/^- (.*$)/gim, '• $1') // - -> •

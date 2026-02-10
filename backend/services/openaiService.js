@@ -593,6 +593,100 @@ const saveToCorrectTable = async (type, kineId, message, response) => {
   });
 };
 
+// ========== FONCTION FOLLOWUP (SANS RAG) ==========
+
+/**
+ * Génère une réponse de suivi conversationnelle SANS RAG
+ * Utilisée pour les questions de suivi après une recherche initiale (biblio, clinique)
+ * Sauvegarde dans la table de l'IA source (pas dans chatIaBasique)
+ */
+const generateFollowupResponse = async (message, conversationHistory = [], kineId, sourceIa) => {
+  try {
+    const validSources = ['biblio', 'clinique'];
+    if (!validSources.includes(sourceIa)) {
+      throw new Error(`sourceIa invalide: ${sourceIa}. Valeurs acceptées: ${validSources.join(', ')}`);
+    }
+
+    logger.debug(`🔄 IA Followup (source: ${sourceIa}) pour kiné ID: ${sanitizeUID(kineId)}`);
+
+    if (!message?.trim()) {
+      throw new Error('Message requis');
+    }
+
+    // Pas de RAG - on utilise uniquement le contexte de la conversation
+    const systemPrompt = `Tu es un assistant IA spécialisé en kinésithérapie. Tu réponds à un kinésithérapeute diplômé.
+
+CONTEXTE : Le kiné a lancé une recherche ${sourceIa === 'biblio' ? 'bibliographique (études, publications scientifiques)' : 'clinique (tests, diagnostics, cotations)'} et pose maintenant une question de suivi.
+
+RÔLE :
+- Répondre aux questions de suivi en te basant sur le contexte de la conversation
+- Approfondir, clarifier ou compléter les informations déjà fournies
+- Ton professionnel mais accessible (de kiné à kiné)
+
+TON & STYLE :
+- Format conversationnel, réponses claires et structurées
+- 200-300 mots maximum
+- Utilise le gras (**) pour les points clés
+- 2-3 emojis maximum
+
+RÈGLES :
+- Base-toi sur le contexte de la conversation précédente
+- Si la question sort du cadre de la discussion, dis-le poliment
+- Ne jamais inventer d'études, de chiffres ou de faits
+- Si tu ne sais pas, dis-le clairement
+- JAMAIS poser de diagnostic médical`;
+
+    // Historique limité à 10 messages pour garder le contexte biblio/clinique
+    const limitedHistory = conversationHistory.slice(-10);
+
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...limitedHistory,
+      { role: 'user', content: message }
+    ];
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages,
+      max_tokens: 750,
+      temperature: 0.5,
+      presence_penalty: 0.1,
+      frequency_penalty: 0.1
+    });
+
+    const aiResponse = completion.choices[0].message.content;
+
+    // Sauvegarde dans la table de l'IA SOURCE (biblio -> chatIaBiblio, clinique -> chatIaClinique)
+    await saveToCorrectTable(sourceIa, kineId, message, aiResponse);
+    logger.debug(`💾 Followup sauvegardé dans table ${sourceIa}`);
+
+    return {
+      success: true,
+      message: aiResponse,
+      sources: [],
+      confidence: null,
+      metadata: {
+        model: 'gpt-4o-mini',
+        iaType: 'followup',
+        sourceIa: sourceIa,
+        kineId: kineId,
+        documentsFound: 0,
+        documentsUsedForAI: 0,
+        documentsDisplayed: 0,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+  } catch (error) {
+    logger.error(`❌ Erreur generateFollowupResponse (source: ${sourceIa}):`, error.message);
+    throw {
+      success: false,
+      error: `Erreur lors de la génération de la réponse de suivi`,
+      details: error.message
+    };
+  }
+};
+
 // ========== PROMPTS SYSTÈME SPÉCIALISÉS ==========
 
 function buildBasiqueSystemPrompt(contextDocuments) {
@@ -1277,7 +1371,8 @@ ${doc.content.substring(0, 500)}
 module.exports = {
   // Nouvelles fonctions IA Kiné
   generateKineResponse,
-  
+  generateFollowupResponse,
+
   // Anciennes fonctions chat patients (conservées)
   generateChatResponse,
   generateWelcomeMessage,

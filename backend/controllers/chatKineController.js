@@ -1,6 +1,6 @@
 // controllers/chatKineController.js
 const prismaService = require('../services/prismaService');
-const { generateKineResponse } = require('../services/openaiService');
+const { generateKineResponse, generateFollowupResponse } = require('../services/openaiService');
 const logger = require('../utils/logger');
 
 // ========== HANDLER UNIFIÉ ==========
@@ -69,6 +69,53 @@ const sendIaClinique = async (req, res) => {
 
 const sendIaAdministrative = async (req, res) => {
   await handleKineRequest(req, res, 'admin');
+};
+
+// ========== FOLLOWUP (SANS RAG) ==========
+const sendIaFollowup = async (req, res) => {
+  try {
+    const { message, conversationHistory = [], sourceIa } = req.body;
+    const firebaseUid = req.uid;
+
+    if (!firebaseUid) {
+      return res.status(401).json({
+        error: 'Authentification échouée - UID manquant'
+      });
+    }
+
+    const prisma = prismaService.getInstance();
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid }
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: 'Kiné non trouvé' });
+    }
+
+    if (!message?.trim()) {
+      return res.status(400).json({ error: 'Message requis' });
+    }
+
+    if (!sourceIa || !['biblio', 'clinique'].includes(sourceIa)) {
+      return res.status(400).json({ error: 'sourceIa requis (biblio ou clinique)' });
+    }
+
+    const response = await generateFollowupResponse(message, conversationHistory, kine.id, sourceIa);
+    response.metadata.firebaseUid = firebaseUid;
+
+    res.json(response);
+
+  } catch (error) {
+    logger.error('❌ Erreur sendIaFollowup:', error);
+
+    const errorResponse = error.success === false ? error : {
+      success: false,
+      error: 'Erreur lors de la génération de la réponse de suivi',
+      details: error.message
+    };
+
+    res.status(500).json(errorResponse);
+  }
 };
 
 // ========== HISTORIQUES ==========
@@ -433,6 +480,7 @@ module.exports = {
   sendIaBiblio,
   sendIaClinique,
   sendIaAdministrative,
+  sendIaFollowup,
   getHistoryBasique,
   getHistoryBiblio,
   getHistoryClinique,

@@ -72,7 +72,8 @@ const PLANS = {
         AI_ASSISTANTS.CONVERSATIONNEL,
         AI_ASSISTANTS.BIBLIOTHEQUE,
         AI_ASSISTANTS.CLINIQUE
-      ]
+      ],
+      bilanKine: true
     },
     limits: {
       programmes: 3
@@ -109,7 +110,8 @@ const PLANS = {
         AI_ASSISTANTS.BIBLIOTHEQUE,
         AI_ASSISTANTS.CLINIQUE,
         AI_ASSISTANTS.ADMINISTRATIF
-      ]
+      ],
+      bilanKine: true
     },
     limits: {
       programmes: -1 // illimité
@@ -147,7 +149,8 @@ const PLANS = {
         AI_ASSISTANTS.BIBLIOTHEQUE,
         AI_ASSISTANTS.CLINIQUE,
         AI_ASSISTANTS.ADMINISTRATIF
-      ]
+      ],
+      bilanKine: true
     },
     limits: {
       programmes: -1 // illimité

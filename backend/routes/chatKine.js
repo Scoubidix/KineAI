@@ -31,6 +31,13 @@ router.post('/ia-clinique', authenticate, chatKineController.sendIaClinique);
  */
 router.post('/ia-administrative', authenticate, chatKineController.sendIaAdministrative);
 
+/**
+ * POST /api/chat/kine/ia-followup
+ * IA de suivi conversationnel (sans RAG) - sauvegarde dans la table source
+ * Body: { message, conversationHistory, sourceIa: 'biblio' | 'clinique' }
+ */
+router.post('/ia-followup', authenticate, chatKineController.sendIaFollowup);
+
 // ========== ROUTES HISTORIQUE SPÉCIALISÉES ==========
 
 /**
