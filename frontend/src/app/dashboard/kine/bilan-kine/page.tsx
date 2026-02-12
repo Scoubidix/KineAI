@@ -279,7 +279,7 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
         />
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-sm p-6 mb-6">
+        <div className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] rounded-lg shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <FileText className="text-white h-7 w-7" />

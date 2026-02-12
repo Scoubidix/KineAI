@@ -3,40 +3,57 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const chatKineController = require('../controllers/chatKineController');
 const { authenticate } = require('../middleware/authenticate');
-const { requireAdmin } = require('../middleware/authorization');
+const { requireAdmin, requireAssistant } = require('../middleware/authorization');
 
 // ========== NOUVELLES ROUTES IA SPÉCIALISÉES ==========
+
+/**
+ * Middleware dynamique pour ia-followup : vérifie l'accès selon sourceIa
+ * sourceIa 'biblio' → plan BIBLIOTHEQUE requis
+ * sourceIa 'clinique' → plan CLINIQUE requis
+ */
+const requireFollowupAssistant = (req, res, next) => {
+  const sourceIaMap = {
+    'biblio': 'BIBLIOTHEQUE',
+    'clinique': 'CLINIQUE'
+  };
+  const assistantType = sourceIaMap[req.body.sourceIa];
+  if (!assistantType) {
+    return res.status(400).json({ error: 'sourceIa requis (biblio ou clinique)' });
+  }
+  return requireAssistant(assistantType)(req, res, next);
+};
 
 /**
  * POST /api/chat/kine/ia-basique
  * IA conversationnelle basique avec recherche vectorielle
  */
-router.post('/ia-basique', authenticate, chatKineController.sendIaBasique);
+router.post('/ia-basique', authenticate, requireAssistant('CONVERSATIONNEL'), chatKineController.sendIaBasique);
 
 /**
- * POST /api/chat/kine/ia-biblio  
+ * POST /api/chat/kine/ia-biblio
  * IA bibliographique spécialisée
  */
-router.post('/ia-biblio', authenticate, chatKineController.sendIaBiblio);
+router.post('/ia-biblio', authenticate, requireAssistant('BIBLIOTHEQUE'), chatKineController.sendIaBiblio);
 
 /**
  * POST /api/chat/kine/ia-clinique
  * IA clinique spécialisée
  */
-router.post('/ia-clinique', authenticate, chatKineController.sendIaClinique);
+router.post('/ia-clinique', authenticate, requireAssistant('CLINIQUE'), chatKineController.sendIaClinique);
 
 /**
  * POST /api/chat/kine/ia-administrative
- * IA administrative spécialisée  
+ * IA administrative spécialisée
  */
-router.post('/ia-administrative', authenticate, chatKineController.sendIaAdministrative);
+router.post('/ia-administrative', authenticate, requireAssistant('ADMINISTRATIF'), chatKineController.sendIaAdministrative);
 
 /**
  * POST /api/chat/kine/ia-followup
  * IA de suivi conversationnel (sans RAG) - sauvegarde dans la table source
  * Body: { message, conversationHistory, sourceIa: 'biblio' | 'clinique' }
  */
-router.post('/ia-followup', authenticate, chatKineController.sendIaFollowup);
+router.post('/ia-followup', authenticate, requireFollowupAssistant, chatKineController.sendIaFollowup);
 
 // ========== ROUTES HISTORIQUE SPÉCIALISÉES ==========
 

@@ -378,7 +378,7 @@ function SettingsModal() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <SidebarMenuButton tooltip="Paramètres" className="text-white/90 hover:bg-white/20 hover:text-white">
+        <SidebarMenuButton tooltip="Paramètres" className="text-primary font-semibold hover:bg-primary/10 hover:text-primary">
           <Settings className="h-4 w-4 shrink-0" />
           <span>Paramètres</span>
         </SidebarMenuButton>
@@ -1129,17 +1129,23 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <Sidebar collapsible="icon" side="left" variant="sidebar" className="bg-gradient-to-b from-blue-600 to-purple-600 text-white">
-        <SidebarHeader className="items-center gap-2 border-b border-white/20">
+      {/* Dégradé global couvrant sidebar + contenu */}
+      <div
+        className="fixed inset-0 z-0 dark:hidden"
+        style={{ background: 'linear-gradient(to right, #c2e4e8 0%, #d9eff1 8%, #e8f4f5 18%, #f0f8f8 30%, #f5fafa 45%, #fafcfc 65%, #fdfdfd 100%)' }}
+      />
+      <div
+        className="fixed inset-0 z-0 hidden dark:block"
+        style={{ background: 'linear-gradient(to right, #0c1618 0%, #0e1719 8%, #101819 18%, #111919 30%, #121a1a 45%, #131414 65%, #141414 100%)' }}
+      />
+      <Sidebar collapsible="icon" side="left" variant="sidebar" className="bg-transparent text-primary border-r border-primary/20">
+        <SidebarHeader className="items-center gap-2 border-b border-primary/20">
           <img
             src="/logo.jpg"
             alt="Mon Assistant Kiné"
-            className="h-7 w-7 rounded-md object-contain group-data-[state=collapsed]:h-7 group-data-[state=collapsed]:w-7"
+            className="h-12 w-12 rounded-md object-contain group-data-[state=collapsed]:h-8 group-data-[state=collapsed]:w-8"
           />
-          <span className="text-lg font-semibold text-white group-data-[state=collapsed]:hidden">
-            Mon Assistant Kiné
-          </span>
-          <SidebarTrigger className="ml-auto text-white hover:bg-white/20" />
+          <SidebarTrigger className="ml-auto text-primary hover:bg-primary/10" />
         </SidebarHeader>
         <SidebarContent className="p-2">
           <SidebarMenu>
@@ -1155,7 +1161,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   }
                   disabled={item.disabled && item.label.includes('(Bientôt)')}
                   aria-disabled={item.disabled && !item.label.includes('(Bientôt)')}
-                  className={item.disabled && !item.label.includes('(Bientôt)') ? "text-white/50 cursor-not-allowed opacity-60" : "text-white/90 hover:bg-white/20 hover:text-white data-[active=true]:bg-white/30 data-[active=true]:text-white"}
+                  className={item.disabled && !item.label.includes('(Bientôt)') ? "text-primary/40 cursor-not-allowed opacity-60 font-semibold" : "text-primary font-semibold hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/15 data-[active=true]:text-primary"}
                 >
                   <Link href={item.href}>
                     <item.icon className="h-4 w-4 shrink-0" />
@@ -1166,13 +1172,20 @@ export default function AppLayout({ children }: AppLayoutProps) {
             ))}
           </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter className="border-t border-white/20 p-2">
+        <SidebarFooter className="border-t border-primary/20 p-2">
           <SidebarMenu>
+            {role === 'kine' && (
+              <SidebarMenuItem>
+                <div className="px-2 py-1 group-data-[state=collapsed]:hidden">
+                  <PlanIndicator />
+                </div>
+              </SidebarMenuItem>
+            )}
             <SidebarMenuItem>
               <SettingsModal />
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Déconnexion" onClick={handleLogout} className="text-red-200 hover:bg-red-500/20 hover:text-red-100">
+              <SidebarMenuButton tooltip="Déconnexion" onClick={handleLogout} className="text-red-600 font-semibold hover:bg-red-500/10 hover:text-red-700">
                 <LogOut className="h-4 w-4 shrink-0" />
                 <span>Déconnexion</span>
               </SidebarMenuButton>
@@ -1199,17 +1212,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
         </div>
 
-        {/* Barre de navigation desktop - seulement visible sur lg+ */}
-        <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border hidden lg:block">
-          <div className="flex h-16 items-center px-6 justify-end">
-            {/* Plan Indicator desktop - seulement pour les kinés en FREE */}
-            {role === 'kine' && <PlanIndicator />}
-          </div>
-        </div>
-
         {/* Contenu principal */}
-        <div className="relative p-4 md:p-6 lg:p-8 bg-background text-foreground min-h-screen">
-          {children}
+        <div className="relative p-4 md:p-6 lg:p-8 text-foreground min-h-screen">
+{/* Accent subtil en haut à droite */}
+          <div
+            className="pointer-events-none absolute top-0 right-0 w-[600px] h-[600px] opacity-[0.07] dark:opacity-[0.12] rounded-full blur-3xl"
+            style={{ background: 'radial-gradient(circle, #3899aa, transparent 70%)' }}
+          />
+          <div className="relative z-10">
+            {children}
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>

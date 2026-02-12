@@ -6,8 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { BookOpen, History, Trash2, Send, Loader2, CheckCircle, Target, Search, X } from 'lucide-react';
+import { BookOpen, History, Trash2, Send, Loader2, CheckCircle, Search, X } from 'lucide-react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
@@ -20,21 +19,10 @@ interface ChatMessage {
   createdAt: string;
 }
 
-interface Source {
-  title: string;
-  category: string;
-  similarity: string;
-  confidence: number;
-  relevanceLevel: string;
-  rank: number;
-  preview?: string;
-}
-
 interface HistoryMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  sources?: Source[];
   enhanced?: boolean;
   confidence?: number;
 }
@@ -103,63 +91,6 @@ export default function KineChatbotBiblioPage() {
   const getAuthToken = async () => {
     const auth = getAuth(app);
     return await auth.currentUser?.getIdToken();
-  };
-
-  const areSourcesRelevant = (sources: Source[], userQuestion: string) => {
-    if (!sources || sources.length === 0) return false;
-    
-    const questionLower = userQuestion.toLowerCase();
-    
-    const anatomicalKeywords = [
-      'épaule', 'epaule', 'shoulder',
-      'genou', 'knee', 
-      'cheville', 'ankle', 
-      'dos', 'back', 'lombalgie', 'lombaire',
-      'cervical', 'cou', 'neck',
-      'coude', 'elbow',
-      'poignet', 'wrist',
-      'hanche', 'hip',
-      'achille', 'tendon',
-      'main', 'hand',
-      'pied', 'foot'
-    ];
-    
-    const questionAnatomy = anatomicalKeywords.filter(keyword => 
-      questionLower.includes(keyword)
-    );
-    
-    if (questionAnatomy.length === 0) {
-      const MIN_CONFIDENCE_THRESHOLD = 85;
-      return sources.some(source => source.confidence >= MIN_CONFIDENCE_THRESHOLD);
-    }
-    
-    const relevantSources = sources.filter(source => {
-      const sourceText = (source.title + ' ' + source.category).toLowerCase();
-      
-      const hasAnatomicalMatch = questionAnatomy.some(anatomy => 
-        sourceText.includes(anatomy)
-      );
-      
-      const hasDecentScore = source.confidence >= 70;
-      
-      return hasAnatomicalMatch && hasDecentScore;
-    });
-    
-    return relevantSources.length > 0;
-  };
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 90) return 'text-green-600 bg-green-50';
-    if (confidence >= 80) return 'text-blue-600 bg-blue-50';
-    if (confidence >= 70) return 'text-yellow-600 bg-yellow-50';
-    return 'text-gray-600 bg-gray-50';
-  };
-
-  const getConfidenceIcon = (confidence: number) => {
-    if (confidence >= 90) return <Target className="w-3 h-3" />;
-    if (confidence >= 80) return <CheckCircle className="w-3 h-3" />;
-    if (confidence >= 70) return <BookOpen className="w-3 h-3" />;
-    return <BookOpen className="w-3 h-3" />;
   };
 
   const loadHistory = async () => {
@@ -246,7 +177,7 @@ export default function KineChatbotBiblioPage() {
           role: 'assistant',
           content: data.message,
           timestamp: new Date().toISOString(),
-          sources: data.sources && areSourcesRelevant(data.sources, currentMessage) ? data.sources : [],
+
           enhanced: data.metadata?.enhanced,
           confidence: data.confidence
         };
@@ -352,7 +283,7 @@ export default function KineChatbotBiblioPage() {
           role: 'assistant',
           content: data.message,
           timestamp: new Date().toISOString(),
-          sources: data.sources && areSourcesRelevant(data.sources, currentQuery) ? data.sources : [],
+
           enhanced: data.metadata?.enhanced,
           confidence: data.confidence
         };
@@ -468,7 +399,7 @@ export default function KineChatbotBiblioPage() {
         />
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-sm p-6 mb-6">
+        <div className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] rounded-lg shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <BookOpen className="text-white h-7 w-7" />
@@ -484,17 +415,42 @@ export default function KineChatbotBiblioPage() {
           </div>
         </div>
 
+        {/* Bouton recherche + encart recherche en cours */}
+        <div className="flex items-stretch gap-4 mb-4 -mt-2">
+          <Button
+            onClick={handleNewResearch}
+            disabled={isSending}
+            size="lg"
+            className="w-1/2 h-auto bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white shadow-lg"
+          >
+            <Search className="h-5 w-5 mr-2" />
+            {phase === 'conversation' ? 'Nouvelle recherche' : 'Lancer une recherche'}
+          </Button>
+          <div className="w-1/2 bg-muted/60 border rounded-lg px-4 py-2 flex items-center">
+            {phase === 'conversation' && chatMessages.length > 0 ? (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-0.5">Recherche en cours :</p>
+                <p className="text-sm text-foreground leading-snug">
+                  {chatMessages.find(m => m.role === 'user')?.content || ''}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground/50">Aucune recherche en cours</p>
+            )}
+          </div>
+        </div>
+
         {/* Zone de chat principale */}
-        <ChatDisabledOverlay 
+        <ChatDisabledOverlay
           assistantType="BIBLIOTHEQUE"
           canAccessFeature={canAccessFeature}
           isLoading={paywallLoading}
         >
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            
+
             {/* Chat */}
             <div className="lg:col-span-3">
-            <Card className="shadow-md min-h-[60vh] max-h-[75vh] flex flex-col">
+            <Card className={`shadow-md min-h-[60vh] max-h-[75vh] flex flex-col ${phase === 'initial' ? 'opacity-50 pointer-events-none' : ''}`}>
               
               <CardContent 
                 ref={messagesContainerRef}
@@ -514,22 +470,13 @@ export default function KineChatbotBiblioPage() {
                 ) : chatMessages.length === 0 ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
-                      <BookOpen className="w-16 h-16 text-muted-foreground/30 mx-auto mb-6" />
-                      <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                      <BookOpen className="w-16 h-16 text-muted-foreground/20 mx-auto mb-6" />
+                      <h3 className="text-lg font-medium text-muted-foreground/60 mb-2">
                         Recherche Bibliographique
                       </h3>
-                      <p className="text-sm text-muted-foreground mb-6 max-w-md">
-                        Lancez une recherche pour accéder aux références et publications scientifiques.
-                        Vous pourrez ensuite poser des questions de suivi.
+                      <p className="text-sm text-muted-foreground/50 max-w-md">
+                        Lancez une recherche ci-dessus pour accéder aux références et publications scientifiques.
                       </p>
-                      <Button
-                        onClick={() => setIsModalOpen(true)}
-                        size="lg"
-                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
-                      >
-                        <Search className="h-5 w-5 mr-2" />
-                        Lancer une recherche
-                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -568,83 +515,6 @@ export default function KineChatbotBiblioPage() {
                               />
                             </div>
                             
-                            {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
-                              <div className="mt-4 pt-3 border-t border-muted-foreground/20">
-                                <div className="flex items-center gap-2 mb-3">
-                                  <BookOpen className="w-4 h-4 text-muted-foreground" />
-                                  <span className="text-sm font-medium text-muted-foreground">
-                                    Sources consultées ({(() => {
-                                      const grouped = msg.sources.reduce((acc, source) => {
-                                        const baseTitle = source.title.replace(/ - Partie \d+\/\d+$/, '');
-                                        if (!acc[baseTitle]) {
-                                          acc[baseTitle] = [];
-                                        }
-                                        acc[baseTitle].push(source);
-                                        return acc;
-                                      }, {} as Record<string, Source[]>);
-                                      return Object.keys(grouped).length;
-                                    })()} documents) :
-                                  </span>
-                                  {msg.confidence && (
-                                    <Badge variant="outline" className="text-xs">
-                                      Confiance: {Math.round(msg.confidence * 100)}%
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="space-y-2">
-                                  {(() => {
-                                    const grouped = msg.sources.reduce((acc, source) => {
-                                      const baseTitle = source.title.replace(/ - Partie \d+\/\d+$/, '');
-                                      if (!acc[baseTitle]) {
-                                        acc[baseTitle] = [];
-                                      }
-                                      acc[baseTitle].push(source);
-                                      return acc;
-                                    }, {} as Record<string, Source[]>);
-
-                                    const sortedGroups = Object.entries(grouped)
-                                      .map(([baseTitle, sources]) => ({
-                                        baseTitle,
-                                        sources,
-                                        bestConfidence: Math.max(...sources.map(s => s.confidence))
-                                      }))
-                                      .sort((a, b) => b.bestConfidence - a.bestConfidence)
-                                      .slice(0, 3);
-
-                                    return sortedGroups.map(({ baseTitle, sources }, i) => {
-                                      const bestSource = sources.reduce((best, current) => 
-                                        current.confidence > best.confidence ? current : best
-                                      );
-                                      
-                                      return (
-                                        <div key={i} className="text-sm bg-background/50 rounded-lg p-3 border">
-                                          <div className="flex items-center justify-between mb-1">
-                                            <div className="flex items-center gap-2">
-                                              <Badge 
-                                                variant="outline" 
-                                                className={`text-xs ${getConfidenceColor(bestSource.confidence)}`}
-                                              >
-                                                {getConfidenceIcon(bestSource.confidence)}
-                                                {bestSource.similarity}
-                                              </Badge>
-                                              <span className="font-medium text-foreground">{baseTitle}</span>
-                                            </div>
-                                            <Badge variant="secondary" className="text-xs">
-                                              #{i + 1}
-                                            </Badge>
-                                          </div>
-                                          <div className="flex items-center justify-between text-xs">
-                                            <span className="text-muted-foreground">• {bestSource.category}</span>
-                                            <span className="text-muted-foreground">{bestSource.relevanceLevel}</span>
-                                          </div>
-                                        </div>
-                                      );
-                                    });
-                                  })()}
-                                </div>
-                              </div>
-                            )}
-                            
                             <div className="flex items-center justify-between mt-2">
                               <p className={`text-xs ${
                                 msg.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
@@ -678,81 +548,51 @@ export default function KineChatbotBiblioPage() {
                 )}
               </CardContent>
 
-              <div className="border-t p-4 bg-background">
-                {phase === 'conversation' ? (
-                  <>
-                    <div className="flex items-center gap-3 mb-3">
-                      <Button
-                        onClick={handleNewResearch}
+              {phase === 'conversation' && (
+                <div className="border-t p-4 bg-background">
+                  <div className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="Question de suivi sur les résultats..."
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        onKeyPress={handleKeyPress}
                         disabled={isSending}
-                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-sm"
-                      >
-                        <Search className="h-4 w-4 mr-2" />
-                        Nouvelle recherche
-                      </Button>
-                      <span className="text-sm text-muted-foreground">
-                        ou posez une question de suivi ci-dessous
-                      </span>
+                        className="min-h-[44px]"
+                      />
                     </div>
-
-                    <div className="flex items-end gap-3">
-                      <div className="flex-1">
-                        <Input
-                          placeholder="Question de suivi sur les résultats..."
-                          value={message}
-                          onChange={(e) => setMessage(e.target.value)}
-                          onKeyPress={handleKeyPress}
-                          disabled={isSending}
-                          className="min-h-[44px]"
-                        />
-                      </div>
-                      <Button
-                        onClick={handleAsk}
-                        disabled={isSending || !message.trim()}
-                        size="icon"
-                        className="min-h-[44px] min-w-[44px]"
-                      >
-                        {isSending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-
-                    <div className="mt-3 mb-2">
-                      <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded px-3 py-2">
-                        L'IA peut faire des erreurs, vérifiez les informations importantes.
-                      </p>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <p className="text-xs text-muted-foreground">
-                        Entrée pour envoyer - Questions de suivi en mode conversationnel
-                      </p>
-                      {chatMessages.length > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          {Math.floor(chatMessages.length / 2)} échanges
-                        </p>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Commencez par lancer une recherche bibliographique
-                    </p>
                     <Button
-                      onClick={() => setIsModalOpen(true)}
-                      variant="outline"
-                      className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                      onClick={handleAsk}
+                      disabled={isSending || !message.trim()}
+                      size="icon"
+                      className="min-h-[44px] min-w-[44px]"
                     >
-                      <Search className="h-4 w-4 mr-2" />
-                      Lancer une recherche
+                      {isSending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
-                )}
-              </div>
+
+                  <div className="mt-3 mb-2">
+                    <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded px-3 py-2">
+                      L'IA peut faire des erreurs, vérifiez les informations importantes.
+                    </p>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs text-muted-foreground">
+                      Entrée pour envoyer - Questions de suivi en mode conversationnel
+                    </p>
+                    {chatMessages.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {Math.floor(chatMessages.length / 2)} échanges
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </Card>
 
             {/* Bouton Proposer une étude */}

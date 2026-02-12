@@ -577,7 +577,7 @@ export default function PatientDetailPage() {
 
     return (
       <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
-        <DialogHeader className="bg-gradient-to-r from-blue-600 to-purple-600 -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+        <DialogHeader className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
           <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
             {modalTitle}
           </DialogTitle>
@@ -748,7 +748,7 @@ export default function PatientDetailPage() {
                         type="button"
                         size="sm"
                         onClick={typeFilters.includes('templates') ? handleConfirmTemplateSelection : handleConfirmSelection}
-                        className="h-7 text-xs bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white"
+                        className="h-7 text-xs bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white"
                       >
                         <Plus className="w-3 h-3 mr-1" />
                         {typeFilters.includes('templates')
@@ -982,7 +982,7 @@ export default function PatientDetailPage() {
               </Button>
               <Button
                 onClick={handleSubmit}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
+                className="flex-1 bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
                 disabled={!title || !description || selectedExercises.length === 0 || selectedExercises.length > 5 || duration <= 0 || duration > 30}
               >
                 {buttonText}
@@ -1002,7 +1002,7 @@ export default function PatientDetailPage() {
     <AppLayout>
       <div className="p-6 space-y-6">
         {/* Section profil patient NOUVELLE VERSION */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg overflow-hidden">
+        <div className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] rounded-lg overflow-hidden">
           <div className="relative">
             {/* Pattern de fond */}
             <div className="absolute inset-0 bg-black/10">

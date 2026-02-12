@@ -6,6 +6,7 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+
 @layer base {
   :root {
     /* Light Theme - Darker Blue/Slate Palette */
@@ -36,7 +37,6 @@ body {
     --radius: 0.5rem;
 
     /* Sidebar specific theme (aligned with main theme) */
-    --sidebar-background: 215 30% 85%; /* Darker sidebar background */
     --sidebar-foreground: 215 30% 20%;
     --sidebar-primary: 185 80% 38%; /* Use main accent */
     --sidebar-primary-foreground: 0 0% 100%;
@@ -73,7 +73,6 @@ body {
     --chart-5: 10 80% 75%;
 
     /* Sidebar specific theme (dark) */
-    --sidebar-background: 215 30% 8%; /* Very Dark Slate Blue */
     --sidebar-foreground: 210 40% 95%;
     --sidebar-primary: 185 70% 55%; /* Use main accent */
     --sidebar-primary-foreground: 0 0% 100%;

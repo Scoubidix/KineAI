@@ -1130,7 +1130,10 @@ function buildResponseStructure() {
 - N'invente JAMAIS de red flags qui ne sont pas dans les documents fournis
 
 **3. TESTS CLINIQUES PRINCIPAUX** (2 à 5 selon complexité)
-Pour chaque test, structure OBLIGATOIRE :
+EXCLUS les tests déjà mentionnés par le kinésithérapeute dans sa question (ils sont déjà réalisés, inutile de les re-décrire).
+Propose UNIQUEMENT des tests COMPLÉMENTAIRES pour affiner le diagnostic.
+Si les tests principaux pertinents sont déjà mentionnés et qu'il n'y a pas de test complémentaire utile à ajouter, écris simplement : "Les tests principaux ont déjà été réalisés. Aucun test complémentaire nécessaire à ce stade."
+Pour chaque test proposé, structure OBLIGATOIRE :
   - Nom du test
   - Objectif / pathologie ciblée
   - Procédure clinique (position, geste, résistance - claire sans jargon)

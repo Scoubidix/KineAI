@@ -14,7 +14,7 @@ export const handleProgrammeCreationError = async (error, toast) => {
         toast({
           title: "🚫 Abonnement requis",
           description: "Un abonnement est requis pour créer un programme. Cliquez sur 'Upgrade' en haut à droite pour découvrir nos plans.",
-          className: "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0",
+          className: "bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] text-white border-0",
           duration: 8000, // Plus long pour laisser le temps de lire
         });
         return;
@@ -26,7 +26,7 @@ export const handleProgrammeCreationError = async (error, toast) => {
         toast({
           title: "⚠️ Limite atteinte",
           description: `${message} Cliquez sur 'Upgrade' en haut à droite pour augmenter votre limite.`,
-          className: "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0",
+          className: "bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] text-white border-0",
           duration: 8000,
         });
         return;

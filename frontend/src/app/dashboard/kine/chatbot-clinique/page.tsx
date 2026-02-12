@@ -4,9 +4,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Stethoscope, History, Trash2, Send, Loader2, CheckCircle, Target, BookOpen } from 'lucide-react';
+import { Stethoscope, History, Trash2, Send, Loader2, CheckCircle, Search, X } from 'lucide-react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
@@ -19,21 +19,10 @@ interface ChatMessage {
   createdAt: string;
 }
 
-interface Source {
-  title: string;
-  category: string;
-  similarity: string;
-  confidence: number;
-  relevanceLevel: string;
-  rank: number;
-  preview?: string;
-}
-
 interface HistoryMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  sources?: Source[];
   enhanced?: boolean;
   confidence?: number;
 }
@@ -44,12 +33,15 @@ export default function KineChatbotCliniquePage() {
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [chatMessages, setChatMessages] = useState<HistoryMessage[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-  
+  const [phase, setPhase] = useState<'initial' | 'conversation'>('initial');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [researchQuery, setResearchQuery] = useState('');
+
   // Hook paywall pour vérifier les permissions
   const { isLoading: paywallLoading, canAccessFeature, subscription } = usePaywall();
-  
+
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
-  
+
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastBotMessageRef = useRef<HTMLDivElement>(null);
@@ -78,7 +70,7 @@ export default function KineChatbotCliniquePage() {
 
   const scrollToBottom = () => {
     if (messagesContainerRef.current && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ 
+      messagesEndRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'end',
         inline: 'nearest'
@@ -88,7 +80,7 @@ export default function KineChatbotCliniquePage() {
 
   const scrollToBotMessage = () => {
     if (messagesContainerRef.current && lastBotMessageRef.current) {
-      lastBotMessageRef.current.scrollIntoView({ 
+      lastBotMessageRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'start',
         inline: 'nearest'
@@ -101,63 +93,6 @@ export default function KineChatbotCliniquePage() {
     return await auth.currentUser?.getIdToken();
   };
 
-  const areSourcesRelevant = (sources: Source[], userQuestion: string) => {
-    if (!sources || sources.length === 0) return false;
-    
-    const questionLower = userQuestion.toLowerCase();
-    
-    const anatomicalKeywords = [
-      'épaule', 'epaule', 'shoulder',
-      'genou', 'knee', 
-      'cheville', 'ankle', 
-      'dos', 'back', 'lombalgie', 'lombaire',
-      'cervical', 'cou', 'neck',
-      'coude', 'elbow',
-      'poignet', 'wrist',
-      'hanche', 'hip',
-      'achille', 'tendon',
-      'main', 'hand',
-      'pied', 'foot'
-    ];
-    
-    const questionAnatomy = anatomicalKeywords.filter(keyword => 
-      questionLower.includes(keyword)
-    );
-    
-    if (questionAnatomy.length === 0) {
-      const MIN_CONFIDENCE_THRESHOLD = 85;
-      return sources.some(source => source.confidence >= MIN_CONFIDENCE_THRESHOLD);
-    }
-    
-    const relevantSources = sources.filter(source => {
-      const sourceText = (source.title + ' ' + source.category).toLowerCase();
-      
-      const hasAnatomicalMatch = questionAnatomy.some(anatomy => 
-        sourceText.includes(anatomy)
-      );
-      
-      const hasDecentScore = source.confidence >= 70;
-      
-      return hasAnatomicalMatch && hasDecentScore;
-    });
-    
-    return relevantSources.length > 0;
-  };
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 90) return 'text-green-600 bg-green-50';
-    if (confidence >= 80) return 'text-blue-600 bg-blue-50';
-    if (confidence >= 70) return 'text-yellow-600 bg-yellow-50';
-    return 'text-gray-600 bg-gray-50';
-  };
-
-  const getConfidenceIcon = (confidence: number) => {
-    if (confidence >= 90) return <Target className="w-3 h-3" />;
-    if (confidence >= 80) return <CheckCircle className="w-3 h-3" />;
-    if (confidence >= 70) return <BookOpen className="w-3 h-3" />;
-    return <Stethoscope className="w-3 h-3" />;
-  };
-
   const loadHistory = async () => {
     try {
       setIsLoadingHistory(true);
@@ -167,11 +102,11 @@ export default function KineChatbotCliniquePage() {
           Authorization: `Bearer ${token}`
         }
       });
-      
+
       const data = await res.json();
       if (data.success) {
         setHistory(data.history);
-        
+
         if (chatMessages.length === 0) {
           const chatHistory: HistoryMessage[] = [];
           data.history.reverse().forEach((chat: ChatMessage) => {
@@ -187,6 +122,9 @@ export default function KineChatbotCliniquePage() {
             });
           });
           setChatMessages(chatHistory);
+          if (chatHistory.length > 0) {
+            setPhase('conversation');
+          }
         }
       }
     } catch (error) {
@@ -196,15 +134,16 @@ export default function KineChatbotCliniquePage() {
     }
   };
 
+  // Follow-ups via ia-followup (conversationnel, sauvegarde dans table clinique)
   const handleAsk = async () => {
     if (!message.trim() || isSending) return;
-    
+
     const userMessage: HistoryMessage = {
       role: 'user',
       content: message.trim(),
       timestamp: new Date().toISOString()
     };
-    
+
     setChatMessages(prev => [...prev, userMessage]);
     const currentMessage = message;
     setMessage('');
@@ -212,61 +151,62 @@ export default function KineChatbotCliniquePage() {
 
     try {
       const token = await getAuthToken();
-      
-      const res = await fetch(`${API_BASE}/api/chat/kine/ia-clinique`, {
+
+      const res = await fetch(`${API_BASE}/api/chat/kine/ia-followup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           message: currentMessage,
-          conversationHistory: chatMessages.slice(-6).map(msg => ({
+          conversationHistory: chatMessages.slice(-10).map(msg => ({
             role: msg.role,
             content: msg.content
-          }))
+          })),
+          sourceIa: 'clinique'
         })
       });
 
       const data = await res.json();
-      
+
       if (data.success) {
         setIsSending(false);
-        
+
         const assistantMessage: HistoryMessage = {
           role: 'assistant',
           content: data.message,
           timestamp: new Date().toISOString(),
-          sources: data.sources && areSourcesRelevant(data.sources, currentMessage) ? data.sources : [],
+
           enhanced: data.metadata?.enhanced,
           confidence: data.confidence
         };
         setChatMessages(prev => [...prev, assistantMessage]);
-        
+
         setTimeout(() => {
           scrollToBotMessage();
         }, 100);
-        
-        const token = await getAuthToken();
-        const res = await fetch(`${API_BASE}/api/chat/kine/history-clinique?days=5`, {
+
+        const token2 = await getAuthToken();
+        const histRes = await fetch(`${API_BASE}/api/chat/kine/history-clinique?days=5`, {
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${token2}`
           }
         });
-        const historyData = await res.json();
+        const historyData = await histRes.json();
         if (historyData.success) {
           setHistory(historyData.history);
         }
       } else {
         setIsSending(false);
-        
+
         const errorMessage: HistoryMessage = {
           role: 'assistant',
           content: data.error || 'Erreur lors de la génération de la réponse',
           timestamp: new Date().toISOString()
         };
         setChatMessages(prev => [...prev, errorMessage]);
-        
+
         setTimeout(() => {
           scrollToBotMessage();
         }, 100);
@@ -274,18 +214,121 @@ export default function KineChatbotCliniquePage() {
     } catch (error) {
       console.error('Erreur envoi message:', error);
       setIsSending(false);
-      
+
       const errorMessage: HistoryMessage = {
         role: 'assistant',
         content: "Erreur lors de l'appel à l'assistant.",
         timestamp: new Date().toISOString()
       };
       setChatMessages(prev => [...prev, errorMessage]);
-      
+
       setTimeout(() => {
         scrollToBotMessage();
       }, 100);
     }
+  };
+
+  // Première question via ia-clinique (RAG spécialisé)
+  const handleResearch = async () => {
+    if (!researchQuery.trim() || isSending) return;
+
+    // Effacer l'historique precedent si existant (nouveau raisonnement)
+    if (chatMessages.length > 0) {
+      try {
+        const deleteToken = await getAuthToken();
+        await fetch(`${API_BASE}/api/chat/kine/history-clinique`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${deleteToken}` }
+        });
+      } catch (error) {
+        console.error('Erreur suppression historique:', error);
+      }
+      setHistory([]);
+      setChatMessages([]);
+    }
+
+    const userMessage: HistoryMessage = {
+      role: 'user',
+      content: researchQuery.trim(),
+      timestamp: new Date().toISOString()
+    };
+
+    setChatMessages([userMessage]);
+    const currentQuery = researchQuery;
+    setResearchQuery('');
+    setIsModalOpen(false);
+    setPhase('conversation');
+    setIsSending(true);
+
+    try {
+      const token = await getAuthToken();
+
+      const res = await fetch(`${API_BASE}/api/chat/kine/ia-clinique`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          message: currentQuery,
+          conversationHistory: []
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setIsSending(false);
+
+        const assistantMessage: HistoryMessage = {
+          role: 'assistant',
+          content: data.message,
+          timestamp: new Date().toISOString(),
+
+          enhanced: data.metadata?.enhanced,
+          confidence: data.confidence
+        };
+        setChatMessages(prev => [...prev, assistantMessage]);
+
+        setTimeout(() => {
+          scrollToBotMessage();
+        }, 100);
+
+        const token2 = await getAuthToken();
+        const histRes = await fetch(`${API_BASE}/api/chat/kine/history-clinique?days=5`, {
+          headers: { Authorization: `Bearer ${token2}` }
+        });
+        const historyData = await histRes.json();
+        if (historyData.success) {
+          setHistory(historyData.history);
+        }
+      } else {
+        setIsSending(false);
+        const errorMessage: HistoryMessage = {
+          role: 'assistant',
+          content: data.error || 'Erreur lors de la génération de la réponse',
+          timestamp: new Date().toISOString()
+        };
+        setChatMessages(prev => [...prev, errorMessage]);
+        setTimeout(() => { scrollToBotMessage(); }, 100);
+      }
+    } catch (error) {
+      console.error('Erreur raisonnement clinique:', error);
+      setIsSending(false);
+      const errorMessage: HistoryMessage = {
+        role: 'assistant',
+        content: "Erreur lors de l'appel à l'assistant clinique.",
+        timestamp: new Date().toISOString()
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+      setTimeout(() => { scrollToBotMessage(); }, 100);
+    }
+  };
+
+  const handleNewResearch = () => {
+    if (isSending) return;
+    setResearchQuery('');
+    setIsModalOpen(true);
   };
 
   const clearHistory = async () => {
@@ -295,21 +338,22 @@ export default function KineChatbotCliniquePage() {
 
     try {
       const token = await getAuthToken();
-      
+
       const res = await fetch(`${API_BASE}/api/chat/kine/history-clinique`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
-      
+
       if (!res.ok) {
         console.error('Erreur suppression:', await res.text());
         return;
       }
-      
+
       setHistory([]);
       setChatMessages([]);
+      setPhase('initial');
     } catch (error) {
       console.error('Erreur suppression historique:', error);
     }
@@ -329,7 +373,7 @@ export default function KineChatbotCliniquePage() {
     });
   };
 
-  // ✅ Attendre la fin du chargement des permissions avant d'afficher la page
+  // Attendre la fin du chargement des permissions avant d'afficher la page
   if (paywallLoading) {
     return (
       <AppLayout>
@@ -346,17 +390,17 @@ export default function KineChatbotCliniquePage() {
   return (
     <AppLayout>
       <div className="max-w-6xl mx-auto p-4">
-        
+
         {/* Header Upgrade si pas d'accès */}
-        <ChatUpgradeHeader 
+        <ChatUpgradeHeader
           assistantType="CLINIQUE"
           canAccessFeature={canAccessFeature}
           isLoading={paywallLoading}
           subscription={subscription}
         />
-        
+
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-sm p-6 mb-6">
+        <div className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] rounded-lg shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Stethoscope className="text-white h-7 w-7" />
@@ -372,22 +416,47 @@ export default function KineChatbotCliniquePage() {
           </div>
         </div>
 
+        {/* Bouton raisonnement + encart en cours */}
+        <div className="flex items-stretch gap-4 mb-4 -mt-2">
+          <Button
+            onClick={handleNewResearch}
+            disabled={isSending}
+            size="lg"
+            className="w-1/2 h-auto bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white shadow-lg"
+          >
+            <Stethoscope className="h-5 w-5 mr-2" />
+            {phase === 'conversation' ? 'Nouveau raisonnement' : 'Lancer un raisonnement clinique'}
+          </Button>
+          <div className="w-1/2 bg-muted/60 border rounded-lg px-4 py-2 flex items-center">
+            {phase === 'conversation' && chatMessages.length > 0 ? (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-0.5">Raisonnement en cours :</p>
+                <p className="text-sm text-foreground leading-snug">
+                  {chatMessages.find(m => m.role === 'user')?.content || ''}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground/50">Aucun raisonnement en cours</p>
+            )}
+          </div>
+        </div>
+
         {/* Zone de chat principale */}
-        <ChatDisabledOverlay 
+        <ChatDisabledOverlay
           assistantType="CLINIQUE"
           canAccessFeature={canAccessFeature}
           isLoading={paywallLoading}
         >
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            
+
             {/* Chat */}
             <div className="lg:col-span-3">
-            <Card className="shadow-md min-h-[60vh] max-h-[75vh] flex flex-col">
-              
-              <CardContent 
+            <Card className={`shadow-md min-h-[60vh] max-h-[75vh] flex flex-col ${phase === 'initial' ? 'opacity-50 pointer-events-none' : ''}`}>
+
+              <CardContent
                 ref={messagesContainerRef}
                 className="flex-1 p-6 overflow-y-auto scroll-smooth"
-                style={{ 
+                style={{
                   scrollBehavior: 'smooth',
                   overflowAnchor: 'none'
                 }}
@@ -402,21 +471,21 @@ export default function KineChatbotCliniquePage() {
                 ) : chatMessages.length === 0 ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
-                      <Stethoscope className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                      <Stethoscope className="w-16 h-16 text-muted-foreground/20 mx-auto mb-6" />
+                      <h3 className="text-lg font-medium text-muted-foreground/60 mb-2">
                         Raisonnement Clinique
                       </h3>
-                      <p className="text-sm text-muted-foreground">
-                        Posez vos questions cliniques - Aide au diagnostic et protocoles thérapeutiques
+                      <p className="text-sm text-muted-foreground/50 max-w-md">
+                        Lancez un raisonnement ci-dessus pour démarrer l'analyse clinique.
                       </p>
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {chatMessages.map((msg, index) => {
-                      const isLastBotMessage = msg.role === 'assistant' && 
+                      const isLastBotMessage = msg.role === 'assistant' &&
                         index === chatMessages.length - 1;
-                      
+
                       return (
                         <div
                           key={index}
@@ -431,99 +500,22 @@ export default function KineChatbotCliniquePage() {
                             }`}
                           >
                             <div className="prose prose-sm max-w-none">
-                              <div 
+                              <div
                                 className="whitespace-pre-wrap"
                                 dangerouslySetInnerHTML={{
                                   __html: msg.content
-                                    .replace(/^### (.*$)/gim, '<strong class="text-base">$1</strong>') // ### -> heading
-                                    .replace(/^## (.*$)/gim, '<strong class="text-base">$1</strong>') // ## -> heading
-                                    .replace(/^# (.*$)/gim, '<strong class="text-lg">$1</strong>') // # -> heading
-                                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // **texte** -> gras
-                                    .replace(/\*(.*?)\*/g, '<em>$1</em>') // *texte* -> italique
-                                    .replace(/^- (.*$)/gim, '• $1') // - -> •
-                                    .replace(/^\d+\.\s+(.*$)/gim, '<strong>$1</strong>') // 1. -> gras
-                                    .replace(/\n/g, '<br>') // retours à la ligne
+                                    .replace(/^### (.*$)/gim, '<strong class="text-base">$1</strong>')
+                                    .replace(/^## (.*$)/gim, '<strong class="text-base">$1</strong>')
+                                    .replace(/^# (.*$)/gim, '<strong class="text-lg">$1</strong>')
+                                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                                    .replace(/^- (.*$)/gim, '• $1')
+                                    .replace(/^\d+\.\s+(.*$)/gim, '<strong>$1</strong>')
+                                    .replace(/\n/g, '<br>')
                                 }}
                               />
                             </div>
-                            
-                            {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
-                              <div className="mt-4 pt-3 border-t border-muted-foreground/20">
-                                <div className="flex items-center gap-2 mb-3">
-                                  <BookOpen className="w-4 h-4 text-muted-foreground" />
-                                  <span className="text-sm font-medium text-muted-foreground">
-                                    Sources consultées ({(() => {
-                                      const grouped = msg.sources.reduce((acc, source) => {
-                                        const baseTitle = source.title.replace(/ - Partie \d+\/\d+$/, '');
-                                        if (!acc[baseTitle]) {
-                                          acc[baseTitle] = [];
-                                        }
-                                        acc[baseTitle].push(source);
-                                        return acc;
-                                      }, {} as Record<string, Source[]>);
-                                      return Object.keys(grouped).length;
-                                    })()} documents) :
-                                  </span>
-                                  {msg.confidence && (
-                                    <Badge variant="outline" className="text-xs">
-                                      Confiance: {Math.round(msg.confidence * 100)}%
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="space-y-2">
-                                  {(() => {
-                                    const grouped = msg.sources.reduce((acc, source) => {
-                                      const baseTitle = source.title.replace(/ - Partie \d+\/\d+$/, '');
-                                      if (!acc[baseTitle]) {
-                                        acc[baseTitle] = [];
-                                      }
-                                      acc[baseTitle].push(source);
-                                      return acc;
-                                    }, {} as Record<string, Source[]>);
 
-                                    const sortedGroups = Object.entries(grouped)
-                                      .map(([baseTitle, sources]) => ({
-                                        baseTitle,
-                                        sources,
-                                        bestConfidence: Math.max(...sources.map(s => s.confidence))
-                                      }))
-                                      .sort((a, b) => b.bestConfidence - a.bestConfidence)
-                                      .slice(0, 3);
-
-                                    return sortedGroups.map(({ baseTitle, sources }, i) => {
-                                      const bestSource = sources.reduce((best, current) => 
-                                        current.confidence > best.confidence ? current : best
-                                      );
-                                      
-                                      return (
-                                        <div key={i} className="text-sm bg-background/50 rounded-lg p-3 border">
-                                          <div className="flex items-center justify-between mb-1">
-                                            <div className="flex items-center gap-2">
-                                              <Badge 
-                                                variant="outline" 
-                                                className={`text-xs ${getConfidenceColor(bestSource.confidence)}`}
-                                              >
-                                                {getConfidenceIcon(bestSource.confidence)}
-                                                {bestSource.similarity}
-                                              </Badge>
-                                              <span className="font-medium text-foreground">{baseTitle}</span>
-                                            </div>
-                                            <Badge variant="secondary" className="text-xs">
-                                              #{i + 1}
-                                            </Badge>
-                                          </div>
-                                          <div className="flex items-center justify-between text-xs">
-                                            <span className="text-muted-foreground">• {bestSource.category}</span>
-                                            <span className="text-muted-foreground">{bestSource.relevanceLevel}</span>
-                                          </div>
-                                        </div>
-                                      );
-                                    });
-                                  })()}
-                                </div>
-                              </div>
-                            )}
-                            
                             <div className="flex items-center justify-between mt-2">
                               <p className={`text-xs ${
                                 msg.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
@@ -535,66 +527,73 @@ export default function KineChatbotCliniquePage() {
                         </div>
                       );
                     })}
-                    
+
                     {isSending && (
                       <div className="flex justify-start">
                         <div className="bg-muted p-4 rounded-2xl rounded-bl-md">
                           <div className="flex items-center gap-2">
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            <span className="text-muted-foreground">Analyse clinique en cours...</span>
+                            <span className="text-muted-foreground">
+                              {chatMessages.length <= 1
+                                ? 'Analyse clinique en cours...'
+                                : 'Réflexion en cours...'
+                              }
+                            </span>
                           </div>
                         </div>
                       </div>
                     )}
-                    
+
                     <div ref={messagesEndRef} className="h-1" />
                   </div>
                 )}
               </CardContent>
 
-              <div className="border-t p-4 bg-background">
-                <div className="flex items-end gap-3">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="Votre question clinique (raisonnement diagnostique et thérapeutique)..."
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      disabled={isSending}
-                      className="min-h-[44px]"
-                    />
+              {phase === 'conversation' && (
+                <div className="border-t p-4 bg-background">
+                  <div className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="Question de suivi sur le raisonnement clinique..."
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        disabled={isSending}
+                        className="min-h-[44px]"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleAsk}
+                      disabled={isSending || !message.trim()}
+                      size="icon"
+                      className="min-h-[44px] min-w-[44px]"
+                    >
+                      {isSending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
-                  <Button 
-                    onClick={handleAsk} 
-                    disabled={isSending || !message.trim()}
-                    size="icon"
-                    className="min-h-[44px] min-w-[44px]"
-                  >
-                    {isSending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
 
-                <div className="mt-3 mb-2">
-                  <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded px-3 py-2">
-                    ⚠️ L'IA peut faire des erreurs, vérifiez les informations importantes.
-                  </p>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <p className="text-xs text-muted-foreground">
-                    Appuyez sur Entrée pour envoyer • Raisonnement clinique • Protocoles thérapeutiques
-                  </p>
-                  {chatMessages.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      {Math.floor(chatMessages.length / 2)} questions posées
+                  <div className="mt-3 mb-2">
+                    <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded px-3 py-2">
+                      L'IA peut faire des erreurs, vérifiez les informations importantes.
                     </p>
-                  )}
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs text-muted-foreground">
+                      Entrée pour envoyer - Questions de suivi en mode conversationnel
+                    </p>
+                    {chatMessages.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {Math.floor(chatMessages.length / 2)} échanges
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </Card>
           </div>
 
@@ -670,6 +669,71 @@ export default function KineChatbotCliniquePage() {
           </div>
         </ChatDisabledOverlay>
       </div>
+
+      {/* Modal de raisonnement clinique */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-background rounded-lg shadow-xl border w-full max-w-lg mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Stethoscope className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">Nouveau raisonnement clinique</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setResearchQuery('');
+                }}
+                className="p-1 rounded-md hover:bg-muted transition-colors"
+              >
+                <X className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-4">
+              Décrivez votre cas clinique. L'IA analysera les données et proposera un raisonnement diagnostique et thérapeutique structuré.
+            </p>
+
+            <Textarea
+              placeholder="Ex: Patient 45 ans, sportif amateur. Douleur épaule antérieure apparue progressivement depuis 3 semaines après reprise tennis. Limitation flexion active 130°, douleur nocturne sur décubitus latéral côté atteint."
+              value={researchQuery}
+              onChange={(e) => setResearchQuery(e.target.value)}
+              className="min-h-[120px] mb-4 resize-none"
+              disabled={isSending}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleResearch();
+                }
+              }}
+              autoFocus
+            />
+
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Entrée pour envoyer - Shift+Entrée pour retour à la ligne
+              </p>
+              <Button
+                onClick={handleResearch}
+                disabled={!researchQuery.trim() || isSending}
+                className="min-w-[140px]"
+              >
+                {isSending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Analyse...
+                  </>
+                ) : (
+                  <>
+                    <Stethoscope className="h-4 w-4 mr-2" />
+                    Analyser
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

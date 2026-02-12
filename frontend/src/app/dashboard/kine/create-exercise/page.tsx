@@ -603,7 +603,7 @@ export default function KineCreateExercisePage() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
-                  <DialogHeader className="bg-gradient-to-r from-blue-600 to-purple-600 -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+                  <DialogHeader className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
                     <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
                       {form.id ? 'Modifier l\'exercice' : 'Créer un nouvel exercice'}
                     </DialogTitle>
@@ -713,7 +713,7 @@ export default function KineCreateExercisePage() {
                         </Button>
                         <Button 
                           onClick={handleSubmit}
-                          className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
+                          className="flex-1 bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
                           disabled={!form.nom || !form.description}
                         >
                           {form.id ? 'Mettre à jour' : 'Créer l\'exercice'}
@@ -1073,7 +1073,7 @@ export default function KineCreateExercisePage() {
           }
         }}>
           <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
-            <DialogHeader className="bg-gradient-to-r from-blue-600 to-purple-600 -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+            <DialogHeader className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
               <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
                 {templateForm.id ? 'Modifier le template' : 'Créer un template'}
               </DialogTitle>
@@ -1349,7 +1349,7 @@ export default function KineCreateExercisePage() {
                 <Button
                   onClick={handleSubmitTemplate}
                   disabled={!templateForm.nom || selectedTemplateExercises.length === 0}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b]"
                 >
                   {templateForm.id ? 'Mettre à jour' : 'Créer le template'}
                 </Button>

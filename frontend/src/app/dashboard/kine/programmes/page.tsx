@@ -880,7 +880,7 @@ export default function ProgrammesPage() {
         if (!open) resetCreateForm();
       }}>
         <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
-          <DialogHeader className="bg-gradient-to-r from-blue-600 to-purple-600 -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+          <DialogHeader className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
             <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
               Créer un programme pour {selectedPatient?.firstName} {selectedPatient?.lastName}
             </DialogTitle>
@@ -1051,7 +1051,7 @@ export default function ProgrammesPage() {
                           type="button"
                           size="sm"
                           onClick={typeFilters.includes('templates') ? handleConfirmTemplateSelection : handleConfirmSelection}
-                          className="h-7 text-xs bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white"
+                          className="h-7 text-xs bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white"
                         >
                           <Plus className="w-3 h-3 mr-1" />
                           {typeFilters.includes('templates')
@@ -1281,7 +1281,7 @@ export default function ProgrammesPage() {
                 </Button>
                 <Button
                   onClick={handleCreateProgramme}
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
+                  className="flex-1 bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
                   disabled={!createTitle || !createDescription || selectedExercises.length === 0 || selectedExercises.length > 5 || creatingProgramme || createDuration <= 0 || createDuration > 30}
                 >
                   {creatingProgramme ? (

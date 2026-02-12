@@ -5,8 +5,7 @@ import AppLayout from '@/components/AppLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Wand2, History, Trash2, Send, Loader2, CheckCircle, Target, BookOpen } from 'lucide-react';
+import { Wand2, History, Trash2, Send, Loader2, CheckCircle } from 'lucide-react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
@@ -19,21 +18,10 @@ interface ChatMessage {
   createdAt: string;
 }
 
-interface Source {
-  title: string;
-  category: string;
-  similarity: string;
-  confidence: number;
-  relevanceLevel: string;
-  rank: number;
-  preview?: string;
-}
-
 interface HistoryMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  sources?: Source[];
   enhanced?: boolean;
   confidence?: number;
 }
@@ -99,63 +87,6 @@ export default function KineChatbotPage() {
   const getAuthToken = async () => {
     const auth = getAuth(app);
     return await auth.currentUser?.getIdToken();
-  };
-
-  const areSourcesRelevant = (sources: Source[], userQuestion: string) => {
-    if (!sources || sources.length === 0) return false;
-    
-    const questionLower = userQuestion.toLowerCase();
-    
-    const anatomicalKeywords = [
-      'épaule', 'epaule', 'shoulder',
-      'genou', 'knee', 
-      'cheville', 'ankle', 
-      'dos', 'back', 'lombalgie', 'lombaire',
-      'cervical', 'cou', 'neck',
-      'coude', 'elbow',
-      'poignet', 'wrist',
-      'hanche', 'hip',
-      'achille', 'tendon',
-      'main', 'hand',
-      'pied', 'foot'
-    ];
-    
-    const questionAnatomy = anatomicalKeywords.filter(keyword => 
-      questionLower.includes(keyword)
-    );
-    
-    if (questionAnatomy.length === 0) {
-      const MIN_CONFIDENCE_THRESHOLD = 85;
-      return sources.some(source => source.confidence >= MIN_CONFIDENCE_THRESHOLD);
-    }
-    
-    const relevantSources = sources.filter(source => {
-      const sourceText = (source.title + ' ' + source.category).toLowerCase();
-      
-      const hasAnatomicalMatch = questionAnatomy.some(anatomy => 
-        sourceText.includes(anatomy)
-      );
-      
-      const hasDecentScore = source.confidence >= 70;
-      
-      return hasAnatomicalMatch && hasDecentScore;
-    });
-    
-    return relevantSources.length > 0;
-  };
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 90) return 'text-green-600 bg-green-50';
-    if (confidence >= 80) return 'text-blue-600 bg-blue-50';
-    if (confidence >= 70) return 'text-yellow-600 bg-yellow-50';
-    return 'text-gray-600 bg-gray-50';
-  };
-
-  const getConfidenceIcon = (confidence: number) => {
-    if (confidence >= 90) return <Target className="w-3 h-3" />;
-    if (confidence >= 80) return <CheckCircle className="w-3 h-3" />;
-    if (confidence >= 70) return <BookOpen className="w-3 h-3" />;
-    return <Wand2 className="w-3 h-3" />;
   };
 
   const loadHistory = async () => {
@@ -237,7 +168,7 @@ export default function KineChatbotPage() {
           role: 'assistant',
           content: data.message,
           timestamp: new Date().toISOString(),
-          sources: data.sources && areSourcesRelevant(data.sources, currentMessage) ? data.sources : [],
+
           enhanced: data.metadata?.enhanced,
           confidence: data.confidence
         };
@@ -357,7 +288,7 @@ export default function KineChatbotPage() {
         
         {/* Header */}
         <div className="mb-6">
-          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-sm p-6">
+          <div className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Wand2 className="text-white h-7 w-7" />
@@ -448,83 +379,6 @@ export default function KineChatbotPage() {
                                 }}
                               />
                             </div>
-                            
-                            {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
-                              <div className="mt-4 pt-3 border-t border-muted-foreground/20">
-                                <div className="flex items-center gap-2 mb-3">
-                                  <BookOpen className="w-4 h-4 text-muted-foreground" />
-                                  <span className="text-sm font-medium text-muted-foreground">
-                                    Sources consultées ({(() => {
-                                      const grouped = msg.sources.reduce((acc, source) => {
-                                        const baseTitle = source.title.replace(/ - Partie \d+\/\d+$/, '');
-                                        if (!acc[baseTitle]) {
-                                          acc[baseTitle] = [];
-                                        }
-                                        acc[baseTitle].push(source);
-                                        return acc;
-                                      }, {} as Record<string, Source[]>);
-                                      return Object.keys(grouped).length;
-                                    })()} documents) :
-                                  </span>
-                                  {msg.confidence && (
-                                    <Badge variant="outline" className="text-xs">
-                                      Confiance: {Math.round(msg.confidence * 100)}%
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="space-y-2">
-                                  {(() => {
-                                    const grouped = msg.sources.reduce((acc, source) => {
-                                      const baseTitle = source.title.replace(/ - Partie \d+\/\d+$/, '');
-                                      if (!acc[baseTitle]) {
-                                        acc[baseTitle] = [];
-                                      }
-                                      acc[baseTitle].push(source);
-                                      return acc;
-                                    }, {} as Record<string, Source[]>);
-
-                                    const sortedGroups = Object.entries(grouped)
-                                      .map(([baseTitle, sources]) => ({
-                                        baseTitle,
-                                        sources,
-                                        bestConfidence: Math.max(...sources.map(s => s.confidence))
-                                      }))
-                                      .sort((a, b) => b.bestConfidence - a.bestConfidence)
-                                      .slice(0, 3);
-
-                                    return sortedGroups.map(({ baseTitle, sources }, i) => {
-                                      const bestSource = sources.reduce((best, current) => 
-                                        current.confidence > best.confidence ? current : best
-                                      );
-                                      
-                                      return (
-                                        <div key={i} className="text-sm bg-background/50 rounded-lg p-3 border">
-                                          <div className="flex items-center justify-between mb-1">
-                                            <div className="flex items-center gap-2">
-                                              <Badge 
-                                                variant="outline" 
-                                                className={`text-xs ${getConfidenceColor(bestSource.confidence)}`}
-                                              >
-                                                {getConfidenceIcon(bestSource.confidence)}
-                                                {bestSource.similarity}
-                                              </Badge>
-                                              <span className="font-medium text-foreground">{baseTitle}</span>
-                                            </div>
-                                            <Badge variant="secondary" className="text-xs">
-                                              #{i + 1}
-                                            </Badge>
-                                          </div>
-                                          <div className="flex items-center justify-between text-xs">
-                                            <span className="text-muted-foreground">• {bestSource.category}</span>
-                                            <span className="text-muted-foreground">{bestSource.relevanceLevel}</span>
-                                          </div>
-                                        </div>
-                                      );
-                                    });
-                                  })()}
-                                </div>
-                              </div>
-                            )}
                             
                             <div className="flex items-center justify-between mt-2">
                               <p className={`text-xs ${
