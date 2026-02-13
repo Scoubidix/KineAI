@@ -279,13 +279,13 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
         />
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] rounded-lg shadow-sm p-6 mb-6">
+        <div className="card-hover rounded-lg p-6 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <FileText className="text-white h-7 w-7" />
+              <FileText className="text-[#3899aa] h-7 w-7" />
               <div>
-                <h2 className="text-xl font-semibold text-white">Bilan Kiné</h2>
-                <p className="text-blue-100 text-sm">Transformez vos notes cliniques en vrac en un bilan structuré professionnel</p>
+                <h2 className="text-xl font-semibold text-[#3899aa]">Bilan Kiné</h2>
+                <p className="text-foreground text-sm">Transformez vos notes cliniques en vrac en un bilan structuré professionnel</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -294,15 +294,15 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                   variant="outline"
                   size="sm"
                   onClick={handleReset}
-                  className="h-8 bg-white/20 border-white/30 text-white hover:bg-white/30"
+                  className="h-8"
                 >
                   <RotateCcw className="h-3 w-3 mr-1" />
                   Réinitialiser
                 </Button>
               )}
-              <div className="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1">
-                <CheckCircle className="w-4 h-4 text-green-300" />
-                <span className="text-sm text-white font-medium">IA Active</span>
+              <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1">
+                <CheckCircle className="w-4 h-4 text-[#3899aa]" />
+                <span className="text-sm text-foreground font-medium">IA Active</span>
               </div>
             </div>
           </div>
@@ -318,13 +318,13 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
 
             {/* Colonne gauche: Saisie des notes */}
             <div>
-              <Card className="shadow-md h-full">
+              <Card className="card-hover h-full">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-purple-600" />
+                  <CardTitle className="text-lg flex items-center gap-2 text-foreground">
+                    <Sparkles className="h-5 w-5 text-[#3899aa]" />
                     Notes cliniques en vrac
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-foreground">
                     Entrez vos observations, mesures, tests... L'IA structurera le tout
                   </CardDescription>
                 </CardHeader>
@@ -334,7 +334,7 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                     value={rawNotes}
                     onChange={(e) => setRawNotes(e.target.value)}
                     placeholder={placeholderText}
-                    className="min-h-[500px] font-mono text-sm"
+                    className="bubble-ai min-h-[500px] font-mono text-sm text-foreground"
                     disabled={isGenerating}
                   />
 
@@ -346,7 +346,7 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                       onClick={handleGenerateBilan}
                       disabled={isGenerating || !rawNotes.trim()}
                       size="lg"
-                      className="w-full sm:w-auto"
+                      className="btn-teal w-full sm:w-auto"
                     >
                       {isGenerating ? (
                         <>
@@ -362,9 +362,9 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                     </Button>
                   </div>
 
-                  <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded p-3">
-                    <p className="font-medium text-blue-800 dark:text-blue-300 mb-1">💡 Conseils :</p>
-                    <ul className="space-y-1 text-blue-700 dark:text-blue-300">
+                  <div className="card-hover text-xs rounded p-3">
+                    <p className="font-medium text-[#3899aa] mb-1">💡 Conseils :</p>
+                    <ul className="space-y-1 text-foreground">
                       <li>• Notez vos observations sans vous soucier de la structure</li>
                       <li>• Incluez : anamnèse, tests, mesures, observations</li>
                       <li>• L'IA organisera tout selon la structure professionnelle</li>
@@ -379,38 +379,35 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
 
             {/* Colonne droite: Résultat structuré */}
             <div>
-              <Card className="shadow-md h-full">
+              <Card className="card-hover h-full">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-purple-600" />
+                    <div className="flex items-center gap-2 text-foreground">
+                      <FileText className="h-5 w-5 text-[#3899aa]" />
                       Bilan structuré
                     </div>
                     {structuredBilan && (
                       <div className="flex items-center gap-2">
                         <Button
-                          variant="outline"
                           size="sm"
                           onClick={handleCopyBilan}
-                          className="h-8"
+                          className="btn-teal h-8"
                         >
                           <Copy className="h-3 w-3 mr-1" />
                           Copier
                         </Button>
                         <Button
-                          variant="outline"
                           size="sm"
                           onClick={handleSendEmail}
-                          className="h-8"
+                          className="btn-teal h-8"
                         >
                           <Mail className="h-3 w-3 mr-1" />
                           Envoyer par mail
                         </Button>
                         <Button
-                          variant="outline"
                           size="sm"
                           onClick={handleDownloadPDF}
-                          className="h-8"
+                          className="btn-teal h-8"
                         >
                           <Download className="h-3 w-3 mr-1" />
                           Télécharger PDF
@@ -418,7 +415,7 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                       </div>
                     )}
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-foreground">
                     Votre bilan professionnel prêt à l'emploi
                   </CardDescription>
                 </CardHeader>
@@ -442,7 +439,7 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                       <Textarea
                         value={structuredBilan}
                         onChange={(e) => setStructuredBilan(e.target.value)}
-                        className="min-h-[500px] max-h-[600px] text-sm leading-relaxed"
+                        className="bubble-ai min-h-[500px] max-h-[600px] text-sm leading-relaxed text-foreground"
                         placeholder="Le bilan structuré apparaîtra ici..."
                       />
                       <p className="text-xs text-muted-foreground">

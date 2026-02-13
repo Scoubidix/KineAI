@@ -37,9 +37,14 @@ router.post('/create-checkout', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'planType invalide' });
     }
 
-    // URLs par défaut si non fournies
-    const defaultSuccessUrl = successUrl || `${process.env.FRONTEND_URL}/dashboard/kine/upgrade/success?upgrade=success`;
-    const defaultCancelUrl = cancelUrl || `${process.env.FRONTEND_URL}/dashboard/kine?upgrade=cancel`;
+    // URLs par défaut si non fournies, avec validation whitelist
+    const frontendOrigin = process.env.FRONTEND_URL;
+    const defaultSuccessUrl = (successUrl && successUrl.startsWith(frontendOrigin))
+      ? successUrl
+      : `${frontendOrigin}/dashboard/kine/upgrade/success?upgrade=success`;
+    const defaultCancelUrl = (cancelUrl && cancelUrl.startsWith(frontendOrigin))
+      ? cancelUrl
+      : `${frontendOrigin}/dashboard/kine?upgrade=cancel`;
 
     // 🔥 NOUVEAU : Vérifier si un abonnement existe déjà
     const hasActiveSubscription = kine.subscriptionId && 

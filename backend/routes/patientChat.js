@@ -124,14 +124,11 @@ router.post('/chat/:token',
         message: chatResponse.message,
         usage: chatResponse.usage,
         patient: {
-          id: req.patient.id,
-          nom: `${req.patient.firstName} ${req.patient.lastName}`,
-          age: calculateAge(req.patient.birthDate)
+          id: req.patient.id
         },
         programme: {
           id: req.programme.id,
           titre: req.programme.titre,
-          duree: req.programme.duree,
           isArchived: req.programme.isArchived
         },
         timestamp: new Date().toISOString()
@@ -175,9 +172,7 @@ router.get('/welcome/:token',
           isArchived: true,
           welcomeMessage: `Ce programme "${req.programme.titre}" est archivé. Vous ne pouvez plus interagir avec le chat. Contactez votre kinésithérapeute pour un nouveau programme.`,
           patient: {
-            id: req.patient.id,
-            nom: `${req.patient.firstName} ${req.patient.lastName}`,
-            age: calculateAge(req.patient.birthDate)
+            id: req.patient.id
           },
           programme: {
             id: req.programme.id,
@@ -205,9 +200,7 @@ router.get('/welcome/:token',
           hasHistory: true,
           chatHistory: existingHistory,
           patient: {
-            id: req.patient.id,
-            nom: `${req.patient.firstName} ${req.patient.lastName}`,
-            age: calculateAge(req.patient.birthDate)
+            id: req.patient.id
           },
           programme: {
             id: req.programme.id,
@@ -242,12 +235,10 @@ router.get('/welcome/:token',
       const response = {
         success: true,
         hasHistory: false,
-        welcomeMessage: welcomeResponse.success ? welcomeResponse.message : 
+        welcomeMessage: welcomeResponse.success ? welcomeResponse.message :
           "Bonjour ! Je suis votre assistant kinésithérapeute virtuel. Comment puis-je vous aider aujourd'hui ?",
         patient: {
-          id: req.patient.id,
-          nom: `${req.patient.firstName} ${req.patient.lastName}`,
-          age: calculateAge(req.patient.birthDate)
+          id: req.patient.id
         },
         programme: {
           id: req.programme.id,
@@ -296,8 +287,7 @@ router.get('/chat-history/:token',
         history,
         count: history.length,
         patient: {
-          id: req.patient.id,
-          nom: `${req.patient.firstName} ${req.patient.lastName}`
+          id: req.patient.id
         },
         programme: {
           id: req.programme.id,
@@ -345,8 +335,7 @@ router.get('/programme/:token',
           }))
         },
         patient: {
-          id: req.patient.id,
-          nom: `${req.patient.firstName} ${req.patient.lastName}`
+          id: req.patient.id
         },
         tokenInfo: {
           expiresAt: req.tokenData.expiresAt,
@@ -456,15 +445,11 @@ router.get('/session-status/:token',
           validatedAt: existingValidation.validatedAt
         } : null,
         patient: {
-          id: req.patient.id,
-          nom: `${req.patient.firstName} ${req.patient.lastName}`,
-          age: calculateAge(req.patient.birthDate)
+          id: req.patient.id
         },
         programme: {
           id: req.programme.id,
           titre: req.programme.titre,
-          duree: req.programme.duree,
-          dateFin: req.programme.dateFin,
           isArchived: req.programme.isArchived
         },
         timestamp: new Date().toISOString()
@@ -641,15 +626,11 @@ router.post('/validate-session/:token',
           validatedAt: validation.validatedAt
         },
         patient: {
-          id: req.patient.id,
-          nom: `${req.patient.firstName} ${req.patient.lastName}`,
-          age: calculateAge(req.patient.birthDate)
+          id: req.patient.id
         },
         programme: {
           id: req.programme.id,
           titre: req.programme.titre,
-          duree: req.programme.duree,
-          dateFin: req.programme.dateFin,
           isArchived: req.programme.isArchived
         },
         timestamp: new Date().toISOString()

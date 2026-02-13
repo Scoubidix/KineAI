@@ -413,7 +413,7 @@ export default function KineHomePage() {
           )}
 
           {/* Card Adhérence Patients */}
-          <Card className="shadow-md hover:shadow-lg transition-shadow duration-200 ease-in-out border-border hover:border-accent">
+          <Card className="card-hover">
             <CardHeader className="pb-4 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-3 text-primary">
@@ -518,7 +518,7 @@ export default function KineHomePage() {
                               <TableCell>
                                 <Link 
                                   href={`/dashboard/kine/patients/${patientSession.patient.id}`} 
-                                  className="flex items-center gap-3 group hover:text-primary transition-colors"
+                                  className="flex items-center gap-3 group hover:text-primary transition-colors rounded-md"
                                 >
                                   <Avatar className="h-8 w-8 border group-hover:border-primary">
                                     <AvatarFallback className="text-xs bg-secondary text-secondary-foreground group-hover:bg-primary/10">
@@ -592,7 +592,7 @@ export default function KineHomePage() {
           </Card>
 
           {/* Bouton Feedback Beta */}
-          <Card className="shadow-md hover:shadow-lg transition-shadow duration-200 ease-in-out border-blue-200 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/30">
+          <Card className="card-hover">
             <CardContent className="pt-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-center sm:text-left">
@@ -605,7 +605,7 @@ export default function KineHomePage() {
                 </div>
                 <Button
                   asChild
-                  className="flex items-center gap-2 whitespace-nowrap"
+                  className="btn-teal flex items-center gap-2 whitespace-nowrap"
                 >
                   <a
                     href="https://tally.so/r/Np5BJp"

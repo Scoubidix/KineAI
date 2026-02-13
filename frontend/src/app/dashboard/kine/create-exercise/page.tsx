@@ -514,8 +514,8 @@ export default function KineCreateExercisePage() {
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <Dumbbell className="text-accent" />
+            <h2 className="text-2xl font-bold flex items-center gap-2 text-[#3899aa]">
+              <Dumbbell />
               {viewMode === 'exercises'
                 ? (showPublic ? 'Exercices Publics' : 'Mes Exercices Privés')
                 : (showPublic ? 'Templates Publics' : 'Mes Templates')
@@ -597,7 +597,7 @@ export default function KineCreateExercisePage() {
                 }
               }}>
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button className="btn-teal">
                     <Plus className="h-4 w-4 mr-2" />
                     {form.id ? 'Modifier' : 'Créer'} un exercice
                   </Button>
@@ -711,9 +711,9 @@ export default function KineCreateExercisePage() {
                         >
                           Annuler
                         </Button>
-                        <Button 
+                        <Button
                           onClick={handleSubmit}
-                          className="flex-1 bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
+                          className="btn-teal flex-1 text-sm sm:text-base"
                           disabled={!form.nom || !form.description}
                         >
                           {form.id ? 'Mettre à jour' : 'Créer l\'exercice'}
@@ -730,7 +730,7 @@ export default function KineCreateExercisePage() {
             )}
 
             {!showPublic && viewMode === 'templates' && (
-              <Button onClick={() => {
+              <Button className="btn-teal" onClick={() => {
                 setTemplateForm({ id: null, nom: '', description: '' });
                 setSelectedTemplateExercises([]);
                 setTemplateDialogOpen(true);
@@ -744,7 +744,7 @@ export default function KineCreateExercisePage() {
 
         {/* Panneau de filtres - seulement pour exercices */}
         {viewMode === 'exercises' && showFilters && (
-          <Card>
+          <Card className="card-hover">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium flex items-center gap-2">
@@ -843,7 +843,7 @@ export default function KineCreateExercisePage() {
                       const exerciceTags = parseTagsFromString(ex.tags);
                       
                       return (
-                        <Card key={ex.id} className="relative hover:shadow-md transition-all duration-300">
+                        <Card key={ex.id} className="card-hover relative">
                           <CardHeader className="pb-3">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
@@ -978,7 +978,7 @@ export default function KineCreateExercisePage() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {templates.map((template) => (
-                      <Card key={template.id} className="hover:shadow-lg transition-shadow">
+                      <Card key={template.id} className="card-hover">
                         <CardHeader>
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -1349,7 +1349,7 @@ export default function KineCreateExercisePage() {
                 <Button
                   onClick={handleSubmitTemplate}
                   disabled={!templateForm.nom || selectedTemplateExercises.length === 0}
-                  className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b]"
+                  className="btn-teal"
                 >
                   {templateForm.id ? 'Mettre à jour' : 'Créer le template'}
                 </Button>

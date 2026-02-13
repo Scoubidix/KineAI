@@ -250,14 +250,14 @@ const requireAdmin = async (req, res, next) => {
       });
     }
 
-    // Liste des emails administrateurs
-    const adminEmails = [
-      'val50.jean@hotmail.fr',
-      'admin@monassistantkine.com'
-    ];
+    // Liste des emails administrateurs (depuis variables d'environnement)
+    const adminEmails = (process.env.ADMIN_EMAILS || '')
+      .split(',')
+      .map(e => e.trim().toLowerCase())
+      .filter(Boolean);
 
-    // Vérifier si l'email est dans la liste admin
-    if (!adminEmails.includes(kine.email)) {
+    // Vérifier si l'email est dans la liste admin (case-insensitive)
+    if (!adminEmails.includes(kine.email.toLowerCase())) {
       logger.warn(`🚫 Tentative accès admin refusée - User: ${sanitizeEmail(kine.email)} - Route: ${req.path}`);
       return res.status(403).json({ 
         error: 'Accès administrateur requis',

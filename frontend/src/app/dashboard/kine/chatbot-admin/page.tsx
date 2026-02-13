@@ -13,6 +13,7 @@ import { app } from '@/lib/firebase/config';
 import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
 import { usePaywall } from '@/hooks/usePaywall';
 import { useToast } from '@/hooks/use-toast';
+import DOMPurify from 'dompurify';
 
 interface Template {
   id: number;
@@ -248,8 +249,10 @@ export default function KineChatbotAdminPage() {
   const highlightVariables = (text: string) => {
     if (!text) return text;
 
-    // Remplacer les variables [xxx] par du texte surligné en jaune
-    return text.replace(/\[([^\]]+)\]/g, '<mark class="bg-yellow-300 text-black px-1 rounded">[$1]</mark>');
+    // Échapper le HTML d'abord, puis appliquer le surlignage sur les variables [xxx]
+    const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const highlighted = escaped.replace(/\[([^\]]+)\]/g, '<mark class="bg-yellow-300 text-black px-1 rounded">[$1]</mark>');
+    return DOMPurify.sanitize(highlighted, { ALLOWED_TAGS: ['mark'], ALLOWED_ATTR: ['class'] });
   };
 
   const canSendWhatsApp = () => {
@@ -469,18 +472,18 @@ export default function KineChatbotAdminPage() {
         />
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] rounded-lg shadow-sm p-6 mb-6">
+        <div className="card-hover rounded-lg p-6 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <FileText className="text-white h-7 w-7" />
+              <FileText className="text-[#3899aa] h-7 w-7" />
               <div>
-                <h2 className="text-xl font-semibold text-white">IA Administrative</h2>
-                <p className="text-blue-100 text-sm">Sélectionnez un template, choisissez un patient, personnalisez et envoyez par email ou WhatsApp</p>
+                <h2 className="text-xl font-semibold text-[#3899aa]">IA Administrative</h2>
+                <p className="text-foreground text-sm">Sélectionnez un template, choisissez un patient, personnalisez et envoyez par email ou WhatsApp</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1">
-              <CheckCircle className="w-4 h-4 text-green-300" />
-              <span className="text-sm text-white font-medium">Système actif</span>
+            <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1">
+              <CheckCircle className="w-4 h-4 text-green-500" />
+              <span className="text-sm text-foreground font-medium">Système actif</span>
             </div>
           </div>
         </div>
@@ -497,7 +500,7 @@ export default function KineChatbotAdminPage() {
             <div className="lg:col-span-1 space-y-4">
 
               {/* Recherche patient - EN HAUT */}
-              <Card className="shadow-sm">
+              <Card className="card-hover">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <User className="h-4 w-4" />
@@ -508,7 +511,7 @@ export default function KineChatbotAdminPage() {
                   {/* Patient sélectionné */}
                   {selectedPatient ? (
                     <div className="space-y-2">
-                      <div className="p-3 bg-primary/10 border border-primary rounded-lg">
+                      <div className="p-3 bg-[#3899aa]/10 border border-[#3899aa]/30 rounded-lg">
                         <div className="flex items-center justify-between mb-2">
                           <p className="font-medium text-sm">
                             {selectedPatient.firstName} {selectedPatient.lastName}
@@ -577,7 +580,7 @@ export default function KineChatbotAdminPage() {
                             filteredPatients.map(patient => (
                               <div
                                 key={patient.id}
-                                className="p-2 rounded-md hover:bg-muted cursor-pointer transition-colors"
+                                className="p-2 rounded-md hover:bg-[#3899aa]/10 hover:border-[#3899aa]/50 cursor-pointer transition-all duration-300"
                                 onClick={() => handlePatientSelect(patient)}
                               >
                                 <p className="font-medium text-sm">
@@ -595,7 +598,7 @@ export default function KineChatbotAdminPage() {
               </Card>
 
               {/* Recherche et filtres */}
-              <Card className="shadow-sm">
+              <Card className="card-hover">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Search className="h-4 w-4" />
@@ -637,7 +640,7 @@ export default function KineChatbotAdminPage() {
               </Card>
 
               {/* Liste des templates - HAUTEUR OPTIMISÉE */}
-              <Card className="shadow-sm flex-1">
+              <Card className="card-hover flex-1">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">
                     Templates ({filteredTemplates.length})
@@ -652,10 +655,10 @@ export default function KineChatbotAdminPage() {
                     filteredTemplates.map(template => (
                       <div
                         key={template.id}
-                        className={`p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                        className={`p-2.5 rounded-lg border cursor-pointer transition-all duration-300 ${
                           selectedTemplate?.id === template.id
-                            ? 'bg-primary/10 border-primary'
-                            : 'hover:bg-muted border-border'
+                            ? 'bg-[#3899aa]/10 border-[#3899aa]/50 shadow-[0_0_12px_rgba(56,153,170,0.3)]'
+                            : 'hover:bg-[#3899aa]/10 hover:border-[#3899aa]/50 border-border'
                         }`}
                         onClick={() => handleTemplateSelect(template)}
                       >
@@ -679,9 +682,9 @@ export default function KineChatbotAdminPage() {
 
             {/* Zone principale: Aperçu et édition */}
             <div className="lg:col-span-2">
-              <Card className="shadow-md">
+              <Card className="card-hover">
                 <CardHeader>
-                  <CardTitle className="text-lg">
+                  <CardTitle className="text-lg text-foreground">
                     {selectedTemplate ? selectedTemplate.title : 'Sélectionnez un template'}
                   </CardTitle>
                   {selectedTemplate && (
@@ -753,7 +756,7 @@ export default function KineChatbotAdminPage() {
                         <Button
                           onClick={handleSendEmail}
                           disabled={!canSendEmail() || isSending}
-                          className="flex-1"
+                          className={`flex-1 ${canSendEmail() ? 'btn-teal' : ''}`}
                           variant={canSendEmail() ? 'default' : 'secondary'}
                         >
                           {isSending ? (
@@ -772,7 +775,7 @@ export default function KineChatbotAdminPage() {
                         <Button
                           onClick={handleSendWhatsApp}
                           disabled={!canSendWhatsApp() || isSending}
-                          className="flex-1"
+                          className={`flex-1 ${canSendWhatsApp() ? 'btn-teal' : ''}`}
                           variant={canSendWhatsApp() ? 'default' : 'secondary'}
                         >
                           {isSending ? (
@@ -864,7 +867,7 @@ export default function KineChatbotAdminPage() {
                         <Button
                           onClick={handleSendEmail}
                           disabled={!canSendEmail() || isSending}
-                          className="flex-1"
+                          className={`flex-1 ${canSendEmail() ? 'btn-teal' : ''}`}
                           variant={canSendEmail() ? 'default' : 'secondary'}
                         >
                           {isSending ? (
@@ -883,7 +886,7 @@ export default function KineChatbotAdminPage() {
                         <Button
                           onClick={handleSendWhatsApp}
                           disabled={!canSendWhatsApp() || isSending}
-                          className="flex-1"
+                          className={`flex-1 ${canSendWhatsApp() ? 'btn-teal' : ''}`}
                           variant={canSendWhatsApp() ? 'default' : 'secondary'}
                         >
                           {isSending ? (

@@ -351,6 +351,47 @@ class NotificationService {
   }
 
   /**
+   * Supprimer toutes les notifications d'un kiné
+   */
+  async deleteAllByKine(kineUid) {
+    try {
+      const prisma = prismaService.getInstance();
+
+      const kine = await prisma.kine.findUnique({
+        where: { uid: kineUid },
+        select: { id: true }
+      });
+
+      if (!kine) {
+        return {
+          success: false,
+          error: 'Kinésithérapeute non trouvé'
+        };
+      }
+
+      const result = await prisma.notification.deleteMany({
+        where: {
+          kineId: kine.id
+        }
+      });
+
+      logger.info(`🗑️ DELETE ALL: ${result.count} notifications supprimées pour kiné ${sanitizeId(kineUid)}`);
+
+      return {
+        success: true,
+        deletedCount: result.count
+      };
+
+    } catch (error) {
+      logger.error('Erreur suppression toutes notifications:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
    * Récupérer les statistiques des notifications d'un kiné
    */
   async getNotificationStats(kineUid) {

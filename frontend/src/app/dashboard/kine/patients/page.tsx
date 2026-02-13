@@ -204,10 +204,10 @@ export default function PatientsPage() {
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold">Liste des patients</h2>
-            <Input 
-              className="mt-2" 
-              placeholder="Rechercher un patient (nom, email, téléphone)..." 
+            <h2 className="text-2xl font-bold text-[#3899aa]">Liste des patients</h2>
+            <Input
+              className="mt-2 w-[150%]"
+              placeholder="Rechercher un patient (nom, mail, tél...)" 
               value={search} 
               onChange={handleSearchChange} 
             />
@@ -221,7 +221,7 @@ export default function PatientsPage() {
             }
           }}>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-2">
+              <Button className="btn-teal flex items-center gap-2">
                 <Plus className="h-4 w-4" /> {form.id ? 'Modifier' : 'Créer'} un patient
               </Button>
             </DialogTrigger>
@@ -346,7 +346,7 @@ export default function PatientsPage() {
                 </div>
 
                 {/* Section validation */}
-                <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-white dark:bg-gray-900">
+                <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
                   {/* Checkbox consentement RGPD */}
                   {!form.id && (
                     <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -387,7 +387,7 @@ export default function PatientsPage() {
                     </Button>
                     <Button
                       onClick={handleAddOrUpdatePatient}
-                      className="flex-1 bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
+                      className="btn-teal flex-1 text-sm sm:text-base"
                       disabled={!form.firstName || !form.lastName || !form.birthDate || !form.phone || !form.email || (!form.id && !consentChecked)}
                     >
                       {form.id ? 'Mettre à jour' : 'Créer le patient'}
@@ -403,7 +403,7 @@ export default function PatientsPage() {
           </Dialog>
         </div>
 
-        <Card>
+        <Card className="card-hover">
           <CardContent>
             {loading ? (
               <div className="flex items-center justify-center py-10">
@@ -417,9 +417,9 @@ export default function PatientsPage() {
                 {filteredPatients.map((p) => (
                   <div 
                     key={p.id} 
-                    className={`border rounded-lg p-4 space-y-3 transition-all hover:shadow-md ${
-                      p.hasActiveProgram 
-                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20' 
+                    className={`border rounded-lg p-4 space-y-3 transition-all duration-300 hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-[#3899aa]/10 ${
+                      p.hasActiveProgram
+                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
                         : 'border-gray-200 dark:border-gray-700'
                     }`}
                   >
@@ -561,7 +561,7 @@ export default function PatientsPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredPatients.map((p) => (
-                    <TableRow key={p.id} className={p.hasActiveProgram ? 'bg-green-50 dark:bg-green-900/20' : ''}>
+                    <TableRow key={p.id} className={`transition-all duration-300 hover:border hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-[#3899aa]/10 ${p.hasActiveProgram ? 'bg-green-50 dark:bg-green-900/20' : ''}`}>
                       <TableCell>
                         <Link href={`/dashboard/kine/patients/${p.id}`}>
                           <Button size="icon" variant="ghost" className="hover:bg-blue-100 dark:hover:bg-blue-900/30">

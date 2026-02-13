@@ -1,7 +1,29 @@
 require('dotenv').config()
+
+// Validation des variables d'environnement critiques au démarrage
+const REQUIRED_ENV = [
+  'DATABASE_URL',
+  'JWT_SECRET_PATIENT',
+  'FIREBASE_PROJECT_ID',
+  'FIREBASE_CLIENT_EMAIL',
+  'FIREBASE_PRIVATE_KEY',
+  'OPENAI_API_KEY',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_ENDPOINT_SECRET',
+  'SUPABASE_URL',
+  'SUPABASE_API_KEY',
+  'ADMIN_EMAILS',
+];
+const missing = REQUIRED_ENV.filter(key => !process.env[key]);
+if (missing.length > 0) {
+  console.error(`FATAL: Variables d'environnement manquantes: ${missing.join(', ')}`);
+  process.exit(1);
+}
+
 const logger = require('./utils/logger');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const bodyParser = require('body-parser');
 const prismaService = require('./services/prismaService');
 
@@ -71,21 +93,15 @@ const PORT = process.env.PORT || 8080;
 // ========== CONFIGURATION CORS ==========
 const corsOptions = {
   origin: function (origin, callback) {
-    // Autorise les requêtes sans origin (apps mobiles, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
+    // Requêtes sans origin (webhooks, Postman, curl) : laisser passer sans headers CORS
+    if (!origin) return callback(null, false);
+
     const allowedOrigins = [
       'https://monassistantkine.vercel.app',
       'http://localhost:3000',  // Pour ton HTML de test
       'http://localhost:3001',  // Pour ton frontend principal
-      'file://'  // Pour les fichiers HTML ouverts directement
     ];
-    
-    // Vérification spéciale pour les fichiers locaux
-    if (origin.startsWith('file://')) {
-      return callback(null, true);
-    }
-    
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -108,7 +124,8 @@ app.use('/webhook', stripeWebhookLimiter, stripeWebhookRoutes);
 app.set('trust proxy', true);
 logger.warn('🔧 Configuration proxy activée pour récupération IP correcte');
 
-// Middleware - Augmenté pour les PDFs
+// Middleware - Headers de sécurité HTTP
+app.use(helmet());
 app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));

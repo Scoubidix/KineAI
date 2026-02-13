@@ -2,7 +2,10 @@ const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
 
 // Secret spécifique aux patients (différent de Firebase)
-const PATIENT_JWT_SECRET = process.env.JWT_SECRET_PATIENT || 'your_patient_secret_here';
+const PATIENT_JWT_SECRET = process.env.JWT_SECRET_PATIENT;
+if (!PATIENT_JWT_SECRET) {
+  throw new Error('FATAL: Variable d\'environnement JWT_SECRET_PATIENT non définie. Le serveur ne peut pas démarrer.');
+}
 
 /**
  * Génère un token JWT pour un patient avec durée = durée du programme
@@ -55,7 +58,7 @@ const generatePatientToken = (patientId, programmeId, dateFin) => {
 const validatePatientToken = (token) => {
   try {
     // Vérifier et décoder le token
-    const decoded = jwt.verify(token, PATIENT_JWT_SECRET);
+    const decoded = jwt.verify(token, PATIENT_JWT_SECRET, { algorithms: ['HS256'] });
 
     // Vérifications supplémentaires
     if (decoded.type !== 'patient_chat') {

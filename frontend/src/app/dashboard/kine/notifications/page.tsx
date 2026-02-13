@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { 
-  Bell, 
-  AlertCircle, 
+import {
+  Bell,
+  AlertCircle,
   Calendar,
   Trophy,
   CheckCircle,
@@ -13,9 +13,11 @@ import {
   RefreshCw,
   Filter,
   Eye,
-  EyeOff
+  EyeOff,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
@@ -58,6 +60,8 @@ export default function KineNotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   
   // États de filtres
   const [showOnlyUnread, setShowOnlyUnread] = useState(false);
@@ -248,6 +252,49 @@ export default function KineNotificationsPage() {
     }
   };
 
+  // Supprimer toutes les notifications
+  const deleteAllNotifications = async () => {
+    try {
+      setDeleting(true);
+      const token = await getAuthToken();
+
+      const response = await fetch(`${API_URL}/api/notifications`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la suppression');
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        setNotifications([]);
+        setDeleteDialogOpen(false);
+        loadStats();
+
+        toast({
+          title: "Notifications supprimées",
+          description: `${data.deletedCount} notifications supprimées avec succès`
+        });
+      }
+
+    } catch (error) {
+      console.error('Erreur suppression notifications:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de supprimer les notifications"
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Helpers pour l'affichage
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -293,7 +340,7 @@ export default function KineNotificationsPage() {
       <AppLayout>
         <div className="space-y-6">
           <h1 className="text-2xl md:text-3xl font-bold text-primary">Notifications</h1>
-          <Card className="w-full max-w-4xl mx-auto shadow-md">
+          <Card className="card-hover w-full max-w-4xl mx-auto">
             <CardContent className="pt-6">
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
@@ -332,13 +379,43 @@ export default function KineNotificationsPage() {
               <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
               Actualiser
             </Button>
-            
+
+            {notifications.length > 0 && (
+              <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Confirmer la suppression</DialogTitle>
+                  </DialogHeader>
+                  <p className="py-4">
+                    Êtes-vous sûr de vouloir supprimer <strong>toutes vos notifications</strong> ({notifications.length}) ?
+                    Cette action est irréversible.
+                  </p>
+                  <div className="flex justify-end gap-4 mt-4">
+                    <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Annuler</Button>
+                    <Button variant="destructive" onClick={deleteAllNotifications} disabled={deleting}>
+                      {deleting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                      Oui, tout supprimer
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+
             {unreadNotifications.length > 0 && (
               <Button
-                variant="default"
                 size="sm"
                 onClick={markAllAsRead}
                 disabled={markingAllRead}
+                className="btn-teal"
               >
                 {markingAllRead ? (
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -352,7 +429,7 @@ export default function KineNotificationsPage() {
         </div>
 
         {/* Filtres */}
-        <Card className="w-full max-w-4xl mx-auto">
+        <Card className="card-hover w-full max-w-4xl mx-auto">
           <CardContent className="pt-4">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
@@ -384,7 +461,7 @@ export default function KineNotificationsPage() {
         </Card>
 
         {/* Liste des notifications */}
-        <Card className="w-full max-w-4xl mx-auto shadow-md">
+        <Card className="card-hover w-full max-w-4xl mx-auto">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-primary">
               <Bell className="text-accent" /> 

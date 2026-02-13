@@ -378,7 +378,7 @@ function SettingsModal() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <SidebarMenuButton tooltip="Paramètres" className="text-primary font-semibold hover:bg-primary/10 hover:text-primary">
+        <SidebarMenuButton tooltip="Paramètres" className="text-foreground hover:border hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-transparent">
           <Settings className="h-4 w-4 shrink-0" />
           <span>Paramètres</span>
         </SidebarMenuButton>
@@ -390,7 +390,7 @@ function SettingsModal() {
       >
         <DialogHeader className="px-6 py-4 border-b">
           <DialogTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5 text-primary" />
+            <Settings className="h-5 w-5 text-[#3899aa]" />
             Paramètres de l'application
           </DialogTitle>
         </DialogHeader>
@@ -401,35 +401,35 @@ function SettingsModal() {
             <TabsList className="flex-col h-full w-64 bg-muted/30 justify-start p-2 space-y-1 flex-shrink-0">
               <TabsTrigger
                 value="account"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="w-full justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
               >
                 <User className="h-4 w-4 mr-2" />
                 Mon Compte
               </TabsTrigger>
               <TabsTrigger
                 value="security"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="w-full justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
               >
                 <Shield className="h-4 w-4 mr-2" />
                 Sécurité et confidentialité
               </TabsTrigger>
               <TabsTrigger
                 value="interface"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="w-full justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
               >
                 <Palette className="h-4 w-4 mr-2" />
                 Interface
               </TabsTrigger>
               <TabsTrigger
                 value="subscription"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="w-full justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
               >
                 <CreditCard className="h-4 w-4 mr-2" />
                 Mon Abonnement
               </TabsTrigger>
               <TabsTrigger
                 value="compliance"
-                className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="w-full justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
               >
                 <FileText className="h-4 w-4 mr-2" />
                 Conformité RGPD
@@ -441,12 +441,12 @@ function SettingsModal() {
               {/* Mon Compte */}
               <TabsContent value="account" className="m-0 p-6 space-y-6">
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Informations personnelles</h3>
+                  <h3 className="text-lg font-semibold mb-4 text-[#3899aa]">Informations personnelles</h3>
                   
-                  <Card>
+                  <Card className="card-hover">
                     <CardHeader>
-                      <CardTitle className="text-base">Profil professionnel</CardTitle>
-                      <CardDescription>
+                      <CardTitle className="text-base text-foreground">Profil professionnel</CardTitle>
+                      <CardDescription className="text-foreground">
                         Gérez vos informations de kinésithérapeute
                       </CardDescription>
                     </CardHeader>
@@ -517,9 +517,10 @@ function SettingsModal() {
                       </div>
                       
                       <div className="flex items-center gap-4 mt-4">
-                        <Button 
+                        <Button
                           onClick={handleSaveProfile}
                           disabled={loading}
+                          className="btn-teal"
                         >
                           {loading ? (
                             <>
@@ -554,13 +555,13 @@ function SettingsModal() {
               {/* Sécurité et confidentialité */}
               <TabsContent value="security" className="m-0 p-6 space-y-6">
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Sécurité et confidentialité</h3>
+                  <h3 className="text-lg font-semibold mb-4 text-[#3899aa]">Sécurité et confidentialité</h3>
                   
                   <div className="space-y-4">
-                    <Card>
+                    <Card className="card-hover">
                       <CardHeader>
-                        <CardTitle className="text-base">Mot de passe</CardTitle>
-                        <CardDescription>
+                        <CardTitle className="text-base text-foreground">Mot de passe</CardTitle>
+                        <CardDescription className="text-foreground">
                           Modifiez votre mot de passe de connexion via un email sécurisé
                         </CardDescription>
                       </CardHeader>
@@ -625,13 +626,13 @@ function SettingsModal() {
               {/* Interface */}
               <TabsContent value="interface" className="m-0 p-6 space-y-6">
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Préférences d'interface</h3>
+                  <h3 className="text-lg font-semibold mb-4 text-[#3899aa]">Préférences d'interface</h3>
                   
                   <div className="space-y-4">
-                    <Card>
+                    <Card className="card-hover">
                       <CardHeader>
-                        <CardTitle className="text-base">Apparence</CardTitle>
-                        <CardDescription>
+                        <CardTitle className="text-base text-foreground">Apparence</CardTitle>
+                        <CardDescription className="text-foreground">
                           Personnalisez l'apparence de l'application
                         </CardDescription>
                       </CardHeader>
@@ -670,10 +671,10 @@ function SettingsModal() {
                       </CardContent>
                     </Card>
 
-                    <Card>
+                    <Card className="card-hover">
                       <CardHeader>
-                        <CardTitle className="text-base">Notifications</CardTitle>
-                        <CardDescription>
+                        <CardTitle className="text-base text-foreground">Notifications</CardTitle>
+                        <CardDescription className="text-foreground">
                           Configurez vos préférences de notifications
                         </CardDescription>
                       </CardHeader>
@@ -695,7 +696,7 @@ function SettingsModal() {
               {/* Mon Abonnement */}
               <TabsContent value="subscription" className="m-0 p-6 space-y-6">
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Mon Abonnement</h3>
+                  <h3 className="text-lg font-semibold mb-4 text-[#3899aa]">Mon Abonnement</h3>
                   
                   {subscriptionLoading ? (
                     <div className="flex items-center justify-center py-8">
@@ -705,10 +706,10 @@ function SettingsModal() {
                   ) : (
                     <div className="space-y-4">
                       {/* Informations essentielles */}
-                      <Card>
+                      <Card className="card-hover">
                         <CardHeader>
-                          <CardTitle className="text-base">Plan actuel</CardTitle>
-                          <CardDescription>
+                          <CardTitle className="text-base text-foreground">Plan actuel</CardTitle>
+                          <CardDescription className="text-foreground">
                             Informations sur votre abonnement en cours
                           </CardDescription>
                         </CardHeader>
@@ -750,10 +751,10 @@ function SettingsModal() {
                       </Card>
 
                       {/* Gestion des paiements */}
-                      <Card>
+                      <Card className="card-hover">
                         <CardHeader>
-                          <CardTitle className="text-base">Gestion des paiements</CardTitle>
-                          <CardDescription>
+                          <CardTitle className="text-base text-foreground">Gestion des paiements</CardTitle>
+                          <CardDescription className="text-foreground">
                             Gérez vos factures et moyens de paiement
                           </CardDescription>
                         </CardHeader>
@@ -807,10 +808,10 @@ function SettingsModal() {
                       </Card>
 
                       {/* Actions d'abonnement */}
-                      <Card>
+                      <Card className="card-hover">
                         <CardHeader>
-                          <CardTitle className="text-base">Actions d'abonnement</CardTitle>
-                          <CardDescription>
+                          <CardTitle className="text-base text-foreground">Actions d'abonnement</CardTitle>
+                          <CardDescription className="text-foreground">
                             Modifier ou résilier votre abonnement
                           </CardDescription>
                         </CardHeader>
@@ -822,8 +823,9 @@ function SettingsModal() {
                                 Débloquez plus de fonctionnalités et augmentez vos limites
                               </p>
                             </div>
-                            <Button 
+                            <Button
                               size="sm"
+                              className="btn-teal"
                               onClick={() => setIsPaywallModalOpen(true)}
                             >
                               Upgrader
@@ -857,13 +859,13 @@ function SettingsModal() {
               {/* Conformité RGPD */}
               <TabsContent value="compliance" className="m-0 p-6 space-y-6">
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Conformité RGPD</h3>
+                  <h3 className="text-lg font-semibold mb-4 text-[#3899aa]">Conformité RGPD</h3>
                   
                   <div className="space-y-4">
-                    <Card>
+                    <Card className="card-hover">
                       <CardHeader>
-                        <CardTitle className="text-base">Vos données</CardTitle>
-                        <CardDescription>
+                        <CardTitle className="text-base text-foreground">Vos données</CardTitle>
+                        <CardDescription className="text-foreground">
                           Gérez et contrôlez vos données personnelles
                         </CardDescription>
                       </CardHeader>
@@ -904,10 +906,10 @@ function SettingsModal() {
                       </CardContent>
                     </Card>
 
-                    <Card>
+                    <Card className="card-hover">
                       <CardHeader>
-                        <CardTitle className="text-base">Conservation des données</CardTitle>
-                        <CardDescription>
+                        <CardTitle className="text-base text-foreground">Conservation des données</CardTitle>
+                        <CardDescription className="text-foreground">
                           Durée de conservation de vos données
                         </CardDescription>
                       </CardHeader>
@@ -925,10 +927,10 @@ function SettingsModal() {
                       </CardContent>
                     </Card>
 
-                    <Card>
+                    <Card className="card-hover">
                       <CardHeader>
-                        <CardTitle className="text-base">Consentements</CardTitle>
-                        <CardDescription>
+                        <CardTitle className="text-base text-foreground">Consentements</CardTitle>
+                        <CardDescription className="text-foreground">
                           Gérez vos consentements pour le traitement des données
                         </CardDescription>
                       </CardHeader>
@@ -1074,7 +1076,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { href: '/dashboard/kine/create-exercise', label: 'Mes Exercices', icon: Dumbbell, disabled: false },
         { href: '/dashboard/kine/programmes', label: 'Programmes', icon: Calendar, disabled: false },
         { href: '/dashboard/kine/bilan-kine', label: 'Bilan Kiné', icon: ClipboardCheck, disabled: false },
-        { href: '/dashboard/kine/chatbot', label: 'IA Basique', icon: Wand2, disabled: false },
+        { href: '/dashboard/kine/chatbot', label: 'IA Conversationnelle', icon: Wand2, disabled: false },
         { href: '/dashboard/kine/chatbot-biblio', label: 'IA Bibliographique', icon: BookOpen, disabled: false },
         { href: '/dashboard/kine/chatbot-clinique', label: 'IA Clinique', icon: Stethoscope, disabled: false },
         { href: '/dashboard/kine/chatbot-admin', label: 'IA Administrative', icon: FileText, disabled: false },
@@ -1129,23 +1131,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      {/* Dégradé global couvrant sidebar + contenu */}
-      <div
-        className="fixed inset-0 z-0 dark:hidden"
-        style={{ background: 'linear-gradient(to right, #c2e4e8 0%, #d9eff1 8%, #e8f4f5 18%, #f0f8f8 30%, #f5fafa 45%, #fafcfc 65%, #fdfdfd 100%)' }}
-      />
-      <div
-        className="fixed inset-0 z-0 hidden dark:block"
-        style={{ background: 'linear-gradient(to right, #0c1618 0%, #0e1719 8%, #101819 18%, #111919 30%, #121a1a 45%, #131414 65%, #141414 100%)' }}
-      />
-      <Sidebar collapsible="icon" side="left" variant="sidebar" className="bg-transparent text-primary border-r border-primary/20">
-        <SidebarHeader className="items-center gap-2 border-b border-primary/20">
+      {/* Fond uni */}
+      <div className="fixed inset-0 z-0 bg-white dark:bg-[#141414]" />
+      <Sidebar collapsible="icon" side="left" variant="sidebar" className="text-sm text-foreground border-r border-primary/20 bg-[#eef7f6] dark:bg-[#0f1c1b]">
+        <SidebarHeader className="items-center gap-2 border-b border-primary/20 bg-gradient-to-b from-[#4db3c5] via-[#4db3c5] to-[#eef7f6] dark:to-[#0f1c1b] rounded-t-lg pb-6">
           <img
             src="/logo.jpg"
             alt="Mon Assistant Kiné"
             className="h-12 w-12 rounded-md object-contain group-data-[state=collapsed]:h-8 group-data-[state=collapsed]:w-8"
           />
-          <SidebarTrigger className="ml-auto text-primary hover:bg-primary/10" />
+          <SidebarTrigger className="ml-auto text-white hover:bg-white/20" />
         </SidebarHeader>
         <SidebarContent className="p-2">
           <SidebarMenu>
@@ -1161,7 +1156,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   }
                   disabled={item.disabled && item.label.includes('(Bientôt)')}
                   aria-disabled={item.disabled && !item.label.includes('(Bientôt)')}
-                  className={item.disabled && !item.label.includes('(Bientôt)') ? "text-primary/40 cursor-not-allowed opacity-60 font-semibold" : "text-primary font-semibold hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/15 data-[active=true]:text-primary"}
+                  className={item.disabled && !item.label.includes('(Bientôt)') ? "text-foreground/40 cursor-not-allowed opacity-60" : "text-foreground hover:border hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-transparent data-[active=true]:border data-[active=true]:border-[#3899aa]/50 data-[active=true]:shadow-[0_0_12px_rgba(56,153,170,0.3)] data-[active=true]:bg-transparent"}
                 >
                   <Link href={item.href}>
                     <item.icon className="h-4 w-4 shrink-0" />
@@ -1185,7 +1180,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <SettingsModal />
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Déconnexion" onClick={handleLogout} className="text-red-600 font-semibold hover:bg-red-500/10 hover:text-red-700">
+              <SidebarMenuButton tooltip="Déconnexion" onClick={handleLogout} className="text-red-600 font-semibold hover:border hover:border-red-400 hover:shadow-[0_0_12px_rgba(239,68,68,0.3)] hover:bg-transparent hover:text-red-700">
                 <LogOut className="h-4 w-4 shrink-0" />
                 <span>Déconnexion</span>
               </SidebarMenuButton>

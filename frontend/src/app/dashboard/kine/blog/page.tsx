@@ -10,15 +10,15 @@ export default function KineBlogPage() {
   return (
     <AppLayout>
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <Card className="w-full max-w-lg text-center shadow-md">
+        <Card className="w-full max-w-lg text-center card-hover">
           <CardHeader>
-            <CardTitle className="flex items-center justify-center gap-2 text-primary">
-              <Library className="text-accent" /> Blog Pro & Veille Scientifique (Bientôt)
+            <CardTitle className="flex items-center justify-center gap-2 text-[#3899aa]">
+              <Library className="text-[#3899aa]" /> Blog Pro & Veille Scientifique (Bientôt)
             </CardTitle>
-            <CardDescription>Fonctionnalité bientôt disponible.</CardDescription>
+            <CardDescription className="text-foreground">Fonctionnalité bientôt disponible.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">
+            <p className="text-foreground">
               Accédez bientôt ici à des résumés d'articles scientifiques pertinents, des actualités métier et des ressources pour votre pratique professionnelle.
             </p>
           </CardContent>

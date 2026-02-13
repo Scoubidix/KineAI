@@ -17,9 +17,8 @@ function generateSecureKey(req, prefix) {
     return `${prefix}_user_${req.uid}`;
   }
   
-  // Fallback sur IP avec gestion IPv6 sécurisée
-  const forwarded = req.headers['x-forwarded-for'];
-  const ip = forwarded ? forwarded.split(',')[0].trim() : req.ip || req.connection.remoteAddress;
+  // Fallback sur IP (req.ip gère trust proxy configuré dans Express)
+  const ip = req.ip || req.connection.remoteAddress;
   
   // Normaliser les IPs IPv6 et IPv4
   let normalizedIP = ip;

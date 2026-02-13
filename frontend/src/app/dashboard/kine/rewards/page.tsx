@@ -10,20 +10,20 @@ export default function KineRewardsPage() {
   return (
     <AppLayout>
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <Card className="w-full max-w-lg text-center shadow-md">
+        <Card className="w-full max-w-lg text-center card-hover">
           <CardHeader>
-            <CardTitle className="flex items-center justify-center gap-2 text-primary">
-              <Gift className="text-accent" /> Mes Récompenses (Bientôt)
+            <CardTitle className="flex items-center justify-center gap-2 text-[#3899aa]">
+              <Gift className="text-[#3899aa]" /> Mes Récompenses (Bientôt)
             </CardTitle>
-            <CardDescription>Fonctionnalité bientôt disponible.</CardDescription>
+            <CardDescription className="text-foreground">Fonctionnalité bientôt disponible.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">
-              Gagnez bientôt ici des récompenses et des avantages exclusifs en participant activement à la plateforme KineAI : ajoutez des exercices, partagez des programmes, publiez des articles, et plus encore !
+            <p className="text-foreground">
+              Gagnez bientôt ici des récompenses et des avantages exclusifs en participant activement à la plateforme Mon Assistant Kiné : ajoutez des exercices, partagez des programmes, publiez des articles, et plus encore !
             </p>
              {/* Placeholder for future rewards display */}
              <div className="mt-6 p-6 border rounded-md bg-muted/50">
-                 <p className="text-muted-foreground italic">Vos récompenses et badges apparaîtront bientôt ici.</p>
+                 <p className="text-foreground italic">Vos récompenses et badges apparaîtront bientôt ici.</p>
              </div>
           </CardContent>
         </Card>

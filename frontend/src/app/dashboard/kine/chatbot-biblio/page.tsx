@@ -11,6 +11,7 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
 import { usePaywall } from '@/hooks/usePaywall';
+import DOMPurify from 'dompurify';
 
 interface ChatMessage {
   id: number;
@@ -399,44 +400,19 @@ export default function KineChatbotBiblioPage() {
         />
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] rounded-lg shadow-sm p-6 mb-6">
+        <div className="card-hover rounded-lg p-6 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <BookOpen className="text-white h-7 w-7" />
+              <BookOpen className="text-[#3899aa] h-7 w-7" />
               <div>
-                <h2 className="text-xl font-semibold text-white">IA Bibliographique</h2>
-                <p className="text-blue-100 text-sm">Spécialisée dans la recherche et l'analyse bibliographique - Références scientifiques et publications</p>
+                <h2 className="text-xl font-semibold text-[#3899aa]">IA Bibliographique</h2>
+                <p className="text-foreground text-sm">Spécialisée dans la recherche et l'analyse bibliographique - Références scientifiques et publications</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1">
-              <CheckCircle className="w-4 h-4 text-green-300" />
-              <span className="text-sm text-white font-medium">Connecté</span>
+            <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1">
+              <CheckCircle className="w-4 h-4 text-green-500" />
+              <span className="text-sm text-foreground font-medium">Connecté</span>
             </div>
-          </div>
-        </div>
-
-        {/* Bouton recherche + encart recherche en cours */}
-        <div className="flex items-stretch gap-4 mb-4 -mt-2">
-          <Button
-            onClick={handleNewResearch}
-            disabled={isSending}
-            size="lg"
-            className="w-1/2 h-auto bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white shadow-lg"
-          >
-            <Search className="h-5 w-5 mr-2" />
-            {phase === 'conversation' ? 'Nouvelle recherche' : 'Lancer une recherche'}
-          </Button>
-          <div className="w-1/2 bg-muted/60 border rounded-lg px-4 py-2 flex items-center">
-            {phase === 'conversation' && chatMessages.length > 0 ? (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-0.5">Recherche en cours :</p>
-                <p className="text-sm text-foreground leading-snug">
-                  {chatMessages.find(m => m.role === 'user')?.content || ''}
-                </p>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground/50">Aucune recherche en cours</p>
-            )}
           </div>
         </div>
 
@@ -446,13 +422,45 @@ export default function KineChatbotBiblioPage() {
           canAccessFeature={canAccessFeature}
           isLoading={paywallLoading}
         >
+          {/* Header row - Recherche en cours + Bouton */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-4">
+            <div className="lg:col-span-3">
+              <div className="card-hover flex items-stretch h-full px-5 py-3 bg-gradient-to-r from-[#eef7f6] to-[#e4f1f3] dark:from-[#0f1c1b] dark:to-[#132221] rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Search className="h-4 w-4 text-[#3899aa] shrink-0" />
+                  {phase === 'conversation' && chatMessages.length > 0 ? (
+                    <div>
+                      <p className="text-sm font-bold text-[#3899aa]">Recherche en cours</p>
+                      <p className="text-sm text-foreground leading-snug font-semibold">
+                        {chatMessages.find(m => m.role === 'user')?.content || ''}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground/50">Aucune recherche en cours</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="lg:col-span-1 flex">
+              <Button
+                onClick={handleNewResearch}
+                disabled={isSending}
+                size="lg"
+                className="w-full h-full btn-teal"
+              >
+                <Search className="h-5 w-5 mr-2" />
+                {phase === 'conversation' ? 'Nouvelle recherche' : 'Lancer une recherche'}
+              </Button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
             {/* Chat */}
             <div className="lg:col-span-3">
-            <Card className={`shadow-md min-h-[60vh] max-h-[75vh] flex flex-col ${phase === 'initial' ? 'opacity-50 pointer-events-none' : ''}`}>
-              
-              <CardContent 
+            <Card className={`card-hover min-h-[60vh] max-h-[75vh] flex flex-col ${phase === 'initial' ? 'opacity-50 pointer-events-none' : ''}`}>
+
+              <CardContent
                 ref={messagesContainerRef}
                 className="flex-1 p-6 overflow-y-auto scroll-smooth"
                 style={{ 
@@ -482,9 +490,12 @@ export default function KineChatbotBiblioPage() {
                 ) : (
                   <div className="space-y-4">
                     {chatMessages.map((msg, index) => {
-                      const isLastBotMessage = msg.role === 'assistant' && 
+                      // Masquer le 1er message user (déjà affiché dans le header "Recherche en cours")
+                      if (index === 0 && msg.role === 'user') return null;
+
+                      const isLastBotMessage = msg.role === 'assistant' &&
                         index === chatMessages.length - 1;
-                      
+
                       return (
                         <div
                           key={index}
@@ -492,17 +503,17 @@ export default function KineChatbotBiblioPage() {
                           className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
-                            className={`max-w-[80%] p-4 rounded-2xl ${
+                            className={`max-w-[80%] py-4 pl-4 pr-10 rounded-2xl ${
                               msg.role === 'user'
-                                ? 'bg-primary text-primary-foreground rounded-br-md'
-                                : 'bg-muted text-foreground rounded-bl-md'
+                                ? 'bubble-user rounded-br-md'
+                                : 'bubble-ai text-foreground rounded-bl-md'
                             }`}
                           >
-                            <div className="prose prose-sm max-w-none">
-                              <div 
+                            <div className="prose prose-sm max-w-none text-justify">
+                              <div
                                 className="whitespace-pre-wrap"
                                 dangerouslySetInnerHTML={{
-                                  __html: msg.content
+                                  __html: DOMPurify.sanitize(msg.content
                                     .replace(/^### (.*$)/gim, '<strong class="text-base">$1</strong>') // ### -> heading
                                     .replace(/^## (.*$)/gim, '<strong class="text-base">$1</strong>') // ## -> heading
                                     .replace(/^# (.*$)/gim, '<strong class="text-lg">$1</strong>') // # -> heading
@@ -510,14 +521,14 @@ export default function KineChatbotBiblioPage() {
                                     .replace(/\*(.*?)\*/g, '<em>$1</em>') // *texte* -> italique
                                     .replace(/^- (.*$)/gim, '• $1') // - -> •
                                     .replace(/^\d+\.\s+(.*$)/gim, '<strong>$1</strong>') // 1. -> gras
-                                    .replace(/\n/g, '<br>') // retours à la ligne
+                                    .replace(/\n/g, '<br>')) // retours à la ligne
                                 }}
                               />
                             </div>
                             
                             <div className="flex items-center justify-between mt-2">
                               <p className={`text-xs ${
-                                msg.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                                msg.role === 'user' ? 'text-white/70' : 'text-muted-foreground'
                               }`}>
                                 {formatTime(msg.timestamp)}
                               </p>
@@ -549,7 +560,7 @@ export default function KineChatbotBiblioPage() {
               </CardContent>
 
               {phase === 'conversation' && (
-                <div className="border-t p-4 bg-background">
+                <div className="border-t p-4 bg-white dark:bg-card">
                   <div className="flex items-end gap-3">
                     <div className="flex-1">
                       <Input
@@ -565,7 +576,7 @@ export default function KineChatbotBiblioPage() {
                       onClick={handleAsk}
                       disabled={isSending || !message.trim()}
                       size="icon"
-                      className="min-h-[44px] min-w-[44px]"
+                      className="min-h-[44px] min-w-[44px] btn-teal"
                     >
                       {isSending ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -581,15 +592,10 @@ export default function KineChatbotBiblioPage() {
                     </p>
                   </div>
 
-                  <div className="flex justify-between items-center">
-                    <p className="text-xs text-muted-foreground">
+                  <div>
+                    <p className="text-xs text-foreground">
                       Entrée pour envoyer - Questions de suivi en mode conversationnel
                     </p>
-                    {chatMessages.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {Math.floor(chatMessages.length / 2)} échanges
-                      </p>
-                    )}
                   </div>
                 </div>
               )}
@@ -598,7 +604,7 @@ export default function KineChatbotBiblioPage() {
             {/* Bouton Proposer une étude */}
             <Button
               asChild
-              className="flex items-center gap-2 w-full mt-3"
+              className="flex items-center gap-2 w-full mt-3 btn-teal"
             >
               <a
                 href="https://tally.so/r/mV25VJ"
@@ -615,12 +621,12 @@ export default function KineChatbotBiblioPage() {
           <div className="lg:col-span-1 space-y-4">
 
             {/* Conseils d'utilisation */}
-            <Card className="shadow-sm">
+            <Card className="card-hover">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">💡 Conseils Biblio</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="text-xs text-muted-foreground space-y-3">
+                <div className="text-xs text-foreground space-y-3">
                   <div>
                     <p className="font-medium mb-1">Questions bibliographiques :</p>
                     <ul className="space-y-1 pl-2">
@@ -640,41 +646,11 @@ export default function KineChatbotBiblioPage() {
                     </ul>
                   </div>
                   <div>
-                    <p className="font-medium text-foreground mb-2">📝 Exemple optimisé :</p>
+                    <p className="font-medium mb-2">📝 Exemple optimisé :</p>
                     <p className="text-xs italic bg-muted/50 p-2 rounded border">
                       "Quelles sont les dernières études sur l'efficacité du renforcement excentrique dans la tendinopathie rotulienne chez le sportif ?"
                     </p>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Actions rapides */}
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between text-base">
-                  <div className="flex items-center gap-2">
-                    <History className="h-4 w-4" />
-                    Actions
-                  </div>
-                  {history.length > 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={clearHistory}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p>📊 <strong>{history.length}</strong> conversations sauvegardées</p>
-                  <p>📅 Historique sur <strong>5 jours</strong></p>
-                  <p>🔐 Données <strong>sécurisées</strong></p>
-                  <p>📚 Base bibliographique <strong>active</strong></p>
                 </div>
               </CardContent>
             </Card>
@@ -687,7 +663,7 @@ export default function KineChatbotBiblioPage() {
       {/* Modal de recherche bibliographique */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-background rounded-lg shadow-xl border w-full max-w-lg mx-4 p-6">
+          <div className="card-hover rounded-lg w-full max-w-lg mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Search className="h-5 w-5 text-blue-600" />
@@ -730,7 +706,7 @@ export default function KineChatbotBiblioPage() {
               <Button
                 onClick={handleResearch}
                 disabled={!researchQuery.trim() || isSending}
-                className="min-w-[140px]"
+                className="min-w-[140px] btn-teal"
               >
                 {isSending ? (
                   <>

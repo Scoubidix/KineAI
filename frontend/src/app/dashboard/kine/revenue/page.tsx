@@ -10,15 +10,15 @@ export default function KineRevenuePage() {
   return (
     <AppLayout>
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <Card className="w-full max-w-lg text-center shadow-md">
+        <Card className="w-full max-w-lg text-center card-hover">
           <CardHeader>
-            <CardTitle className="flex items-center justify-center gap-2 text-primary">
-              <DollarSign className="text-accent" /> Revenus / Affiliation (Bientôt)
+            <CardTitle className="flex items-center justify-center gap-2 text-[#3899aa]">
+              <DollarSign className="text-[#3899aa]" /> Revenus / Affiliation (Bientôt)
             </CardTitle>
-            <CardDescription>Fonctionnalité bientôt disponible.</CardDescription>
+            <CardDescription className="text-foreground">Fonctionnalité bientôt disponible.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">
+            <p className="text-foreground">
               Gérez bientôt ici vos invitations de patients, votre programme d'affiliation et suivez vos revenus récurrents.
             </p>
           </CardContent>

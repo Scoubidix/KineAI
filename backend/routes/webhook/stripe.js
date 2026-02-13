@@ -10,11 +10,18 @@ const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../../
 const router = express.Router();
 const prisma = prismaService.getInstance();
 
-// IPs autorisées de Stripe (liste officielle)
-const STRIPE_IPS = [
+// IPs autorisées de Stripe (depuis env ou liste officielle par défaut - https://docs.stripe.com/ips)
+const DEFAULT_STRIPE_IPS = [
   '3.18.12.63', '3.130.192.231', '13.235.14.237', '13.235.122.149',
   '18.211.135.69', '35.154.171.200', '52.15.183.38', '54.88.130.119',
-  '54.88.130.237', '54.187.174.169', '54.187.205.235', '54.187.216.72'
+  '54.88.130.237', '54.187.174.169', '54.187.205.235', '54.187.216.72',
+  '35.157.207.129', '3.69.109.8', '3.120.168.93'
+];
+const STRIPE_IPS = [
+  ...(process.env.STRIPE_WEBHOOK_IPS
+    ? process.env.STRIPE_WEBHOOK_IPS.split(',').map(ip => ip.trim()).filter(Boolean)
+    : DEFAULT_STRIPE_IPS),
+  ...(process.env.NODE_ENV === 'development' ? ['127.0.0.1', '::1'] : [])
 ];
 
 /**
@@ -39,18 +46,6 @@ const validateIPWithFallback = (req) => {
     userAgent: req.headers['user-agent'],
     host: req.headers.host
   });
-
-  // En développement, on skip la vérification mais on affiche les headers pour debug
-  if (process.env.NODE_ENV === 'development') {
-    logger.warn('🔓 Dev mode - Validation IP bypassée');
-    logger.warn('📋 Headers disponibles pour production:', headers);
-    return { 
-      valid: true, 
-      ip: headers['x-forwarded-for'] || headers['direct-ip'] || '127.0.0.1', 
-      source: 'development-bypass',
-      headers 
-    };
-  }
 
   // Fonction de normalisation et validation d'une IP
   const normalizeAndValidateIP = (ip) => {

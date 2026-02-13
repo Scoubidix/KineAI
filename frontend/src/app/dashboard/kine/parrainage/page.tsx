@@ -180,7 +180,7 @@ export default function ParrainagePage() {
   const getPlanLabel = (plan: string) => {
     const planLabels: Record<string, string> = {
       'DECLIC': 'Déclic (9€)',
-      'PRATIQUE': 'Pratique (19€)',
+      'PRATIQUE': 'Pratique (29€)',
       'PIONNIER': 'Pionnier (20€)',
       'EXPERT': 'Expert (59€)'
     };
@@ -202,11 +202,11 @@ export default function ParrainagePage() {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* En-tête */}
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Gift className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold flex items-center gap-2 text-[#3899aa]">
+            <Gift className="h-6 w-6 text-[#3899aa]" />
             Parrainage
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-foreground mt-1">
             Parrainez vos confrères et gagnez tous les deux 1 mois gratuit !
           </p>
         </div>
@@ -229,13 +229,13 @@ export default function ParrainagePage() {
         )}
 
         {/* Carte principale - Code de parrainage */}
-        <Card>
+        <Card className="card-hover">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Share2 className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <Share2 className="h-5 w-5 text-[#3899aa]" />
               Mon code de parrainage
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-foreground">
               Partagez ce code avec vos confrères kinésithérapeutes
             </CardDescription>
           </CardHeader>
@@ -283,7 +283,7 @@ export default function ParrainagePage() {
                 <p className="text-muted-foreground mb-4">
                   Vous n'avez pas encore de code de parrainage
                 </p>
-                <Button onClick={generateCode} disabled={generating || !!error}>
+                <Button onClick={generateCode} disabled={generating || !!error} className="btn-teal">
                   {generating ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -302,39 +302,39 @@ export default function ParrainagePage() {
         </Card>
 
         {/* Comment ça marche */}
-        <Card>
+        <Card className="card-hover">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <HelpCircle className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <HelpCircle className="h-5 w-5 text-[#3899aa]" />
               Comment ça marche ?
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-3 gap-4">
               <div className="p-4 border rounded-lg text-center">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-primary font-bold">1</span>
+                <div className="h-10 w-10 rounded-full bg-[#3899aa]/10 flex items-center justify-center mx-auto mb-3">
+                  <span className="text-[#3899aa] font-bold">1</span>
                 </div>
-                <p className="font-medium">Partagez votre code</p>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="font-medium text-foreground">Partagez votre code</p>
+                <p className="text-sm text-foreground mt-1">
                   Envoyez votre code à un confrère kiné
                 </p>
               </div>
               <div className="p-4 border rounded-lg text-center">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-primary font-bold">2</span>
+                <div className="h-10 w-10 rounded-full bg-[#3899aa]/10 flex items-center justify-center mx-auto mb-3">
+                  <span className="text-[#3899aa] font-bold">2</span>
                 </div>
-                <p className="font-medium">Il s'abonne</p>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="font-medium text-foreground">Il s'abonne</p>
+                <p className="text-sm text-foreground mt-1">
                   Il entre votre code lors de son paiement
                 </p>
               </div>
               <div className="p-4 border rounded-lg text-center">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-primary font-bold">3</span>
+                <div className="h-10 w-10 rounded-full bg-[#3899aa]/10 flex items-center justify-center mx-auto mb-3">
+                  <span className="text-[#3899aa] font-bold">3</span>
                 </div>
-                <p className="font-medium">Vous gagnez tous les deux</p>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="font-medium text-foreground">Vous gagnez tous les deux</p>
+                <p className="text-sm text-foreground mt-1">
                   1 mois offert après son 1er renouvellement
                 </p>
               </div>
@@ -353,43 +353,43 @@ export default function ParrainagePage() {
         {/* Statistiques */}
         {stats && (
           <div className="grid md:grid-cols-3 gap-4">
-            <Card>
+            <Card className="card-hover">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
                     <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{stats.stats.total}</p>
-                    <p className="text-sm text-muted-foreground">Filleuls total</p>
+                    <p className="text-2xl font-bold text-foreground">{stats.stats.total}</p>
+                    <p className="text-sm text-foreground">Filleuls total</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="card-hover">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
                     <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{stats.stats.completed}</p>
-                    <p className="text-sm text-muted-foreground">Parrainages validés</p>
+                    <p className="text-2xl font-bold text-foreground">{stats.stats.completed}</p>
+                    <p className="text-sm text-foreground">Parrainages validés</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="card-hover">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
                     <Euro className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{stats.stats.totalCreditsEarned}€</p>
-                    <p className="text-sm text-muted-foreground">Crédits gagnés</p>
+                    <p className="text-2xl font-bold text-foreground">{stats.stats.totalCreditsEarned}€</p>
+                    <p className="text-sm text-foreground">Crédits gagnés</p>
                   </div>
                 </div>
               </CardContent>
@@ -399,10 +399,10 @@ export default function ParrainagePage() {
 
         {/* Liste des filleuls */}
         {stats && stats.referrals.length > 0 && (
-          <Card>
+          <Card className="card-hover">
             <CardHeader>
-              <CardTitle>Mes filleuls</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-foreground">Mes filleuls</CardTitle>
+              <CardDescription className="text-foreground">
                 Limite : {stats.limits.monthlyUsed}/{stats.limits.monthlyMax} parrainages validés ce mois
               </CardDescription>
             </CardHeader>
@@ -411,7 +411,7 @@ export default function ParrainagePage() {
                 {stats.referrals.map((referral) => (
                   <div
                     key={referral.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
+                    className="flex items-center justify-between p-3 border rounded-lg transition-all duration-300 hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-[#3899aa]/10"
                   >
                     <div>
                       <p className="font-medium">{referral.refereeName}</p>
@@ -432,10 +432,10 @@ export default function ParrainagePage() {
 
         {/* Message si pas de filleuls */}
         {stats && stats.referrals.length === 0 && stats.code && (
-          <Card className="border-dashed">
+          <Card className="card-hover border-dashed">
             <CardContent className="pt-6 text-center">
               <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">
+              <p className="text-foreground">
                 Vous n'avez pas encore de filleuls. Partagez votre code !
               </p>
             </CardContent>

@@ -577,8 +577,8 @@ export default function PatientDetailPage() {
 
     return (
       <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
-        <DialogHeader className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
-          <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
+        <DialogHeader className="-mx-6 -mt-6 px-6 py-4 rounded-t-lg border-b">
+          <DialogTitle className="text-lg sm:text-xl font-semibold text-[#3899aa]">
             {modalTitle}
           </DialogTitle>
         </DialogHeader>
@@ -586,8 +586,8 @@ export default function PatientDetailPage() {
         <div className="space-y-4 sm:space-y-6 py-4">
           {/* Section Informations du programme */}
           <div className="space-y-3 sm:space-y-4">
-            <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-              <div className="w-1 h-5 sm:h-6 bg-blue-500 rounded-full"></div>
+            <h3 className="text-base sm:text-lg font-medium text-foreground flex items-center gap-2">
+              <div className="w-1 h-5 sm:h-6 bg-[#3899aa] rounded-full"></div>
               Informations du programme
             </h3>
             
@@ -652,8 +652,8 @@ export default function PatientDetailPage() {
 
           {/* Section Exercices avec filtres et sélection */}
           <div className="space-y-3 sm:space-y-4">
-            <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-              <div className="w-1 h-5 sm:h-6 bg-green-500 rounded-full"></div>
+            <h3 className="text-base sm:text-lg font-medium text-foreground flex items-center gap-2">
+              <div className="w-1 h-5 sm:h-6 bg-[#3899aa] rounded-full"></div>
               Exercices du programme
             </h3>
 
@@ -748,7 +748,7 @@ export default function PatientDetailPage() {
                         type="button"
                         size="sm"
                         onClick={typeFilters.includes('templates') ? handleConfirmTemplateSelection : handleConfirmSelection}
-                        className="h-7 text-xs bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white"
+                        className="h-7 text-xs btn-teal"
                       >
                         <Plus className="w-3 h-3 mr-1" />
                         {typeFilters.includes('templates')
@@ -875,8 +875,8 @@ export default function PatientDetailPage() {
               {selectedExercises.length > 0 && (
                 <div ref={selectedExercisesRef} className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <Dumbbell className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-medium">
+                    <Dumbbell className="w-4 h-4 text-[#3899aa]" />
+                    <span className="text-sm font-medium text-foreground">
                       Exercices sélectionnés ({selectedExercises.length})
                     </span>
                   </div>
@@ -982,7 +982,7 @@ export default function PatientDetailPage() {
               </Button>
               <Button
                 onClick={handleSubmit}
-                className="flex-1 bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
+                className="flex-1 btn-teal text-sm sm:text-base"
                 disabled={!title || !description || selectedExercises.length === 0 || selectedExercises.length > 5 || duration <= 0 || duration > 30}
               >
                 {buttonText}
@@ -1002,38 +1002,34 @@ export default function PatientDetailPage() {
     <AppLayout>
       <div className="p-6 space-y-6">
         {/* Section profil patient NOUVELLE VERSION */}
-        <div className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] rounded-lg overflow-hidden">
+        <div className="card-hover rounded-lg overflow-hidden">
           <div className="relative">
-            {/* Pattern de fond */}
-            <div className="absolute inset-0 bg-black/10">
-              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
-            </div>
             
             {loading ? (
               <div className="relative flex items-center justify-center py-6">
-                <Loader2 className="animate-spin w-6 h-6 text-white" />
+                <Loader2 className="animate-spin w-6 h-6 text-[#3899aa]" />
               </div>
             ) : patient && (
               <div className="relative p-4">
                 {/* Tout dans un seul bloc ultra-compact */}
-                <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="rounded-xl p-4">
                   <div className="space-y-2">
                     {/* Ligne 1 : Avatar + Nom */}
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center ring-2 ring-white/30">
-                          <User className="w-6 h-6 text-white" />
+                        <div className="w-12 h-12 rounded-full bg-[#3899aa]/10 flex items-center justify-center ring-2 ring-[#3899aa]/30">
+                          <User className="w-6 h-6 text-[#3899aa]" />
                         </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center ring-1 ring-white/30">
+                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center ring-1 ring-white">
                           <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                         </div>
                       </div>
-                      
+
                       <div className="flex-1">
-                        <h1 className="text-xl font-bold text-white leading-tight">
+                        <h1 className="text-xl font-bold text-[#3899aa] leading-tight">
                           {patient.firstName} {patient.lastName.toUpperCase()}
                         </h1>
-                        <div className="flex items-center gap-1 text-blue-100">
+                        <div className="flex items-center gap-1 text-muted-foreground">
                           <Calendar className="w-3 h-3" />
                           <span className="text-xs">
                             {calculateAge(patient.birthDate)} ans • {formatDate(patient.birthDate)}
@@ -1041,35 +1037,35 @@ export default function PatientDetailPage() {
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Ligne 2 : Email */}
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-white/20 rounded-md flex items-center justify-center">
-                        <Mail className="w-4 h-4 text-white" />
+                      <div className="w-8 h-8 bg-[#3899aa]/10 rounded-md flex items-center justify-center">
+                        <Mail className="w-4 h-4 text-[#3899aa]" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-white text-sm font-medium">{patient.email}</p>
+                        <p className="text-foreground text-sm font-medium">{patient.email}</p>
                       </div>
                     </div>
-                    
+
                     {/* Ligne 3 : Téléphone */}
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-white/20 rounded-md flex items-center justify-center">
-                        <Phone className="w-4 h-4 text-white" />
+                      <div className="w-8 h-8 bg-[#3899aa]/10 rounded-md flex items-center justify-center">
+                        <Phone className="w-4 h-4 text-[#3899aa]" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-white text-sm font-medium">{patient.phone}</p>
+                        <p className="text-foreground text-sm font-medium">{patient.phone}</p>
                       </div>
                     </div>
-                    
+
                     {/* Ligne 4 : Objectifs (si présents) */}
                     {patient.goals && (
-                      <div className="flex items-start gap-2 pt-1 border-t border-white/20">
-                        <div className="w-8 h-8 bg-white/20 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Target className="w-4 h-4 text-white" />
+                      <div className="flex items-start gap-2 pt-1 border-t border-border">
+                        <div className="w-8 h-8 bg-[#3899aa]/10 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <Target className="w-4 h-4 text-[#3899aa]" />
                         </div>
                         <div className="flex-1">
-                          <p className="text-white text-xs leading-relaxed">{patient.goals}</p>
+                          <p className="text-foreground text-xs leading-relaxed">{patient.goals}</p>
                         </div>
                       </div>
                     )}
@@ -1081,14 +1077,14 @@ export default function PatientDetailPage() {
         </div>
 
         {/* Section programmes */}
-        <Card>
+        <Card className="card-hover">
           <CardHeader className="flex flex-row items-center justify-between">
             <div className="space-y-1">
-              <CardTitle className="text-xl font-semibold flex items-center gap-2">
-                <Activity className="w-5 h-5 text-blue-600" />
+              <CardTitle className="text-xl font-semibold flex items-center gap-2 text-[#3899aa]">
+                <Activity className="w-5 h-5 text-[#3899aa]" />
                 Programmes d'exercices
               </CardTitle>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-foreground">
                 Gérez les programmes de rééducation de votre patient
               </p>
             </div>
@@ -1098,7 +1094,7 @@ export default function PatientDetailPage() {
                 if (!open) resetCreateForm();
               }}>
                 <DialogTrigger asChild>
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Button className="btn-teal">
                     <Plus className="h-4 w-4 mr-2" />
                     Nouveau programme
                   </Button>
@@ -1111,26 +1107,26 @@ export default function PatientDetailPage() {
           <CardContent>
             {programmesData.length === 0 ? (
               <div className="text-center py-12">
-                <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
                   Aucun programme créé
                 </h3>
-                <p className="text-gray-600 mb-6">
+                <p className="text-foreground mb-6">
                   Commencez par créer un programme d'exercices personnalisé pour ce patient
                 </p>
               </div>
             ) : (
               <div className="space-y-6">
                 {programmesData.map((programme: any, index: number) => (
-                  <Card key={programme.id || index} className="border-l-4 border-l-blue-500">
+                  <Card key={programme.id || index} className="card-hover border-l-4 border-l-[#3899aa]">
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex-1">
-                          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                          <h3 className="text-xl font-semibold text-foreground mb-2">
                             {programme.titre}
                           </h3>
-                          <p className="text-gray-700 mb-3">{programme.description}</p>
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <p className="text-foreground mb-3">{programme.description}</p>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <Clock className="w-4 h-4" />
                               <span>{programme.duree} jours</span>
@@ -1198,8 +1194,8 @@ export default function PatientDetailPage() {
                       {/* Liste des exercices */}
                       {programme.exercices && programme.exercices.length > 0 && (
                         <div className="mb-6">
-                          <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
-                            <Dumbbell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
+                            <Dumbbell className="w-4 h-4 text-[#3899aa]" />
                             Exercices du programme
                           </h4>
                           <div className="grid gap-3">
@@ -1394,10 +1390,10 @@ export default function PatientDetailPage() {
                 <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg border text-sm break-all font-mono">
                   {generatedLink}
                 </div>
-                <Button 
+                <Button
                   onClick={copyLinkToClipboard}
                   variant="outline"
-                  className="w-full"
+                  className="w-full hover:bg-gradient-to-r hover:from-[#4db3c5] hover:to-[#1f5c6a] hover:text-white hover:border-[#3899aa]/30 hover:shadow-[0_0_15px_rgba(56,153,170,0.3)]"
                 >
                   <Copy className="w-4 h-4 mr-2" />
                   Copier le lien
@@ -1406,7 +1402,7 @@ export default function PatientDetailPage() {
               
               {/* Actions */}
               <div className="flex gap-3 pt-4 border-t">
-                <Button 
+                <Button
                   onClick={() => {
                     setShowLinkModal(false);
                     setWhatsappStatus('idle');
@@ -1415,7 +1411,7 @@ export default function PatientDetailPage() {
                     setGeneratedLink(null);
                   }}
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 hover:bg-gradient-to-r hover:from-[#4db3c5] hover:to-[#1f5c6a] hover:text-white hover:border-[#3899aa]/30 hover:shadow-[0_0_15px_rgba(56,153,170,0.3)]"
                 >
                   Fermer
                 </Button>

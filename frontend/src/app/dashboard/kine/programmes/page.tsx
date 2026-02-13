@@ -629,20 +629,20 @@ export default function ProgrammesPage() {
         {/* En-tête */}
         <div className="pb-4 border-b border-border flex justify-between items-start pr-16 lg:pr-0">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-primary">Gestion des Programmes</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-[#3899aa]">Gestion des Programmes</h1>
             <p className="flex items-center gap-2 text-md md:text-lg text-muted-foreground mt-1">
               <Calendar className="h-5 w-5 text-accent" />
               Vue d'ensemble de tous vos programmes de rééducation
             </p>
           </div>
-          <Button onClick={handleOpenPatientSelector} className="flex items-center gap-2 shrink-0">
+          <Button onClick={handleOpenPatientSelector} className="btn-teal flex items-center gap-2 shrink-0">
             <Plus className="h-4 w-4" />
             Créer un programme
           </Button>
         </div>
 
         {/* Barre de recherche et filtres */}
-        <Card className="shadow-sm">
+        <Card className="card-hover">
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="relative flex-1">
@@ -657,25 +657,27 @@ export default function ProgrammesPage() {
               
               <div className="flex gap-2">
                 <Button
-                  variant={statusFilter === 'all' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setStatusFilter('all')}
-                  className="flex items-center gap-1"
+                  className={`flex items-center gap-1 ${statusFilter === 'all' ? 'btn-teal' : ''}`}
+                  variant={statusFilter === 'all' ? 'default' : 'outline'}
                 >
                   <Filter className="h-4 w-4" />
                   Tous ({programmes.length})
                 </Button>
                 <Button
-                  variant={statusFilter === 'active' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setStatusFilter('active')}
+                  className={statusFilter === 'active' ? 'btn-teal' : ''}
+                  variant={statusFilter === 'active' ? 'default' : 'outline'}
                 >
                   Actifs
                 </Button>
                 <Button
-                  variant={statusFilter === 'ending' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setStatusFilter('ending')}
+                  className={statusFilter === 'ending' ? 'btn-teal' : ''}
+                  variant={statusFilter === 'ending' ? 'default' : 'outline'}
                 >
                   Fin proche
                 </Button>
@@ -686,10 +688,10 @@ export default function ProgrammesPage() {
 
         {/* Liste des programmes */}
         {filteredProgrammes.length === 0 ? (
-          <Card className="shadow-sm">
+          <Card className="card-hover">
             <CardContent className="text-center py-12">
               <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Aucun programme trouvé</h3>
+              <h3 className="text-lg font-semibold mb-2 text-foreground">Aucun programme trouvé</h3>
               <p className="text-muted-foreground mb-4">
                 {searchQuery || statusFilter !== 'all' 
                   ? 'Aucun programme ne correspond à vos critères de recherche.'
@@ -707,7 +709,7 @@ export default function ProgrammesPage() {
               ));
 
               return (
-                <Card key={programme.id} className="shadow-md hover:shadow-lg transition-all duration-200 ease-in-out border-border hover:border-accent group">
+                <Card key={programme.id} className="card-hover group">
                   <CardContent className="p-6">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                       {/* Infos principales */}
@@ -717,7 +719,7 @@ export default function ProgrammesPage() {
                             <h3 className="text-lg font-semibold text-primary group-hover:text-accent transition-colors">
                               {programme.titre}
                             </h3>
-                            <p className="text-sm text-muted-foreground line-clamp-1">
+                            <p className="text-sm text-foreground line-clamp-1">
                               {programme.description}
                             </p>
                           </div>
@@ -732,7 +734,7 @@ export default function ProgrammesPage() {
                             {getInitials(programme.patient.firstName, programme.patient.lastName)}
                           </div>
                           <div>
-                            <p className="font-medium text-sm">
+                            <p className="font-medium text-sm text-foreground">
                               {programme.patient.firstName} {programme.patient.lastName}
                             </p>
                             <p className="text-xs text-muted-foreground">
@@ -741,34 +743,49 @@ export default function ProgrammesPage() {
                           </div>
                         </div>
 
-                        {/* Progression */}
+                        {/* Progression segmentée */}
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Progression</span>
-                            <span className="text-primary font-medium">{statusInfo.daysText}</span>
+                            <span className="text-foreground">Progression</span>
+                            <span className={`font-medium ${
+                              statusInfo.status === 'expired' ? 'text-destructive' :
+                              statusInfo.status === 'ending' ? 'text-orange-500' : 'text-[#3899aa]'
+                            }`}>{statusInfo.daysText}</span>
                           </div>
-                          <Progress 
-                            value={progressPercent} 
-                            className="h-2" 
-                            indicatorClassName={
-                              statusInfo.status === 'expired' ? 'bg-destructive' :
-                              statusInfo.status === 'ending' ? 'bg-orange-500' : 'bg-primary'
-                            }
-                          />
+                          <div className="flex gap-1.5">
+                            {Array.from({ length: Math.min(programme.duree, 30) }).map((_, i) => {
+                              const segmentPercent = ((i + 1) / programme.duree) * 100;
+                              const isFilled = segmentPercent <= progressPercent;
+                              return (
+                                <div
+                                  key={i}
+                                  className={`h-2.5 flex-1 rounded-full transition-all duration-300 ${
+                                    isFilled
+                                      ? statusInfo.status === 'expired'
+                                        ? 'bg-destructive shadow-[0_0_6px_rgba(220,38,38,0.4)]'
+                                        : statusInfo.status === 'ending'
+                                          ? 'bg-orange-500 shadow-[0_0_6px_rgba(249,115,22,0.4)]'
+                                          : 'bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] shadow-[0_0_6px_rgba(56,153,170,0.4)]'
+                                      : 'bg-muted/60'
+                                  }`}
+                                />
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
 
                       {/* Métriques */}
                       <div className="flex flex-row lg:flex-col gap-4 lg:gap-2 lg:items-end">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2 text-sm text-foreground">
                           <Dumbbell className="h-4 w-4" />
                           <span>{programme._count.exercices} exercices</span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2 text-sm text-foreground">
                           <MessageSquare className="h-4 w-4" />
                           <span>{programme._count.chatSessions} messages</span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2 text-sm text-foreground">
                           <Clock className="h-4 w-4" />
                           <span>{programme.duree} jours</span>
                         </div>
@@ -776,7 +793,7 @@ export default function ProgrammesPage() {
 
                       {/* Actions */}
                       <div className="flex flex-row lg:flex-col gap-2">
-                        <Button asChild variant="default" size="sm" className="flex-1 lg:flex-none">
+                        <Button asChild size="sm" className="btn-teal flex-1 lg:flex-none">
                           <Link href={`/dashboard/kine/patients/${programme.patient.id}`}>
                             <User className="h-4 w-4 mr-2" />
                             Voir Patient
@@ -793,10 +810,10 @@ export default function ProgrammesPage() {
 
         {/* Résumé en bas */}
         {filteredProgrammes.length > 0 && (
-          <Card className="shadow-sm bg-muted/30">
+          <Card className="card-hover">
             <CardContent className="pt-6">
-              <div className="text-center text-sm text-muted-foreground">
-                Affichage de <span className="font-medium text-primary">{filteredProgrammes.length}</span> programme(s) 
+              <div className="text-center text-sm text-foreground">
+                Affichage de <span className="font-medium text-[#3899aa]">{filteredProgrammes.length}</span> programme(s) 
                 {searchQuery && <span> correspondant à "{searchQuery}"</span>}
                 {programmes.length > 0 && <span> sur un total de {programmes.length}</span>}
               </div>
@@ -838,10 +855,10 @@ export default function ProgrammesPage() {
                   return (
                     <Card
                       key={patient.id}
-                      className={`p-3 transition-colors ${
+                      className={`p-3 transition-all duration-300 ${
                         hasActiveProgram
                           ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60'
-                          : 'cursor-pointer hover:bg-accent'
+                          : 'cursor-pointer hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-[#3899aa]/10'
                       }`}
                       onClick={() => !hasActiveProgram && handleSelectPatient(patient)}
                     >
@@ -889,14 +906,14 @@ export default function ProgrammesPage() {
           <div className="space-y-4 sm:space-y-6 py-4">
             {/* Section Informations du programme */}
             <div className="space-y-3 sm:space-y-4">
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-medium text-foreground flex items-center gap-2">
                 <div className="w-1 h-5 sm:h-6 bg-blue-500 rounded-full"></div>
                 Informations du programme
               </h3>
               
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="programme-title" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <Label htmlFor="programme-title" className="text-xs sm:text-sm font-medium text-foreground">
                     Titre du programme *
                   </Label>
                   <Input 
@@ -910,7 +927,7 @@ export default function ProgrammesPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="programme-description" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <Label htmlFor="programme-description" className="text-xs sm:text-sm font-medium text-foreground">
                     Objectifs du programme *
                   </Label>
                   <Textarea
@@ -925,7 +942,7 @@ export default function ProgrammesPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="programme-duration" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <Label htmlFor="programme-duration" className="text-xs sm:text-sm font-medium text-foreground">
                     Durée (jours) *
                   </Label>
                   <div className="relative">
@@ -955,7 +972,7 @@ export default function ProgrammesPage() {
 
             {/* Section Exercices avec filtres et sélection */}
             <div className="space-y-3 sm:space-y-4">
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-medium text-foreground flex items-center gap-2">
                 <div className="w-1 h-5 sm:h-6 bg-green-500 rounded-full"></div>
                 Exercices du programme
               </h3>
@@ -976,7 +993,7 @@ export default function ProgrammesPage() {
 
                   {/* Filtres Type */}
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-gray-600 dark:text-gray-400">Type</Label>
+                    <Label className="text-xs font-medium text-muted-foreground">Type</Label>
                     <div className="flex flex-wrap gap-2">
                       <Badge
                         variant={typeFilters.includes('public') ? 'default' : 'outline'}
@@ -1004,7 +1021,7 @@ export default function ProgrammesPage() {
 
                   {/* Filtres Tags */}
                   <div className="space-y-2">
-                    <Label className="text-xs font-medium text-gray-600 dark:text-gray-400">Catégories</Label>
+                    <Label className="text-xs font-medium text-muted-foreground">Catégories</Label>
                     <div className="flex flex-wrap gap-2">
                       {availableTags.map(tag => (
                         <Badge
@@ -1042,7 +1059,7 @@ export default function ProgrammesPage() {
                 {/* Liste des exercices/templates avec checkboxes - Hauteur fixe pour stabilité UX */}
                 <div className="flex flex-col h-[480px] border rounded-lg overflow-hidden">
                   <div className="flex items-center justify-between p-3 border-b bg-gray-50 dark:bg-gray-800 flex-shrink-0 gap-2">
-                    <Label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 flex-shrink-0">
+                    <Label className="text-xs sm:text-sm font-medium text-foreground flex-shrink-0">
                       {typeFilters.includes('templates') ? 'Sélectionner des templates' : 'Sélectionner des exercices'}
                     </Label>
                     <div className="flex gap-2 flex-wrap justify-end">
@@ -1051,7 +1068,7 @@ export default function ProgrammesPage() {
                           type="button"
                           size="sm"
                           onClick={typeFilters.includes('templates') ? handleConfirmTemplateSelection : handleConfirmSelection}
-                          className="h-7 text-xs bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white"
+                          className="btn-teal h-7 text-xs"
                         >
                           <Plus className="w-3 h-3 mr-1" />
                           {typeFilters.includes('templates')
@@ -1107,7 +1124,7 @@ export default function ProgrammesPage() {
                                 className="mt-0.5 pointer-events-none"
                               />
                               <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                <p className="font-medium text-sm text-foreground">
                                   {template.nom}
                                 </p>
                                 {template.description && (
@@ -1121,7 +1138,7 @@ export default function ProgrammesPage() {
                                     {template.items.length} exercice{template.items.length > 1 ? 's' : ''}
                                   </Badge>
                                 </div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                <div className="text-xs text-muted-foreground mt-1">
                                   {template.items.slice(0, 2).map(item => item.exerciceModele.nom).join(', ')}
                                   {template.items.length > 2 && ` +${template.items.length - 2} autre${template.items.length - 2 > 1 ? 's' : ''}`}
                                 </div>
@@ -1151,7 +1168,7 @@ export default function ProgrammesPage() {
                                 className="mt-0.5 pointer-events-none"
                               />
                               <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                <p className="font-medium text-sm text-foreground">
                                   {exercise.nom}
                                 </p>
                                 <div className="flex gap-1 mt-1 flex-wrap">
@@ -1194,13 +1211,13 @@ export default function ProgrammesPage() {
                           <X className="w-4 h-4" />
                         </Button>
                         
-                        <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3 pr-8">
+                        <h4 className="font-medium text-foreground mb-3 pr-8">
                           {ex.nom}
                         </h4>
                         
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           <div className="space-y-1">
-                            <Label className="text-xs font-medium text-gray-600">Séries</Label>
+                            <Label className="text-xs font-medium text-muted-foreground">Séries</Label>
                             <Input
                               type="number"
                               min="1"
@@ -1210,7 +1227,7 @@ export default function ProgrammesPage() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs font-medium text-gray-600">Répétitions</Label>
+                            <Label className="text-xs font-medium text-muted-foreground">Répétitions</Label>
                             <Input
                               type="number"
                               min="1"
@@ -1220,7 +1237,7 @@ export default function ProgrammesPage() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs font-medium text-gray-600">Travail (sec)</Label>
+                            <Label className="text-xs font-medium text-muted-foreground">Travail (sec)</Label>
                             <Input
                               type="number"
                               min="0"
@@ -1231,7 +1248,7 @@ export default function ProgrammesPage() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs font-medium text-gray-600">Pause (sec)</Label>
+                            <Label className="text-xs font-medium text-muted-foreground">Pause (sec)</Label>
                             <Input
                               type="number"
                               min="0"
@@ -1243,7 +1260,7 @@ export default function ProgrammesPage() {
                         </div>
                         
                         <div className="mt-3 space-y-1">
-                          <Label className="text-xs font-medium text-gray-600">Consignes spécifiques</Label>
+                          <Label className="text-xs font-medium text-muted-foreground">Consignes spécifiques</Label>
                           <Textarea
                             value={ex.instructions}
                             onChange={(e) => handleInputChange(index, 'instructions', e.target.value)}
@@ -1281,7 +1298,7 @@ export default function ProgrammesPage() {
                 </Button>
                 <Button
                   onClick={handleCreateProgramme}
-                  className="flex-1 bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] hover:from-[#3899aa] hover:to-[#1a4f5b] text-white shadow-lg transition-all duration-200 text-sm sm:text-base"
+                  className="btn-teal flex-1 text-sm sm:text-base"
                   disabled={!createTitle || !createDescription || selectedExercises.length === 0 || selectedExercises.length > 5 || creatingProgramme || createDuration <= 0 || createDuration > 30}
                 >
                   {creatingProgramme ? (

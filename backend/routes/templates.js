@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const templateService = require('../services/templateService');
 const { authenticate } = require('../middleware/authenticate');
+const { requireAssistant } = require('../middleware/authorization');
 const logger = require('../utils/logger');
 const { sanitizeUID, sanitizeName, sanitizeId } = require('../utils/logSanitizer');
 const { sendMessageTemplate } = require('./webhook/whatsapp');
@@ -13,7 +14,7 @@ const { sendMessageTemplate } = require('./webhook/whatsapp');
 
 // ========== GET /api/templates - Liste tous les templates ==========
 
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, requireAssistant('TEMPLATES_ADMIN'), async (req, res) => {
   try {
     const { category, search } = req.query;
 
@@ -37,7 +38,7 @@ router.get('/', authenticate, async (req, res) => {
 
 // ========== GET /api/templates/categories - Liste des catégories ==========
 
-router.get('/categories', authenticate, async (req, res) => {
+router.get('/categories', authenticate, requireAssistant('TEMPLATES_ADMIN'), async (req, res) => {
   try {
     logger.debug(`📂 GET /api/templates/categories - Kiné: ${sanitizeUID(req.uid)}`);
 
@@ -56,7 +57,7 @@ router.get('/categories', authenticate, async (req, res) => {
 
 // ========== POST /api/templates/personalize - Personnalise un template ==========
 
-router.post('/personalize', authenticate, async (req, res) => {
+router.post('/personalize', authenticate, requireAssistant('TEMPLATES_ADMIN'), async (req, res) => {
   try {
     const { templateId, patientId } = req.body;
     const firebaseUid = req.uid;
@@ -110,7 +111,7 @@ router.post('/personalize', authenticate, async (req, res) => {
 
 // ========== POST /api/templates/history - Sauvegarde dans l'historique ==========
 
-router.post('/history', authenticate, async (req, res) => {
+router.post('/history', authenticate, requireAssistant('TEMPLATES_ADMIN'), async (req, res) => {
   try {
     const { patientId, templateId, templateTitle, subject, body, method } = req.body;
     const firebaseUid = req.uid;
@@ -167,7 +168,7 @@ router.post('/history', authenticate, async (req, res) => {
 
 // ========== GET /api/templates/history - Historique des envois ==========
 
-router.get('/history', authenticate, async (req, res) => {
+router.get('/history', authenticate, requireAssistant('TEMPLATES_ADMIN'), async (req, res) => {
   try {
     const firebaseUid = req.uid;
     const prisma = require('../services/prismaService').getInstance();
@@ -204,7 +205,7 @@ router.get('/history', authenticate, async (req, res) => {
 
 // ========== POST /api/templates/send-whatsapp - Envoie via WhatsApp Business API ==========
 
-router.post('/send-whatsapp', authenticate, async (req, res) => {
+router.post('/send-whatsapp', authenticate, requireAssistant('TEMPLATES_ADMIN'), async (req, res) => {
   try {
     const { patientId, templateId, templateTitle, subject, body } = req.body;
     const firebaseUid = req.uid;

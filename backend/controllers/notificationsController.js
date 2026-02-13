@@ -286,6 +286,47 @@ const notificationsController = {
   },
 
   /**
+   * DELETE /api/notifications
+   * Supprimer toutes les notifications du kiné
+   */
+  async deleteAll(req, res) {
+    try {
+      const kineUid = req.uid;
+
+      if (!kineUid) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentification invalide - UID manquant'
+        });
+      }
+
+      const result = await notificationService.deleteAllByKine(kineUid);
+
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          error: result.error
+        });
+      }
+
+      res.json({
+        success: true,
+        message: `${result.deletedCount} notifications supprimées`,
+        deletedCount: result.deletedCount,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      logger.error('Erreur contrôleur deleteAll notifications:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Erreur serveur lors de la suppression des notifications',
+        details: error.message
+      });
+    }
+  },
+
+  /**
    * GET /api/notifications/types
    * Récupérer les types de notifications disponibles
    */

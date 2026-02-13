@@ -627,7 +627,22 @@ Pour toute question concernant vos données: contact@monassistantkine.com
         logger.warn(`✅ Suppression en base de données terminée pour: ${sanitizeUID(kineUid)}`);
       });
 
-      // 4. Supprimer l'utilisateur Firebase
+      // 4. Vérification post-suppression (preuve RGPD)
+      let verificationOk = true;
+      try {
+        const kineCheck = await prisma.kine.findUnique({ where: { uid: kineUid } });
+        const patientsCheck = await prisma.patient.count({ where: { kineId: kine.id } });
+        if (kineCheck || patientsCheck > 0) {
+          verificationOk = false;
+          logger.error(`⚠️ RGPD CRITICAL: Données résiduelles détectées après suppression pour: ${sanitizeUID(kineUid)} (kine: ${!!kineCheck}, patients: ${patientsCheck})`);
+        } else {
+          logger.warn(`✅ Vérification RGPD: suppression confirmée pour: ${sanitizeUID(kineUid)}`);
+        }
+      } catch (verifyError) {
+        logger.error('⚠️ Erreur vérification post-suppression (non bloquante):', verifyError.message);
+      }
+
+      // 5. Supprimer l'utilisateur Firebase
       try {
         await admin.auth().deleteUser(kineUid);
         logger.warn(`✅ Utilisateur Firebase supprimé: ${sanitizeUID(kineUid)}`);
@@ -638,10 +653,10 @@ Pour toute question concernant vos données: contact@monassistantkine.com
 
       logger.warn(`🎯 Suppression de compte terminée avec succès pour: ${sanitizeUID(kineUid)}`);
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: 'Compte supprimé définitivement',
-        details: deletionDetails
+        details: { ...deletionDetails, verificationOk }
       };
 
     } catch (error) {

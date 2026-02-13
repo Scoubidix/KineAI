@@ -108,10 +108,28 @@ exports.getProgrammesByPatient = async (req, res) => {
 // 🔽 POST création programme
 exports.createProgramme = async (req, res) => {
   const { titre, description, duree, patientId, dateFin, exercises } = req.body;
+  const firebaseUid = req.uid;
 
   try {
     const prisma = prismaService.getInstance();
-    
+
+    // Vérifier ownership : le patient doit appartenir au kiné connecté
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    const patient = await prisma.patient.findFirst({
+      where: { id: patientId, kineId: kine.id, isActive: true },
+    });
+
+    if (!patient) {
+      return res.status(403).json({ error: "Patient non trouvé ou accès refusé." });
+    }
+
     const newProgramme = await prisma.programme.create({
       data: {
         titre,

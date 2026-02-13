@@ -10,6 +10,7 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
 import { usePaywall } from '@/hooks/usePaywall';
+import DOMPurify from 'dompurify';
 
 interface ChatMessage {
   id: number;
@@ -288,18 +289,18 @@ export default function KineChatbotPage() {
         
         {/* Header */}
         <div className="mb-6">
-          <div className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] rounded-lg shadow-sm p-6">
+          <div className="card-hover rounded-lg p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Wand2 className="text-white h-7 w-7" />
+                <Wand2 className="text-[#3899aa] h-7 w-7" />
                 <div>
-                  <h2 className="text-xl font-semibold text-white">Assistant IA Personnel</h2>
-                  <p className="text-blue-100 text-sm">Assistant IA avec base de connaissances spécialisée - Historique conservé 5 jours</p>
+                  <h2 className="text-xl font-semibold text-[#3899aa]">Assistant IA Personnel</h2>
+                  <p className="text-foreground text-sm">Assistant IA avec base de connaissances spécialisée - Historique conservé 5 jours</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1">
-                <CheckCircle className="w-4 h-4 text-green-300" />
-                <span className="text-sm text-white font-medium">Connecté</span>
+              <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1">
+                <CheckCircle className="w-4 h-4 text-[#3899aa]" />
+                <span className="text-sm text-foreground font-medium">Connecté</span>
               </div>
             </div>
           </div>
@@ -315,7 +316,7 @@ export default function KineChatbotPage() {
             
             {/* Chat */}
             <div className="lg:col-span-3">
-            <Card className="shadow-md min-h-[60vh] max-h-[75vh] flex flex-col">
+            <Card className="card-hover min-h-[60vh] max-h-[75vh] flex flex-col">
               
               <CardContent 
                 ref={messagesContainerRef}
@@ -359,15 +360,15 @@ export default function KineChatbotPage() {
                           <div
                             className={`max-w-[80%] p-4 rounded-2xl ${
                               msg.role === 'user'
-                                ? 'bg-primary text-primary-foreground rounded-br-md'
-                                : 'bg-muted text-foreground rounded-bl-md'
+                                ? 'bubble-user rounded-br-md'
+                                : 'bubble-ai text-foreground rounded-bl-md'
                             }`}
                           >
                             <div className="prose prose-sm max-w-none">
-                              <div 
-                                className="whitespace-pre-wrap"
+                              <div
+                                className="whitespace-pre-wrap text-justify pr-10"
                                 dangerouslySetInnerHTML={{
-                                  __html: msg.content
+                                  __html: DOMPurify.sanitize(msg.content
                                     .replace(/^### (.*$)/gim, '<strong class="text-base">$1</strong>') // ### -> heading
                                     .replace(/^## (.*$)/gim, '<strong class="text-base">$1</strong>') // ## -> heading
                                     .replace(/^# (.*$)/gim, '<strong class="text-lg">$1</strong>') // # -> heading
@@ -375,7 +376,7 @@ export default function KineChatbotPage() {
                                     .replace(/\*(.*?)\*/g, '<em>$1</em>') // *texte* -> italique
                                     .replace(/^- (.*$)/gim, '• $1') // - -> •
                                     .replace(/^\d+\.\s+(.*$)/gim, '<strong>$1</strong>') // 1. -> gras
-                                    .replace(/\n/g, '<br>') // retours à la ligne
+                                    .replace(/\n/g, '<br>')) // retours à la ligne
                                 }}
                               />
                             </div>
@@ -394,7 +395,7 @@ export default function KineChatbotPage() {
                     
                     {isSending && (
                       <div className="flex justify-start">
-                        <div className="bg-muted p-4 rounded-2xl rounded-bl-md">
+                        <div className="bubble-ai p-4 rounded-2xl rounded-bl-md">
                           <div className="flex items-center gap-2">
                             <Loader2 className="w-4 h-4 animate-spin" />
                             <span className="text-muted-foreground">Recherche dans la base de connaissances...</span>
@@ -408,7 +409,7 @@ export default function KineChatbotPage() {
                 )}
               </CardContent>
 
-              <div className="border-t p-4 bg-background">
+              <div className="border-t p-4 bg-white dark:bg-card">
                 <div className="flex items-end gap-3">
                   <div className="flex-1">
                     <Input
@@ -424,7 +425,7 @@ export default function KineChatbotPage() {
                     onClick={handleAsk}
                     disabled={isSending || !message.trim()}
                     size="icon"
-                    className="min-h-[44px] min-w-[44px]"
+                    className="min-h-[44px] min-w-[44px] btn-teal"
                   >
                     {isSending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -441,14 +442,9 @@ export default function KineChatbotPage() {
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <p className="text-xs text-muted-foreground">
-                    Appuyez sur Entrée pour envoyer • Conversation sécurisée • Base documentaire active
+                  <p className="text-xs text-foreground">
+                    Appuyez sur Entrée pour envoyer
                   </p>
-                  {chatMessages.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      {Math.floor(chatMessages.length / 2)} questions posées
-                    </p>
-                  )}
                 </div>
               </div>
             </Card>
@@ -458,12 +454,12 @@ export default function KineChatbotPage() {
           <div className="lg:col-span-1 space-y-4">
 
             {/* Conseils d'utilisation */}
-            <Card className="shadow-sm">
+            <Card className="card-hover">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">💡 Assistant Conversationnel</CardTitle>
+                <CardTitle className="text-base text-foreground">💡 Assistant Conversationnel</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="text-xs text-muted-foreground space-y-3">
+                <div className="text-xs text-foreground space-y-3">
                   <div>
                     <p className="font-medium text-foreground mb-2">🎯 Idéal pour les questions simples et pratiques</p>
                     <p className="mb-2">Réponses courtes et directes pour votre pratique quotidienne.</p>
@@ -481,9 +477,9 @@ export default function KineChatbotPage() {
             </Card>
 
             {/* Actions rapides */}
-            <Card className="shadow-sm">
+            <Card className="card-hover">
               <CardHeader>
-                <CardTitle className="flex items-center justify-between text-base">
+                <CardTitle className="flex items-center justify-between text-base text-foreground">
                   <div className="flex items-center gap-2">
                     <History className="h-4 w-4" />
                     Actions
@@ -501,7 +497,7 @@ export default function KineChatbotPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-xs text-muted-foreground space-y-1">
+                <div className="text-xs text-foreground space-y-1">
                   <p>📊 <strong>{history.length}</strong> conversations sauvegardées</p>
                   <p>📅 Historique sur <strong>5 jours</strong></p>
                   <p>🔐 Données <strong>sécurisées</strong></p>

@@ -51,6 +51,12 @@ router.put('/:id/read', authenticate, notificationsController.markAsRead);
 router.put('/mark-all-read', authenticate, notificationsController.markAllAsRead);
 
 /**
+ * DELETE /api/notifications
+ * Supprimer toutes les notifications du kiné connecté
+ */
+router.delete('/', authenticate, notificationsController.deleteAll);
+
+/**
  * POST /api/notifications/cleanup
  * Nettoyer les anciennes notifications lues
  * Body: { daysOld: number } (défaut: 30, minimum: 7)

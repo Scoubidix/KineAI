@@ -21,9 +21,6 @@ const authenticatePatient = async (req, res, next) => {
       if (authHeader.startsWith('Bearer ')) {
         token = authHeader.substring(7);
       }
-    } else if (req.body.token) {
-      // Token dans le body (fallback)
-      token = req.body.token;
     }
 
     if (!token) {
@@ -142,8 +139,7 @@ const authenticatePatient = async (req, res, next) => {
     res.status(500).json({
       success: false,
       error: 'Erreur serveur lors de l\'authentification',
-      code: 'AUTH_SERVER_ERROR',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      code: 'AUTH_SERVER_ERROR'
     });
   }
 };

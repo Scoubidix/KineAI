@@ -40,9 +40,7 @@ class StripeService {
           email: kine.email,
           name: `${kine.firstName} ${kine.lastName}`,
           metadata: {
-            kineId: kineId.toString(),
-            uid: kine.uid,
-            rpps: kine.rpps
+            kineId: kineId.toString()
           }
         });
         customerId = customer.id;
@@ -127,7 +125,7 @@ class StripeService {
   getPriceIdFromPlanType(planType) {
     const priceMap = {
       'DECLIC': 'price_1RtoheEHFuBHSJxklQe0tUMh',    // 9€ Déclic
-      'PRATIQUE': 'price_1Rtpv9EHFuBHSJxk20JM0SqR',  // 19€ Pratique
+      'PRATIQUE': 'price_1Rtpv9EHFuBHSJxk20JM0SqR',  // 29€ Pratique
       'PIONNIER': 'price_1RuXvBEHFuBHSJxkyXom9QGe',  // 20€ Pionnier (limité)
       'EXPERT': 'price_1RuXvmEHFuBHSJxknXv8U4GQ'     // 59€ Expert
     };
@@ -143,7 +141,7 @@ class StripeService {
   getPlanTypeFromPriceId(priceId) {
     const priceMap = {
       'price_1RtoheEHFuBHSJxklQe0tUMh': 'DECLIC',    // 9€ Déclic
-      'price_1Rtpv9EHFuBHSJxk20JM0SqR': 'PRATIQUE',  // 19€ Pratique  
+      'price_1Rtpv9EHFuBHSJxk20JM0SqR': 'PRATIQUE',  // 29€ Pratique  
       'price_1RuXvBEHFuBHSJxkyXom9QGe': 'PIONNIER',  // 20€ Pionnier (limité)
       'price_1RuXvmEHFuBHSJxknXv8U4GQ': 'EXPERT'     // 59€ Expert
     };
