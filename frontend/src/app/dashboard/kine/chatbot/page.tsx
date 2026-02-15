@@ -67,7 +67,7 @@ export default function KineChatbotPage() {
 
   const scrollToBottom = () => {
     if (messagesContainerRef.current && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ 
+      messagesEndRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'end',
         inline: 'nearest'

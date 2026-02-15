@@ -35,6 +35,7 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { sendPasswordReset } from "@/lib/auth-utils";
 import { useToast } from "@/hooks/use-toast"; // Test réactivé
@@ -79,7 +80,9 @@ import {
   BookOpen,
   Stethoscope,
   CreditCard,
-  AlertTriangle
+  AlertTriangle,
+  Trophy,
+  AlertCircle
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -113,7 +116,7 @@ const getRoleFromPath = (path: string): RoleOrUnknown => {
 };
 
 // Composant Settings Modal
-function SettingsModal() {
+function SettingsModal({ trigger }: { trigger?: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('account');
   const [showPassword, setShowPassword] = useState(false);
@@ -378,10 +381,12 @@ function SettingsModal() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <SidebarMenuButton tooltip="Paramètres" className="text-foreground hover:border hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-transparent">
-          <Settings className="h-4 w-4 shrink-0" />
-          <span>Paramètres</span>
-        </SidebarMenuButton>
+        {trigger || (
+          <SidebarMenuButton tooltip="Paramètres" className="text-foreground hover:border hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-transparent">
+            <Settings className="h-4 w-4 shrink-0" />
+            <span>Paramètres</span>
+          </SidebarMenuButton>
+        )}
       </DialogTrigger>
       
       <DialogContent 
@@ -395,44 +400,44 @@ function SettingsModal() {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex min-h-[500px] max-h-[85vh]">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex w-full">
-            {/* Liste des onglets à gauche */}
-            <TabsList className="flex-col h-full w-64 bg-muted/30 justify-start p-2 space-y-1 flex-shrink-0">
+        <div className="flex flex-col md:flex-row min-h-[500px] max-h-[85vh]">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col md:flex-row w-full">
+            {/* Liste des onglets : horizontal sur mobile, vertical sur desktop */}
+            <TabsList className="flex md:flex-col h-auto md:h-full w-full md:w-64 bg-muted/30 justify-start p-2 gap-1 md:space-y-1 flex-shrink-0 overflow-x-auto md:overflow-x-visible">
               <TabsTrigger
                 value="account"
-                className="w-full justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
+                className="w-auto md:w-full justify-center md:justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
               >
-                <User className="h-4 w-4 mr-2" />
-                Mon Compte
+                <User className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Mon Compte</span>
               </TabsTrigger>
               <TabsTrigger
                 value="security"
-                className="w-full justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
+                className="w-auto md:w-full justify-center md:justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
               >
-                <Shield className="h-4 w-4 mr-2" />
-                Sécurité et confidentialité
+                <Shield className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Sécurité et confidentialité</span>
               </TabsTrigger>
               <TabsTrigger
                 value="interface"
-                className="w-full justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
+                className="w-auto md:w-full justify-center md:justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
               >
-                <Palette className="h-4 w-4 mr-2" />
-                Interface
+                <Palette className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Interface</span>
               </TabsTrigger>
               <TabsTrigger
                 value="subscription"
-                className="w-full justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
+                className="w-auto md:w-full justify-center md:justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
               >
-                <CreditCard className="h-4 w-4 mr-2" />
-                Mon Abonnement
+                <CreditCard className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Mon Abonnement</span>
               </TabsTrigger>
               <TabsTrigger
                 value="compliance"
-                className="w-full justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
+                className="w-auto md:w-full justify-center md:justify-start data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4db3c5] data-[state=active]:to-[#1f5c6a] data-[state=active]:text-white"
               >
-                <FileText className="h-4 w-4 mr-2" />
-                Conformité RGPD
+                <FileText className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Conformité RGPD</span>
               </TabsTrigger>
             </TabsList>
 
@@ -1040,6 +1045,192 @@ function SettingsModal() {
   );
 }
 
+// Composant Notifications Dropdown (Header)
+function NotificationsDropdown() {
+  const [notifications, setNotifications] = useState<Array<{
+    id: number;
+    type: string;
+    title: string;
+    message: string;
+    isRead: boolean;
+    createdAt: string;
+    metadata?: any;
+  }>>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter();
+
+  const formatTimeAgo = (timestamp: string) => {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffInMinutes = Math.floor((now.getTime() - time.getTime()) / (1000 * 60));
+    if (diffInMinutes < 1) return 'À l\'instant';
+    if (diffInMinutes < 60) return `${diffInMinutes}min`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h`;
+    return `${Math.floor(diffInMinutes / 1440)}j`;
+  };
+
+  const getNotifIcon = (type: string) => {
+    switch (type) {
+      case 'DAILY_VALIDATION': return <Calendar className="h-4 w-4 text-blue-500" />;
+      case 'PROGRAM_COMPLETED': return <Trophy className="h-4 w-4 text-green-500" />;
+      case 'PAIN_ALERT': return <AlertCircle className="h-4 w-4 text-red-500" />;
+      default: return <Bell className="h-4 w-4 text-blue-500" />;
+    }
+  };
+
+  const fetchUnreadCount = async () => {
+    try {
+      const user = getAuth(app).currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/unread-count`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setUnreadCount(data.count);
+      }
+    } catch {}
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      const user = getAuth(app).currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications?limit=10`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setNotifications(data.notifications);
+      }
+    } catch {} finally {
+      setLoading(false);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const user = getAuth(app).currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/mark-all-read`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      if (res.ok) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch {}
+  };
+
+  const markAsRead = async (id: number) => {
+    try {
+      const user = getAuth(app).currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}/read`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      if (res.ok) {
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch {}
+  };
+
+  // Fetch unread count on mount + poll every 60s
+  React.useEffect(() => {
+    const auth = getAuth(app);
+    const unsubscribe = auth.onAuthStateChanged((user: any) => {
+      if (user) fetchUnreadCount();
+    });
+    const interval = setInterval(fetchUnreadCount, 60000);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Fetch notifications when popover opens
+  React.useEffect(() => {
+    if (isOpen) fetchNotifications();
+  }, [isOpen]);
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button className="relative p-2 rounded-full hover:bg-white/20 transition-colors" title="Notifications">
+          <Bell className="h-5 w-5 text-white" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] flex items-center justify-center px-1">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-96 p-0" align="end" sideOffset={8}>
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="font-semibold text-sm">Notifications</h3>
+          {unreadCount > 0 && (
+            <button onClick={markAllAsRead} className="text-xs text-[#3899aa] hover:underline">
+              Tout marquer comme lu
+            </button>
+          )}
+        </div>
+        <div className="max-h-80 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : notifications.length === 0 ? (
+            <div className="text-center py-8 px-4">
+              <Bell className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">Aucune notification</p>
+            </div>
+          ) : (
+            notifications.map(notif => (
+              <div
+                key={notif.id}
+                className={`flex items-start gap-3 p-3 border-b last:border-b-0 hover:bg-muted/50 transition-colors ${
+                  !notif.isRead ? 'bg-accent/5 cursor-pointer' : ''
+                }`}
+                onClick={() => !notif.isRead && markAsRead(notif.id)}
+              >
+                <div className="mt-0.5 flex-shrink-0">{getNotifIcon(notif.type)}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className={`text-sm truncate ${!notif.isRead ? 'font-semibold' : ''}`}>
+                      {notif.title}
+                    </p>
+                    {!notif.isRead && <span className="h-2 w-2 bg-[#3899aa] rounded-full flex-shrink-0" />}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{notif.message}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">{formatTimeAgo(notif.createdAt)}</p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        <div className="border-t p-2">
+          <button
+            onClick={() => { setIsOpen(false); router.push('/dashboard/kine/notifications'); }}
+            className="w-full text-center text-sm text-[#3899aa] hover:bg-muted/50 py-2 rounded-md transition-colors font-medium"
+          >
+            Voir toutes les notifications
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function AppLayout({ children }: AppLayoutProps) {
   const currentPathname = usePathname();
   const router = useRouter();
@@ -1071,7 +1262,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
     if (role === 'kine') {
       return [
         { href: '/dashboard/kine/home', label: 'Accueil Kiné', icon: Home, disabled: false },
-        { href: '/dashboard/kine/notifications', label: 'Notifications', icon: Bell, disabled: false },
         { href: '/dashboard/kine/patients', label: 'Patients', icon: Users, disabled: false },
         { href: '/dashboard/kine/create-exercise', label: 'Mes Exercices', icon: Dumbbell, disabled: false },
         { href: '/dashboard/kine/programmes', label: 'Programmes', icon: Calendar, disabled: false },
@@ -1134,13 +1324,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Fond uni */}
       <div className="fixed inset-0 z-0 bg-white dark:bg-[#141414]" />
       <Sidebar collapsible="icon" side="left" variant="sidebar" className="text-sm text-foreground border-r border-primary/20 bg-[#eef7f6] dark:bg-[#0f1c1b]">
-        <SidebarHeader className="items-center gap-2 border-b border-primary/20 bg-gradient-to-b from-[#4db3c5] via-[#4db3c5] to-[#eef7f6] dark:to-[#0f1c1b] rounded-t-lg pb-6">
+        <SidebarHeader className="h-14 flex-row items-center gap-3 px-3 border-b border-primary/20 bg-[#4db3c5]">
           <img
             src="/logo.jpg"
             alt="Mon Assistant Kiné"
-            className="h-12 w-12 rounded-md object-contain group-data-[state=collapsed]:h-8 group-data-[state=collapsed]:w-8"
+            className="h-9 w-9 rounded-md object-contain flex-shrink-0 bg-white/15 p-0.5"
           />
-          <SidebarTrigger className="ml-auto text-white hover:bg-white/20" />
+          <span className="font-semibold text-white text-base truncate group-data-[state=collapsed]:hidden">Mon Assistant Kiné</span>
         </SidebarHeader>
         <SidebarContent className="p-2">
           <SidebarMenu>
@@ -1151,7 +1341,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   tooltip={item.label}
                   isActive={
                     currentPathname === item.href ||
-                    (item.href !== '/' && !item.href.endsWith('/home') && currentPathname.startsWith(item.href)) ||
+                    (item.href !== '/' && !item.href.endsWith('/home') && currentPathname.startsWith(item.href + '/')) ||
                     (item.href.endsWith('/home') && currentPathname === item.href)
                   }
                   disabled={item.disabled && item.label.includes('(Bientôt)')}
@@ -1177,9 +1367,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </SidebarMenuItem>
             )}
             <SidebarMenuItem>
-              <SettingsModal />
-            </SidebarMenuItem>
-            <SidebarMenuItem>
               <SidebarMenuButton tooltip="Déconnexion" onClick={handleLogout} className="text-red-600 font-semibold hover:border hover:border-red-400 hover:shadow-[0_0_12px_rgba(239,68,68,0.3)] hover:bg-transparent hover:text-red-700">
                 <LogOut className="h-4 w-4 shrink-0" />
                 <span>Déconnexion</span>
@@ -1190,26 +1377,29 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </Sidebar>
 
       <SidebarInset>
-        {/* Barre de navigation mobile TOUJOURS visible */}
-        <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border lg:hidden">
-          <div className="flex h-14 items-center px-4">
-            <SidebarTrigger className="mr-2" />
-            <div className="flex items-center gap-2 flex-1">
-              <img 
-                src="/logo.jpg" 
-                alt="Mon Assistant Kiné" 
-                className="h-6 w-6 rounded-md object-contain" 
-              />
-              <span className="font-semibold text-primary">Mon Assistant Kiné</span>
+        {/* Header principal - toutes tailles */}
+        <header className="sticky top-0 z-50 bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] shadow-md">
+          <div className="flex h-14 items-center px-4 gap-3">
+            <SidebarTrigger className="text-white hover:bg-white/20" />
+            <div className="flex-1" />
+            <div className="flex items-center gap-1">
+              {role === 'kine' && <NotificationsDropdown />}
+              <SettingsModal trigger={
+                <button className="p-2 rounded-full hover:bg-white/20 transition-colors" title="Paramètres">
+                  <Settings className="h-5 w-5 text-white" />
+                </button>
+              } />
+              <Avatar className="h-8 w-8 border-2 border-white/30 ml-1">
+                <AvatarFallback className="bg-white/20 text-white text-xs font-semibold">
+                  {displayInitials}
+                </AvatarFallback>
+              </Avatar>
             </div>
-            {/* Plan Indicator mobile - seulement pour les kinés en FREE */}
-            {role === 'kine' && <PlanIndicator />}
           </div>
-        </div>
+        </header>
 
         {/* Contenu principal */}
         <div className="relative p-4 md:p-6 lg:p-8 text-foreground min-h-screen">
-{/* Accent subtil en haut à droite */}
           <div
             className="pointer-events-none absolute top-0 right-0 w-[600px] h-[600px] opacity-[0.07] dark:opacity-[0.12] rounded-full blur-3xl"
             style={{ background: 'radial-gradient(circle, #3899aa, transparent 70%)' }}

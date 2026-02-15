@@ -414,7 +414,7 @@ export default function KineHomePage() {
 
           {/* Card Adhérence Patients */}
           <Card className="card-hover">
-            <CardHeader className="pb-4 flex flex-row items-center justify-between">
+            <CardHeader className="pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <CardTitle className="flex items-center gap-3 text-primary">
                   <Users className="text-accent h-6 w-6" />
@@ -447,7 +447,7 @@ export default function KineHomePage() {
                     <Button
                       variant={"outline"}
                       className={cn(
-                        "w-[200px] justify-start text-left font-normal",
+                        "w-auto md:w-[200px] justify-start text-left font-normal",
                         !selectedDate && "text-muted-foreground"
                       )}
                       disabled={loadingAdherence}
@@ -503,12 +503,12 @@ export default function KineHomePage() {
 
                   {/* Liste des patients */}
                   {patientsData && patientsData.patients.length > 0 ? (
-                    <div className="max-h-60 overflow-y-auto border rounded-md">
+                    <div className="max-h-60 overflow-y-auto overflow-x-auto border rounded-md">
                       <Table>
                         <TableHeader className="sticky top-0 bg-card z-10">
                           <TableRow>
                             <TableHead>Patient</TableHead>
-                            <TableHead>Programme</TableHead>
+                            <TableHead className="hidden md:table-cell">Programme</TableHead>
                             <TableHead className="text-right">Statut Séance</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -531,7 +531,7 @@ export default function KineHomePage() {
                                   </div>
                                 </Link>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="hidden md:table-cell">
                                 <div>
                                   <p className="font-medium text-sm">{patientSession.programme.titre}</p>
                                   {patientSession.programme.isArchived && (

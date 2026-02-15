@@ -480,12 +480,11 @@ export default function KineCreateExercisePage() {
       }
 
       let assigned = false;
-      // Vérifier les tags prioritaires en premier
+      // Ajouter dans toutes les catégories correspondantes
       for (const priorityTag of SUGGESTED_TAGS) {
         if (exerciceTags.some(tag => tag.toLowerCase() === priorityTag.toLowerCase())) {
           groups[priorityTag].push(ex);
           assigned = true;
-          break;
         }
       }
 
@@ -506,8 +505,17 @@ export default function KineCreateExercisePage() {
       }
     });
 
+    // Si des filtres sont actifs, ne garder que les catégories filtrées
+    if (selectedTags.length > 0) {
+      Object.keys(groups).forEach(key => {
+        if (!selectedTags.some(t => t.toLowerCase() === key.toLowerCase())) {
+          delete groups[key];
+        }
+      });
+    }
+
     return groups;
-  }, [exercices]);
+  }, [exercices, selectedTags]);
 
   return (
     <AppLayout>
@@ -909,9 +917,20 @@ export default function KineCreateExercisePage() {
                             </div>
                           </CardHeader>
                           <CardContent className="pt-0">
+                            {hasExpandableContent && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="p-0 h-auto text-blue-600 hover:text-blue-800 transition-colors mb-2"
+                                onClick={() => toggleCardExpansion(ex.id)}
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                {isExpanded ? 'Voir moins' : 'Voir plus'}
+                              </Button>
+                            )}
                             <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line break-words">
-                              {isExpanded || !shouldTruncate 
-                                ? ex.description 
+                              {isExpanded || !shouldTruncate
+                                ? ex.description
                                 : `${ex.description.substring(0, 150)}...`
                               }
                             </p>
@@ -922,17 +941,6 @@ export default function KineCreateExercisePage() {
                                 loading="lazy"
                                 className="max-w-[280px] rounded-lg mt-2"
                               />
-                            )}
-                            {hasExpandableContent && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="mt-2 p-0 h-auto text-blue-600 hover:text-blue-800 transition-colors"
-                                onClick={() => toggleCardExpansion(ex.id)}
-                              >
-                                <Eye className="w-3 h-3 mr-1" />
-                                {isExpanded ? 'Voir moins' : 'Voir plus'}
-                              </Button>
                             )}
                           </CardContent>
                         </Card>

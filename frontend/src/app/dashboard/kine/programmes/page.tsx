@@ -1175,7 +1175,7 @@ export default function ProgrammesPage() {
                                   <Badge variant={exercise.isPublic ? "default" : "secondary"} className="text-xs">
                                     {exercise.isPublic ? 'Public' : 'Privé'}
                                   </Badge>
-                                  {exercise.tags && parseTagsFromString(exercise.tags).slice(0, 3).map(tag => (
+                                  {exercise.tags && parseTagsFromString(exercise.tags).map(tag => (
                                     <Badge key={tag} variant="outline" className="text-xs">
                                       {tag}
                                     </Badge>
