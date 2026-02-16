@@ -104,7 +104,8 @@ router.post('/chat/:token',
         req.patient,
         [req.programme],
         message.trim(),
-        chatHistory
+        chatHistory,
+        { dateFin: req.programme.dateFin }
       );
 
       if (!chatResponse.success) {
@@ -224,7 +225,8 @@ router.get('/welcome/:token',
       // Sinon, générer un nouveau message d'accueil pour ce programme
       const welcomeResponse = await generateWelcomeMessage(
         req.patient,
-        [req.programme]
+        [req.programme],
+        { dateFin: req.programme.dateFin }
       );
 
       // Sauvegarder le message d'accueil

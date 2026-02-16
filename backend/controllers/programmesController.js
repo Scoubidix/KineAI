@@ -1,5 +1,6 @@
 const prismaService = require('../services/prismaService');
 const { generateChatUrl } = require('../services/patientTokenService');
+const gcsStorageService = require('../services/gcsStorageService');
 const logger = require('../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../utils/logSanitizer');
 
@@ -327,6 +328,52 @@ exports.updateProgramme = async (req, res) => {
         }
       }
     });
+
+    // Injecter un message ASSISTANT dans le chat patient pour notifier la mise à jour
+    try {
+      const remaining = new Date(programme.dateFin).getTime() - Date.now();
+      const expirationMs = remaining > 0 ? remaining : 2 * 60 * 60 * 1000;
+
+      const exerciceLines = await Promise.all(updatedProgramme.exercices.map(async (ex) => {
+        const nom = ex.exerciceModele?.nom || 'Exercice';
+        let detail = `${ex.series} séries × ${ex.repetitions} répétitions`;
+        if (ex.tempsTravail && ex.tempsTravail > 0) {
+          detail += ` (maintien ${ex.tempsTravail}s)`;
+        }
+
+        let line = `\n• **${nom}** : ${detail}`;
+
+        if (ex.consigne) {
+          line += `\n  _${ex.consigne}_`;
+        }
+
+        // URL signée v2 (expire à dateFin du programme)
+        const gifPath = ex.exerciceModele?.gifPath;
+        if (gifPath) {
+          const signedUrl = await gcsStorageService.generateSignedUrl(gifPath, expirationMs, 'v2');
+          if (signedUrl) {
+            line += `\n![Démonstration](${signedUrl})`;
+          }
+        }
+
+        return line;
+      }));
+
+      const messageMarkdown = `📋 **Votre kiné a mis à jour votre programme. Voici vos exercices actualisés :**\n${exerciceLines.join('\n')}`;
+
+      await prisma.chatSession.create({
+        data: {
+          message: messageMarkdown,
+          role: 'ASSISTANT',
+          patientId: programme.patientId,
+          programmeId: programmeId
+        }
+      });
+
+      logger.info(`Message de mise à jour programme injecté dans le chat (programme ${programmeId})`);
+    } catch (chatError) {
+      logger.warn(`Échec injection message chat pour mise à jour programme ${programmeId}:`, chatError);
+    }
 
     res.json(updatedProgramme);
   } catch (error) {

@@ -634,8 +634,9 @@ export default function PatientDetailPage() {
                     value={duration}
                     onChange={(e) => setDuration(Number(e.target.value))}
                     placeholder="Durée en jours (max 30)"
-                    className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className={`text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isEdit ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''}`}
                     required
+                    disabled={isEdit}
                   />
                   {duration > 30 && (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-red-600 font-medium">
@@ -644,7 +645,7 @@ export default function PatientDetailPage() {
                   )}
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Durée recommandée : 7-14 jours
+                  {isEdit ? 'La durée ne peut pas être modifiée après création' : 'Durée recommandée : 7-14 jours'}
                 </p>
               </div>
             </div>

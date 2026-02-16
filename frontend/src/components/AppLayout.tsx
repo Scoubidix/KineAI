@@ -61,6 +61,7 @@ import {
   FileText, 
   ShoppingBag, 
   Calendar,
+  CalendarDays,
   User,
   Shield,
   Palette,
@@ -89,6 +90,8 @@ import Link from 'next/link';
 import type { RoleOrUnknown } from '@/types/user';
 import { getAuth, signOut } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { PlanIndicator } from './PlanIndicator';
 import { RGPDExportModal } from './RGPDExportModal';
 import { RGPDDeleteModal } from './RGPDDeleteModal';
@@ -1381,6 +1384,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <header className="sticky top-0 z-50 bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] shadow-md">
           <div className="flex h-14 items-center px-4 gap-3">
             <SidebarTrigger className="text-white hover:bg-white/20" />
+            <span className="hidden sm:flex items-center text-white/90 text-sm font-medium ml-2 capitalize">
+              {format(new Date(), 'EEEE d MMMM yyyy', { locale: fr })}
+            </span>
             <div className="flex-1" />
             <div className="flex items-center gap-1">
               {role === 'kine' && <NotificationsDropdown />}

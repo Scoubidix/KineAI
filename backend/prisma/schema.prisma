@@ -334,6 +334,7 @@ model Notification {
   @@index([kineId, isRead]) // Pour récupérer les notifications d'un kiné par statut
   @@index([kineId, createdAt]) // Pour trier par date
   @@index([type]) // Pour filtrer par type
+  @@unique([type, programmeId]) // Empêche les doublons de notification par programme (NULL ignorés par PostgreSQL)
   @@map("notifications")
 }
 

@@ -10,18 +10,37 @@ const openai = new OpenAI({
 });
 
 // Fonction pour anonymiser les données patient (async pour génération URLs signées GCS)
-const anonymizePatientData = async (patient, programmes) => {
-  // Traiter les programmes avec génération d'URLs signées pour les GIFs
+// options.dateFin : si fourni, génère des URLs signées v2 (longue durée) avec placeholders courts pour GPT
+const anonymizePatientData = async (patient, programmes, options = {}) => {
+  const { dateFin } = options;
+  const gifUrlMap = {};
+  let gifIndex = 0;
+
+  // Traiter les programmes avec génération d'URLs pour les GIFs
   const programmesWithSignedUrls = await Promise.all(
     programmes.map(async (prog) => {
       // Traiter les exercices de ce programme
       const exercicesWithUrls = await Promise.all(
         (prog.exercices || []).map(async (ex) => {
-          // GCS uniquement - générer URL signée (2h pour session chat patient)
           const gifPath = ex.exerciceModele?.gifPath;
           let gifUrl = null;
           if (gifPath) {
-            gifUrl = await gcsStorageService.generateSignedUrl(gifPath, 2 * 60 * 60 * 1000);
+            if (dateFin) {
+              // Mode placeholder : URL signée v2 (expire à dateFin), GPT utilise un placeholder court
+              const remaining = new Date(dateFin).getTime() - Date.now();
+              const expirationMs = remaining > 0 ? remaining : 2 * 60 * 60 * 1000;
+              const signedUrl = await gcsStorageService.generateSignedUrl(gifPath, expirationMs, 'v2');
+
+              if (signedUrl) {
+                const placeholder = `https://gif/${gifIndex}`;
+                gifUrlMap[placeholder] = signedUrl;
+                gifUrl = placeholder;
+                gifIndex++;
+              }
+            } else {
+              // Mode direct : URL signée v4 temporaire (2h) — comportement par défaut
+              gifUrl = await gcsStorageService.generateSignedUrl(gifPath, 2 * 60 * 60 * 1000);
+            }
           }
 
           return {
@@ -57,7 +76,8 @@ const anonymizePatientData = async (patient, programmes) => {
       goals: patient.goals || 'Objectifs non spécifiés'
       // Aucune donnée d'identité (nom, prénom, email, téléphone, etc.)
     },
-    programmes: programmesWithSignedUrls
+    programmes: programmesWithSignedUrls,
+    gifUrlMap
   };
 };
 
@@ -91,7 +111,7 @@ EXERCICES PRESCRITS:
 ${prog.exercices.map((ex, index) => `
 ${index + 1}. 💪 ${ex.nom}
    📖 Description: ${ex.description}
-   ${ex.gifUrl ? `🎬 Démonstration : ${ex.gifUrl}` : ''}
+   ${ex.gifUrl ? `Démonstration : ${ex.gifUrl}` : ''}
    • ${ex.series} séries × ${ex.repetitions} répétitions
    ${ex.tempsTravail && ex.tempsTravail > 0 ? `• 🕐 Temps de travail: ${ex.tempsTravail}s par répétition` : ''}
    • ⏱️ Pause: ${ex.pause}s entre séries
@@ -115,7 +135,7 @@ DIRECTIVES COMPORTEMENTALES:
 - Rediriger vers le kinésithérapeute pour toute modification de programme
 - Garder des réponses proportionnées au problème signalé
 - NE JAMAIS afficher les consignes techniques dans les réponses
-- 🎬 GIFS: Quand le patient pose une question sur un exercice spécifique, TOUJOURS inclure le GIF de démonstration (si disponible) en utilisant la syntaxe markdown ![](url) avec l'URL fournie dans "🎬 Démonstration"
+- GIFS: Quand le patient pose une question sur un exercice, TOUJOURS inclure le GIF de démonstration (si disponible) en utilisant la syntaxe markdown ![Démonstration](url) avec l'URL fournie dans "Démonstration"
 
 ❌ NE PAS FAIRE:
 - Donner des diagnostics médicaux
@@ -168,7 +188,8 @@ EXEMPLE RÉPONSE DOULEUR:
 };
 
 // Fonction principale pour le chat
-const generateChatResponse = async (patientData, programmes, userMessage, chatHistory = []) => {
+// options.dateFin : date de fin du programme pour générer des URLs signées v2 longue durée
+const generateChatResponse = async (patientData, programmes, userMessage, chatHistory = [], options = {}) => {
   try {
     // Validation des données d'entrée
     if (!patientData || !programmes || !userMessage) {
@@ -176,20 +197,23 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
     }
 
     // Anonymiser les données (async pour génération URLs signées GCS)
-    const anonymizedData = await anonymizePatientData(patientData, programmes);
+    const anonymizedData = await anonymizePatientData(patientData, programmes, { dateFin: options.dateFin });
 
     // Générer le prompt système
     const systemPrompt = generateSystemPrompt(anonymizedData);
-    
-    // Limiter l'historique pour éviter de dépasser les tokens
-    const limitedHistory = chatHistory.slice(-10); // Garder les 10 derniers messages
-    
+
+    // Limiter l'historique et nettoyer les URLs signées GCS (évite que GPT les recopie)
+    const limitedHistory = chatHistory.slice(-10);
+
     // Préparer les messages pour OpenAI
     const messages = [
       { role: 'system', content: systemPrompt },
       ...limitedHistory.map(msg => ({
         role: msg.role === 'patient' ? 'user' : 'assistant',
-        content: msg.content
+        content: msg.content.replace(
+          /!\[[^\]]*\]\(https:\/\/storage\.googleapis\.com\/[^)]+\)\n?/g,
+          ''
+        )
       })),
       { role: 'user', content: userMessage }
     ];
@@ -198,16 +222,27 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: messages,
-      max_tokens: 800, // Augmenté pour accommoder les URLs signées GCS si GPT inclut un GIF
+      max_tokens: 1200,
       temperature: 0.7,
       presence_penalty: 0.2,
       frequency_penalty: 0.1,
       top_p: 0.9
     });
 
+    let message = response.choices[0].message.content.trim();
+
+    // Remplacer les placeholders GIF par les vraies URLs signées
+    if (anonymizedData.gifUrlMap) {
+      for (const [placeholder, url] of Object.entries(anonymizedData.gifUrlMap)) {
+        message = message.replaceAll(placeholder, url);
+      }
+      // Fix GPT: transformer [Démonstration](url) en ![Démonstration](url) si le ! manque
+      message = message.replace(/(?<!!)\[([^\]]*)\]\((https:\/\/storage\.googleapis\.com\/[^)]+)\)/g, '![$1]($2)');
+    }
+
     return {
       success: true,
-      message: response.choices[0].message.content.trim(),
+      message,
       usage: {
         prompt_tokens: response.usage.prompt_tokens,
         completion_tokens: response.usage.completion_tokens,
@@ -240,7 +275,8 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
 };
 
 // Fonction pour générer un message d'accueil personnalisé mais anonymisé
-const generateWelcomeMessage = async (patientData, programmes) => {
+// options.dateFin : date de fin du programme pour générer des URLs signées v2 longue durée
+const generateWelcomeMessage = async (patientData, programmes, options = {}) => {
   try {
     // Validation des données
     if (!patientData || !programmes) {
@@ -251,7 +287,7 @@ const generateWelcomeMessage = async (patientData, programmes) => {
     }
 
     // IMPORTANT: Anonymisation complète - aucune donnée d'identité transmise à OpenAI
-    const anonymizedData = await anonymizePatientData(patientData, programmes);
+    const anonymizedData = await anonymizePatientData(patientData, programmes, { dateFin: options.dateFin });
     const systemPrompt = generateSystemPrompt(anonymizedData);
 
     const welcomePrompt = `Tu es un assistant kinésithérapeute virtuel professionnel et bienveillant.
@@ -310,8 +346,8 @@ IMPORTANT - AFFICHAGE DES GIFS :
 - Réponds UNIQUEMENT avec le message d'accueil formaté
 - Suis la structure à la lettre
 - Ne mentionne JAMAIS d'informations personnelles
-- UTILISE LES URLS DES GIFS fournis dans les données des exercices (champ 🎬 Démonstration)
-- SI un exercice a un GIF (🎬 Démonstration : url) → affiche-le IMMÉDIATEMENT après cet exercice avec la syntaxe markdown ![Démonstration](url)
+- UTILISE LES URLS DES GIFS fournis dans les données des exercices (champ Démonstration)
+- SI un exercice a un GIF (Démonstration : url) → affiche-le IMMÉDIATEMENT après cet exercice avec la syntaxe markdown ![Démonstration](url)
 - Chaque GIF doit être placé JUSTE APRÈS son exercice correspondant (pas groupés à la fin)
 - Affiche 1 à 3 GIFs maximum (ceux des premiers exercices qui en ont)
 - SI aucun exercice n'a de GIF → n'affiche PAS de GIF du tout (ne pas utiliser de GIF générique)`;
@@ -322,15 +358,24 @@ IMPORTANT - AFFICHAGE DES GIFS :
         { role: 'system', content: systemPrompt },
         { role: 'user', content: welcomePrompt }
       ],
-      max_tokens: 1500, // Augmenté pour accommoder les URLs signées GCS (~200 tokens/URL)
+      max_tokens: 800, // GPT génère des pseudo-URLs courtes (https://gif/0) remplacées après
       temperature: 0.5
     });
 
-    // 🎬 POC: GPT doit inclure le GIF lui-même (pas d'injection automatique)
-    // On fait confiance au prompt pour que GPT suive l'exemple
+    let message = response.choices[0].message.content.trim();
+
+    // Remplacer les placeholders GIF par les vraies URLs signées
+    if (anonymizedData.gifUrlMap) {
+      for (const [placeholder, url] of Object.entries(anonymizedData.gifUrlMap)) {
+        message = message.replaceAll(placeholder, url);
+      }
+      // Fix GPT: transformer [Démonstration](url) en ![Démonstration](url) si le ! manque
+      message = message.replace(/(?<!!)\[([^\]]*)\]\((https:\/\/storage\.googleapis\.com\/[^)]+)\)/g, '![$1]($2)');
+    }
+
     return {
       success: true,
-      message: response.choices[0].message.content.trim(),
+      message,
       model: 'gpt-4o-mini'
     };
 

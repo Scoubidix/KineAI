@@ -76,10 +76,11 @@ const processChatMessage = async (patientData, programmes, userMessage) => {
 
     // 3. Générer la réponse IA
     const aiResponse = await generateChatResponse(
-      patientData, 
-      programmes, 
-      userMessage, 
-      chatHistory
+      patientData,
+      programmes,
+      userMessage,
+      chatHistory,
+      { dateFin: programmes[0]?.dateFin }
     );
 
     // 4. Sauvegarder la réponse IA si succès
@@ -126,7 +127,7 @@ const initializeChatSession = async (patientData, programmes) => {
     }
 
     // Générer message de bienvenue pour le nouveau programme
-    const welcomeResponse = await generateWelcomeMessage(patientData, programmes);
+    const welcomeResponse = await generateWelcomeMessage(patientData, programmes, { dateFin: programmes[0]?.dateFin });
     
     if (welcomeResponse.success) {
       // Sauvegarder le message de bienvenue

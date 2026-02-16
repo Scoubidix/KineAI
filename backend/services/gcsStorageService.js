@@ -73,7 +73,7 @@ async function uploadGif(fileBuffer, fileName) {
  * @param {number} expirationMs - Durée de validité en ms (défaut: 1h)
  * @returns {Promise<string|null>} URL signée temporaire ou null si erreur
  */
-async function generateSignedUrl(gifPath, expirationMs = DEFAULT_SIGNED_URL_EXPIRATION) {
+async function generateSignedUrl(gifPath, expirationMs = DEFAULT_SIGNED_URL_EXPIRATION, version = 'v4') {
   try {
     if (!gifPath) {
       return null;
@@ -89,7 +89,7 @@ async function generateSignedUrl(gifPath, expirationMs = DEFAULT_SIGNED_URL_EXPI
     }
 
     const [signedUrl] = await file.getSignedUrl({
-      version: 'v4',
+      version: version,
       action: 'read',
       expires: Date.now() + expirationMs,
     });
