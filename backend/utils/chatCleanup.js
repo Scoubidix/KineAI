@@ -327,32 +327,12 @@ const startProgramCleanupCron = () => {
     logger.warn('⚠️ Impossible de parser DATABASE_URL pour diagnostic');
   }
 
-  // 🆕 NOUVEAU: Notifications programmes terminés - 00h01 + backup 00h09
-  cron.schedule('1 0 * * *', async () => {
-    logger.info(`🔔 [00h01] Notifications programmes terminés PRINCIPAL`);
-    
-    await executeWithTimeout(
-      'notifications programmes terminés PRINCIPAL (00h01)',
-      createProgramCompletedNotificationsTask,
-      90000
-    );
-  }, {
-    timezone: "Europe/Paris",
-    scheduled: true
-  });
-
-  cron.schedule('9 0 * * *', async () => {
-    logger.info(`🔔 [00h09] Notifications programmes terminés BACKUP`);
-    
-    await executeWithTimeout(
-      'notifications programmes terminés BACKUP (00h09)',
-      createProgramCompletedNotificationsTask,
-      90000
-    );
-  }, {
-    timezone: "Europe/Paris",
-    scheduled: true
-  });
+  // 🔄 MIGRÉ VERS CLOUD SCHEDULER - Notifications programmes terminés
+  // Cloud Scheduler appelle GET /test-notifications-programs en HTTP (CPU alloué)
+  // → Résout le problème de CPU throttlé avec node-cron sur Cloud Run (facturation par requête)
+  // Ancien cron node-cron désactivé :
+  // cron.schedule('1 0 * * *', ...) → remplacé par Cloud Scheduler job "notifications-programmes-termines"
+  // cron.schedule('9 0 * * *', ...) → backup supprimé (Cloud Scheduler a son propre retry)
 
   // PRODUCTION: Archivage programmes - 00h10 + backup 00h18
   cron.schedule('10 0 * * *', async () => {
