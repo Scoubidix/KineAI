@@ -228,12 +228,14 @@ const whatsappSendLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    const programmeId = req.params.id;
+    // req.params.id n'est pas disponible dans app.use() middleware (avant le router)
+    // On extrait le programmeId depuis req.path (ex: "/123/send-whatsapp")
+    const programmeId = req.path.split('/')[1];
     const baseKey = generateSecureKey(req, 'whatsapp_send');
     return `${baseKey}_programme_${programmeId}`;
   },
   handler: (req, res) => {
-    const programmeId = req.params.id;
+    const programmeId = req.path.split('/')[1];
     const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
     logger.warn(`🚫 Rate limit dépassé - Envoi WhatsApp - User: ${safeUser} - Programme: ${programmeId}`);
     res.status(429).json({
