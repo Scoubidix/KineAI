@@ -1,13 +1,14 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 
 export function useAuthGuard(requiredRole?: 'kine' | 'patient') {
   const router = useRouter();
   const pathname = usePathname();
+  const [status, setStatus] = useState<'loading' | 'authenticated'>('loading');
 
   useEffect(() => {
     const auth = getAuth(app);
@@ -43,7 +44,9 @@ export function useAuthGuard(requiredRole?: 'kine' | 'patient') {
           router.replace('/unauthorized');
           return;
         }
-        
+
+        setStatus('authenticated');
+
       } catch (error) {
         router.replace('/login');
       }
@@ -51,4 +54,6 @@ export function useAuthGuard(requiredRole?: 'kine' | 'patient') {
 
     return () => unsubscribe();
   }, [router, requiredRole, pathname]);
+
+  return status;
 }

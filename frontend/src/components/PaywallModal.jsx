@@ -110,13 +110,11 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
         if (data.type === 'plan_change') {
           // Changement de plan instantané → toast amélioré SANS redirection
           toast({
-            title: "Plan modifié avec succès !",
-            description: `✅ Changement de ${data.subscription.previousPlan} vers ${data.subscription.newPlan} effectué
-💳 Proratisation automatique sur votre prochaine facture
-🚀 Nouvelles fonctionnalités actives immédiatement`,
+            title: "Abonnement modifié",
+            description: `Passage de ${data.subscription.previousPlan} vers ${data.subscription.newPlan} effectué.`,
             variant: "default",
-            className: "bg-green-50 border-green-200 text-green-800",
-            duration: 6000
+            className: "toast-success",
+            duration: 4000
           });
 
           // Fermer la modal - l'utilisateur reste dans l'app
@@ -223,15 +221,15 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
     <Dialog open={isOpen} onOpenChange={handleModalClose}>
       <DialogContent 
         className={`p-0 overflow-hidden ${
-          currentStep === 'confirmation' 
-            ? 'max-w-md sm:max-w-md' 
+          currentStep === 'confirmation'
+            ? 'max-w-md sm:max-w-md'
             : 'max-w-7xl sm:max-w-7xl w-[95vw] max-h-[90vh]'
         }`}
       >
         {currentStep === 'selection' ? (
           <>
             {/* Header - Style cohérent avec l'app */}
-            <DialogHeader className="px-6 py-4 border-b border-border bg-card">
+            <DialogHeader className="px-6 py-4 border-b border-border">
               <DialogTitle className="flex items-center gap-2 text-xl font-semibold text-foreground">
                 <Shield className="h-5 w-5 text-accent" />
                 Mon Assistant Kiné
@@ -242,7 +240,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
             </DialogHeader>
 
             {/* Contenu scrollable */}
-            <div className="p-6 overflow-y-auto space-y-6 bg-background">
+            <div className="p-6 overflow-y-auto space-y-6">
 
               {/* Grid des plans - Style cohérent avec l'app */}
               <div className="flex flex-wrap justify-center gap-4 max-w-7xl mx-auto">
@@ -451,56 +449,67 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
         ) : (
           /* Étape de confirmation */
           <>
-            <DialogHeader>
-              <DialogTitle className="text-center">
-                Confirmer le changement de plan ?
+            <DialogHeader className="px-6 py-4 border-b border-border">
+              <DialogTitle className="flex items-center gap-2 text-xl font-semibold text-foreground">
+                <Shield className="h-5 w-5 text-accent" />
+                Confirmer le changement de plan
               </DialogTitle>
             </DialogHeader>
-            
+
             {pendingUpgrade && (
               <div className="space-y-4 p-6">
-                {/* Plan actuel */}
-                <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
-                  <div>
-                    <p className="font-medium text-red-900">Plan actuel</p>
-                    <p className="text-sm text-red-700">
-                      {plans[pendingUpgrade.currentPlan]?.name} - {plans[pendingUpgrade.currentPlan]?.price}€/mois
-                    </p>
-                  </div>
-                  <div className="text-red-600">❌</div>
-                </div>
+                {/* Plan actuel → Nouveau plan */}
+                <Card className="card-hover">
+                  <CardContent className="pt-5 pb-5 space-y-3">
+                    <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Plan actuel</p>
+                        <p className="font-semibold text-foreground">
+                          {plans[pendingUpgrade.currentPlan]?.name} - {plans[pendingUpgrade.currentPlan]?.price}€/mois
+                        </p>
+                      </div>
+                    </div>
 
-                {/* Nouveau plan */}
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                  <div>
-                    <p className="font-medium text-green-900">Nouveau plan</p>
-                    <p className="text-sm text-green-700">
-                      {pendingUpgrade.planData.name} - {pendingUpgrade.planData.price}€/mois
-                    </p>
-                  </div>
-                  <div className="text-green-600">✅</div>
-                </div>
+                    <div className="flex justify-center">
+                      <div className="p-1.5 rounded-full bg-accent/10">
+                        <Zap className="h-4 w-4 text-accent" />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-accent/30 bg-accent/5">
+                      <div>
+                        <p className="text-xs text-accent font-medium uppercase tracking-wide">Nouveau plan</p>
+                        <p className="font-semibold text-foreground">
+                          {pendingUpgrade.planData.name} - {pendingUpgrade.planData.price}€/mois
+                        </p>
+                      </div>
+                      <Badge className="bg-accent text-accent-foreground">Upgrade</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* Informations importantes */}
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="text-sm space-y-2">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-blue-600" />
-                      <span className="text-blue-800">Accès immédiat aux nouvelles fonctionnalités</span>
+                <Card className="card-hover">
+                  <CardContent className="pt-5 pb-5">
+                    <div className="text-sm space-y-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
+                        <span className="text-foreground">Accès immédiat aux nouvelles fonctionnalités</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-accent flex-shrink-0" />
+                        <span className="text-foreground">Proratisation automatique sur votre prochaine facture</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-accent flex-shrink-0" />
+                        <span className="text-foreground">Aucun prélèvement aujourd'hui</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 text-blue-600" />
-                      <span className="text-blue-800">Proratisation automatique sur votre prochaine facture</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-blue-600" />
-                      <span className="text-blue-800">Aucun prélèvement aujourd'hui</span>
-                    </div>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
 
                 {/* Boutons */}
-                <div className="flex gap-3 pt-4">
+                <div className="flex gap-3 pt-2">
                   <Button
                     variant="outline"
                     onClick={handleCancelUpgrade}
@@ -512,9 +521,11 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                   <Button
                     onClick={handleConfirmUpgrade}
                     disabled={isLoading}
-                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    className="flex-1 btn-teal"
                   >
-                    {isLoading ? '⏳ Changement...' : 'Confirmer'}
+                    {isLoading ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Changement...</>
+                    ) : 'Confirmer'}
                   </Button>
                 </div>
               </div>

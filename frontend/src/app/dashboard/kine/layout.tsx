@@ -5,8 +5,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 
 export default function KineLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
-      <AuthGuard role="kine" />
+    <AuthGuard role="kine">
       <div className="min-h-screen flex flex-col">
         <div className="flex-1">
           {children}
@@ -28,6 +27,6 @@ export default function KineLayout({ children }: { children: React.ReactNode }) 
           </div>
         </footer>
       </div>
-    </>
+    </AuthGuard>
   );
 }

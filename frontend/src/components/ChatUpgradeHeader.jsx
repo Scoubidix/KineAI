@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Lock } from 'lucide-react';
 import { usePaywall } from '../hooks/usePaywall';
+import { useSubscription } from '../hooks/useSubscription';
+import { PaywallModal } from './PaywallModal';
 
 export const ChatUpgradeHeader = ({ assistantType, canAccessFeature, isLoading, subscription }) => {
   // Si les props ne sont pas fournies, utiliser le hook (fallback)
@@ -39,6 +41,9 @@ export const ChatUpgradeHeader = ({ assistantType, canAccessFeature, isLoading, 
 
 // Wrapper pour désactiver les zones d'interaction du chat
 export const ChatDisabledOverlay = ({ children, assistantType, canAccessFeature, isLoading }) => {
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  const { subscription } = useSubscription();
+
   // Si les props ne sont pas fournies, utiliser le hook (fallback)
   const paywall = canAccessFeature && isLoading !== undefined ?
     { canAccessFeature, isLoading } :
@@ -78,15 +83,24 @@ export const ChatDisabledOverlay = ({ children, assistantType, canAccessFeature,
       {/* Overlay transparent sur les zones d'interaction */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-50/30 to-gray-100/30 backdrop-blur-[1px] rounded-lg flex items-center justify-center">
         <div className="text-center p-6 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg border">
-          <Lock className="h-8 w-8 text-amber-600 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-700 mb-2">
+          <Lock className="h-8 w-8 text-[#3899aa] mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-700 mb-3">
             Accès restreint
           </p>
-          <p className="text-xs text-gray-500">
-            Cette fonctionnalité nécessite un plan supérieur
-          </p>
+          <button
+            onClick={() => setIsPaywallOpen(true)}
+            className="btn-teal px-4 py-2 rounded-md text-sm font-medium"
+          >
+            Changer de plan
+          </button>
         </div>
       </div>
+
+      <PaywallModal
+        isOpen={isPaywallOpen}
+        onClose={() => setIsPaywallOpen(false)}
+        subscription={subscription}
+      />
     </div>
   );
 };

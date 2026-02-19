@@ -8,7 +8,6 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,10 +30,11 @@ import {
   X,
   Tag
 } from 'lucide-react';
-import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
+import { format, differenceInDays, isAfter, isBefore, addDays, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 interface Programme {
   id: number;
@@ -50,6 +50,12 @@ interface Programme {
     lastName: string;
     phone: string;
   };
+  sessionValidations: {
+    date: string;
+    isValidated: boolean;
+    painLevel: number | null;
+    difficultyLevel: number | null;
+  }[];
   _count: {
     exercices: number;
     chatSessions: number;
@@ -704,9 +710,6 @@ export default function ProgrammesPage() {
           <div className="grid gap-4">
             {filteredProgrammes.map((programme) => {
               const statusInfo = getStatusInfo(programme);
-              const progressPercent = Math.max(0, Math.min(100, 
-                ((programme.duree - differenceInDays(new Date(programme.dateFin), new Date())) / programme.duree) * 100
-              ));
 
               return (
                 <Card key={programme.id} className="card-hover group">
@@ -743,35 +746,65 @@ export default function ProgrammesPage() {
                           </div>
                         </div>
 
-                        {/* Progression segmentée */}
+                        {/* Progression basée sur les validations */}
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
                             <span className="text-foreground">Progression</span>
                             <span className={`font-medium ${
-                              statusInfo.status === 'expired' ? 'text-destructive' :
-                              statusInfo.status === 'ending' ? 'text-orange-500' : 'text-[#3899aa]'
+                              statusInfo.status === 'expired' ? 'text-destructive' : 'text-[#3899aa]'
                             }`}>{statusInfo.daysText}</span>
                           </div>
-                          <div className="flex gap-1.5">
-                            {Array.from({ length: Math.min(programme.duree, 30) }).map((_, i) => {
-                              const segmentPercent = ((i + 1) / programme.duree) * 100;
-                              const isFilled = segmentPercent <= progressPercent;
-                              return (
-                                <div
-                                  key={i}
-                                  className={`h-2.5 flex-1 rounded-full transition-all duration-300 ${
-                                    isFilled
-                                      ? statusInfo.status === 'expired'
-                                        ? 'bg-destructive shadow-[0_0_6px_rgba(220,38,38,0.4)]'
-                                        : statusInfo.status === 'ending'
-                                          ? 'bg-orange-500 shadow-[0_0_6px_rgba(249,115,22,0.4)]'
-                                          : 'bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] shadow-[0_0_6px_rgba(56,153,170,0.4)]'
-                                      : 'bg-muted/60'
-                                  }`}
-                                />
-                              );
-                            })}
-                          </div>
+                          <TooltipProvider delayDuration={200}>
+                            <div className="flex gap-1.5">
+                              {Array.from({ length: Math.min(programme.duree, 30) }).map((_, i) => {
+                                const dayDate = addDays(new Date(programme.dateDebut), i);
+                                const now = new Date();
+                                const isPastDay = isBefore(dayDate, new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+                                const isToday = isSameDay(dayDate, now);
+                                const validation = (programme.sessionValidations ?? []).find(v =>
+                                  isSameDay(new Date(v.date), dayDate)
+                                );
+
+                                const isFutureDay = !isPastDay && !isToday;
+                                const segmentClass = isFutureDay
+                                  ? 'bg-muted/60'
+                                  : (isToday && !validation?.isValidated)
+                                    ? 'bg-muted/60'
+                                    : validation?.isValidated
+                                      ? 'bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] shadow-[0_0_6px_rgba(56,153,170,0.4)]'
+                                      : 'bg-destructive shadow-[0_0_6px_rgba(220,38,38,0.4)]';
+
+                                const showTooltip = isPastDay || (isToday && validation?.isValidated);
+                                if (showTooltip) {
+                                  return (
+                                    <Tooltip key={i}>
+                                      <TooltipTrigger asChild>
+                                        <div className={`h-2.5 flex-1 rounded-full transition-all duration-300 cursor-pointer ${segmentClass}`} />
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="text-xs">
+                                        <p className="font-medium">{format(dayDate, 'dd/MM/yyyy', { locale: fr })}</p>
+                                        {validation?.isValidated ? (
+                                          <>
+                                            <p>Douleur : {validation.painLevel ?? '—'}/10</p>
+                                            <p>Difficulté : {validation.difficultyLevel ?? '—'}/10</p>
+                                          </>
+                                        ) : (
+                                          <p className="text-destructive">Pas de validation</p>
+                                        )}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  );
+                                }
+
+                                return (
+                                  <div
+                                    key={i}
+                                    className={`h-2.5 flex-1 rounded-full transition-all duration-300 ${segmentClass}`}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </TooltipProvider>
                         </div>
                       </div>
 

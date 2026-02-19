@@ -93,7 +93,7 @@ export default function KineCreateExercisePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [exerciceToDelete, setExerciceToDelete] = useState<ExerciceModele | null>(null);
-  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [form, setForm] = useState({
     id: null as number | null,
@@ -447,7 +447,7 @@ export default function KineCreateExercisePage() {
     setDialogOpen(true);
   };
 
-  const toggleCardExpansion = (exerciceId: number) => {
+  const toggleCardExpansion = (exerciceId: string) => {
     setExpandedCards(prev => {
       const newSet = new Set(prev);
       if (newSet.has(exerciceId)) {
@@ -845,7 +845,8 @@ export default function KineCreateExercisePage() {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {categoryExercices.map((ex) => {
-                      const isExpanded = expandedCards.has(ex.id);
+                      const cardKey = `${category}-${ex.id}`;
+                      const isExpanded = expandedCards.has(cardKey);
                       const shouldTruncate = ex.description.length > 150;
                       const hasExpandableContent = shouldTruncate || !!ex.gifUrl;
                       const exerciceTags = parseTagsFromString(ex.tags);
@@ -922,7 +923,7 @@ export default function KineCreateExercisePage() {
                                 variant="ghost"
                                 size="sm"
                                 className="p-0 h-auto text-blue-600 hover:text-blue-800 transition-colors mb-2"
-                                onClick={() => toggleCardExpansion(ex.id)}
+                                onClick={() => toggleCardExpansion(cardKey)}
                               >
                                 <Eye className="w-3 h-3 mr-1" />
                                 {isExpanded ? 'Voir moins' : 'Voir plus'}

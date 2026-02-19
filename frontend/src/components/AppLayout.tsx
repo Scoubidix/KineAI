@@ -65,8 +65,6 @@ import {
   Shield,
   Palette,
   Save,
-  Eye,
-  EyeOff,
   Download,
   Loader2,
   Trash2,
@@ -80,7 +78,6 @@ import {
   BookOpen,
   Stethoscope,
   CreditCard,
-  AlertTriangle,
   Trophy,
   AlertCircle,
   Crown
@@ -143,15 +140,12 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   
-  // 💳 NOUVEAU : État pour la modal Paywall
+  // 💳 États abonnement
+  const [portalLoading, setPortalLoading] = useState(false);
   const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
-  
-  // 🚫 NOUVEAU : État pour la modal de résiliation
-  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-  const [cancelLoading, setCancelLoading] = useState(false);
 
   const { toast } = useToast();
-  const { subscription, usage, isLoading: subscriptionLoading, refreshSubscription } = useSubscription();
+  const { subscription, usage, isLoading: subscriptionLoading } = useSubscription();
 
   // Charger les données du kiné au montage
   React.useEffect(() => {
@@ -336,66 +330,45 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
     handleThemeChange(savedTheme);
   }, []);
 
-  // Fonction pour résilier l'abonnement
-  const handleCancelSubscription = async () => {
-    setCancelLoading(true);
-    
+  const handleOpenPortal = async () => {
+    setPortalLoading(true);
     try {
       const auth = getAuth(app);
       const user = auth.currentUser;
-      
-      if (!user) {
-        toast({
-          title: "Erreur",
-          description: "Vous devez être connecté",
-          variant: "destructive"
-        });
-        return;
-      }
+      if (!user) return;
 
       const token = await user.getIdToken();
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stripe/cancel-subscription`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stripe/create-portal`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          cancelAtPeriodEnd: true // Pas de résiliation immédiate
-        })
+        body: JSON.stringify({
+          returnUrl: `${window.location.origin}/dashboard/kine/home`,
+        }),
       });
-
-      const data = await response.json();
 
       if (response.ok) {
-        const endDate = subscription?.currentPeriodEnd 
-          ? new Date(subscription.currentPeriodEnd).toLocaleDateString('fr-FR')
-          : 'la fin de la période en cours';
-          
-        toast({
-          title: "Résiliation programmée",
-          description: `Votre abonnement sera résilié le ${endDate}. Vous gardez l'accès jusqu'à cette date.`,
-          className: "bg-orange-50 border-orange-200 text-orange-800",
-          duration: 8000
-        });
-        
-        // Fermer la modal et rafraîchir les données
-        setIsCancelModalOpen(false);
-        await refreshSubscription();
-        
+        const data = await response.json();
+        window.open(data.url, '_blank');
       } else {
-        throw new Error(data.details || data.error || 'Erreur lors de la résiliation');
+        const error = await response.json();
+        toast({
+          title: "Erreur",
+          description: error.details || "Impossible d'ouvrir le portail de facturation.",
+          variant: "destructive",
+        });
       }
-
     } catch (error) {
-      console.error('Erreur résiliation:', error);
+      console.error('Erreur portail Stripe:', error);
       toast({
-        title: "Erreur de résiliation",
-        description: error.message,
-        variant: "destructive"
+        title: "Erreur",
+        description: "Impossible d'ouvrir le portail de facturation.",
+        variant: "destructive",
       });
     } finally {
-      setCancelLoading(false);
+      setPortalLoading(false);
     }
   };
 
@@ -418,7 +391,7 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col md:flex-row min-h-[500px] max-h-[85vh]">
+        <div className="flex flex-col md:flex-row h-[60vh]">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col md:flex-row w-full">
             {/* Liste des onglets : horizontal sur mobile, vertical sur desktop */}
             <TabsList className="flex md:flex-col h-auto md:h-full w-full md:w-64 bg-muted/30 justify-start p-2 gap-1 md:space-y-1 flex-shrink-0 overflow-x-auto md:overflow-x-visible">
@@ -467,12 +440,6 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                   <h3 className="text-lg font-semibold mb-4 text-[#3899aa]">Informations personnelles</h3>
                   
                   <Card className="card-hover">
-                    <CardHeader>
-                      <CardTitle className="text-base text-foreground">Profil professionnel</CardTitle>
-                      <CardDescription className="text-foreground">
-                        Gérez vos informations de kinésithérapeute
-                      </CardDescription>
-                    </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -721,161 +688,80 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
               <TabsContent value="subscription" className="m-0 p-6 space-y-6">
                 <div>
                   <h3 className="text-lg font-semibold mb-4 text-[#3899aa]">Mon Abonnement</h3>
-                  
+
                   {subscriptionLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin" />
                       <span className="ml-2">Chargement de votre abonnement...</span>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {/* Informations essentielles */}
-                      <Card className="card-hover">
-                        <CardHeader>
-                          <CardTitle className="text-base text-foreground">Plan actuel</CardTitle>
-                          <CardDescription className="text-foreground">
-                            Informations sur votre abonnement en cours
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="flex items-center justify-between p-4 border rounded-lg">
-                            <div>
-                              <div className="flex items-center gap-3">
-                                <h4 className="font-semibold text-lg">
-                                  {subscription ? getPlanByType(subscription.planType).name : 'Aucun abonnement'}
-                                </h4>
-                                <Badge 
-                                  variant={subscription ? 'default' : 'secondary'}
-                                  className={subscription ? 'bg-green-100 text-green-800' : ''}
-                                >
-                                  {subscription ? 'Actif' : 'Gratuit'}
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {subscription ? 
-                                  `${getPlanByType(subscription.planType).price}€/mois` : 
-                                  'Plan gratuit limité'
+                    <Card className="card-hover">
+                      <CardContent className="pt-6 space-y-6">
+                        <div className="flex items-center justify-between p-4 border rounded-lg">
+                          <div>
+                            <div className="flex items-center gap-3">
+                              <h4 className="font-semibold text-lg">
+                                {subscription ? getPlanByType(subscription.planType).name : 'Aucun abonnement'}
+                              </h4>
+                              <Badge
+                                variant={subscription ? 'default' : 'secondary'}
+                                className={
+                                  subscription?.cancelAtPeriodEnd ? 'bg-orange-100 text-orange-800' :
+                                  subscription ? 'bg-green-100 text-green-800' : ''
+                                }
+                              >
+                                {subscription?.cancelAtPeriodEnd ? 'Résiliation programmée' :
+                                 subscription ? 'Actif' : 'Gratuit'}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {subscription ?
+                                `${getPlanByType(subscription.planType).price}€/mois` :
+                                'Plan gratuit limité'
+                              }
+                            </p>
+                            {subscription && subscription.currentPeriodEnd && (
+                              <p className="text-xs text-muted-foreground mt-2">
+                                {subscription.cancelAtPeriodEnd
+                                  ? `Accès jusqu'au ${new Date(subscription.currentPeriodEnd).toLocaleDateString('fr-FR')}`
+                                  : `Prochain paiement : ${new Date(subscription.currentPeriodEnd).toLocaleDateString('fr-FR')}`
                                 }
                               </p>
-                              {subscription && subscription.currentPeriodEnd && (
-                                <p className="text-xs text-muted-foreground mt-2">
-                                  Prochain paiement : {new Date(subscription.currentPeriodEnd).toLocaleDateString('fr-FR')}
-                                </p>
-                              )}
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm font-medium">
-                                Statut : <span className={subscription ? 'text-green-600' : 'text-orange-600'}>
-                                  {subscription ? 'Payé' : 'Gratuit'}
-                                </span>
-                              </p>
-                            </div>
+                            )}
                           </div>
-                        </CardContent>
-                      </Card>
+                          <Button
+                            size="sm"
+                            className="btn-teal"
+                            onClick={() => setIsPaywallModalOpen(true)}
+                          >
+                            Changer de plan
+                          </Button>
+                        </div>
 
-                      {/* Gestion des paiements */}
-                      <Card className="card-hover">
-                        <CardHeader>
-                          <CardTitle className="text-base text-foreground">Gestion des paiements</CardTitle>
-                          <CardDescription className="text-foreground">
-                            Gérez vos factures et moyens de paiement
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="flex items-center justify-between p-3 border rounded-lg">
-                            <div>
-                              <p className="font-medium">Historique des factures</p>
-                              <p className="text-sm text-muted-foreground">
-                                Téléchargez vos factures et relevés
-                              </p>
-                            </div>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                // TODO: Implémenter téléchargement factures
-                                toast({
-                                  title: "Bientôt disponible",
-                                  description: "Le téléchargement des factures sera disponible prochainement."
-                                });
-                              }}
-                            >
-                              <Download className="h-4 w-4 mr-2" />
-                              Télécharger
-                            </Button>
-                          </div>
-                          
-                          <div className="flex items-center justify-between p-3 border rounded-lg">
-                            <div>
-                              <p className="font-medium">Gérer la facturation</p>
-                              <p className="text-sm text-muted-foreground">
-                                Modifier vos informations de paiement via Stripe
-                              </p>
-                            </div>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                // TODO: Ouvrir portail Stripe
-                                toast({
-                                  title: "Bientôt disponible", 
-                                  description: "Le portail de facturation sera disponible prochainement."
-                                });
-                              }}
-                            >
-                              <CreditCard className="h-4 w-4 mr-2" />
-                              Gérer
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Actions d'abonnement */}
-                      <Card className="card-hover">
-                        <CardHeader>
-                          <CardTitle className="text-base text-foreground">Actions d'abonnement</CardTitle>
-                          <CardDescription className="text-foreground">
-                            Modifier ou résilier votre abonnement
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="flex items-center justify-between p-3 border rounded-lg border-blue-200 bg-blue-50 dark:bg-blue-950/20">
-                            <div>
-                              <p className="font-medium text-blue-900 dark:text-blue-100">Passer au plan supérieur</p>
-                              <p className="text-sm text-blue-700 dark:text-blue-300">
-                                Débloquez plus de fonctionnalités et augmentez vos limites
-                              </p>
-                            </div>
-                            <Button
-                              size="sm"
-                              className="btn-teal"
-                              onClick={() => setIsPaywallModalOpen(true)}
-                            >
-                              Upgrader
-                            </Button>
-                          </div>
-                          
-                          {subscription && (
-                            <div className="flex items-center justify-between p-3 border rounded-lg border-red-200">
-                              <div>
-                                <p className="font-medium text-red-900">Résilier mon abonnement</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Votre accès restera actif jusqu'à la fin de la période
-                                </p>
-                              </div>
-                              <Button 
-                                variant="destructive" 
-                                size="sm"
-                                onClick={() => setIsCancelModalOpen(true)}
-                              >
-                                Résilier
-                              </Button>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </div>
+                        <div className="p-4 bg-muted/30 rounded-lg border">
+                          <p className="text-sm text-muted-foreground mb-3">
+                            Consultez vos factures, modifiez votre moyen de paiement ou résiliez votre abonnement.
+                          </p>
+                          <Button
+                            onClick={handleOpenPortal}
+                            disabled={portalLoading}
+                            className="btn-teal"
+                          >
+                            {portalLoading ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Ouverture...
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard className="h-4 w-4 mr-2" />
+                                Gérer mon abonnement
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   )}
                 </div>
               </TabsContent>
@@ -981,85 +867,12 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
         onClose={() => setIsDeleteModalOpen(false)}
         kineData={kineData}
       />
-      
-      {/* 💳 NOUVEAU : Modal Paywall pour upgrade */}
+
       <PaywallModal
         isOpen={isPaywallModalOpen}
         onClose={() => setIsPaywallModalOpen(false)}
         subscription={subscription}
       />
-      
-      {/* 🚫 NOUVEAU : Modal de confirmation de résiliation */}
-      <Dialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-center text-destructive">
-              Résilier votre abonnement ?
-            </DialogTitle>
-            <DialogDescription className="text-center">
-              Cette action programmera la résiliation de votre abonnement
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {/* Informations sur l'abonnement actuel */}
-            {subscription && (
-              <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <Shield className="h-5 w-5 text-red-600" />
-                  <span className="font-medium text-red-900">
-                    Plan {getPlanByType(subscription.planType).name}
-                  </span>
-                </div>
-                <div className="text-sm text-red-700 space-y-1">
-                  <p>• Résiliation programmée pour le {subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('fr-FR') : 'fin de période'}</p>
-                  <p>• Accès maintenu jusqu'à cette date</p>
-                  <p>• Aucun remboursement (facturation au prorata)</p>
-                  <p>• Vous pourrez réactiver à tout moment avant l'expiration</p>
-                </div>
-              </div>
-            )}
-
-            {/* Avertissement */}
-            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
-                <div className="text-sm text-orange-800">
-                  <p className="font-medium">Êtes-vous sûr de vouloir résilier ?</p>
-                  <p className="mt-1">Cette action peut être annulée avant la date d'expiration en contactant le support.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Boutons */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setIsCancelModalOpen(false)}
-                className="flex-1"
-                disabled={cancelLoading}
-              >
-                Annuler
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleCancelSubscription}
-                disabled={cancelLoading}
-                className="flex-1"
-              >
-                {cancelLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Résiliation...
-                  </>
-                ) : (
-                  'Confirmer la résiliation'
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </Dialog>
   );
 }
@@ -1398,7 +1211,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <Sidebar collapsible="icon" side="left" variant="sidebar" className="text-sm text-foreground border-r border-primary/20 bg-[#eef7f6] dark:bg-[#0f1c1b]">
         <SidebarHeader className="h-14 flex-row items-center gap-3 px-3 border-b border-primary/20 bg-[#4db3c5]">
           <img
-            src="/logo.png"
+            src="/logo.jpg"
             alt="Mon Assistant Kiné"
             className="h-9 w-9 rounded-md object-contain flex-shrink-0 bg-white/15 p-0.5"
           />

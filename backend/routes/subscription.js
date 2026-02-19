@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const prismaService = require('../services/prismaService');
+const StripeService = require('../services/StripeService');
 const { authenticate } = require('../middleware/authenticate');
 
 const prisma = prismaService.getInstance();
@@ -9,7 +10,6 @@ const prisma = prismaService.getInstance();
 // GET /kine/subscription - Récupérer les infos d'abonnement du kiné
 router.get('/subscription', authenticate, async (req, res) => {
   try {
-    // Récupérer le kiné via son UID Firebase avec les VRAIS champs de votre schéma
     const kine = await prisma.kine.findUnique({
       where: { uid: req.uid },
       select: {
@@ -17,12 +17,8 @@ router.get('/subscription', authenticate, async (req, res) => {
         email: true,
         firstName: true,
         lastName: true,
-        stripeCustomerId: true,
         subscriptionId: true,
         planType: true,
-        subscriptionStatus: true,
-        subscriptionStartDate: true,
-        subscriptionEndDate: true,
         createdAt: true
       }
     });
@@ -31,41 +27,70 @@ router.get('/subscription', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Kinésithérapeute non trouvé' });
     }
 
+    const kineInfo = {
+      id: kine.id,
+      email: kine.email,
+      firstName: kine.firstName,
+      lastName: kine.lastName
+    };
+
     // Si pas d'abonnement Stripe, retourner plan FREE
     if (!kine.subscriptionId) {
       return res.json({
         subscription: {
-          planType: kine.planType || 'FREE',  // NULL = FREE
+          planType: kine.planType || 'FREE',
           status: 'active',
           currentPeriodEnd: null,
+          cancelAtPeriodEnd: false,
           createdAt: kine.createdAt
         },
-        kine: {
-          id: kine.id,
-          email: kine.email,
-          firstName: kine.firstName,
-          lastName: kine.lastName
-        }
+        kine: kineInfo
       });
     }
 
-    // Retourner les infos d'abonnement
-    const subscription = {
-      planType: kine.planType,
-      status: kine.subscriptionStatus,
-      currentPeriodEnd: kine.subscriptionEndDate,
-      createdAt: kine.subscriptionStartDate || kine.createdAt
-    };
+    // Fetch temps réel depuis Stripe
+    try {
+      const stripeSub = await StripeService.stripe.subscriptions.retrieve(kine.subscriptionId);
 
-    res.json({
-      subscription,
-      kine: {
-        id: kine.id,
-        email: kine.email,
-        firstName: kine.firstName,
-        lastName: kine.lastName
+      // Récupérer la date du prochain paiement via upcoming invoice
+      let nextPaymentDate = null;
+      if (stripeSub.status === 'active' && !stripeSub.cancel_at_period_end) {
+        try {
+          const upcomingInvoice = await StripeService.stripe.invoices.createPreview({
+            subscription: kine.subscriptionId,
+          });
+          nextPaymentDate = upcomingInvoice.period_end
+            ? new Date(upcomingInvoice.period_end * 1000)
+            : null;
+        } catch (invoiceError) {
+          // Pas de prochaine facture (ex: résiliation programmée)
+          logger.warn('[subscription] Pas de upcoming invoice:', invoiceError.message);
+        }
       }
-    });
+
+      res.json({
+        subscription: {
+          planType: kine.planType,
+          status: stripeSub.status,
+          currentPeriodEnd: nextPaymentDate,
+          cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
+          createdAt: new Date(stripeSub.start_date * 1000)
+        },
+        kine: kineInfo
+      });
+    } catch (stripeError) {
+      logger.warn('Stripe injoignable, fallback Prisma:', stripeError.message);
+      res.json({
+        subscription: {
+          planType: kine.planType,
+          status: 'active',
+          currentPeriodEnd: null,
+          cancelAtPeriodEnd: false,
+          createdAt: kine.createdAt
+        },
+        kine: kineInfo
+      });
+    }
 
   } catch (error) {
     logger.error('Erreur récupération abonnement:', error);

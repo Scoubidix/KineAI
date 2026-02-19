@@ -41,8 +41,17 @@ exports.getAllProgrammesByKine = async (req, res) => {
             phone: true
           }
         },
+        sessionValidations: {
+          select: {
+            date: true,
+            isValidated: true,
+            painLevel: true,
+            difficultyLevel: true
+          },
+          orderBy: { date: 'asc' }
+        },
         _count: {
-          select: { 
+          select: {
             exercices: true,
             chatSessions: true
           }

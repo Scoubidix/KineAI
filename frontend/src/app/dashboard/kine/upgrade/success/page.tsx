@@ -129,66 +129,49 @@ function UpgradeSuccessContent() {
     }
   };
 
-  // Couleurs du plan
-  const getPlanColors = (planType: string) => {
-    const colors = {
-      'DECLIC': { bg: 'bg-gray-50 dark:bg-gray-800', border: 'border-gray-200 dark:border-gray-700', accent: 'text-gray-600 dark:text-gray-400' },
-      'PRATIQUE': { bg: 'bg-blue-50 dark:bg-blue-900/30', border: 'border-blue-200 dark:border-blue-700', accent: 'text-blue-600 dark:text-blue-400' },
-      'PIONNIER': { bg: 'bg-purple-50 dark:bg-purple-900/30', border: 'border-purple-200 dark:border-purple-700', accent: 'text-purple-600 dark:text-purple-400' },
-      'EXPERT': { bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-amber-200 dark:border-amber-700', accent: 'text-amber-600 dark:text-amber-400' }
-    };
-    return colors[planType as keyof typeof colors] || colors['DECLIC'];
-  };
 
   if (loading || subscriptionLoading) {
     return (
-      <AppLayout>
-        <AuthGuard role="kine" />
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Vérification de votre abonnement...</p>
-          </div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Vérification de votre abonnement...</p>
         </div>
-      </AppLayout>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <AppLayout>
-        <AuthGuard role="kine" />
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Card className="max-w-md mx-auto text-center border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/30">
-            <CardHeader>
-              <div className="mx-auto mb-4 p-3 bg-red-100 dark:bg-red-900/50 rounded-full w-fit">
-                <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
-              </div>
-              <CardTitle className="text-red-900 dark:text-red-300">Erreur de vérification</CardTitle>
-              <CardDescription className="text-red-700 dark:text-red-400">
-                Une erreur s'est produite lors de la vérification de votre paiement.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-red-700 dark:text-red-400 mb-4">{error}</p>
-              <div className="space-y-2">
-                <Button asChild className="w-full">
-                  <Link href="/dashboard/kine/home">
-                    <Home className="h-4 w-4 mr-2" />
-                    Retour au tableau de bord
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </AppLayout>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="max-w-md mx-auto text-center border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/30">
+          <CardHeader>
+            <div className="mx-auto mb-4 p-3 bg-red-100 dark:bg-red-900/50 rounded-full w-fit">
+              <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+            <CardTitle className="text-red-900 dark:text-red-300">Erreur de vérification</CardTitle>
+            <CardDescription className="text-red-700 dark:text-red-400">
+              Une erreur s'est produite lors de la vérification de votre paiement.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-red-700 dark:text-red-400 mb-4">{error}</p>
+            <div className="space-y-2">
+              <Button asChild className="w-full btn-teal">
+                <Link href="/dashboard/kine/home">
+                  <Home className="h-4 w-4 mr-2" />
+                  Retour au tableau de bord
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   const currentPlan = subscription?.planType || null;
   const planDetails = currentPlan ? getPlanDetails(currentPlan) : null;
-  const colors = currentPlan ? getPlanColors(currentPlan) : getPlanColors('DECLIC');
 
   return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -208,12 +191,12 @@ function UpgradeSuccessContent() {
 
         {/* Activation en cours */}
         {(!currentPlan || currentPlan === 'FREE') ? (
-          <Card className="border-border bg-card shadow-lg mb-8">
+          <Card className="card-hover mb-8">
             <CardHeader className="text-center pb-4">
-              <div className="mx-auto mb-4 p-3 bg-primary/10 rounded-full w-fit">
-                <RefreshCw className="h-8 w-8 text-primary" />
+              <div className="mx-auto mb-4 p-3 bg-[#3899aa]/10 rounded-full w-fit">
+                <RefreshCw className="h-8 w-8 text-[#3899aa]" />
               </div>
-              <CardTitle className="text-primary">Activation de votre abonnement</CardTitle>
+              <CardTitle className="text-[#3899aa]">Activation de votre abonnement</CardTitle>
               <CardDescription className="text-muted-foreground text-lg">
                 Votre paiement a été traité avec succès ! Nous finalisons l'activation de votre compte.
               </CardDescription>
@@ -229,10 +212,10 @@ function UpgradeSuccessContent() {
               </div>
               
               <div className="space-y-3">
-                <Button 
+                <Button
                   onClick={handleRefreshSubscription}
                   disabled={refreshing}
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                  className="w-full btn-teal"
                 >
                   <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                   {refreshing ? 'Actualisation...' : 'Actualiser maintenant'}
@@ -249,7 +232,7 @@ function UpgradeSuccessContent() {
             </CardContent>
           </Card>
         ) : currentPlan && planDetails ? (
-          <Card className={`${colors.border} ${colors.bg} shadow-lg mb-8`}>
+          <Card className="card-hover mb-8">
             <CardHeader className="text-center pb-4 relative">
               {/* Bouton actualiser en haut à droite */}
               <Button 
@@ -262,7 +245,7 @@ function UpgradeSuccessContent() {
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               </Button>
               
-              <div className={`mx-auto p-4 rounded-full ${colors.bg} ${colors.border} border-2 mb-4`}>
+              <div className="mx-auto p-4 rounded-full bg-[#3899aa]/10 border-2 border-[#3899aa]/20 mb-4">
                 {getPlanIcon(currentPlan)}
               </div>
               <CardTitle className="text-2xl font-bold flex items-center justify-center gap-2">
@@ -290,9 +273,9 @@ function UpgradeSuccessContent() {
                   <div>
                     <p className="font-semibold">Prochaine facturation</p>
                     <p className="text-lg font-medium">
-                      {subscription?.currentPeriodEnd 
+                      {subscription?.currentPeriodEnd
                         ? format(new Date(subscription.currentPeriodEnd), 'd MMMM yyyy', { locale: fr })
-                        : format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), 'd MMMM yyyy', { locale: fr })
+                        : 'En cours de calcul...'
                       }
                     </p>
                   </div>
@@ -325,10 +308,10 @@ function UpgradeSuccessContent() {
 
               {/* Actions */}
               <div className="flex justify-center pt-4">
-                <Button 
-                  asChild 
-                  size="lg" 
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-8"
+                <Button
+                  asChild
+                  size="lg"
+                  className="btn-teal px-8"
                 >
                   <Link href="/dashboard/kine/home">
                     <Home className="h-5 w-5 mr-2" />
@@ -352,10 +335,10 @@ function UpgradeSuccessContent() {
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center">
-              <Button 
+              <Button
                 onClick={handleRefreshSubscription}
                 disabled={refreshing}
-                className="bg-amber-600 hover:bg-amber-700 text-white"
+                className="btn-teal"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                 Actualiser l'abonnement

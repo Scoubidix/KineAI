@@ -120,6 +120,12 @@ body {
     box-shadow: 0 0 20px rgba(56, 153, 170, 0.4), 0 6px 28px -4px rgba(0, 0, 0, 0.55);
   }
 
+  /* Toast succès teal */
+  .toast-success {
+    @apply bg-white dark:bg-gray-900 border-[#3899aa]/40;
+    box-shadow: 0 0 15px rgba(56, 153, 170, 0.15);
+  }
+
   /* Bulle chat user dégradé teal */
   .bubble-user {
     background-image: linear-gradient(to right, #4db3c5, #1f5c6a);
