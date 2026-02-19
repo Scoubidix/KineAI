@@ -6,7 +6,6 @@ import {
   Sidebar,
   SidebarHeader,
   SidebarContent,
-  SidebarFooter,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -83,7 +82,8 @@ import {
   CreditCard,
   AlertTriangle,
   Trophy,
-  AlertCircle
+  AlertCircle,
+  Crown
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -92,7 +92,6 @@ import { getAuth, signOut } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { PlanIndicator } from './PlanIndicator';
 import { RGPDExportModal } from './RGPDExportModal';
 import { RGPDDeleteModal } from './RGPDDeleteModal';
 import { PaywallModal } from './PaywallModal';
@@ -119,8 +118,10 @@ const getRoleFromPath = (path: string): RoleOrUnknown => {
 };
 
 // Composant Settings Modal
-function SettingsModal({ trigger }: { trigger?: React.ReactNode }) {
-  const [isOpen, setIsOpen] = useState(false);
+function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = open !== undefined ? open : internalOpen;
+  const setIsOpen = onOpenChange || setInternalOpen;
   const [activeTab, setActiveTab] = useState('account');
   const [showPassword, setShowPassword] = useState(false);
   const [dataRetention, setDataRetention] = useState('5-years');
@@ -196,6 +197,22 @@ function SettingsModal({ trigger }: { trigger?: React.ReactNode }) {
   };
 
   const handleSaveProfile = async () => {
+    // Validation RPPS : vide ou exactement 11 chiffres
+    const rppsValue = kineData.rpps?.trim() || '';
+    if (rppsValue && (rppsValue.length !== 11 || !/^\d{11}$/.test(rppsValue))) {
+      setSaveMessage('❌ Le numéro RPPS doit contenir exactement 11 chiffres');
+      setTimeout(() => setSaveMessage(''), 3000);
+      return;
+    }
+
+    // Validation téléphone : vide ou exactement 10 chiffres
+    const phoneValue = kineData.phone?.replace(/\s/g, '') || '';
+    if (phoneValue && (phoneValue.length !== 10 || !/^\d{10}$/.test(phoneValue))) {
+      setSaveMessage('❌ Le numéro de téléphone doit contenir exactement 10 chiffres');
+      setTimeout(() => setSaveMessage(''), 3000);
+      return;
+    }
+
     setLoading(true);
     try {
       const auth = getAuth(app);
@@ -216,7 +233,8 @@ function SettingsModal({ trigger }: { trigger?: React.ReactNode }) {
         },
         body: JSON.stringify({
           phone: kineData.phone,
-          adresseCabinet: kineData.adresseCabinet
+          adresseCabinet: kineData.adresseCabinet,
+          rpps: kineData.rpps?.trim() || null
         }),
       });
       
@@ -383,14 +401,11 @@ function SettingsModal({ trigger }: { trigger?: React.ReactNode }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <SidebarMenuButton tooltip="Paramètres" className="text-foreground hover:border hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-transparent">
-            <Settings className="h-4 w-4 shrink-0" />
-            <span>Paramètres</span>
-          </SidebarMenuButton>
-        )}
-      </DialogTrigger>
+      {trigger && (
+        <DialogTrigger asChild>
+          {trigger}
+        </DialogTrigger>
+      )}
       
       <DialogContent 
         className="!w-[98vw] !max-w-[1200px] !max-h-[95vh] overflow-hidden p-0"
@@ -466,7 +481,7 @@ function SettingsModal({ trigger }: { trigger?: React.ReactNode }) {
                             id="firstName" 
                             value={kineData.firstName}
                             disabled
-                            className="bg-muted text-muted-foreground"
+                            className="bg-white dark:bg-zinc-900 text-foreground"
                           />
                           <p className="text-xs text-muted-foreground mt-1">Non modifiable</p>
                         </div>
@@ -476,7 +491,7 @@ function SettingsModal({ trigger }: { trigger?: React.ReactNode }) {
                             id="lastName" 
                             value={kineData.lastName}
                             disabled
-                            className="bg-muted text-muted-foreground"
+                            className="bg-white dark:bg-zinc-900 text-foreground"
                           />
                           <p className="text-xs text-muted-foreground mt-1">Non modifiable</p>
                         </div>
@@ -489,7 +504,7 @@ function SettingsModal({ trigger }: { trigger?: React.ReactNode }) {
                           type="email" 
                           value={kineData.email}
                           disabled
-                          className="bg-muted text-muted-foreground"
+                          className="bg-white dark:bg-zinc-900 text-foreground"
                         />
                         <p className="text-xs text-muted-foreground mt-1">Non modifiable</p>
                       </div>
@@ -497,30 +512,31 @@ function SettingsModal({ trigger }: { trigger?: React.ReactNode }) {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="rpps">Numéro RPPS</Label>
-                          <Input 
-                            id="rpps" 
+                          <Input
+                            id="rpps"
                             value={kineData.rpps}
-                            disabled
-                            className="bg-muted text-muted-foreground"
+                            onChange={(e) => setKineData({...kineData, rpps: e.target.value})}
+                            className="bg-white dark:bg-zinc-900 text-foreground"
                           />
-                          <p className="text-xs text-muted-foreground mt-1">Non modifiable</p>
                         </div>
                         <div>
                           <Label htmlFor="phone">Téléphone</Label>
-                          <Input 
-                            id="phone" 
+                          <Input
+                            id="phone"
                             value={kineData.phone}
                             onChange={(e) => setKineData({...kineData, phone: e.target.value})}
+                            className="bg-white dark:bg-zinc-900 text-foreground"
                           />
                         </div>
                       </div>
                       
                       <div>
                         <Label htmlFor="address">Adresse du cabinet</Label>
-                        <Input 
-                          id="address" 
+                        <Input
+                          id="address"
                           value={kineData.adresseCabinet}
                           onChange={(e) => setKineData({...kineData, adresseCabinet: e.target.value})}
+                          className="bg-white dark:bg-zinc-900 text-foreground"
                         />
                       </div>
                       
@@ -1201,10 +1217,8 @@ function NotificationsDropdown() {
             notifications.map(notif => (
               <div
                 key={notif.id}
-                className={`flex items-start gap-3 p-3 border-b last:border-b-0 hover:bg-muted/50 transition-colors ${
-                  !notif.isRead ? 'bg-accent/5 cursor-pointer' : ''
-                }`}
-                onClick={() => !notif.isRead && markAsRead(notif.id)}
+                className={`flex items-start gap-3 p-3 border-b last:border-b-0 hover:bg-muted/50 transition-colors cursor-pointer`}
+                onClick={() => { if (!notif.isRead) markAsRead(notif.id); setIsOpen(false); router.push('/dashboard/kine/notifications'); }}
               >
                 <div className="mt-0.5 flex-shrink-0">{getNotifIcon(notif.type)}</div>
                 <div className="flex-1 min-w-0">
@@ -1300,8 +1314,63 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const displayName = role === 'kine' ? 'Dr. Kiné (Dev)' : role === 'patient' ? 'Patient (Dev)' : 'Utilisateur (Dev)';
   const displayInitials = role === 'kine' ? 'DK' : role === 'patient' ? 'PA' : 'U';
 
+  // Subscription pour le bouton Upgrade dans le header
+  const { subscription: headerSubscription } = useSubscription();
+  const [isPaywallHeaderOpen, setIsPaywallHeaderOpen] = useState(false);
+
+  // Profil kiné pour l'avatar header (cache localStorage pour éviter flash)
+  const [headerInitials, setHeaderInitials] = useState('');
+  const [headerName, setHeaderName] = useState('');
+  const [headerEmail, setHeaderEmail] = useState('');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Lecture cache localStorage au montage (après hydratation)
+  React.useEffect(() => {
+    const cachedInitials = localStorage.getItem('kine_initials');
+    const cachedName = localStorage.getItem('kine_name');
+    const cachedEmail = localStorage.getItem('kine_email');
+    if (cachedInitials) setHeaderInitials(cachedInitials);
+    if (cachedName) setHeaderName(cachedName);
+    if (cachedEmail) setHeaderEmail(cachedEmail);
+  }, []);
+
+  React.useEffect(() => {
+    if (role !== 'kine') return;
+    const fetchProfile = async () => {
+      try {
+        const auth = getAuth(app);
+        const user = auth.currentUser;
+        if (!user) return;
+        const token = await user.getIdToken();
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const first = data.firstName?.charAt(0)?.toUpperCase() || '';
+          const last = data.lastName?.charAt(0)?.toUpperCase() || '';
+          const initials = first + last;
+          const name = `${data.firstName || ''} ${data.lastName || ''}`.trim();
+          const email = data.email || '';
+          setHeaderInitials(initials);
+          setHeaderName(name);
+          setHeaderEmail(email);
+          localStorage.setItem('kine_initials', initials);
+          localStorage.setItem('kine_name', name);
+          localStorage.setItem('kine_email', email);
+        }
+      } catch (error) {
+        // Silencieux
+      }
+    };
+    fetchProfile();
+  }, [role]);
+
   const handleLogout = async () => {
     try {
+      localStorage.removeItem('kine_initials');
+      localStorage.removeItem('kine_name');
+      localStorage.removeItem('kine_email');
       const auth = getAuth(app);
       await signOut(auth);
       router.replace('/login');
@@ -1329,7 +1398,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <Sidebar collapsible="icon" side="left" variant="sidebar" className="text-sm text-foreground border-r border-primary/20 bg-[#eef7f6] dark:bg-[#0f1c1b]">
         <SidebarHeader className="h-14 flex-row items-center gap-3 px-3 border-b border-primary/20 bg-[#4db3c5]">
           <img
-            src="/logo.jpg"
+            src="/logo.png"
             alt="Mon Assistant Kiné"
             className="h-9 w-9 rounded-md object-contain flex-shrink-0 bg-white/15 p-0.5"
           />
@@ -1360,23 +1429,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
             ))}
           </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter className="border-t border-primary/20 p-2">
-          <SidebarMenu>
-            {role === 'kine' && (
-              <SidebarMenuItem>
-                <div className="px-2 py-1 group-data-[state=collapsed]:hidden">
-                  <PlanIndicator />
-                </div>
-              </SidebarMenuItem>
-            )}
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Déconnexion" onClick={handleLogout} className="text-red-600 font-semibold hover:border hover:border-red-400 hover:shadow-[0_0_12px_rgba(239,68,68,0.3)] hover:bg-transparent hover:text-red-700">
-                <LogOut className="h-4 w-4 shrink-0" />
-                <span>Déconnexion</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
       </Sidebar>
 
       <SidebarInset>
@@ -1389,17 +1441,62 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </span>
             <div className="flex-1" />
             <div className="flex items-center gap-1">
-              {role === 'kine' && <NotificationsDropdown />}
-              <SettingsModal trigger={
-                <button className="p-2 rounded-full hover:bg-white/20 transition-colors" title="Paramètres">
-                  <Settings className="h-5 w-5 text-white" />
+              {role === 'kine' && headerSubscription && headerSubscription.planType === 'FREE' && (
+                <button
+                  onClick={() => setIsPaywallHeaderOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sky-400 hover:bg-sky-300 text-white text-xs font-bold shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg"
+                >
+                  <Crown className="h-3.5 w-3.5" />
+                  Passer à Premium
                 </button>
-              } />
-              <Avatar className="h-8 w-8 border-2 border-white/30 ml-1">
-                <AvatarFallback className="bg-white/20 text-white text-xs font-semibold">
-                  {displayInitials}
-                </AvatarFallback>
-              </Avatar>
+              )}
+              {role === 'kine' && <NotificationsDropdown />}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="rounded-full hover:ring-2 hover:ring-white/40 transition-all">
+                    <Avatar className="h-8 w-8 border-2 border-white/30 cursor-pointer">
+                      <AvatarFallback className="bg-white/20 text-white text-xs font-semibold">
+                        {headerInitials || displayInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="end" sideOffset={8}>
+                  {/* Profil */}
+                  <div className="flex flex-col items-center gap-2 p-4 border-b">
+                    <Avatar className="h-16 w-16 border-2 border-[#3899aa]/30">
+                      <AvatarFallback className="bg-[#eef7f6] text-[#1f5c6a] text-lg font-semibold">
+                        {headerInitials || displayInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="text-center min-w-0 w-full">
+                      <p className="text-sm font-semibold text-foreground truncate">{headerName || 'Mon compte'}</p>
+                      <p className="text-xs text-muted-foreground truncate">{headerEmail}</p>
+                    </div>
+                  </div>
+                  {/* Actions */}
+                  <div className="p-1">
+                    <button
+                      onClick={() => setIsSettingsOpen(true)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-muted/50 rounded-md transition-colors"
+                    >
+                      <Settings className="h-4 w-4 text-muted-foreground" />
+                      Paramètres
+                    </button>
+                  </div>
+                  {/* Déconnexion */}
+                  <div className="border-t p-1">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-md transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Déconnexion
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <SettingsModal open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
             </div>
           </div>
         </header>
@@ -1415,6 +1512,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
         </div>
       </SidebarInset>
+
+      {/* PaywallModal pour le bouton Upgrade du header */}
+      <PaywallModal
+        isOpen={isPaywallHeaderOpen}
+        onClose={() => setIsPaywallHeaderOpen(false)}
+        subscription={headerSubscription}
+      />
     </SidebarProvider>
   );
 }

@@ -7,11 +7,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { LogIn, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -52,22 +48,11 @@ export default function LoginPage() {
       // 3. ✨ Vérifier si l'email est vérifié
       if (!userCredential.user.emailVerified) {
         // Rediriger vers la page de vérification obligatoire
-        toast({
-          title: "Vérification requise",
-          description: "Vous devez vérifier votre email avant d'accéder à votre compte.",
-          variant: "destructive"
-        });
         router.push("/verify-email-required");
         return;
       }
 
-      // 4. Toast de succès personnalisé (seulement si email vérifié)
-      toast({
-        title: "Connexion réussie",
-        description: `Bienvenue ${kineData.firstName}`,
-      });
-
-      // 5. Redirection vers le dashboard (seulement si email vérifié)
+      // 4. Redirection vers le dashboard (seulement si email vérifié)
       router.push("/dashboard/kine/home");
 
     } catch (error) {
@@ -97,155 +82,113 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8">
-        
-        {/* Header avec logo et titre */}
-        <div className="text-center space-y-6">
-          {/* Logo */}
-          <div className="flex justify-center">
-            <Image
-              src="/logo.jpg"
-              alt="Mon Assistant Kiné"
-              width={120}
-              height={120}
-              className="mx-auto rounded-xl bg-white p-3 shadow-sm"
-              priority
+    <div className="min-h-screen bg-white flex justify-center pt-20 p-4">
+      <div className="w-full max-w-sm space-y-8">
+
+        {/* Logo */}
+        <div className="flex justify-center">
+          <Image
+            src="/logo.png"
+            alt="Mon Assistant Kiné"
+            width={100}
+            height={100}
+            className="rounded-xl"
+            priority
+          />
+        </div>
+
+        {/* Titre */}
+        <h1 className="text-2xl font-bold text-center" style={{ color: '#1f5c6a' }}>
+          Mon Assistant Kiné
+        </h1>
+
+        <form onSubmit={handleLogin} className="space-y-5">
+
+          {/* Email */}
+          <div className="space-y-1">
+            <label htmlFor="email" className="text-sm font-medium text-gray-700">
+              Adresse email
+            </label>
+            <input
+              id="email"
+              type="email"
+              placeholder="votre@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full h-11 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              required
+              disabled={loading}
             />
           </div>
 
-          {/* Titre et sous-titre */}
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              Mon Assistant Kiné
-            </h1>
-            <p className="text-muted-foreground">
-              Plateforme professionnelle de rééducation
-            </p>
+          {/* Mot de passe */}
+          <div className="space-y-1">
+            <label htmlFor="password" className="text-sm font-medium text-gray-700">
+              Mot de passe
+            </label>
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full h-11 px-3 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                required
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                disabled={loading}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
+
+          {/* Mot de passe oublié */}
+          <div className="text-right">
+            <Link href="/forgot-password" className="text-sm text-teal-600 hover:text-teal-800">
+              Mot de passe oublié ?
+            </Link>
+          </div>
+
+          {/* Bouton Se connecter */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn-teal w-full h-11 rounded-lg text-sm font-medium disabled:opacity-50"
+          >
+            {loading ? (
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Connexion en cours...
+              </div>
+            ) : (
+              "Se connecter"
+            )}
+          </button>
+        </form>
+
+        {/* Séparateur */}
+        <div className="border-t border-gray-200" />
+
+        {/* Inscription */}
+        <div className="text-center">
+          <p className="text-sm text-gray-500 mb-3">Pas encore de compte ?</p>
+          <Link
+            href="/signup"
+            className="inline-block w-full h-11 leading-[2.75rem] rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 text-center"
+          >
+            Créer un compte professionnel
+          </Link>
         </div>
 
-        {/* Card de connexion */}
-        <Card className="shadow-lg border">
-          <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-2xl font-semibold text-center">Connexion</CardTitle>
-            <CardDescription className="text-center">
-              Accédez à votre espace professionnel sécurisé
-            </CardDescription>
-          </CardHeader>
-          
-          <form onSubmit={handleLogin}>
-            <CardContent className="space-y-6">
-              
-              {/* Champ Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Adresse email
-                </Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    placeholder="votre@email.com"
-                    value={email} 
-                    onChange={(e) => setEmail(e.target.value)} 
-                    className="pl-10 h-12"
-                    required 
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
-              {/* Champ Mot de passe */}
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium">
-                  Mot de passe
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="password" 
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password} 
-                    onChange={(e) => setPassword(e.target.value)} 
-                    className="pl-10 pr-10 h-12"
-                    required 
-                    disabled={loading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
-                    disabled={loading}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Lien mot de passe oublié */}
-              <div className="text-right">
-                <Link 
-                  href="/forgot-password" 
-                  className="text-sm text-primary hover:text-primary/80 transition-colors"
-                >
-                  Mot de passe oublié ?
-                </Link>
-              </div>
-            </CardContent>
-
-            <CardFooter className="flex flex-col space-y-4 pt-6">
-              
-              {/* Bouton de connexion */}
-              <Button 
-                type="submit" 
-                disabled={loading} 
-                className="w-full h-12 text-base font-medium"
-                size="lg"
-              >
-                {loading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Connexion en cours...
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <LogIn className="h-4 w-4" />
-                    Se connecter
-                  </div>
-                )}
-              </Button>
-
-              {/* Séparateur */}
-              <div className="relative w-full">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-muted" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">ou</span>
-                </div>
-              </div>
-
-              {/* Lien inscription */}
-              <div className="text-center space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Pas encore de compte ?
-                </p>
-                <Button variant="outline" className="w-full h-12" asChild>
-                  <Link href="/signup">
-                    Créer un compte professionnel
-                  </Link>
-                </Button>
-              </div>
-            </CardFooter>
-          </form>
-        </Card>
-
         {/* Footer */}
-        <div className="text-center text-xs text-muted-foreground space-y-1">
-          <p>© {new Date().getFullYear()} Mon Assistant Kiné</p>
+        <div className="text-center text-xs text-gray-400 space-y-1">
+          <p>&copy; {new Date().getFullYear()} Mon Assistant Kiné</p>
           <p>
             <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer" className="hover:underline">CGU</a>
             {" • "}
@@ -254,6 +197,7 @@ export default function LoginPage() {
             <a href="/legal/mentions-legales.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Mentions légales</a>
           </p>
         </div>
+
       </div>
     </div>
   );

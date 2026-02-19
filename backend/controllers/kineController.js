@@ -12,11 +12,6 @@ const createKine = async (req, res) => {
     email,
     firstName,
     lastName,
-    phone,
-    rpps,
-    adresseCabinet,
-    birthDate,
-    // Nouveaux champs pour traçabilité légale
     acceptedCguAt,
     acceptedPolitiqueConfidentialiteAt,
     cguVersion,
@@ -24,6 +19,12 @@ const createKine = async (req, res) => {
   } = req.body;
 
   logger.warn("📥 Création kiné - UID:", sanitizeUID(req.body.uid));
+
+  // Honeypot anti-bot : si le champ caché est rempli, rejet silencieux
+  if (req.body.website) {
+    logger.warn("🤖 Bot détecté (honeypot) - rejet silencieux");
+    return res.status(201).json({ id: 0, message: "OK" });
+  }
 
   try {
     const prisma = prismaService.getInstance();
@@ -49,11 +50,6 @@ const createKine = async (req, res) => {
         email,
         firstName,
         lastName,
-        phone,
-        rpps,
-        adresseCabinet,
-        birthDate: new Date(birthDate),
-        // Traçabilité légale
         acceptedCguAt: acceptedCguAt ? new Date(acceptedCguAt) : null,
         acceptedPolitiqueConfidentialiteAt: acceptedPolitiqueConfidentialiteAt ? new Date(acceptedPolitiqueConfidentialiteAt) : null,
         cguVersion: cguVersion || null,
@@ -114,7 +110,7 @@ const getKineProfile = async (req, res) => {
 
 const updateKineProfile = async (req, res) => {
   const uid = req.uid; // Récupéré depuis le middleware authenticate
-  const { email, phone, adresseCabinet } = req.body;
+  const { email, phone, adresseCabinet, rpps } = req.body;
 
   logger.info("📥 Mise à jour profil kiné pour UID:", sanitizeUID(uid));
 
@@ -141,6 +137,7 @@ const updateKineProfile = async (req, res) => {
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
     if (adresseCabinet !== undefined) updateData.adresseCabinet = adresseCabinet;
+    if (rpps !== undefined) updateData.rpps = rpps;
 
     // Mettre à jour le profil
     const updatedKine = await prisma.kine.update({

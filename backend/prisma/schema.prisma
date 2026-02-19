@@ -13,10 +13,10 @@ model Kine {
   email          String   @unique
   firstName      String
   lastName       String
-  phone          String
-  rpps           String   @unique
-  birthDate      DateTime
-  adresseCabinet String
+  phone          String?
+  rpps           String?  @unique
+  birthDate      DateTime?
+  adresseCabinet String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

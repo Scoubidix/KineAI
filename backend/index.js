@@ -45,6 +45,7 @@ const {
   documentSearchLimiter,
   rgpdExportLimiter,
   rgpdDeleteLimiter,
+  signupLimiter,
   rateLimitLogger
 } = require('./middleware/rateLimiter');
 
@@ -594,8 +595,13 @@ app.use('/api/templates', (req, res, next) => {
 
 // ========== ROUTES MÉTIER - RATE LIMITING SÉLECTIF ==========
 
-// Routes de navigation (LIBRES)
-app.use('/kine', kinesRoutes);              // Profile, adhérence, sessions - LIBRES
+// Routes kiné : Rate limiting sur inscription uniquement
+app.use('/kine', (req, res, next) => {
+  if (req.method === 'POST' && req.path === '/') {
+    return signupLimiter(req, res, next);
+  }
+  next();
+}, kinesRoutes);
 app.use('/patients', patientsRoutes);       // CRUD patients - LIBRES
 
 // Programmes : Rate limiting sélectif par route

@@ -7,7 +7,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Bell, AlertCircle, Users, CheckCircle, XCircle, CalendarDays, Percent, Calendar as CalendarIcon, RefreshCw, Clock, Trophy } from 'lucide-react';
+import { AlertCircle, Users, CheckCircle, XCircle, CalendarDays, Percent, Calendar as CalendarIcon, RefreshCw, Clock, Trophy } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Progress } from '@/components/ui/progress';
@@ -109,23 +109,8 @@ const getInitials = (name?: string): string => {
   return (names[0][0] + names[names.length - 1][0]).toUpperCase();
 };
 
-// Helper pour l'icône des notifications (gardé au cas où, mais plus utilisé)
-const getNotificationIcon = (type: string) => {
-  switch (type) {
-    case 'DAILY_VALIDATION':
-      return <CalendarDays className="h-4 w-4 text-blue-500" />;
-    case 'PROGRAM_COMPLETED':
-      return <Trophy className="h-4 w-4 text-green-500" />;
-    case 'PAIN_ALERT':
-      return <AlertCircle className="h-4 w-4 text-red-500" />;
-    default:
-      return <Bell className="h-4 w-4 text-blue-500" />;
-  }
-};
 
 export default function KineHomePage() {
-  const [notifications, setNotifications] = useState<NotificationData[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [adherenceData, setAdherenceData] = useState<AdherenceData | null>(null);
   const [patientsData, setPatientsData] = useState<PatientsSessionsData | null>(null);
@@ -177,23 +162,7 @@ export default function KineHomePage() {
         setKine(profileResult.data);
         
         // Étape 2: En parallèle, charger les données dépendantes
-        const [adherenceResult, notificationsResult] = await Promise.allSettled([
-          fetchAdherenceData(selectedDate, token),
-          fetchUnreadCount(token)
-        ]);
-        
-        // Traiter les résultats individuellement
-        if (adherenceResult.status === 'fulfilled') {
-          // Adhérence déjà gérée dans fetchAdherenceData
-        } else {
-          console.error('Erreur adhérence:', adherenceResult.reason);
-        }
-        
-        if (notificationsResult.status === 'fulfilled') {
-          // Notifications déjà gérées dans fetchUnreadCount
-        } else {
-          console.error('Erreur notifications:', notificationsResult.reason);
-        }
+        await fetchAdherenceData(selectedDate, token);
       }
     } catch (error) {
       console.error('Erreur chargement initial:', error);
@@ -225,31 +194,6 @@ export default function KineHomePage() {
     }
   };
 
-  // Récupération du count des notifications
-  const fetchUnreadCount = async (token?: string) => {
-    try {
-      const authToken = token || await getAuthToken();
-
-      const unreadResponse = await fetch(`${API_URL}/api/notifications/unread-count`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (unreadResponse.ok) {
-        const unreadData = await unreadResponse.json();
-        if (unreadData.success) {
-          setUnreadCount(unreadData.count);
-          return { success: true };
-        }
-      }
-      return { success: false };
-    } catch (error) {
-      console.error('Erreur chargement count notifications:', error);
-      return { success: false, error };
-    }
-  };
 
   const fetchAdherenceData = async (date: Date, token?: string) => {
     setLoadingAdherence(true);
@@ -337,7 +281,6 @@ export default function KineHomePage() {
 
   const handleRefresh = () => {
     fetchAdherenceData(selectedDate);
-    fetchUnreadCount();
   };
 
   // Chargement en cours
@@ -380,33 +323,6 @@ export default function KineHomePage() {
             <h1 className="text-2xl md:text-3xl font-bold text-primary">Bienvenue {kine.firstName}</h1>
           </div>
 
-          {/* Notifications urgentes - Version simplifiée */}
-          {unreadCount > 0 && (
-            <Card className="shadow-md bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700 hover:shadow-lg transition-shadow duration-200 ease-in-out">
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-300 text-lg">
-                  <AlertCircle size={20} />
-                  Notifications Urgentes
-                  <Badge variant="destructive" className="ml-2">
-                    {unreadCount}
-                  </Badge>
-                </CardTitle>
-                <Link href="/dashboard/kine/notifications">
-                  <Button variant="destructive" size="sm" className="flex items-center gap-1">
-                    <Bell className="h-4 w-4" /> Voir Tout
-                  </Button>
-                </Link>
-              </CardHeader>
-              <CardContent className="pt-0 pb-4">
-                <p className="text-sm text-red-700 dark:text-red-300">
-                  {unreadCount === 1
-                    ? `Vous avez 1 notification non lue nécessitant votre attention.`
-                    : `Vous avez ${unreadCount} notifications non lues nécessitant votre attention.`
-                  }
-                </p>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Card Adhérence Patients */}
           <Card className="card-hover">

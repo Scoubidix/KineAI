@@ -4,11 +4,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Mail, ArrowLeft, Send, CheckCircle } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { sendPasswordReset, validateEmail } from "@/lib/auth-utils";
 
 export default function ForgotPasswordPage() {
@@ -22,196 +18,122 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      // Validation côté client
       const emailValidation = validateEmail(email);
       if (!emailValidation.success) {
-        toast({
-          variant: "destructive",
-          title: "Email invalide",
-          description: emailValidation.error,
-        });
+        toast({ variant: "destructive", title: "Email invalide", description: emailValidation.error });
         return;
       }
 
-      // Envoi de l'email de réinitialisation
       const result = await sendPasswordReset(email);
 
       if (result.success) {
         setEmailSent(true);
-        toast({
-          title: "Email envoyé",
-          description: result.message,
-        });
+        toast({ title: "Email envoyé", description: result.message });
       } else {
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: result.error,
-        });
+        toast({ variant: "destructive", title: "Erreur", description: result.error });
       }
-
-    } catch (error) {
-      console.error('Erreur lors de l\'envoi:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur inattendue",
-        description: "Une erreur s'est produite. Veuillez réessayer.",
-      });
+    } catch {
+      toast({ variant: "destructive", title: "Erreur inattendue", description: "Une erreur s'est produite. Veuillez réessayer." });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8">
-        
-        {/* Header avec logo et titre */}
-        <div className="text-center space-y-6">
-          {/* Logo */}
-          <div className="flex justify-center">
-            <Image
-              src="/logo.jpg"
-              alt="Mon Assistant Kiné"
-              width={120}
-              height={120}
-              className="mx-auto rounded-xl bg-white p-3 shadow-sm"
-              priority
-            />
-          </div>
+    <div className="min-h-screen bg-white flex justify-center pt-20 p-4">
+      <div className="w-full max-w-sm space-y-8">
 
-          {/* Titre et sous-titre */}
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              Mon Assistant Kiné
-            </h1>
-            <p className="text-muted-foreground">
-              Réinitialisation du mot de passe
-            </p>
-          </div>
+        {/* Logo */}
+        <div className="flex justify-center">
+          <Image src="/logo.png" alt="Mon Assistant Kiné" width={100} height={100} className="rounded-xl" priority />
         </div>
 
-        {/* Card de réinitialisation */}
-        <Card className="shadow-lg border">
-          <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-2xl font-semibold text-center">
-              {emailSent ? "Email envoyé" : "Mot de passe oublié"}
-            </CardTitle>
-            <CardDescription className="text-center">
-              {emailSent 
-                ? "Vérifiez votre boîte de réception"
-                : "Saisissez votre adresse email pour recevoir un lien de réinitialisation"
-              }
-            </CardDescription>
-          </CardHeader>
-          
-          {!emailSent ? (
-            <form onSubmit={handleSendReset}>
-              <CardContent className="space-y-6">
-                
-                {/* Champ Email */}
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium">
-                    Adresse email
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      id="email" 
-                      type="email" 
-                      placeholder="votre@email.com"
-                      value={email} 
-                      onChange={(e) => setEmail(e.target.value)} 
-                      className="pl-10 h-12"
-                      required 
-                      disabled={loading}
-                    />
+        {/* Titre */}
+        <h1 className="text-2xl font-bold text-center" style={{ color: '#1f5c6a' }}>
+          Mon Assistant Kiné
+        </h1>
+
+        {!emailSent ? (
+          <>
+            <div>
+              {/* Flèche retour */}
+              <Link href="/login" className="inline-flex items-center text-black hover:text-gray-600">
+                <ArrowLeft className="h-6 w-6" strokeWidth={3} />
+              </Link>
+              <p className="text-center text-2xl font-bold text-gray-900">
+                Mot de passe oublié ?
+              </p>
+            </div>
+
+            <form onSubmit={handleSendReset} className="space-y-5">
+
+              {/* Email */}
+              <div className="space-y-1">
+                <label htmlFor="email" className="text-sm font-medium text-gray-700">Adresse email</label>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="votre@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full h-11 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              {/* Bouton envoi */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-teal w-full h-11 rounded-lg text-sm font-medium disabled:opacity-50"
+              >
+                {loading ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Envoi en cours...
                   </div>
-                </div>
-              </CardContent>
-
-              <CardFooter className="flex flex-col space-y-4 pt-6">
-                
-                {/* Bouton d'envoi */}
-                <Button 
-                  type="submit" 
-                  disabled={loading} 
-                  className="w-full h-12 text-base font-medium"
-                  size="lg"
-                >
-                  {loading ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Envoi en cours...
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Send className="h-4 w-4" />
-                      Envoyer le lien de réinitialisation
-                    </div>
-                  )}
-                </Button>
-
-                {/* Lien retour */}
-                <Button variant="outline" className="w-full h-12" asChild>
-                  <Link href="/login">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Retour à la connexion
-                  </Link>
-                </Button>
-              </CardFooter>
+                ) : (
+                  "Envoyer le lien de réinitialisation"
+                )}
+              </button>
             </form>
-          ) : (
-            /* État après envoi */
-            <CardContent className="space-y-6">
-              
-              {/* Icône de succès */}
-              <div className="flex justify-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="h-8 w-8 text-green-600" />
-                </div>
-              </div>
+          </>
+        ) : (
+          <>
+            <div className="text-center space-y-3">
+              <p className="text-sm text-gray-600">
+                Un email de réinitialisation a été envoyé à :
+              </p>
+              <p className="font-medium text-gray-900">{email}</p>
+              <p className="text-sm text-gray-500">
+                Cliquez sur le lien dans l'email pour créer un nouveau mot de passe.
+                <br />
+                <span className="text-xs">Le lien expire dans 1 heure.</span>
+              </p>
+            </div>
 
-              {/* Message de confirmation */}
-              <div className="text-center space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Un email de réinitialisation a été envoyé à :
-                </p>
-                <p className="font-medium text-foreground">{email}</p>
-                <p className="text-sm text-muted-foreground">
-                  Cliquez sur le lien dans l'email pour créer un nouveau mot de passe.
-                  <br />
-                  <span className="text-xs">Le lien expire dans 1 heure.</span>
-                </p>
-              </div>
+            <div className="space-y-3">
+              <button
+                onClick={() => { setEmailSent(false); setEmail(""); }}
+                className="w-full h-11 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Envoyer à une autre adresse
+              </button>
 
-              {/* Actions après envoi */}
-              <div className="flex flex-col space-y-3 pt-4">
-                <Button 
-                  onClick={() => {
-                    setEmailSent(false);
-                    setEmail("");
-                  }}
-                  variant="outline" 
-                  className="w-full"
-                >
-                  Envoyer à une autre adresse
-                </Button>
-                
-                <Button variant="ghost" className="w-full" asChild>
-                  <Link href="/login">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Retour à la connexion
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          )}
-        </Card>
+              <Link
+                href="/login"
+                className="inline-block w-full h-11 leading-[2.75rem] rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 text-center"
+              >
+                Retour à la connexion
+              </Link>
+            </div>
+          </>
+        )}
 
         {/* Footer */}
-        <div className="text-center text-xs text-muted-foreground space-y-1">
-          <p>© {new Date().getFullYear()} Mon Assistant Kiné</p>
+        <div className="text-center text-xs text-gray-400 space-y-1">
+          <p>&copy; {new Date().getFullYear()} Mon Assistant Kiné</p>
           <p>
             <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer" className="hover:underline">CGU</a>
             {" • "}
@@ -220,6 +142,7 @@ export default function ForgotPasswordPage() {
             <a href="/legal/mentions-legales.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Mentions légales</a>
           </p>
         </div>
+
       </div>
     </div>
   );

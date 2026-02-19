@@ -410,6 +410,31 @@ const videoUploadLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter pour l'inscription (POST /kine)
+ * 5 inscriptions par heure par IP - anti-bot/spam
+ */
+const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 5, // 5 inscriptions par heure
+  message: {
+    error: 'Trop de tentatives d\'inscription',
+    details: 'Veuillez patienter 1 heure avant de réessayer',
+    retryAfter: 3600
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'signup'),
+  handler: (req, res) => {
+    logger.warn(`🚫 Rate limit dépassé - Inscription - IP: ${sanitizeIP(req.ip)}`);
+    res.status(429).json({
+      error: 'Trop de tentatives d\'inscription',
+      details: 'Veuillez patienter 1 heure avant de réessayer',
+      retryAfter: 3600
+    });
+  }
+});
+
+/**
  * Middleware pour afficher les informations de rate limiting
  * Utile pour le debugging
  */
@@ -444,5 +469,6 @@ module.exports = {
   rgpdExportLimiter,
   rgpdDeleteLimiter,
   videoUploadLimiter,
+  signupLimiter,
   rateLimitLogger
 };
