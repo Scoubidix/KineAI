@@ -247,21 +247,21 @@ const cleanupOldArchivedProgramsTask = async () => {
 
   try {
     const result = await prismaService.executeInTransactionForCron(async (tx) => {
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const tenYearsAgo = new Date();
+      tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
 
       const oldArchivedPrograms = await tx.programme.findMany({
         where: {
           isArchived: true,
           archivedAt: {
-            lt: sixMonthsAgo
+            lt: tenYearsAgo
           }
         },
         select: { id: true, titre: true, archivedAt: true }
       });
 
       if (oldArchivedPrograms.length === 0) {
-        logger.info('🧹 Aucun programme archivé à supprimer (< 6 mois)');
+        logger.info('🧹 Aucun programme archivé à supprimer (< 10 ans)');
         return { programs: 0, messages: 0 };
       }
 

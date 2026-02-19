@@ -651,19 +651,32 @@ app.use('/api/documents', (req, res, next) => {
   next();
 }, documentsRoutes);
 
-// Middleware auth pour routes cron (Cloud Scheduler)
-const cronAuth = (req, res, next) => {
+// Middleware auth pour routes cron (Cloud Scheduler via OIDC)
+const { OAuth2Client } = require('google-auth-library');
+const oauthClient = new OAuth2Client();
+
+const cronAuth = async (req, res, next) => {
   logger.info('🔐 Vérification de l\'autorisation cron');
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
-  if (!token || token !== process.env.CRON_SECRET) {
-    logger.warn('❌ Autorisation cron invalide');
+  if (!token) {
+    logger.warn('❌ Autorisation cron invalide - pas de token');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  logger.info('✅ Autorisation cron valide');
-  next();
+  try {
+    const ticket = await oauthClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.CLOUD_RUN_URL || 'https://monassistantkine-821499453857.europe-west9.run.app'
+    });
+    const payload = ticket.getPayload();
+    logger.info(`✅ Autorisation cron valide - email: ${payload.email}`);
+    next();
+  } catch (error) {
+    logger.warn(`❌ Autorisation cron invalide - ${error.message}`);
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 };
 
 // Routes cron protégées (Cloud Scheduler)
