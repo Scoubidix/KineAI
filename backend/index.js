@@ -651,8 +651,23 @@ app.use('/api/documents', (req, res, next) => {
   next();
 }, documentsRoutes);
 
-// Routes de test pour le système d'archivage
-app.get('/test-archive-finished', async (req, res) => {
+// Middleware auth pour routes cron (Cloud Scheduler)
+const cronAuth = (req, res, next) => {
+  logger.info('🔐 Vérification de l\'autorisation cron');
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  if (!token || token !== process.env.CRON_SECRET) {
+    logger.warn('❌ Autorisation cron invalide');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  logger.info('✅ Autorisation cron valide');
+  next();
+};
+
+// Routes cron protégées (Cloud Scheduler)
+app.get('/test-archive-finished', cronAuth, async (req, res) => {
   const { manualArchiveTest } = require('./utils/chatCleanup');
   try {
     const result = await manualArchiveTest();
@@ -662,7 +677,7 @@ app.get('/test-archive-finished', async (req, res) => {
   }
 });
 
-app.get('/test-cleanup-archived', async (req, res) => {
+app.get('/test-cleanup-archived', cronAuth, async (req, res) => {
   const { manualCleanupTest } = require('./utils/chatCleanup');
   try {
     const result = await manualCleanupTest();
@@ -672,8 +687,7 @@ app.get('/test-cleanup-archived', async (req, res) => {
   }
 });
 
-// 🆕 NOUVEAU : Route de test pour les notifications de programmes
-app.get('/test-notifications-programs', async (req, res) => {
+app.get('/test-notifications-programs', cronAuth, async (req, res) => {
   const { manualNotificationsTest } = require('./utils/chatCleanup');
   try {
     const result = await manualNotificationsTest();
