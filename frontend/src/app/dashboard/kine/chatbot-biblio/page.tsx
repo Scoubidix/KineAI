@@ -400,16 +400,16 @@ export default function KineChatbotBiblioPage() {
         />
         
         {/* Header */}
-        <div className="card-hover rounded-lg p-6 mb-6">
-          <div className="flex items-center justify-between">
+        <div className="card-hover rounded-lg p-4 sm:p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3">
-              <BookOpen className="text-[#3899aa] h-7 w-7" />
+              <BookOpen className="text-[#3899aa] h-7 w-7 shrink-0" />
               <div>
                 <h2 className="text-xl font-semibold text-[#3899aa]">IA Bibliographique</h2>
                 <p className="text-foreground text-sm">Spécialisée dans la recherche et l'analyse bibliographique - Références scientifiques et publications</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1">
+            <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1 self-start sm:self-auto">
               <CheckCircle className="w-4 h-4 text-green-500" />
               <span className="text-sm text-foreground font-medium">Connecté</span>
             </div>
@@ -421,6 +421,7 @@ export default function KineChatbotBiblioPage() {
           assistantType="BIBLIOTHEQUE"
           canAccessFeature={canAccessFeature}
           isLoading={paywallLoading}
+          subscription={subscription}
         >
           {/* Header row - Recherche en cours + Bouton */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-4">
@@ -503,7 +504,7 @@ export default function KineChatbotBiblioPage() {
                           className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
-                            className={`max-w-[80%] py-4 pl-4 pr-10 rounded-2xl ${
+                            className={`max-w-[80%] py-4 pl-4 pr-4 sm:pr-10 rounded-2xl ${
                               msg.role === 'user'
                                 ? 'bubble-user rounded-br-md'
                                 : 'bubble-ai text-foreground rounded-bl-md'
@@ -544,10 +545,14 @@ export default function KineChatbotBiblioPage() {
                           <div className="flex items-center gap-2">
                             <Loader2 className="w-4 h-4 animate-spin" />
                             <span className="text-muted-foreground">
-                              {chatMessages.length <= 1
-                                ? 'Recherche dans les références scientifiques...'
-                                : 'Réflexion en cours...'
-                              }
+                              {chatMessages.length <= 1 ? (
+                                <>
+                                  <span className="hidden sm:inline">Recherche dans les références scientifiques...</span>
+                                  <span className="sm:hidden">Recherche...</span>
+                                </>
+                              ) : (
+                                'Réflexion en cours...'
+                              )}
                             </span>
                           </div>
                         </div>
@@ -593,7 +598,7 @@ export default function KineChatbotBiblioPage() {
                   </div>
 
                   <div>
-                    <p className="text-xs text-foreground">
+                    <p className="text-xs text-foreground hidden sm:block">
                       Entrée pour envoyer - Questions de suivi en mode conversationnel
                     </p>
                   </div>
@@ -621,7 +626,7 @@ export default function KineChatbotBiblioPage() {
           <div className="lg:col-span-1 space-y-4">
 
             {/* Conseils d'utilisation */}
-            <Card className="card-hover">
+            <Card className="card-hover hidden lg:block">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">💡 Conseils Biblio</CardTitle>
               </CardHeader>

@@ -576,7 +576,7 @@ export default function PatientDetailPage() {
     const buttonText = isEdit ? "Mettre à jour le programme" : "Créer le programme";
 
     return (
-      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
+      <DialogContent className="w-[95vw] sm:max-w-6xl max-h-[95vh] overflow-y-auto top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader className="-mx-6 -mt-6 px-6 py-4 rounded-t-lg border-b">
           <DialogTitle className="text-lg sm:text-xl font-semibold text-[#3899aa]">
             {modalTitle}
@@ -738,8 +738,8 @@ export default function PatientDetailPage() {
               </div>
 
               {/* Liste des exercices/templates avec checkboxes - Hauteur fixe pour stabilité UX */}
-              <div className="flex flex-col h-[480px] border rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between p-3 border-b bg-gray-50 dark:bg-gray-800 flex-shrink-0 gap-2">
+              <div className="flex flex-col h-[300px] sm:h-[480px] border rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between p-2 sm:p-3 border-b bg-gray-50 dark:bg-gray-800 flex-shrink-0 gap-2">
                   <Label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 flex-shrink-0">
                     {typeFilters.includes('templates') ? 'Sélectionner des templates' : 'Sélectionner des exercices'}
                   </Label>
@@ -882,7 +882,7 @@ export default function PatientDetailPage() {
                     </span>
                   </div>
                   {selectedExercises.map((ex, index) => (
-                    <div key={index} className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800 relative">
+                    <div key={index} className="p-3 sm:p-4 border rounded-lg bg-gray-50 dark:bg-gray-800 relative">
                       <Button
                         size="icon"
                         variant="ghost"
@@ -1001,7 +1001,7 @@ export default function PatientDetailPage() {
 
   return (
     <AppLayout>
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6 overflow-hidden">
         {/* Section profil patient NOUVELLE VERSION */}
         <div className="card-hover rounded-lg overflow-hidden">
           <div className="relative">
@@ -1079,7 +1079,7 @@ export default function PatientDetailPage() {
 
         {/* Section programmes */}
         <Card className="card-hover">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="space-y-1">
               <CardTitle className="text-xl font-semibold flex items-center gap-2 text-[#3899aa]">
                 <Activity className="w-5 h-5 text-[#3899aa]" />
@@ -1095,7 +1095,7 @@ export default function PatientDetailPage() {
                 if (!open) resetCreateForm();
               }}>
                 <DialogTrigger asChild>
-                  <Button className="btn-teal">
+                  <Button className="btn-teal w-full sm:w-auto">
                     <Plus className="h-4 w-4 mr-2" />
                     Nouveau programme
                   </Button>
@@ -1120,14 +1120,14 @@ export default function PatientDetailPage() {
               <div className="space-y-6">
                 {programmesData.map((programme: any, index: number) => (
                   <Card key={programme.id || index} className="card-hover border-l-4 border-l-[#3899aa]">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-4">
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
                         <div className="flex-1">
-                          <h3 className="text-xl font-semibold text-foreground mb-2">
+                          <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">
                             {programme.titre}
                           </h3>
                           <p className="text-foreground mb-3">{programme.description}</p>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2 sm:gap-4 text-sm text-muted-foreground flex-wrap">
                             <div className="flex items-center gap-1">
                               <Clock className="w-4 h-4" />
                               <span>{programme.duree} jours</span>
@@ -1146,7 +1146,7 @@ export default function PatientDetailPage() {
                             )}
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 self-start">
                           <Dialog open={openEditModal && editingProgramme?.id === programme.id} onOpenChange={(open) => {
                             setOpenEditModal(open);
                             if (!open) resetEditForm();
@@ -1207,7 +1207,7 @@ export default function PatientDetailPage() {
                                     <h5 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
                                       {exercise.exerciceModele?.nom || exercise.nom}
                                     </h5>
-                                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-2 flex-wrap">
+                                    <div className="flex items-center gap-2 sm:gap-4 text-sm text-gray-600 dark:text-gray-400 mb-2 flex-wrap">
                                       <Badge variant="outline" className="text-xs">
                                         {exercise.series} série{exercise.series > 1 ? 's' : ''}
                                       </Badge>
@@ -1239,7 +1239,7 @@ export default function PatientDetailPage() {
                       {/* Bouton d'envoi du programme */}
                       <div className="border-t pt-4">
                         <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-4">
-                          <div className="flex items-center justify-between">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div className="flex-1">
                               <h4 className="font-medium text-green-800 dark:text-green-300 mb-1">
                                 Partager avec le patient
@@ -1250,7 +1250,7 @@ export default function PatientDetailPage() {
                             </div>
                             <Button
                               variant="outline"
-                              className="text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 border-green-300 dark:border-green-600 hover:border-green-400 dark:hover:border-green-500 bg-white dark:bg-green-900/20 hover:bg-green-50 dark:hover:bg-green-900/40"
+                              className="w-full sm:w-auto text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 border-green-300 dark:border-green-600 hover:border-green-400 dark:hover:border-green-500 bg-white dark:bg-green-900/20 hover:bg-green-50 dark:hover:bg-green-900/40"
                               onClick={() => handleGenerateLink(programme.id)}
                               disabled={generatingLink === programme.id}
                             >
@@ -1274,7 +1274,7 @@ export default function PatientDetailPage() {
 
         {/* Modal pour afficher le lien généré avec WhatsApp */}
         <Dialog open={showLinkModal} onOpenChange={setShowLinkModal}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="w-[95vw] sm:max-w-lg top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Send className="w-5 h-5 text-green-600" />
@@ -1388,7 +1388,7 @@ export default function PatientDetailPage() {
               {/* Section lien manuel */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Lien à partager manuellement :</Label>
-                <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg border text-sm break-all font-mono">
+                <div className="p-2 sm:p-3 bg-gray-100 dark:bg-gray-800 rounded-lg border text-xs sm:text-sm break-all font-mono">
                   {generatedLink}
                 </div>
                 <Button

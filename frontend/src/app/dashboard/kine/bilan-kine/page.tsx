@@ -5,7 +5,8 @@ import AppLayout from '@/components/AppLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { FileText, Loader2, CheckCircle, Copy, RotateCcw, Sparkles, Mail, Download } from 'lucide-react';
+import { FileText, Loader2, CheckCircle, Copy, Sparkles, Mail, Download, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { getAuth } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
@@ -14,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function BilanKinePage() {
   const [rawNotes, setRawNotes] = useState('');
+  const [motifConsultation, setMotifConsultation] = useState('');
   const [structuredBilan, setStructuredBilan] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -51,7 +53,9 @@ export default function BilanKinePage() {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          message: rawNotes,
+          message: motifConsultation.trim()
+            ? `MOTIF DE CONSULTATION : ${motifConsultation}\n\nNOTES CLINIQUES :\n${rawNotes}`
+            : rawNotes,
           conversationHistory: []
         })
       });
@@ -100,14 +104,6 @@ export default function BilanKinePage() {
     }
   };
 
-  const handleReset = () => {
-    if (rawNotes || structuredBilan) {
-      if (confirm('Êtes-vous sûr de vouloir réinitialiser ? Toutes les données seront perdues.')) {
-        setRawNotes('');
-        setStructuredBilan('');
-      }
-    }
-  };
 
   const handleSendEmail = () => {
     if (!structuredBilan) return;
@@ -218,12 +214,6 @@ export default function BilanKinePage() {
         printWindow.print();
       }, 250);
 
-      toast({
-        title: "📄 Impression lancée",
-        description: "Choisissez 'Enregistrer en PDF' dans la boîte de dialogue",
-        variant: "default",
-        duration: 5000,
-      });
     } catch (error) {
       console.error('Erreur génération PDF:', error);
       toast({
@@ -268,7 +258,7 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
 
   return (
     <AppLayout>
-      <div className="max-w-7xl mx-auto p-4">
+      <div className="max-w-7xl mx-auto p-4 overflow-hidden">
 
         {/* Header Upgrade si pas d'accès */}
         <ChatUpgradeHeader
@@ -279,31 +269,18 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
         />
 
         {/* Header */}
-        <div className="card-hover rounded-lg p-6 mb-6">
-          <div className="flex items-center justify-between">
+        <div className="card-hover rounded-lg p-4 sm:p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3">
-              <FileText className="text-[#3899aa] h-7 w-7" />
+              <FileText className="text-[#3899aa] h-7 w-7 shrink-0" />
               <div>
                 <h2 className="text-xl font-semibold text-[#3899aa]">Bilan Kiné</h2>
                 <p className="text-foreground text-sm">Transformez vos notes cliniques en vrac en un bilan structuré professionnel</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {(rawNotes || structuredBilan) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleReset}
-                  className="h-8"
-                >
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  Réinitialiser
-                </Button>
-              )}
-              <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1">
-                <CheckCircle className="w-4 h-4 text-[#3899aa]" />
-                <span className="text-sm text-foreground font-medium">IA Active</span>
-              </div>
+            <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1 self-start sm:self-auto">
+              <CheckCircle className="w-4 h-4 text-[#3899aa]" />
+              <span className="text-sm text-foreground font-medium">IA Active</span>
             </div>
           </div>
         </div>
@@ -313,7 +290,41 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
           assistantType="ADMINISTRATIF"
           canAccessFeature={canAccessFeature}
           isLoading={paywallLoading}
+          subscription={subscription}
         >
+          {/* Ligne Motif + Conseils */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* Motif de consultation */}
+            <div className="card-hover flex items-stretch h-full px-5 py-3 bg-gradient-to-r from-[#eef7f6] to-[#e4f1f3] dark:from-[#0f1c1b] dark:to-[#132221] rounded-lg">
+              <div className="flex items-center gap-3 w-full">
+                <Search className="h-4 w-4 text-[#3899aa] shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-[#3899aa] mb-1">Motif de consultation</p>
+                  <Input
+                    value={motifConsultation}
+                    onChange={(e) => setMotifConsultation(e.target.value)}
+                    placeholder="Ex : Lombalgie chronique, rééducation post-opératoire..."
+                    className="border-0 bg-white/60 dark:bg-gray-800/60 text-sm h-9 focus-visible:ring-[#3899aa]"
+                    disabled={isGenerating}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Conseils */}
+            <div className="card-hover text-xs rounded-lg p-4">
+              <p className="font-medium text-[#3899aa] mb-1">💡 Conseils :</p>
+              <ul className="space-y-1 text-foreground">
+                <li>• Notez vos observations sans vous soucier de la structure</li>
+                <li>• Incluez : anamnèse, tests, mesures, observations</li>
+                <li>• L'IA organisera tout selon la structure professionnelle</li>
+                <li>• Plus vos notes sont détaillées, meilleur sera le bilan</li>
+                <li>• Utilisez votre messagerie cryptée pour transmettre votre bilan au médecin</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Grille Notes + Bilan */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
             {/* Colonne gauche: Saisie des notes */}
@@ -334,14 +345,11 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                     value={rawNotes}
                     onChange={(e) => setRawNotes(e.target.value)}
                     placeholder={placeholderText}
-                    className="bubble-ai min-h-[500px] font-mono text-sm text-foreground"
+                    className="bubble-ai min-h-[250px] sm:min-h-[500px] font-mono text-sm text-foreground"
                     disabled={isGenerating}
                   />
 
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      {rawNotes.length} caractères
-                    </p>
+                  <div className="flex justify-end">
                     <Button
                       onClick={handleGenerateBilan}
                       disabled={isGenerating || !rawNotes.trim()}
@@ -362,17 +370,6 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                     </Button>
                   </div>
 
-                  <div className="card-hover text-xs rounded p-3">
-                    <p className="font-medium text-[#3899aa] mb-1">💡 Conseils :</p>
-                    <ul className="space-y-1 text-foreground">
-                      <li>• Notez vos observations sans vous soucier de la structure</li>
-                      <li>• Incluez : anamnèse, tests, mesures, observations</li>
-                      <li>• L'IA organisera tout selon la structure professionnelle</li>
-                      <li>• Plus vos notes sont détaillées, meilleur sera le bilan</li>
-                      <li>• Utilisez votre messagerie cryptée pour transmettre votre bilan au médecin</li>
-                    </ul>
-                  </div>
-
                 </CardContent>
               </Card>
             </div>
@@ -387,30 +384,30 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                       Bilan structuré
                     </div>
                     {structuredBilan && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           size="sm"
                           onClick={handleCopyBilan}
                           className="btn-teal h-8"
                         >
-                          <Copy className="h-3 w-3 mr-1" />
-                          Copier
+                          <Copy className="h-3 w-3 sm:mr-1" />
+                          <span className="hidden sm:inline">Copier</span>
                         </Button>
                         <Button
                           size="sm"
                           onClick={handleSendEmail}
                           className="btn-teal h-8"
                         >
-                          <Mail className="h-3 w-3 mr-1" />
-                          Envoyer par mail
+                          <Mail className="h-3 w-3 sm:mr-1" />
+                          <span className="hidden sm:inline">Envoyer par mail</span>
                         </Button>
                         <Button
                           size="sm"
                           onClick={handleDownloadPDF}
                           className="btn-teal h-8"
                         >
-                          <Download className="h-3 w-3 mr-1" />
-                          Télécharger PDF
+                          <Download className="h-3 w-3 sm:mr-1" />
+                          <span className="hidden sm:inline">Télécharger PDF</span>
                         </Button>
                       </div>
                     )}
@@ -422,7 +419,7 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                 <CardContent>
 
                   {!structuredBilan ? (
-                    <div className="flex items-center justify-center min-h-[500px] text-center">
+                    <div className="flex items-center justify-center min-h-[200px] sm:min-h-[500px] text-center">
                       <div>
                         <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
                         <p className="text-muted-foreground mb-2">
@@ -439,7 +436,7 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                       <Textarea
                         value={structuredBilan}
                         onChange={(e) => setStructuredBilan(e.target.value)}
-                        className="bubble-ai min-h-[500px] max-h-[600px] text-sm leading-relaxed text-foreground"
+                        className="bubble-ai min-h-[250px] sm:min-h-[500px] max-h-[400px] sm:max-h-[600px] text-sm leading-relaxed text-foreground"
                         placeholder="Le bilan structuré apparaîtra ici..."
                       />
                       <p className="text-xs text-muted-foreground">

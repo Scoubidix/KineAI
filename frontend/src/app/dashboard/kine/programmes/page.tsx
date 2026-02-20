@@ -631,9 +631,9 @@ export default function ProgrammesPage() {
   return (
     <AppLayout>
       <AuthGuard role="kine" />
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6 overflow-hidden">
         {/* En-tête */}
-        <div className="pb-4 border-b border-border flex justify-between items-start pr-16 lg:pr-0">
+        <div className="pb-4 border-b border-border flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-[#3899aa]">Gestion des Programmes</h1>
             <p className="flex items-center gap-2 text-md md:text-lg text-muted-foreground mt-1">
@@ -641,7 +641,7 @@ export default function ProgrammesPage() {
               Vue d'ensemble de tous vos programmes de rééducation
             </p>
           </div>
-          <Button onClick={handleOpenPatientSelector} className="btn-teal flex items-center gap-2 shrink-0">
+          <Button onClick={handleOpenPatientSelector} className="btn-teal flex items-center gap-2 w-full sm:w-auto">
             <Plus className="h-4 w-4" />
             Créer un programme
           </Button>
@@ -661,7 +661,7 @@ export default function ProgrammesPage() {
                 />
               </div>
               
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   onClick={() => setStatusFilter('all')}
@@ -857,7 +857,7 @@ export default function ProgrammesPage() {
 
       {/* Modal de sélection de patient */}
       <Dialog open={showPatientSelector} onOpenChange={setShowPatientSelector}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] sm:max-w-md top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Choisir un patient</DialogTitle>
           </DialogHeader>
@@ -929,7 +929,7 @@ export default function ProgrammesPage() {
         setShowCreateModal(open);
         if (!open) resetCreateForm();
       }}>
-        <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
+        <DialogContent className="w-[95vw] sm:max-w-6xl max-h-[95vh] overflow-y-auto top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
             <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
               Créer un programme pour {selectedPatient?.firstName} {selectedPatient?.lastName}
@@ -1090,7 +1090,7 @@ export default function ProgrammesPage() {
                 </div>
 
                 {/* Liste des exercices/templates avec checkboxes - Hauteur fixe pour stabilité UX */}
-                <div className="flex flex-col h-[480px] border rounded-lg overflow-hidden">
+                <div className="flex flex-col h-[300px] sm:h-[480px] border rounded-lg overflow-hidden">
                   <div className="flex items-center justify-between p-3 border-b bg-gray-50 dark:bg-gray-800 flex-shrink-0 gap-2">
                     <Label className="text-xs sm:text-sm font-medium text-foreground flex-shrink-0">
                       {typeFilters.includes('templates') ? 'Sélectionner des templates' : 'Sélectionner des exercices'}

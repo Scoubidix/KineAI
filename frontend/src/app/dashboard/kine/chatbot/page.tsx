@@ -277,7 +277,7 @@ export default function KineChatbotPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-6xl mx-auto p-4">
+      <div className="max-w-6xl mx-auto p-4 overflow-hidden">
         
         {/* Header Upgrade si pas d'accès */}
         <ChatUpgradeHeader 
@@ -289,16 +289,16 @@ export default function KineChatbotPage() {
         
         {/* Header */}
         <div className="mb-6">
-          <div className="card-hover rounded-lg p-6">
-            <div className="flex items-center justify-between">
+          <div className="card-hover rounded-lg p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center gap-3">
-                <Wand2 className="text-[#3899aa] h-7 w-7" />
+                <Wand2 className="text-[#3899aa] h-7 w-7 shrink-0" />
                 <div>
                   <h2 className="text-xl font-semibold text-[#3899aa]">Assistant IA Personnel</h2>
                   <p className="text-foreground text-sm">Assistant IA avec base de connaissances spécialisée - Historique conservé 5 jours</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1">
+              <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1 self-start sm:self-auto">
                 <CheckCircle className="w-4 h-4 text-[#3899aa]" />
                 <span className="text-sm text-foreground font-medium">Connecté</span>
               </div>
@@ -307,10 +307,11 @@ export default function KineChatbotPage() {
         </div>
 
         {/* Zone de chat principale */}
-        <ChatDisabledOverlay 
+        <ChatDisabledOverlay
           assistantType="CONVERSATIONNEL"
           canAccessFeature={canAccessFeature}
           isLoading={paywallLoading}
+          subscription={subscription}
         >
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             
@@ -366,7 +367,7 @@ export default function KineChatbotPage() {
                           >
                             <div className="prose prose-sm max-w-none">
                               <div
-                                className="whitespace-pre-wrap text-justify pr-10"
+                                className="whitespace-pre-wrap text-justify pr-4 sm:pr-10"
                                 dangerouslySetInnerHTML={{
                                   __html: DOMPurify.sanitize(msg.content
                                     .replace(/^### (.*$)/gim, '<strong class="text-base">$1</strong>') // ### -> heading
@@ -398,7 +399,7 @@ export default function KineChatbotPage() {
                         <div className="bubble-ai p-4 rounded-2xl rounded-bl-md">
                           <div className="flex items-center gap-2">
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            <span className="text-muted-foreground">Recherche dans la base de connaissances...</span>
+                            <span className="text-muted-foreground"><span className="hidden sm:inline">Recherche dans la base de connaissances...</span><span className="sm:hidden">Recherche en cours...</span></span>
                           </div>
                         </div>
                       </div>
@@ -442,7 +443,7 @@ export default function KineChatbotPage() {
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <p className="text-xs text-foreground">
+                  <p className="text-xs text-foreground hidden sm:block">
                     Appuyez sur Entrée pour envoyer
                   </p>
                 </div>
@@ -454,7 +455,7 @@ export default function KineChatbotPage() {
           <div className="lg:col-span-1 space-y-4">
 
             {/* Conseils d'utilisation */}
-            <Card className="card-hover">
+            <Card className="card-hover hidden lg:block">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base text-foreground">💡 Assistant Conversationnel</CardTitle>
               </CardHeader>

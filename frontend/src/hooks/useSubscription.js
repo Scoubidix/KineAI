@@ -22,27 +22,21 @@ export const useSubscription = () => {
 
     try {
       const token = await user.getIdToken();
-      
-      // Récupérer les infos d'abonnement
-      const subscriptionResponse = await fetch(`${API_URL}/api/kine/subscription`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      // Récupérer abonnement et usage en parallèle
+      const [subscriptionResponse, usageResponse] = await Promise.all([
+        fetch(`${API_URL}/api/kine/subscription`, { headers }),
+        fetch(`${API_URL}/api/kine/usage`, { headers })
+      ]);
 
       if (subscriptionResponse.ok) {
         const subscriptionData = await subscriptionResponse.json();
         setSubscription(subscriptionData.subscription);
       }
-
-      // Récupérer l'usage
-      const usageResponse = await fetch(`${API_URL}/api/kine/usage`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
 
       if (usageResponse.ok) {
         const usageData = await usageResponse.json();

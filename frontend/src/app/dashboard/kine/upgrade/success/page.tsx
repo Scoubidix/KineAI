@@ -184,7 +184,7 @@ function UpgradeSuccessContent() {
             </div>
           </div>
           
-          <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary mb-4">
             🎉 Paiement réussi !
           </h1>
         </div>
@@ -197,7 +197,7 @@ function UpgradeSuccessContent() {
                 <RefreshCw className="h-8 w-8 text-[#3899aa]" />
               </div>
               <CardTitle className="text-[#3899aa]">Activation de votre abonnement</CardTitle>
-              <CardDescription className="text-muted-foreground text-lg">
+              <CardDescription className="text-muted-foreground text-base sm:text-lg">
                 Votre paiement a été traité avec succès ! Nous finalisons l'activation de votre compte.
               </CardDescription>
             </CardHeader>
@@ -248,11 +248,11 @@ function UpgradeSuccessContent() {
               <div className="mx-auto p-4 rounded-full bg-[#3899aa]/10 border-2 border-[#3899aa]/20 mb-4">
                 {getPlanIcon(currentPlan)}
               </div>
-              <CardTitle className="text-2xl font-bold flex items-center justify-center gap-2">
+              <CardTitle className="text-xl sm:text-2xl font-bold flex flex-col sm:flex-row items-center justify-center gap-2">
                 Plan {planDetails.name}
                 <Badge className="bg-accent text-accent-foreground">Actif</Badge>
               </CardTitle>
-              <CardDescription className="text-lg">
+              <CardDescription className="text-base sm:text-lg">
                 Vous avez maintenant accès à toutes les fonctionnalités du plan {planDetails.name}
               </CardDescription>
             </CardHeader>
@@ -260,7 +260,7 @@ function UpgradeSuccessContent() {
             <CardContent className="space-y-6">
               {/* Informations de facturation */}
               <div className="flex flex-col items-center gap-6">
-                <div className="w-full flex flex-col items-center text-center gap-3 p-6 bg-white/50 dark:bg-gray-800/50 rounded-lg">
+                <div className="w-full flex flex-col items-center text-center gap-3 p-4 sm:p-6 bg-white/50 dark:bg-gray-800/50 rounded-lg">
                   <CreditCard className="h-6 w-6 text-accent" />
                   <div>
                     <p className="font-semibold">Montant facturé</p>
@@ -283,7 +283,7 @@ function UpgradeSuccessContent() {
               </div>
 
               {/* Fonctionnalités débloquées */}
-              <div className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-6">
+              <div className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-4 sm:p-6">
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-accent" />
                   Fonctionnalités débloquées
@@ -311,7 +311,7 @@ function UpgradeSuccessContent() {
                 <Button
                   asChild
                   size="lg"
-                  className="btn-teal px-8"
+                  className="btn-teal px-4 sm:px-8"
                 >
                   <Link href="/dashboard/kine/home">
                     <Home className="h-5 w-5 mr-2" />

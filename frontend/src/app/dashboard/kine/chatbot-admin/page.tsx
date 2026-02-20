@@ -472,16 +472,16 @@ export default function KineChatbotAdminPage() {
         />
 
         {/* Header */}
-        <div className="card-hover rounded-lg p-6 mb-6">
-          <div className="flex items-center justify-between">
+        <div className="card-hover rounded-lg p-4 sm:p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3">
-              <FileText className="text-[#3899aa] h-7 w-7" />
+              <FileText className="text-[#3899aa] h-7 w-7 shrink-0" />
               <div>
                 <h2 className="text-xl font-semibold text-[#3899aa]">IA Administrative</h2>
                 <p className="text-foreground text-sm">Sélectionnez un template, choisissez un patient, personnalisez et envoyez par email ou WhatsApp</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1">
+            <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1 self-start sm:self-auto">
               <CheckCircle className="w-4 h-4 text-green-500" />
               <span className="text-sm text-foreground font-medium">Système actif</span>
             </div>
@@ -493,6 +493,7 @@ export default function KineChatbotAdminPage() {
           assistantType="TEMPLATES_ADMIN"
           canAccessFeature={canAccessFeature}
           isLoading={paywallLoading}
+          subscription={subscription}
         >
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 

@@ -411,7 +411,7 @@ export default function ParrainagePage() {
                 {stats.referrals.map((referral) => (
                   <div
                     key={referral.id}
-                    className="flex items-center justify-between p-3 border rounded-lg transition-all duration-300 hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-[#3899aa]/10"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 p-3 border rounded-lg transition-all duration-300 hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-[#3899aa]/10"
                   >
                     <div>
                       <p className="font-medium">{referral.refereeName}</p>

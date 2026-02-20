@@ -219,31 +219,32 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleModalClose}>
-      <DialogContent 
-        className={`p-0 overflow-hidden ${
+      <DialogContent
+        className={`p-0 top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%] ${
           currentStep === 'confirmation'
-            ? 'max-w-md sm:max-w-md'
-            : 'max-w-7xl sm:max-w-7xl w-[95vw] max-h-[90vh]'
+            ? 'w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto'
+            : 'w-[95vw] sm:max-w-7xl max-h-[90vh] overflow-y-auto'
         }`}
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {currentStep === 'selection' ? (
           <>
             {/* Header - Style cohérent avec l'app */}
-            <DialogHeader className="px-6 py-4 border-b border-border">
-              <DialogTitle className="flex items-center gap-2 text-xl font-semibold text-foreground">
+            <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
+              <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl font-semibold text-foreground">
                 <Shield className="h-5 w-5 text-accent" />
                 Mon Assistant Kiné
               </DialogTitle>
-              <DialogDescription className="text-muted-foreground">
+              <DialogDescription className="text-muted-foreground text-sm sm:text-base">
                 Choisissez votre plan d'abonnement professionnel
               </DialogDescription>
             </DialogHeader>
 
             {/* Contenu scrollable */}
-            <div className="p-6 overflow-y-auto space-y-6">
+            <div className="p-3 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6">
 
               {/* Grid des plans - Style cohérent avec l'app */}
-              <div className="flex flex-wrap justify-center gap-4 max-w-7xl mx-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 max-w-7xl mx-auto">
                 {Object.values(plans)
                   .filter(plan => isPlanAvailable(plan.type))
                   .map((plan) => {
@@ -254,7 +255,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                   return (
                     <Card 
                       key={plan.type}
-                      className={`relative flex flex-col w-64 shadow-lg border-border transition-all duration-200 hover:shadow-xl cursor-pointer ${
+                      className={`relative flex flex-col w-full shadow-lg border-border transition-all duration-200 hover:shadow-xl cursor-pointer ${
                         isRecommended ? 'ring-2 ring-accent shadow-accent/20' : ''
                       } ${!isAvailable ? 'opacity-60 cursor-not-allowed' : ''} ${isCurrentPlan ? 'ring-2 ring-primary shadow-primary/20' : 'hover:border-muted-foreground/30'}`}
                       onClick={!isCurrentPlan && isAvailable ? () => handlePlanClick(plan.type) : undefined}
@@ -286,7 +287,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                           }`} />
                         </div>
                         <CardTitle className="text-lg font-semibold text-foreground">{plan.name}</CardTitle>
-                        <div className="text-3xl font-bold text-foreground">
+                        <div className="text-2xl sm:text-3xl font-bold text-foreground">
                           {plan.price}€
                           <span className="text-sm font-normal text-muted-foreground">/mois</span>
                         </div>
@@ -434,14 +435,14 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
               )}
 
               {/* Note de sécurité - Style cohérent */}
-              <div className="flex items-center justify-center gap-4 py-4 text-xs text-muted-foreground">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-4 py-4 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Shield className="h-4 w-4" />
                   <span>Paiement sécurisé Stripe</span>
                 </div>
-                <span>•</span>
+                <span className="hidden sm:inline">•</span>
                 <span>Annulation à tout moment</span>
-                <span>•</span>
+                <span className="hidden sm:inline">•</span>
                 <span>Support professionnel</span>
               </div>
             </div>
@@ -449,15 +450,15 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
         ) : (
           /* Étape de confirmation */
           <>
-            <DialogHeader className="px-6 py-4 border-b border-border">
-              <DialogTitle className="flex items-center gap-2 text-xl font-semibold text-foreground">
+            <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
+              <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl font-semibold text-foreground">
                 <Shield className="h-5 w-5 text-accent" />
                 Confirmer le changement de plan
               </DialogTitle>
             </DialogHeader>
 
             {pendingUpgrade && (
-              <div className="space-y-4 p-6">
+              <div className="space-y-4 p-4 sm:p-6">
                 {/* Plan actuel → Nouveau plan */}
                 <Card className="card-hover">
                   <CardContent className="pt-5 pb-5 space-y-3">

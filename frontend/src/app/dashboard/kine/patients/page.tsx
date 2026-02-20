@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { Plus, Trash2, Pencil, Loader2, UserCheck, Check, X, User, Mail, Phone, Calendar, Activity } from 'lucide-react';
+import { Plus, Trash2, Pencil, Loader2, Check, X, User, Mail, Phone, Calendar, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/components/AppLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -28,6 +28,7 @@ interface UserProfileData {
 }
 
 export default function PatientsPage() {
+  const router = useRouter();
   const [patients, setPatients] = useState<UserProfileData[]>([]);
   const [filteredPatients, setFilteredPatients] = useState<UserProfileData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,7 +37,6 @@ export default function PatientsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [patientToDelete, setPatientToDelete] = useState<UserProfileData | null>(null);
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [consentChecked, setConsentChecked] = useState(false);
   const [form, setForm] = useState<UserProfileData>({
     firstName: '',
@@ -70,17 +70,6 @@ export default function PatientsPage() {
       return a.firstName.localeCompare(b.firstName);
     });
   };
-
-  // Détection de la taille d'écran pour le mode d'affichage
-  useEffect(() => {
-    const handleResize = () => {
-      setViewMode(window.innerWidth < 1024 ? 'cards' : 'table');
-    };
-    
-    handleResize(); // Vérifier au montage
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   useEffect(() => {
     const auth = getAuth();
@@ -201,15 +190,15 @@ export default function PatientsPage() {
 
   return (
     <AppLayout>
-      <div className="p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-[#3899aa]">Liste des patients</h2>
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <div className="space-y-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-[#3899aa]">Liste des patients</h2>
             <Input
-              className="mt-2 w-[150%]"
-              placeholder="Rechercher un patient (nom, mail, tél...)" 
-              value={search} 
-              onChange={handleSearchChange} 
+              className="w-full sm:w-80"
+              placeholder="Rechercher (nom, mail, tél...)"
+              value={search}
+              onChange={handleSearchChange}
             />
           </div>
           <Dialog open={dialogOpen} onOpenChange={(open) => {
@@ -221,11 +210,11 @@ export default function PatientsPage() {
             }
           }}>
             <DialogTrigger asChild>
-              <Button className="btn-teal flex items-center gap-2">
+              <Button className="btn-teal flex items-center gap-2 w-full sm:w-auto">
                 <Plus className="h-4 w-4" /> {form.id ? 'Modifier' : 'Créer'} un patient
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
+            <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[95vh] overflow-y-auto top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
               <DialogHeader className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
                 <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
                   {form.id ? 'Modifier le patient' : 'Créer un nouveau patient'}
@@ -411,220 +400,123 @@ export default function PatientsPage() {
               </div>
             ) : error ? (
               <p className="text-red-500">{error}</p>
-            ) : viewMode === 'cards' ? (
-              // Vue en cartes pour mobile/tablette
-              <div className="grid gap-4 md:grid-cols-2">
-                {filteredPatients.map((p) => (
-                  <div 
-                    key={p.id} 
-                    className={`border rounded-lg p-4 space-y-3 transition-all duration-300 hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-[#3899aa]/10 ${
-                      p.hasActiveProgram
-                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
-                        : 'border-gray-200 dark:border-gray-700'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Link href={`/dashboard/kine/patients/${p.id}`}>
-                          <Button size="sm" variant="ghost" className="hover:bg-blue-100 dark:hover:bg-blue-900/30">
-                            <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          </Button>
-                        </Link>
-                        <div>
-                          <h3 className="font-semibold text-lg">
-                            {p.firstName} {p.lastName.toUpperCase()}
-                          </h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Né(e) le {formatDate(p.birthDate)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {p.hasActiveProgram ? (
-                          <div className="flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 rounded-full">
-                            <Check className="w-4 h-4 text-green-600" />
-                            <span className="text-xs text-green-700 dark:text-green-300">Programme actif</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-full">
-                            <X className="w-4 h-4 text-gray-500" />
-                            <span className="text-xs text-gray-600 dark:text-gray-400">Aucun programme</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                        <span className="text-gray-700 dark:text-gray-300">{p.email}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                        </svg>
-                        <span className="text-gray-700 dark:text-gray-300">{p.phone}</span>
-                      </div>
-                      {p.goals && (
-                        <div className="flex items-start gap-2 mt-2">
-                          <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          <span className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed">
-                            {p.goals}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                      <Button size="sm" variant="outline" onClick={() => handleEditPatient(p)}>
-                        <Pencil className="w-4 h-4 mr-1" />
-                        Modifier
-                      </Button>
-                      <Dialog open={deleteDialogOpen && patientToDelete?.id === p.id} onOpenChange={setDeleteDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button 
-                            size="sm" 
-                            variant="destructive" 
-                            onClick={() => { setDeleteDialogOpen(true); setPatientToDelete(p); }}
-                          >
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            Supprimer
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Confirmer la suppression</DialogTitle>
-                          </DialogHeader>
-                          <p className="py-4">
-                            Êtes-vous sûr de vouloir supprimer le patient{' '}
-                            <strong>{p.firstName} {p.lastName.toUpperCase()}</strong> ?
-                            Cette action est irréversible.
-                          </p>
-                          <div className="flex justify-end gap-4 mt-4">
-                            <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Annuler</Button>
-                            <Button variant="destructive" onClick={handleDeletePatient}>Oui, supprimer</Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </div>
-                ))}
-              </div>
             ) : (
-              // Vue tableau pour desktop
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12"></TableHead>
-                    <TableHead>
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-gray-500" />
-                        Nom
-                      </div>
-                    </TableHead>
-                    <TableHead>
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-gray-500" />
-                        Prénom
-                      </div>
-                    </TableHead>
-                    <TableHead>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-500" />
-                        Date de naissance
-                      </div>
-                    </TableHead>
-                    <TableHead>
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-gray-500" />
-                        Email
-                      </div>
-                    </TableHead>
-                    <TableHead>
-                      <div className="flex items-center gap-2">
-                        <Phone className="w-4 h-4 text-gray-500" />
-                        Téléphone
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <Activity className="w-4 h-4 text-gray-500" />
-                        Programme en cours
-                      </div>
-                    </TableHead>
-                    <TableHead className="w-24"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredPatients.map((p) => (
-                    <TableRow key={p.id} className={`transition-all duration-300 hover:border hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-[#3899aa]/10 ${p.hasActiveProgram ? 'bg-green-50 dark:bg-green-900/20' : ''}`}>
-                      <TableCell>
-                        <Link href={`/dashboard/kine/patients/${p.id}`}>
-                          <Button size="icon" variant="ghost" className="hover:bg-blue-100 dark:hover:bg-blue-900/30">
-                            <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300" />
-                          </Button>
-                        </Link>
-                      </TableCell>
-                      <TableCell className="font-medium">{p.lastName.toUpperCase()}</TableCell>
-                      <TableCell>{p.firstName}</TableCell>
-                      <TableCell>{formatDate(p.birthDate)}</TableCell>
-                      <TableCell>{p.email}</TableCell>
-                      <TableCell>{p.phone}</TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center">
-                          {p.hasActiveProgram ? (
-                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800">
-                              <Check className="w-3 h-3 mr-1" />
-                              Actif
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400">
-                              Aucun
-                            </Badge>
-                          )}
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-gray-500" />
+                          <span className="lg:hidden">Patient</span>
+                          <span className="hidden lg:inline">Nom</span>
                         </div>
-                      </TableCell>
-                      <TableCell className="flex gap-2">
-                        <Button size="icon" variant="outline" onClick={() => handleEditPatient(p)}>
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Dialog open={deleteDialogOpen && patientToDelete?.id === p.id} onOpenChange={setDeleteDialogOpen}>
-                          <DialogTrigger asChild>
-                            <Button 
-                              size="icon" 
-                              variant="destructive" 
-                              onClick={() => { setDeleteDialogOpen(true); setPatientToDelete(p); }}
+                      </TableHead>
+                      <TableHead className="hidden lg:table-cell">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-gray-500" />
+                          Prénom
+                        </div>
+                      </TableHead>
+                      <TableHead className="hidden lg:table-cell">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-gray-500" />
+                          Date de naissance
+                        </div>
+                      </TableHead>
+                      <TableHead className="hidden lg:table-cell">
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-gray-500" />
+                          Email
+                        </div>
+                      </TableHead>
+                      <TableHead className="hidden lg:table-cell">
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-gray-500" />
+                          Téléphone
+                        </div>
+                      </TableHead>
+                      <TableHead className="hidden sm:table-cell text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Activity className="w-4 h-4 text-gray-500" />
+                          Programme
+                        </div>
+                      </TableHead>
+                      <TableHead className="w-auto lg:w-24"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPatients.map((p) => (
+                      <TableRow key={p.id} onClick={() => router.push(`/dashboard/kine/patients/${p.id}`)} className={`cursor-pointer transition-all duration-300 hover:border hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-[#3899aa]/10 ${p.hasActiveProgram ? 'bg-green-50 dark:bg-green-900/20' : ''}`}>
+                        <TableCell>
+                          <div>
+                            <span className="font-medium">
+                              <span className="lg:hidden">{p.firstName} </span>
+                              {p.lastName.toUpperCase()}
+                            </span>
+                            <div className="lg:hidden text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              {p.email} · {p.phone}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">{p.firstName}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{formatDate(p.birthDate)}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{p.email}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{p.phone}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-center">
+                          <div className="flex items-center justify-center">
+                            {p.hasActiveProgram ? (
+                              <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800">
+                                <Check className="w-3 h-3 mr-1" />
+                                Actif
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400">
+                                Aucun
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button size="icon" variant="outline" onClick={(e) => { e.stopPropagation(); handleEditPatient(p); }}>
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="destructive"
+                              onClick={(e) => { e.stopPropagation(); setPatientToDelete(p); setDeleteDialogOpen(true); }}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Confirmer la suppression</DialogTitle>
-                            </DialogHeader>
-                            <p className="py-4">
-                              Êtes-vous sûr de vouloir supprimer le patient{' '}
-                              <strong>{p.firstName} {p.lastName.toUpperCase()}</strong> ?
-                              Cette action est irréversible.
-                            </p>
-                            <div className="flex justify-end gap-4 mt-4">
-                              <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Annuler</Button>
-                              <Button variant="destructive" onClick={handleDeletePatient}>Oui, supprimer</Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>
+
+        {/* Dialog de suppression unique */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="w-[95vw] sm:max-w-md top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle>Confirmer la suppression</DialogTitle>
+            </DialogHeader>
+            <p className="py-4 text-sm sm:text-base">
+              Êtes-vous sûr de vouloir supprimer le patient{' '}
+              <strong>{patientToDelete?.firstName} {patientToDelete?.lastName?.toUpperCase()}</strong> ?
+              Cette action est irréversible.
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-4 mt-4">
+              <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Annuler</Button>
+              <Button variant="destructive" onClick={handleDeletePatient}>Oui, supprimer</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

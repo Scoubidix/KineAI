@@ -392,7 +392,7 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
         </DialogHeader>
 
         <div className="flex flex-col md:flex-row h-[60vh]">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col md:flex-row w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col md:flex-row w-full h-full">
             {/* Liste des onglets : horizontal sur mobile, vertical sur desktop */}
             <TabsList className="flex md:flex-col h-auto md:h-full w-full md:w-64 bg-muted/30 justify-start p-2 gap-1 md:space-y-1 flex-shrink-0 overflow-x-auto md:overflow-x-visible">
               <TabsTrigger
@@ -1244,7 +1244,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </SidebarContent>
       </Sidebar>
 
-      <SidebarInset>
+      <SidebarInset className="min-w-0">
         {/* Header principal - toutes tailles */}
         <header className="sticky top-0 z-50 bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] shadow-md">
           <div className="flex h-14 items-center px-4 gap-3">
@@ -1315,7 +1315,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </header>
 
         {/* Contenu principal */}
-        <div className="relative p-4 md:p-6 lg:p-8 text-foreground min-h-screen">
+        <div className="relative p-4 md:p-6 lg:p-8 text-foreground min-h-screen overflow-x-hidden">
           <div
             className="pointer-events-none absolute top-0 right-0 w-[600px] h-[600px] opacity-[0.07] dark:opacity-[0.12] rounded-full blur-3xl"
             style={{ background: 'radial-gradient(circle, #3899aa, transparent 70%)' }}

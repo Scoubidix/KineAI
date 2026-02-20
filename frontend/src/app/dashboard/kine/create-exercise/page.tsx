@@ -519,18 +519,18 @@ export default function KineCreateExercisePage() {
 
   return (
     <AppLayout>
-      <div className="p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2 text-[#3899aa]">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
+          <div className="space-y-2">
+            <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2 text-[#3899aa]">
               <Dumbbell />
               {viewMode === 'exercises'
                 ? (showPublic ? 'Exercices Publics' : 'Mes Exercices Privés')
                 : (showPublic ? 'Templates Publics' : 'Mes Templates')
               }
             </h2>
-            <div className="flex items-center gap-4 mt-2">
-              <div className="relative flex-1 max-w-md">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="relative flex-1 sm:max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
                   className="pl-10"
@@ -546,7 +546,7 @@ export default function KineCreateExercisePage() {
                   className="flex items-center gap-2"
                 >
                   <Filter className="w-4 h-4" />
-                  Filtres
+                  <span className="hidden sm:inline">Filtres</span>
                   {selectedTags.length > 0 && (
                     <Badge variant="secondary" className="ml-1">
                       {selectedTags.length}
@@ -556,7 +556,7 @@ export default function KineCreateExercisePage() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {/* Switcher Exercices / Templates */}
             <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
               <Button
@@ -583,16 +583,19 @@ export default function KineCreateExercisePage() {
               variant="outline"
               onClick={() => setShowPublic(!showPublic)}
               className="flex items-center gap-2"
+              size="sm"
             >
               {showPublic ? (
                 <>
                   <Lock className="w-4 h-4" />
-                  {viewMode === 'exercises' ? 'Mes exercices privés' : 'Mes templates'}
+                  <span className="hidden sm:inline">{viewMode === 'exercises' ? 'Mes exercices privés' : 'Mes templates'}</span>
+                  <span className="sm:hidden">Privés</span>
                 </>
               ) : (
                 <>
                   <Globe className="w-4 h-4" />
-                  {viewMode === 'exercises' ? 'Exercices publics' : 'Templates publics'}
+                  <span className="hidden sm:inline">{viewMode === 'exercises' ? 'Exercices publics' : 'Templates publics'}</span>
+                  <span className="sm:hidden">Publics</span>
                 </>
               )}
             </Button>
@@ -610,7 +613,7 @@ export default function KineCreateExercisePage() {
                     {form.id ? 'Modifier' : 'Créer'} un exercice
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
+                <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[95vh] overflow-y-auto top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
                   <DialogHeader className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
                     <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
                       {form.id ? 'Modifier l\'exercice' : 'Créer un nouvel exercice'}
@@ -883,36 +886,14 @@ export default function KineCreateExercisePage() {
                                   <Button size="icon" variant="ghost" onClick={() => handleEdit(ex)} className="h-8 w-8">
                                     <Pencil className="w-3 h-3" />
                                   </Button>
-                                  <Dialog open={deleteDialogOpen && exerciceToDelete?.id === ex.id} onOpenChange={setDeleteDialogOpen}>
-                                    <DialogTrigger asChild>
-                                      <Button 
-                                        size="icon" 
-                                        variant="ghost" 
-                                        onClick={() => { setDeleteDialogOpen(true); setExerciceToDelete(ex); }}
-                                        className="h-8 w-8 hover:bg-red-100 hover:text-red-600"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                      <DialogHeader>
-                                        <DialogTitle>Confirmer la suppression</DialogTitle>
-                                      </DialogHeader>
-                                      <p className="py-4">
-                                        Êtes-vous sûr de vouloir supprimer l'exercice{' '}
-                                        <strong>"{ex.nom}"</strong> ?
-                                        Cette action est irréversible.
-                                      </p>
-                                      <div className="flex justify-end gap-4 mt-4">
-                                        <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>
-                                          Annuler
-                                        </Button>
-                                        <Button variant="destructive" onClick={handleDelete}>
-                                          Oui, supprimer
-                                        </Button>
-                                      </div>
-                                    </DialogContent>
-                                  </Dialog>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => { setExerciceToDelete(ex); setDeleteDialogOpen(true); }}
+                                    className="h-8 w-8 hover:bg-red-100 hover:text-red-600"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
                                 </div>
                               )}
                             </div>
@@ -1015,36 +996,14 @@ export default function KineCreateExercisePage() {
                                 <Button size="icon" variant="ghost" onClick={() => handleEditTemplate(template)} className="h-8 w-8">
                                   <Pencil className="w-3 h-3" />
                                 </Button>
-                                <Dialog open={templateDeleteDialogOpen && templateToDelete?.id === template.id} onOpenChange={setTemplateDeleteDialogOpen}>
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      onClick={() => { setTemplateDeleteDialogOpen(true); setTemplateToDelete(template); }}
-                                      className="h-8 w-8 hover:bg-red-100 hover:text-red-600"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent>
-                                    <DialogHeader>
-                                      <DialogTitle>Confirmer la suppression</DialogTitle>
-                                    </DialogHeader>
-                                    <p className="py-4">
-                                      Êtes-vous sûr de vouloir supprimer le template{' '}
-                                      <strong>"{template.nom}"</strong> ?
-                                      Cette action est irréversible.
-                                    </p>
-                                    <div className="flex justify-end gap-4 mt-4">
-                                      <Button variant="ghost" onClick={() => setTemplateDeleteDialogOpen(false)}>
-                                        Annuler
-                                      </Button>
-                                      <Button variant="destructive" onClick={handleDeleteTemplate}>
-                                        Oui, supprimer
-                                      </Button>
-                                    </div>
-                                  </DialogContent>
-                                </Dialog>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => { setTemplateToDelete(template); setTemplateDeleteDialogOpen(true); }}
+                                  className="h-8 w-8 hover:bg-red-100 hover:text-red-600"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
                               </div>
                             )}
                           </div>
@@ -1081,7 +1040,7 @@ export default function KineCreateExercisePage() {
             setShowTemplateExerciseSelector(false);
           }
         }}>
-          <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
+          <DialogContent className="w-[95vw] sm:max-w-6xl max-h-[95vh] overflow-y-auto top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
             <DialogHeader className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
               <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
                 {templateForm.id ? 'Modifier le template' : 'Créer un template'}
@@ -1363,6 +1322,42 @@ export default function KineCreateExercisePage() {
                   {templateForm.id ? 'Mettre à jour' : 'Créer le template'}
                 </Button>
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog suppression exercice unique */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="w-[95vw] sm:max-w-md top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle>Confirmer la suppression</DialogTitle>
+            </DialogHeader>
+            <p className="py-4 text-sm sm:text-base">
+              Êtes-vous sûr de vouloir supprimer l'exercice{' '}
+              <strong>"{exerciceToDelete?.nom}"</strong> ?
+              Cette action est irréversible.
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-4 mt-4">
+              <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Annuler</Button>
+              <Button variant="destructive" onClick={handleDelete}>Oui, supprimer</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog suppression template unique */}
+        <Dialog open={templateDeleteDialogOpen} onOpenChange={setTemplateDeleteDialogOpen}>
+          <DialogContent className="w-[95vw] sm:max-w-md top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle>Confirmer la suppression</DialogTitle>
+            </DialogHeader>
+            <p className="py-4 text-sm sm:text-base">
+              Êtes-vous sûr de vouloir supprimer le template{' '}
+              <strong>"{templateToDelete?.nom}"</strong> ?
+              Cette action est irréversible.
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-4 mt-4">
+              <Button variant="ghost" onClick={() => setTemplateDeleteDialogOpen(false)}>Annuler</Button>
+              <Button variant="destructive" onClick={handleDeleteTemplate}>Oui, supprimer</Button>
             </div>
           </DialogContent>
         </Dialog>

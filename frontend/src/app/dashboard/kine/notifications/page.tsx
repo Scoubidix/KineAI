@@ -359,7 +359,7 @@ export default function KineNotificationsPage() {
     <AppLayout>
       <div className="space-y-6">
         {/* Header avec stats */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-primary">Notifications</h1>
             {stats && (
@@ -369,15 +369,15 @@ export default function KineNotificationsPage() {
             )}
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="outline"
               size="sm"
               onClick={() => loadNotifications(false)}
               disabled={refreshing}
             >
-              <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-              Actualiser
+              <RefreshCw className={`h-4 w-4 sm:mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Actualiser</span>
             </Button>
 
             {notifications.length > 0 && (
@@ -391,7 +391,7 @@ export default function KineNotificationsPage() {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="w-[95vw] sm:max-w-md top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
                   <DialogHeader>
                     <DialogTitle>Confirmer la suppression</DialogTitle>
                   </DialogHeader>
@@ -399,7 +399,7 @@ export default function KineNotificationsPage() {
                     Êtes-vous sûr de vouloir supprimer <strong>toutes vos notifications</strong> ({notifications.length}) ?
                     Cette action est irréversible.
                   </p>
-                  <div className="flex justify-end gap-4 mt-4">
+                  <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-4 mt-4">
                     <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Annuler</Button>
                     <Button variant="destructive" onClick={deleteAllNotifications} disabled={deleting}>
                       {deleting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
@@ -420,9 +420,10 @@ export default function KineNotificationsPage() {
                 {markingAllRead ? (
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                 ) : (
-                  <CheckCircle className="h-4 w-4 mr-1" />
+                  <CheckCircle className="h-4 w-4 sm:mr-1" />
                 )}
-                Tout marquer comme lu
+                <span className="hidden sm:inline">Tout marquer comme lu</span>
+                <span className="sm:hidden">Tout lu</span>
               </Button>
             )}
           </div>
@@ -431,7 +432,7 @@ export default function KineNotificationsPage() {
         {/* Filtres */}
         <Card className="card-hover w-full max-w-4xl mx-auto">
           <CardContent className="pt-4">
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Filtres :</span>
@@ -482,7 +483,7 @@ export default function KineNotificationsPage() {
                 {notifications.map(notification => (
                   <li 
                     key={notification.id} 
-                    className={`p-4 rounded-md border transition-colors ${
+                    className={`p-3 sm:p-4 rounded-md border transition-colors ${
                       notification.type === 'PROGRAM_COMPLETED'
                         ? notification.isRead
                           ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-300 dark:border-green-700 shadow-sm'
@@ -492,7 +493,7 @@ export default function KineNotificationsPage() {
                           : 'bg-accent/10 border-accent font-medium'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-2">
                       <div className="flex items-center gap-2">
                         <span className={`text-sm font-semibold ${
                           notification.type === 'PROGRAM_COMPLETED'
@@ -518,7 +519,7 @@ export default function KineNotificationsPage() {
                         )}
                       </div>
                       
-                      <div className="text-right">
+                      <div className="text-left sm:text-right">
                         <span className="text-xs text-muted-foreground block">
                           {formatTimeAgo(notification.createdAt)}
                         </span>
@@ -556,7 +557,7 @@ export default function KineNotificationsPage() {
                       
                       {notification.type === 'DAILY_VALIDATION' && notification.metadata && (
                         <div className="bg-blue-50 dark:bg-blue-900/30 p-2 rounded border border-blue-200 dark:border-blue-700">
-                          <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                             {notification.metadata.painLevel !== undefined && (
                               <span>Douleur: {notification.metadata.painLevel}/10</span>
                             )}

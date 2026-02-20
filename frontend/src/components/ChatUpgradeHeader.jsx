@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Lock } from 'lucide-react';
 import { usePaywall } from '../hooks/usePaywall';
-import { useSubscription } from '../hooks/useSubscription';
 import { PaywallModal } from './PaywallModal';
 
 export const ChatUpgradeHeader = ({ assistantType, canAccessFeature, isLoading, subscription }) => {
@@ -40,9 +39,8 @@ export const ChatUpgradeHeader = ({ assistantType, canAccessFeature, isLoading, 
 };
 
 // Wrapper pour désactiver les zones d'interaction du chat
-export const ChatDisabledOverlay = ({ children, assistantType, canAccessFeature, isLoading }) => {
+export const ChatDisabledOverlay = ({ children, assistantType, canAccessFeature, isLoading, subscription }) => {
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
-  const { subscription } = useSubscription();
 
   // Si les props ne sont pas fournies, utiliser le hook (fallback)
   const paywall = canAccessFeature && isLoading !== undefined ?
