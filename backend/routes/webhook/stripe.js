@@ -82,7 +82,7 @@ const validateIPWithFallback = (req) => {
     'socket-ip'           // Socket niveau bas
   ];
 
-  logger.warn('🔍 Début validation IP Stripe...');
+  logger.debug('Début validation IP Stripe...');
   
   for (const headerName of headerPriority) {
     const ip = headers[headerName];
@@ -91,7 +91,7 @@ const validateIPWithFallback = (req) => {
       logger.debug(`🔍 Test ${headerName}: ${ip} → ${validation.normalized} (Stripe: ${validation.valid})`);
       
       if (validation.valid) {
-        logger.warn(`✅ IP Stripe validée: ${validation.normalized} (source: ${headerName}, original: ${ip})`);
+        logger.debug(`IP Stripe validée: ${validation.normalized} (source: ${headerName})`);
         return { valid: true, ip: validation.normalized, originalIP: ip, source: headerName, headers };
       }
     }
@@ -120,7 +120,7 @@ const verifyStripeIP = (req, res, next) => {
     });
   }
   
-  logger.warn(`✅ Webhook autorisé - IP: ${validation.ip} (${validation.source})`);
+  logger.debug(`Webhook autorisé - IP: ${validation.ip} (${validation.source})`);
   
   // Ajouter les infos de validation à la request pour logging ultérieur
   req.stripeValidation = validation;
@@ -137,14 +137,14 @@ router.post('/stripe', verifyStripeIP, async (req, res) => {
   const eventId = req.headers['stripe-event-id'] || 'unknown';
   const validation = req.stripeValidation || { ip: 'unknown', source: 'unknown' };
   
-  logger.warn(`🎯 Webhook Stripe reçu - ID: ${eventId} - IP: ${validation.ip} (${validation.source})`);
+  logger.debug(`Webhook Stripe reçu - ID: ${eventId} - Type attendu`);
   logger.debug('🔍 Validation détaillée:', validation);
   
   try {
     // Valider le webhook avec Stripe
     const event = stripeService.validateWebhook(req.body, signature);
     
-    logger.warn(`✅ Webhook validé - Type: ${event.type} - ID: ${event.id}`);
+    logger.debug(`Webhook validé - Type: ${event.type} - ID: ${event.id}`);
     
     // Traiter l'événement selon son type avec gestion d'erreurs individuelle
     let handlerResult = { success: false, message: 'Handler non exécuté' };
@@ -181,10 +181,8 @@ router.post('/stripe', verifyStripeIP, async (req, res) => {
           handlerResult = { success: true, message: 'Événement ignoré' };
       }
       
-      // Log du résultat
-      if (handlerResult.success) {
-        logger.warn(`✅ Handler réussi - ${event.type}: ${handlerResult.message}`);
-      } else {
+      // Log uniquement en cas d'échec (les handlers loggent eux-mêmes le succès)
+      if (!handlerResult.success) {
         logger.error(`❌ Handler échoué - ${event.type}: ${handlerResult.message}`);
       }
       
@@ -234,7 +232,7 @@ async function handleCheckoutCompleted(session, eventId) {
   const startTime = Date.now();
   
   try {
-    logger.info(`✅ [${eventId}] Traitement checkout completed: ${session.id}`);
+    logger.debug(`[${eventId}] Traitement checkout completed: ${session.id}`);
     
     // Validation des métadonnées critiques
     const kineId = parseInt(session.metadata?.kineId);
@@ -326,9 +324,10 @@ async function handleCheckoutCompleted(session, eventId) {
       });
       
       const duration = Date.now() - startTime;
-      const successMessage = `Kiné ${kineId} (${sanitizeEmail(kine.email)}) mis à jour: ${planType} - Customer: ${session.customer} - Subscription: ${session.subscription} (${duration}ms)`;
+      const successMessage = `Abonnement ${planType} créé pour kiné ${kineId}`;
 
-      logger.info(`🎉 [${eventId}] ${successMessage}`);
+      logger.info(`📋 ${successMessage}`);
+      logger.debug(`[${eventId}] Détails: ${sanitizeEmail(kine.email)}, Customer: ${session.customer}, Subscription: ${session.subscription} (${duration}ms)`);
 
       // ========== TRAITEMENT PARRAINAGE ==========
       const referralCode = session.metadata?.referralCode;
@@ -433,7 +432,7 @@ async function handleReferralAtCheckout(refereeKineId, refereeEmail, referralCod
  */
 async function handleSubscriptionCreated(subscription, eventId) {
   try {
-    logger.info(`📝 [${eventId}] Création abonnement: ${subscription.id}`);
+    logger.debug(`[${eventId}] subscription.created reçu: ${subscription.id}`);
     
     const kine = await prisma.kine.findFirst({
       where: { subscriptionId: subscription.id }
@@ -483,9 +482,9 @@ async function handleSubscriptionCreated(subscription, eventId) {
       message += ' - Dates de période seront mises à jour via subscription.updated';
     }
     
-    logger.info(`📅 [${eventId}] ${message}`);
+    logger.debug(`[${eventId}] ${message}`);
     return { success: true, message };
-    
+
   } catch (error) {
     const errorMessage = `Erreur handleSubscriptionCreated: ${error.message}`;
     logger.error(`💥 [${eventId}] ${errorMessage}`, { subscriptionId: subscription.id, stack: error.stack });
@@ -498,10 +497,11 @@ async function handleSubscriptionCreated(subscription, eventId) {
  */
 async function handleSubscriptionUpdated(subscription, eventId) {
   try {
-    logger.info(`🔄 [${eventId}] Mise à jour abonnement: ${subscription.id}`);
-    
+    logger.debug(`[${eventId}] subscription.updated reçu: ${subscription.id}`);
+
     const kine = await prisma.kine.findFirst({
-      where: { subscriptionId: subscription.id }
+      where: { subscriptionId: subscription.id },
+      select: { id: true, planType: true }
     });
     
     if (!kine) {
@@ -547,8 +547,16 @@ async function handleSubscriptionUpdated(subscription, eventId) {
       }
     });
     
-    const message = `Abonnement mis à jour pour kiné ${kine.id}: ${planType} (${subscription.status} -> ${newStatus})`;
-    logger.info(`🔄 [${eventId}] ${message}`);
+    // Log business : distinguer changement de plan vs mise à jour technique
+    const oldPlan = kine.planType;
+    let message;
+    if (planType && oldPlan && planType !== oldPlan) {
+      message = `Changement d'abonnement pour kiné ${kine.id} : ${oldPlan} → ${planType}`;
+      logger.info(`🔄 ${message}`);
+    } else {
+      message = `Abonnement mis à jour pour kiné ${kine.id}: ${planType || oldPlan} (${newStatus})`;
+      logger.debug(`[${eventId}] ${message}`);
+    }
     return { success: true, message };
     
   } catch (error) {
@@ -563,7 +571,7 @@ async function handleSubscriptionUpdated(subscription, eventId) {
  */
 async function handleSubscriptionDeleted(subscription, eventId) {
   try {
-    logger.info(`🗑️ [${eventId}] Suppression abonnement: ${subscription.id}`);
+    logger.debug(`[${eventId}] subscription.deleted reçu: ${subscription.id}`);
     
     const kine = await prisma.kine.findFirst({
       where: { subscriptionId: subscription.id }
@@ -608,8 +616,8 @@ async function handleSubscriptionDeleted(subscription, eventId) {
     }
     // ===========================================================
 
-    const message = `Abonnement supprimé pour kiné ${kine.id} - retour vers plan FREE`;
-    logger.info(`🗑️ [${eventId}] ${message}`);
+    const message = `Abonnement résilié pour kiné ${kine.id} - retour FREE`;
+    logger.info(`🚫 ${message}`);
     return { success: true, message };
     
   } catch (error) {
@@ -628,12 +636,12 @@ async function handlePaymentSucceeded(invoice, eventId) {
     // Support ancien et nouveau format API Stripe
     const subscriptionId = invoice.subscription || invoice.parent?.subscription_details?.subscription;
 
-    logger.info(`💰 [${eventId}] Paiement réussi pour invoice: ${invoice.id} - billing_reason: ${invoice.billing_reason} - subscription: ${subscriptionId || 'none'}`);
+    logger.debug(`[${eventId}] invoice.payment_succeeded: ${invoice.id} - billing_reason: ${invoice.billing_reason}`);
 
     if (subscriptionId) {
       const kine = await prisma.kine.findFirst({
         where: { subscriptionId: subscriptionId },
-        select: { id: true, stripeCustomerId: true, email: true }
+        select: { id: true, stripeCustomerId: true, email: true, planType: true }
       });
 
       if (kine) {
@@ -642,7 +650,12 @@ async function handlePaymentSucceeded(invoice, eventId) {
           data: { subscriptionStatus: 'ACTIVE' }
         });
 
-        logger.info(`✅ [${eventId}] Statut mis à jour vers ACTIVE pour kiné ${kine.id}`);
+        // Log business : renouvellement vs premier paiement
+        if (invoice.billing_reason === 'subscription_cycle') {
+          logger.info(`🔄 Abonnement ${kine.planType} renouvelé pour kiné ${kine.id}`);
+        } else {
+          logger.debug(`[${eventId}] Paiement initial traité pour kiné ${kine.id}`);
+        }
 
         // ========== TRAITEMENT CRÉDIT PARRAINAGE AU RENOUVELLEMENT ==========
         // billing_reason: 'subscription_create' = 1er paiement
@@ -780,7 +793,7 @@ async function handleReferralCreditOnRenewal(refereeKineId, refereeStripeCustome
  */
 async function handlePaymentFailed(invoice, eventId) {
   try {
-    logger.info(`❌ [${eventId}] Échec de paiement pour invoice: ${invoice.id}`);
+    logger.debug(`[${eventId}] invoice.payment_failed: ${invoice.id}`);
     
     if (invoice.subscription) {
       const kine = await prisma.kine.findFirst({
@@ -793,8 +806,8 @@ async function handlePaymentFailed(invoice, eventId) {
           data: { subscriptionStatus: 'PAST_DUE' }
         });
         
-        const message = `Statut mis à jour vers PAST_DUE pour kiné ${kine.id} - Invoice: ${invoice.id}`;
-        logger.info(`⚠️ [${eventId}] ${message}`);
+        const message = `Échec paiement pour kiné ${kine.id} - statut PAST_DUE`;
+        logger.info(`❌ ${message}`);
         logger.debug(`📧 [${eventId}] TODO: Notification à envoyer au kiné ${kine.id}`);
         
         return { success: true, message };

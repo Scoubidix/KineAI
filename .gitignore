@@ -3,3 +3,12 @@ CLAUDE.md
 
 # Dossier configuration Claude
 .claude/
+
+# Dossier upload études (données volumineuses)
+Upload Supabase/
+
+# Scripts et données de migration études (one-off)
+migrateStudiesV2.js
+studies_v2.sql
+migration_processed_ids.json
+migration_error_ids.json

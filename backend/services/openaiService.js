@@ -449,6 +449,87 @@ const cleanChatHistory = (history, maxMessages = 20) => {
     }));
 };
 
+// ========== QUERY ROUTER — DÉTECTION D'INTENTION ==========
+
+const ROUTER_TYPE_MAP = { 'BASIC': 'basique', 'BIBLIO': 'biblio', 'CLINIC': 'clinique' };
+const ROUTER_LABEL_MAP = { 'basique': 'IA Conversationnelle', 'biblio': 'IA Bibliographique', 'clinique': 'IA Clinique' };
+
+/**
+ * Route la requête kiné via GPT-4o-mini (température 0, ~50 tokens)
+ * Retourne { type: "BASIC"|"BIBLIO"|"CLINIC", rag: true|false }
+ */
+const routeQuery = async (message, conversationHistory = []) => {
+  try {
+    const recentHistory = conversationHistory.slice(-10).map(msg =>
+      `${msg.role}: ${msg.content.substring(0, 200)}`
+    ).join('\n');
+
+    const routerPrompt = `Tu es un routeur d'intention pour une application de kinésithérapie. Analyse le message et le contexte pour déterminer le type de réponse et si une recherche documentaire est nécessaire.
+
+TYPES :
+- BASIC : Question conversationnelle, conseil pratique, explication pour un patient, organisation cabinet, salutation, remerciement
+- BIBLIO : Recherche bibliographique, études scientifiques, preuves, "que dit la littérature", "quels traitements optimaux", "quel est l'intérêt de"
+- CLINIC : Cas clinique complexe, diagnostic différentiel, tests diagnostiques spécifiques, cotations musculaires, "test de Lachman", "diagnostic épaule"
+
+RAG (recherche documentaire) :
+- true : Le kiné cherche une information spécifique qui nécessite des sources (tests, mesures, cotations, protocoles précis, données chiffrées)
+- false : Question conversationnelle, conseil général, explication vulgarisée, salutation, remerciement, organisation
+
+Exemples :
+- "Bonjour" → BASIC, rag: false
+- "Comment expliquer une tendinopathie à un patient ?" → BASIC, rag: false
+- "C'est quoi le test de Lachman ?" → BASIC, rag: true
+- "Meilleur exercice pour renforcer le psoas ?" → BASIC, rag: false
+- "Quels traitements optimaux pour la lombalgie ?" → BIBLIO, rag: true
+- "Patient 45 ans douleur épaule après tennis" → CLINIC, rag: true
+- "Merci pour l'info" → BASIC, rag: false
+
+Historique récent :
+${recentHistory || 'Aucun'}
+
+Message : "${message}"
+
+Réponds UNIQUEMENT en JSON : {"type":"BASIC"|"BIBLIO"|"CLINIC","rag":true|false}`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: routerPrompt }],
+      max_tokens: 50,
+      temperature: 0,
+      response_format: { type: 'json_object' }
+    });
+
+    const result = JSON.parse(response.choices[0].message.content);
+    const routedType = ROUTER_TYPE_MAP[result.type] || 'basique';
+    const rag = result.rag !== false;
+
+    logger.debug(`🔀 Query Router: type=${result.type} (${routedType}), rag=${rag}`);
+
+    return { type: routedType, rag };
+  } catch (error) {
+    logger.error('❌ Erreur Query Router:', error.message);
+    return { type: 'basique', rag: true };
+  }
+};
+
+/**
+ * Génère la directive de redirection si mismatch entre page et router
+ */
+const getRedirectDirective = (currentPage, routedType) => {
+  const targetLabel = ROUTER_LABEL_MAP[routedType];
+
+  if (currentPage === 'basique') {
+    return `Tu es un assistant kiné conversationnel. Donne un aperçu très court du sujet (2-3 phrases max, sans inventer de chiffres ni d'études), puis termine en suggérant d'utiliser ${targetLabel} pour une réponse complète et sourcée. Sans emoji. Maximum 50 mots.`;
+  }
+  if (currentPage === 'biblio') {
+    return `Tu es un assistant kiné bibliographique. Dis en une phrase que tu n'as pas d'études disponibles pour cette demande, puis suggère d'utiliser ${targetLabel} pour une réponse adaptée. Sans emoji. Maximum 30 mots.`;
+  }
+  if (currentPage === 'clinique') {
+    return `Tu es un assistant kiné clinique. Dis en une phrase qu'il n'y a pas de raisonnement clinique disponible pour cette demande, puis suggère d'utiliser ${targetLabel} pour une réponse adaptée. Sans emoji. Maximum 30 mots.`;
+  }
+  return '';
+};
+
 // ========== NOUVELLE FONCTION PRINCIPALE POUR LES IA KINÉ ==========
 
 /**
@@ -462,37 +543,61 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
       throw new Error('Message requis');
     }
 
-    // 1. Recherche documentaire via knowledgeService avec type d'IA
-    // EXCEPTION : L'IA admin ne fait PAS de RAG (génération de bilans à partir de notes fournies)
+    // 1. Query Router — détection d'intention (skip pour admin)
+    let routerResult = { type, rag: true };
+    let redirectDirective = '';
+
+    if (type !== 'admin') {
+      routerResult = await routeQuery(message, conversationHistory);
+      const isMismatch = routerResult.type !== type;
+
+      if (isMismatch) {
+        redirectDirective = getRedirectDirective(type, routerResult.type);
+        logger.debug(`🔀 Mismatch: page=${type}, router=${routerResult.type} → redirection suggérée, RAG skippé`);
+      } else if (!routerResult.rag) {
+        logger.debug(`🔀 Match: page=${type}, rag=false → RAG skippé`);
+      } else {
+        logger.debug(`🔀 Match: page=${type}, rag=true → RAG activé`);
+      }
+    }
+
+    const shouldDoRAG = type !== 'admin' && routerResult.type === type && routerResult.rag;
+
+    // 2. Recherche documentaire (uniquement si RAG activé)
     let allDocuments = [];
     let selectedSources = [];
     let metadata = { totalFound: 0, averageScore: 0, categoriesFound: [] };
     let limitedDocuments = [];
 
-    if (type !== 'admin') {
+    if (shouldDoRAG) {
       const searchResult = await knowledgeService.searchDocuments(message, {
         filterCategory: null,
         allowLowerThreshold: true,
-        iaType: type  // Passer le type d'IA pour les filtres adaptés
+        iaType: type
       });
 
       allDocuments = searchResult.allDocuments;
       selectedSources = searchResult.selectedSources;
       metadata = searchResult.metadata;
 
-      // 2. Limitation du nombre de documents selon le type d'IA
       const docLimits = {
-        'basique': 5,      // IA Basique : 5 docs max (RAG intelligent)
-        'biblio': 6,       // IA Biblio : 6 docs max
-        'clinique': 6,     // IA Clinique : 6 docs max
+        'basique': 5,
+        'biblio': 6,
+        'clinique': 6,
       };
 
       const maxDocs = docLimits[type] || 6;
       limitedDocuments = allDocuments.slice(0, maxDocs);
     }
 
-    // 3. Construction du prompt système selon le type
-    const systemPrompt = getSystemPromptByType(type, limitedDocuments);
+    // 3. Construction du prompt système selon le type + directive de redirection si mismatch
+    let systemPrompt;
+    if (redirectDirective) {
+      // Mismatch : prompt minimal + directive de redirection (pas de disclaimer "aucun document")
+      systemPrompt = redirectDirective.trim();
+    } else {
+      systemPrompt = getSystemPromptByType(type, limitedDocuments, shouldDoRAG);
+    }
 
     // 🧪 LOGS DE DEBUG POUR VÉRIFIER LA TRANSMISSION À GPT
     logger.debug(`📤 IA ${type} - Documents trouvés: ${allDocuments.length}, limités à: ${limitedDocuments.length}`);
@@ -595,7 +700,7 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
 /**
  * Sélectionne le prompt système selon le type d'IA
  */
-const getSystemPromptByType = (type, contextDocuments) => {
+const getSystemPromptByType = (type, contextDocuments, ragEnabled = true) => {
   const promptBuilders = {
     'basique': buildBasiqueSystemPrompt,
     'biblio': buildBiblioSystemPrompt,
@@ -608,7 +713,7 @@ const getSystemPromptByType = (type, contextDocuments) => {
     throw new Error(`Type d'IA inconnu: ${type}`);
   }
 
-  return builder(contextDocuments);
+  return builder(contextDocuments, ragEnabled);
 };
 
 /**
@@ -734,7 +839,7 @@ RÈGLES :
 
 // ========== PROMPTS SYSTÈME SPÉCIALISÉS ==========
 
-function buildBasiqueSystemPrompt(contextDocuments) {
+function buildBasiqueSystemPrompt(contextDocuments, ragEnabled = true) {
   let systemPrompt = `Tu es un assistant IA conversationnel pour kinésithérapeutes professionnels.
 
 ATTENTION : L'UTILISATEUR EST UN KINÉSITHÉRAPEUTE DIPLÔMÉ, PAS UN PATIENT !
@@ -770,6 +875,11 @@ RÈGLE ANTI-HALLUCINATION :
 - Ne jamais inventer de chiffres, études, ou faits
 - Rester factuel et honnête sur les limites de tes connaissances
 - Préfère dire "Je n'ai pas cette information" plutôt qu'inventer`;
+
+  // Mode conversationnel simple (rag: false) — pas de bloc documents ni exemples
+  if (!ragEnabled) {
+    return systemPrompt;
+  }
 
   // ========== GESTION INTELLIGENTE DU RAG ==========
   if (contextDocuments.length > 0) {

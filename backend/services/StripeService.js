@@ -9,6 +9,20 @@ class StripeService {
   constructor() {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     this.endpointSecret = process.env.STRIPE_ENDPOINT_SECRET;
+
+    // Price IDs Stripe configurés via variables d'environnement
+    this.priceIds = {
+      'DECLIC': process.env.STRIPE_PRICE_DECLIC,
+      'PRATIQUE': process.env.STRIPE_PRICE_PRATIQUE,
+      'PIONNIER': process.env.STRIPE_PRICE_PIONNIER,
+      'EXPERT': process.env.STRIPE_PRICE_EXPERT,
+    };
+
+    // Map inversée price → plan (construite dynamiquement)
+    this.planFromPrice = {};
+    for (const [plan, priceId] of Object.entries(this.priceIds)) {
+      if (priceId) this.planFromPrice[priceId] = plan;
+    }
   }
 
   /**
@@ -123,14 +137,7 @@ class StripeService {
    * @returns {string} - Price ID Stripe
    */
   getPriceIdFromPlanType(planType) {
-    const priceMap = {
-      'DECLIC': 'price_1RtoheEHFuBHSJxklQe0tUMh',    // 9€ Déclic
-      'PRATIQUE': 'price_1Rtpv9EHFuBHSJxk20JM0SqR',  // 29€ Pratique
-      'PIONNIER': 'price_1RuXvBEHFuBHSJxkyXom9QGe',  // 20€ Pionnier (limité)
-      'EXPERT': 'price_1RuXvmEHFuBHSJxknXv8U4GQ'     // 59€ Expert
-    };
-    
-    return priceMap[planType] || null;
+    return this.priceIds[planType] || null;
   }
 
   /**
@@ -139,14 +146,7 @@ class StripeService {
    * @returns {string} - Type de plan (DECLIC, PRATIQUE, PIONNIER, EXPERT)
    */
   getPlanTypeFromPriceId(priceId) {
-    const priceMap = {
-      'price_1RtoheEHFuBHSJxklQe0tUMh': 'DECLIC',    // 9€ Déclic
-      'price_1Rtpv9EHFuBHSJxk20JM0SqR': 'PRATIQUE',  // 29€ Pratique  
-      'price_1RuXvBEHFuBHSJxkyXom9QGe': 'PIONNIER',  // 20€ Pionnier (limité)
-      'price_1RuXvmEHFuBHSJxknXv8U4GQ': 'EXPERT'     // 59€ Expert
-    };
-    
-    return priceMap[priceId] || null;
+    return this.planFromPrice[priceId] || null;
   }
 
   /**

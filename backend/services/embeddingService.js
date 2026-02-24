@@ -14,6 +14,11 @@ const EMBEDDING_CONFIG = {
   dimensions: 1536
 };
 
+const EMBEDDING_CONFIG_BIBLIO = {
+  model: 'text-embedding-3-large',
+  dimensions: 1536
+};
+
 // ==========================================
 // 📋 DICTIONNAIRE MÉTADONNÉES - BASÉ SUR LE GUIDE UTILISATEUR
 // ==========================================
@@ -283,21 +288,22 @@ function buildMetadataFilters(detectedMetadata, iaType = 'basique') {
  * @param {string} text - Texte à convertir en embedding
  * @returns {array} Vecteur d'embedding
  */
-async function generateEmbedding(text) {
+async function generateEmbedding(text, iaType = 'basique') {
   try {
     const optimizedText = preprocessTextForEmbedding(text);
-    
-    logger.debug('🔄 Génération embedding pour recherche:', optimizedText.substring(0, 100) + '...');
-    
+    const config = iaType === 'biblio' ? EMBEDDING_CONFIG_BIBLIO : EMBEDDING_CONFIG;
+
+    logger.debug(`🔄 Génération embedding (${config.model}) pour recherche:`, optimizedText.substring(0, 100) + '...');
+
     const response = await openai.embeddings.create({
-      model: EMBEDDING_CONFIG.model,
+      model: config.model,
       input: optimizedText,
-      dimensions: EMBEDDING_CONFIG.dimensions
+      dimensions: config.dimensions
     });
 
     const embedding = response.data[0].embedding;
-    logger.debug('✅ Embedding généré:', embedding.length, 'dimensions');
-    
+    logger.debug(`✅ Embedding généré (${config.model}):`, embedding.length, 'dimensions');
+
     return embedding;
   } catch (error) {
     logger.error('❌ Erreur génération embedding:', error);
@@ -440,8 +446,42 @@ async function searchDocumentsOptimized(query, options = {}) {
       return [];
     }
 
-    // 🆕 OPTIMISATION: Générer l'embedding UNE SEULE FOIS + filtres par IA
-    // Pour IA Basique, pas d'analyse de métadonnées (recherche vectorielle pure)
+    // IA Biblio → pipeline hybride dédié (Vector + BM25 → RRF → Rerank)
+    if (iaType === 'biblio') {
+      const queryEmbedding = await generateEmbedding(query, iaType);
+      logger.debug('🔬 IA BIBLIO - Pipeline hybride (Vector + BM25 → RRF → Rerank)');
+
+      const [vectorResults, bm25Results] = await Promise.all([
+        searchDocumentsWithEmbedding(queryEmbedding, {
+          matchThreshold: 0.3,
+          matchCount: 15,
+          metadataFilters: {},
+          iaType: 'biblio'
+        }),
+        searchStudiesBM25(query, 15)
+      ]);
+
+      logger.debug(`📊 Vector search: ${vectorResults.length} résultats`);
+      logger.debug(`📊 BM25 search: ${bm25Results.length} résultats`);
+
+      const fused = fuseWithRRF(vectorResults, bm25Results);
+      logger.debug(`📊 RRF fusion: ${fused.length} candidats uniques`);
+
+      if (fused.length === 0) {
+        logger.debug('⚠️ Aucun candidat après fusion — retour vide');
+        await logSearch(query, 0);
+        return [];
+      }
+
+      const reranked = await rerankWithCohere(query, fused, 5);
+      logger.debug(`📊 Cohere rerank: top ${reranked.length} renvoyés`);
+
+      logger.info(`✅ Recherche hybride biblio terminée: ${reranked.length} résultats`);
+      await logSearch(query, reranked.length);
+      return reranked;
+    }
+
+    // Autres IA (basique, clinique) — analyse metadata + seuil adaptatif
     let metadataFilters = {};
 
     if (iaType !== 'basique') {
@@ -449,14 +489,13 @@ async function searchDocumentsOptimized(query, options = {}) {
       metadataFilters = buildMetadataFilters(detectedMetadata, iaType);
       logger.debug(`🔬 IA ${iaType} - Métadonnées détectées:`, metadataFilters);
     } else {
-      logger.debug(`💬 IA Basique - Pas d'analyse de métadonnées (recherche vectorielle pure)`);
+      logger.debug(`💬 IA Basique - Recherche vectorielle pure`);
     }
-    
-    const queryEmbedding = await generateEmbedding(query);
+
+    const queryEmbedding = await generateEmbedding(query, iaType);
 
     // Première tentative avec seuil élevé (haute qualité)
     logger.debug('🔍 Tentative seuil élevé (0.7)...');
-    logger.debug('🔍 Filtres seuil élevé:', JSON.stringify(metadataFilters));
     let results = await searchDocumentsWithEmbedding(queryEmbedding, {
       matchThreshold: 0.7,
       matchCount: 3,
@@ -509,14 +548,12 @@ async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
 
     // 🆕 APPEL SPÉCIALISÉ PAR TYPE D'IA
     if (iaType === 'biblio') {
-      logger.debug(`🔬 IA BIBLIO - Appel fonction spécialisée search_documents_biblio`);
-      logger.debug(`🔬 Metadata filters IA Biblio:`, JSON.stringify(metadataFilters));
+      logger.debug(`🔬 IA BIBLIO - Appel search_studies_v2 (embedding: text-embedding-3-large)`);
 
-      const result = await supabase.rpc('search_documents_biblio', {
+      const result = await supabase.rpc('search_studies_v2', {
         query_embedding: queryEmbedding,
         match_threshold: matchThreshold,
-        match_count: matchCount,
-        metadata_filters: JSON.stringify(metadataFilters)
+        match_count: matchCount
       });
 
       data = result.data;
@@ -940,6 +977,119 @@ async function testVectorDatabase() {
       searchFunctionWorking: false,
       timestamp: new Date().toISOString()
     };
+  }
+}
+
+// ==========================================
+// 🔬 PIPELINE HYBRIDE BIBLIO (BM25 + RRF + RERANK)
+// ==========================================
+
+/**
+ * Recherche BM25 (mots-clés) dans studies_v2 via tsvector
+ */
+async function searchStudiesBM25(query, matchCount = 15) {
+  try {
+    logger.debug(`🔤 BM25 search: "${query.substring(0, 80)}..." (max ${matchCount})`);
+
+    const { data, error } = await supabase.rpc('search_studies_v2_bm25', {
+      query_text: query,
+      match_count: matchCount
+    });
+
+    if (error) {
+      logger.error('❌ Erreur BM25 search:', error);
+      return [];
+    }
+
+    return (data || []).map((doc, index) => ({
+      ...doc,
+      searchRank: index + 1,
+      similarityPercentage: Math.round((doc.similarity || 0) * 100),
+      contentLength: doc.content ? doc.content.length : 0,
+      hasMetadata: !!doc.metadata,
+      iaType: 'biblio',
+      searchSource: 'bm25'
+    }));
+  } catch (error) {
+    logger.error('❌ Erreur BM25 search:', error);
+    return [];
+  }
+}
+
+/**
+ * Reciprocal Rank Fusion — fusionne vector + BM25, déduplique par study_id
+ */
+function fuseWithRRF(vectorResults, bm25Results, k = 60) {
+  const scores = new Map();
+
+  vectorResults.forEach((doc, rank) => {
+    const key = doc.study_id || doc.id;
+    const rrf = 1 / (k + rank + 1);
+    if (scores.has(key)) {
+      scores.get(key).score += rrf;
+    } else {
+      scores.set(key, { score: rrf, doc: { ...doc, searchSource: 'vector' } });
+    }
+  });
+
+  bm25Results.forEach((doc, rank) => {
+    const key = doc.study_id || doc.id;
+    const rrf = 1 / (k + rank + 1);
+    if (scores.has(key)) {
+      scores.get(key).score += rrf;
+      scores.get(key).doc.searchSource = 'both';
+    } else {
+      scores.set(key, { score: rrf, doc: { ...doc, searchSource: 'bm25' } });
+    }
+  });
+
+  return Array.from(scores.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20)
+    .map((entry, index) => ({
+      ...entry.doc,
+      rrfScore: entry.score,
+      searchRank: index + 1
+    }));
+}
+
+/**
+ * Cohere Rerank v3.5 — reclass les candidats par pertinence
+ * Input: array de strings (content) | Output: { index, relevanceScore }
+ */
+async function rerankWithCohere(query, candidates, topN = 5) {
+  try {
+    if (!process.env.COHERE_API_KEY) {
+      logger.warn('⚠️ COHERE_API_KEY manquante — rerank ignoré, retour top N par RRF');
+      return candidates.slice(0, topN);
+    }
+
+    if (candidates.length === 0) return [];
+
+    const { CohereClient } = require('cohere-ai');
+    const cohere = new CohereClient({ token: process.env.COHERE_API_KEY });
+
+    const documents = candidates.map(doc => doc.content);
+
+    const response = await cohere.rerank({
+      model: 'rerank-v3.5',
+      query,
+      documents,
+      topN
+    });
+
+    return response.results.map((result, index) => ({
+      ...candidates[result.index],
+      relevanceScore: result.relevanceScore,
+      similarity: result.relevanceScore,
+      similarityPercentage: Math.round(result.relevanceScore * 100),
+      searchRank: index + 1,
+      reranked: true
+    }));
+  } catch (error) {
+    logger.error('❌ Erreur Cohere rerank:', error);
+    logger.warn('⚠️ Fallback: retour top N par RRF score');
+    return candidates.slice(0, topN);
   }
 }
 
