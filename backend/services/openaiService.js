@@ -533,117 +533,130 @@ const getRedirectDirective = (currentPage, routedType) => {
 // ========== NOUVELLE FONCTION PRINCIPALE POUR LES IA KINÉ ==========
 
 /**
- * Génère une réponse IA pour les kinésithérapeutes avec RAG et sauvegarde
+ * Prépare la requête IA : query router, RAG, prompt, messages
+ * Réutilisé par generateKineResponse (bloquant) et generateKineResponseStream (SSE)
+ */
+const prepareKineRequest = async (type, message, conversationHistory = [], kineId) => {
+  logger.debug(`🚀 IA ${type} pour kiné ID: ${sanitizeUID(kineId)}`);
+
+  if (!message?.trim()) {
+    throw new Error('Message requis');
+  }
+
+  // 1. Query Router — détection d'intention (skip pour admin)
+  let routerResult = { type, rag: true };
+  let redirectDirective = '';
+
+  if (type !== 'admin') {
+    routerResult = await routeQuery(message, conversationHistory);
+    const isMismatch = routerResult.type !== type;
+
+    if (isMismatch) {
+      redirectDirective = getRedirectDirective(type, routerResult.type);
+      logger.debug(`🔀 Mismatch: page=${type}, router=${routerResult.type} → redirection suggérée, RAG skippé`);
+    } else if (!routerResult.rag) {
+      logger.debug(`🔀 Match: page=${type}, rag=false → RAG skippé`);
+    } else {
+      logger.debug(`🔀 Match: page=${type}, rag=true → RAG activé`);
+    }
+  }
+
+  const shouldDoRAG = type !== 'admin' && routerResult.type === type && routerResult.rag;
+
+  // 2. Recherche documentaire (uniquement si RAG activé)
+  let allDocuments = [];
+  let selectedSources = [];
+  let metadata = { totalFound: 0, averageScore: 0, categoriesFound: [] };
+  let limitedDocuments = [];
+
+  if (shouldDoRAG) {
+    const searchResult = await knowledgeService.searchDocuments(message, {
+      filterCategory: null,
+      allowLowerThreshold: true,
+      iaType: type
+    });
+
+    allDocuments = searchResult.allDocuments;
+    selectedSources = searchResult.selectedSources;
+    metadata = searchResult.metadata;
+
+    const docLimits = {
+      'basique': 5,
+      'biblio': 6,
+      'clinique': 6,
+    };
+
+    const maxDocs = docLimits[type] || 6;
+    limitedDocuments = allDocuments.slice(0, maxDocs);
+  }
+
+  // 3. Construction du prompt système selon le type + directive de redirection si mismatch
+  let systemPrompt;
+  if (redirectDirective) {
+    systemPrompt = redirectDirective.trim();
+  } else {
+    systemPrompt = getSystemPromptByType(type, limitedDocuments, shouldDoRAG);
+  }
+
+  // 🧪 LOGS DE DEBUG POUR VÉRIFIER LA TRANSMISSION À GPT
+  logger.debug(`📤 ═══ IA ${type.toUpperCase()} - TRANSMISSION AU LLM ═══`);
+  logger.debug(`📤 RAG activé: ${shouldDoRAG} | Documents trouvés: ${allDocuments.length} → limités à: ${limitedDocuments.length}`);
+  limitedDocuments.forEach((doc, i) => {
+    const id = doc.study_id || doc.entity_id || doc.id || '?';
+    const score = Math.round((doc.finalScore || doc.relevanceScore || doc.similarity || 0) * 100);
+    const entityType = doc.entity_type || doc.metadata?.entity_type || '?';
+    const name = doc.metadata?.nom || doc.title || 'N/A';
+    const source = doc.searchSource || '?';
+    logger.debug(`📤   Doc #${i + 1}: ${id} | score=${score}% | type=${entityType} | source=${source} | content=${doc.content?.length || 0} chars | ${name.substring(0, 50)}`);
+  });
+  logger.debug(`📝 Taille prompt système: ${systemPrompt.length} caractères`);
+  logger.debug(`📤 ═══════════════════════════════════════════════════════`);
+
+  // 4. Préparation des messages pour OpenAI
+  const limitedHistory = conversationHistory.slice(-6);
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...limitedHistory,
+    { role: 'user', content: message }
+  ];
+
+  // 5. Config modèle selon le type d'IA
+  const modelConfig = {
+    'basique': {
+      model: 'gpt-4o-mini',
+      max_tokens: 750,
+      temperature: 0.5
+    },
+    'clinique': {
+      model: 'gpt-4.1-mini',
+      max_tokens: 1500,
+      temperature: 0.3
+    },
+    'admin': {
+      model: 'gpt-4o-mini',
+      max_tokens: 1000,
+      temperature: 0.2
+    },
+    'default': {
+      model: 'gpt-4o-mini',
+      max_tokens: 1000,
+      temperature: 0.7
+    }
+  };
+
+  const config = modelConfig[type] || modelConfig['default'];
+
+  return { messages, config, limitedDocuments, selectedSources, metadata, redirectDirective };
+};
+
+/**
+ * Génère une réponse IA pour les kinésithérapeutes avec RAG et sauvegarde (bloquant)
  */
 const generateKineResponse = async (type, message, conversationHistory = [], kineId) => {
   try {
-    logger.debug(`🚀 IA ${type} pour kiné ID: ${sanitizeUID(kineId)}`);
-
-    if (!message?.trim()) {
-      throw new Error('Message requis');
-    }
-
-    // 1. Query Router — détection d'intention (skip pour admin)
-    let routerResult = { type, rag: true };
-    let redirectDirective = '';
-
-    if (type !== 'admin') {
-      routerResult = await routeQuery(message, conversationHistory);
-      const isMismatch = routerResult.type !== type;
-
-      if (isMismatch) {
-        redirectDirective = getRedirectDirective(type, routerResult.type);
-        logger.debug(`🔀 Mismatch: page=${type}, router=${routerResult.type} → redirection suggérée, RAG skippé`);
-      } else if (!routerResult.rag) {
-        logger.debug(`🔀 Match: page=${type}, rag=false → RAG skippé`);
-      } else {
-        logger.debug(`🔀 Match: page=${type}, rag=true → RAG activé`);
-      }
-    }
-
-    const shouldDoRAG = type !== 'admin' && routerResult.type === type && routerResult.rag;
-
-    // 2. Recherche documentaire (uniquement si RAG activé)
-    let allDocuments = [];
-    let selectedSources = [];
-    let metadata = { totalFound: 0, averageScore: 0, categoriesFound: [] };
-    let limitedDocuments = [];
-
-    if (shouldDoRAG) {
-      const searchResult = await knowledgeService.searchDocuments(message, {
-        filterCategory: null,
-        allowLowerThreshold: true,
-        iaType: type
-      });
-
-      allDocuments = searchResult.allDocuments;
-      selectedSources = searchResult.selectedSources;
-      metadata = searchResult.metadata;
-
-      const docLimits = {
-        'basique': 5,
-        'biblio': 6,
-        'clinique': 6,
-      };
-
-      const maxDocs = docLimits[type] || 6;
-      limitedDocuments = allDocuments.slice(0, maxDocs);
-    }
-
-    // 3. Construction du prompt système selon le type + directive de redirection si mismatch
-    let systemPrompt;
-    if (redirectDirective) {
-      // Mismatch : prompt minimal + directive de redirection (pas de disclaimer "aucun document")
-      systemPrompt = redirectDirective.trim();
-    } else {
-      systemPrompt = getSystemPromptByType(type, limitedDocuments, shouldDoRAG);
-    }
-
-    // 🧪 LOGS DE DEBUG POUR VÉRIFIER LA TRANSMISSION À GPT
-    logger.debug(`📤 IA ${type} - Documents trouvés: ${allDocuments.length}, limités à: ${limitedDocuments.length}`);
-    logger.debug(`📄 IA ${type} - Détail documents:`, limitedDocuments.map((doc, i) => ({
-      index: i + 1,
-      title: doc.title || 'N/A',
-      score: Math.round(doc.finalScore * 100) + '%',
-      contentLength: doc.content?.length || 0,
-      contentPreview: doc.content?.substring(0, 100) + '...'
-    })));
-    logger.debug(`📝 IA ${type} - Taille prompt système: ${systemPrompt.length} caractères`);
-
-    // 4. Préparation des messages pour OpenAI
-    const limitedHistory = conversationHistory.slice(-6);
-
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...limitedHistory, // Limiter l'historique
-      { role: 'user', content: message }
-    ];
-
-    // 5. Appel OpenAI avec modèle adapté au type d'IA
-    const modelConfig = {
-      'basique': {
-        model: 'gpt-4o-mini',
-        max_tokens: 750,
-        temperature: 0.5  // Température moyenne pour ton conversationnel
-      },
-      'clinique': {
-        model: 'gpt-4o-mini',
-        max_tokens: 1500,
-        temperature: 0.3  // Température basse pour cohérence maximale
-      },
-      'admin': {
-        model: 'gpt-4o-mini',
-        max_tokens: 1000,  // Tokens limités pour bilans concis (250-400 mots)
-        temperature: 0.2   // Température très basse pour réduire l'invention et favoriser la rigueur factuelle
-      },
-      'default': {
-        model: 'gpt-4o-mini',
-        max_tokens: 1000,
-        temperature: 0.7
-      }
-    };
-
-    const config = modelConfig[type] || modelConfig['default'];
+    const { messages, config, limitedDocuments, selectedSources, metadata } =
+      await prepareKineRequest(type, message, conversationHistory, kineId);
 
     const completion = await openai.chat.completions.create({
       model: config.model,
@@ -656,26 +669,22 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
 
     const aiResponse = completion.choices[0].message.content;
 
-    // 6. Sauvegarde dans la bonne table
     await saveToCorrectTable(type, kineId, message, aiResponse);
     logger.debug(`💾 Conversation IA ${type} sauvegardée`);
 
-    // 7. Calcul de la confiance globale (sur documents limités)
-    // Pour l'IA admin (bilans), pas de RAG donc confidence = 1 (haute confiance dans les notes fournies)
     const overallConfidence = type === 'admin' ? 1 : knowledgeService.calculateOverallConfidence(limitedDocuments);
 
-    // 8. Construction de la réponse finale
     const response = {
       success: true,
       message: aiResponse,
       sources: type === 'admin' ? [] : knowledgeService.formatSources(selectedSources),
       confidence: overallConfidence,
       metadata: {
-        model: config.model,  // Modèle dynamique selon le type d'IA
+        model: config.model,
         iaType: type,
         kineId: kineId,
         documentsFound: metadata.totalFound,
-        documentsUsedForAI: limitedDocuments.length,  // Utiliser documents limités
+        documentsUsedForAI: limitedDocuments.length,
         documentsDisplayed: selectedSources.length,
         averageRelevance: Math.round(metadata.averageScore * 100),
         categoriesFound: metadata.categoriesFound,
@@ -695,6 +704,67 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
       details: error.message
     };
   }
+};
+
+/**
+ * Génère une réponse IA en streaming (SSE) pour les kinésithérapeutes
+ * @param {string} type - Type d'IA (basique, biblio, clinique, admin)
+ * @param {string} message - Message du kiné
+ * @param {Array} conversationHistory - Historique de la conversation
+ * @param {string} kineId - ID du kiné
+ * @param {Function} onToken - Callback appelé pour chaque token (delta string)
+ * @returns {Object} Réponse complète (même format que generateKineResponse)
+ */
+const generateKineResponseStream = async (type, message, conversationHistory = [], kineId, onToken) => {
+  const { messages, config, limitedDocuments, selectedSources, metadata } =
+    await prepareKineRequest(type, message, conversationHistory, kineId);
+
+  const stream = await openai.chat.completions.create({
+    model: config.model,
+    messages,
+    max_tokens: config.max_tokens,
+    temperature: config.temperature,
+    presence_penalty: 0.1,
+    frequency_penalty: 0.1,
+    stream: true
+  });
+
+  let fullResponse = '';
+
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta?.content;
+    if (delta) {
+      fullResponse += delta;
+      onToken(delta);
+    }
+  }
+
+  await saveToCorrectTable(type, kineId, message, fullResponse);
+  logger.debug(`💾 Conversation IA ${type} (stream) sauvegardée`);
+
+  const overallConfidence = type === 'admin' ? 1 : knowledgeService.calculateOverallConfidence(limitedDocuments);
+
+  const response = {
+    success: true,
+    message: fullResponse,
+    sources: type === 'admin' ? [] : knowledgeService.formatSources(selectedSources),
+    confidence: overallConfidence,
+    metadata: {
+      model: config.model,
+      iaType: type,
+      kineId: kineId,
+      documentsFound: metadata.totalFound,
+      documentsUsedForAI: limitedDocuments.length,
+      documentsDisplayed: selectedSources.length,
+      averageRelevance: Math.round(metadata.averageScore * 100),
+      categoriesFound: metadata.categoriesFound,
+      hasHighQualityContext: limitedDocuments.some(doc => doc.finalScore > 0.8),
+      timestamp: new Date().toISOString()
+    }
+  };
+
+  logger.debug(`✅ IA ${type} (stream) - Confiance: ${Math.round(overallConfidence * 100)}%`);
+  return response;
 };
 
 /**
@@ -743,11 +813,70 @@ const saveToCorrectTable = async (type, kineId, message, response) => {
   });
 };
 
-// ========== FONCTION FOLLOWUP (SANS RAG) ==========
+// ========== DÉTECTEUR RAG POUR FOLLOWUP ==========
 
 /**
- * Génère une réponse de suivi conversationnelle SANS RAG
+ * Détermine si un message de suivi nécessite une recherche documentaire (RAG)
+ * Mini LLM dédié : ~20 tokens output, température 0, ~100-200ms
+ * Retourne { rag: true|false }
+ */
+const shouldUseRAG = async (message, conversationHistory = []) => {
+  try {
+    const recentHistory = conversationHistory.slice(-10).map(msg =>
+      `${msg.role}: ${msg.content.substring(0, 200)}`
+    ).join('\n');
+
+    const ragDetectorPrompt = `Tu es un détecteur de besoin documentaire pour un assistant kiné.
+
+Un kinésithérapeute est en conversation de suivi après une recherche documentaire.
+Il a DÉJÀ reçu une réponse sourcée. Analyse son nouveau message pour déterminer
+s'il nécessite une NOUVELLE recherche dans la base documentaire.
+
+rag: true SI :
+- Demande une information factuelle ABSENTE de la conversation (nouveau sujet, autre pathologie, autre test)
+- Demande des études, sources, ou données chiffrées supplémentaires
+- Pose une question précise qui nécessite des documents spécifiques
+
+rag: false SI :
+- Reformulation, clarification ou vulgarisation de ce qui a déjà été dit
+- Remerciement, salutation, confirmation
+- Approfondissement ou avis sur les informations déjà fournies
+- Question d'opinion ou de pratique clinique générale
+
+Historique récent :
+${recentHistory || 'Aucun'}
+
+Message : "${message}"
+
+Réponds UNIQUEMENT en JSON : {"rag":true|false}`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: ragDetectorPrompt }],
+      max_tokens: 20,
+      temperature: 0,
+      response_format: { type: 'json_object' }
+    });
+
+    const result = JSON.parse(response.choices[0].message.content);
+    const rag = result.rag === true;
+
+    logger.debug(`🔍 shouldUseRAG: rag=${rag} pour message: "${message.substring(0, 80)}..."`);
+
+    return { rag };
+  } catch (error) {
+    logger.error('❌ Erreur shouldUseRAG:', error.message);
+    // Fallback safe : pas de RAG en cas d'erreur (comportement actuel)
+    return { rag: false };
+  }
+};
+
+// ========== FONCTION FOLLOWUP (RAG CONDITIONNEL) ==========
+
+/**
+ * Génère une réponse de suivi avec RAG conditionnel
  * Utilisée pour les questions de suivi après une recherche initiale (biblio, clinique)
+ * shouldUseRAG() décide si on lance une recherche documentaire
  * Sauvegarde dans la table de l'IA source (pas dans chatIaBasique)
  */
 const generateFollowupResponse = async (message, conversationHistory = [], kineId, sourceIa) => {
@@ -763,10 +892,50 @@ const generateFollowupResponse = async (message, conversationHistory = [], kineI
       throw new Error('Message requis');
     }
 
-    // Pas de RAG - on utilise uniquement le contexte de la conversation
-    const systemPrompt = `Tu es un assistant IA spécialisé en kinésithérapie. Tu réponds à un kinésithérapeute diplômé.
+    // 1. Détection du besoin RAG via mini LLM
+    const ragDecision = await shouldUseRAG(message, conversationHistory);
+    logger.debug(`🔍 Followup RAG décision: rag=${ragDecision.rag} (source: ${sourceIa})`);
 
-CONTEXTE : Le kiné a lancé une recherche ${sourceIa === 'biblio' ? 'bibliographique (études, publications scientifiques)' : 'clinique (tests, diagnostics, cotations)'} et pose maintenant une question de suivi.
+    // 2. Recherche documentaire si RAG activé
+    let limitedDocuments = [];
+    let selectedSources = [];
+    let searchMetadata = { totalFound: 0, averageScore: 0, categoriesFound: [] };
+
+    if (ragDecision.rag) {
+      logger.debug(`📚 Followup RAG activé → recherche dans base ${sourceIa}`);
+
+      const searchResult = await knowledgeService.searchDocuments(message, {
+        filterCategory: null,
+        allowLowerThreshold: true,
+        iaType: sourceIa
+      });
+
+      const docLimits = { 'biblio': 6, 'clinique': 6 };
+      const maxDocs = docLimits[sourceIa] || 6;
+
+      limitedDocuments = (searchResult.allDocuments || []).slice(0, maxDocs);
+      selectedSources = searchResult.selectedSources || [];
+      searchMetadata = searchResult.metadata || searchMetadata;
+
+      logger.debug(`📄 Followup RAG - Documents trouvés: ${searchMetadata.totalFound}, limités à: ${limitedDocuments.length}`);
+      logger.debug(`📄 Followup RAG - Détail documents:`, limitedDocuments.map((doc, i) => ({
+        index: i + 1,
+        title: doc.title || 'N/A',
+        score: Math.round(doc.finalScore * 100) + '%',
+        contentLength: doc.content?.length || 0
+      })));
+    } else {
+      logger.debug(`💬 Followup sans RAG → réponse conversationnelle pure`);
+    }
+
+    // 3. Construction du prompt système (adapté selon RAG on/off)
+    const contextLabel = sourceIa === 'biblio'
+      ? 'bibliographique (études, publications scientifiques)'
+      : 'clinique (tests, diagnostics, cotations)';
+
+    let systemPrompt = `Tu es un assistant IA spécialisé en kinésithérapie. Tu réponds à un kinésithérapeute diplômé.
+
+CONTEXTE : Le kiné a lancé une recherche ${contextLabel} et pose maintenant une question de suivi.
 
 RÔLE :
 - Répondre aux questions de suivi en te basant sur le contexte de la conversation
@@ -786,7 +955,33 @@ RÈGLES :
 - Si tu ne sais pas, dis-le clairement
 - JAMAIS poser de diagnostic médical`;
 
-    // Historique limité à 10 messages pour garder le contexte biblio/clinique
+    // Injection des documents si RAG activé
+    if (ragDecision.rag && limitedDocuments.length > 0) {
+      systemPrompt += `\n\n📚 DOCUMENTS COMPLÉMENTAIRES (${limitedDocuments.length} document(s)) :
+Utilise-les pour enrichir ta réponse. Si non pertinents, ignore-les et base-toi sur l'historique.
+`;
+
+      limitedDocuments.forEach((doc, index) => {
+        const score = Math.round((doc.finalScore || doc.relevanceScore || doc.similarity || 0) * 100);
+        const source = doc.metadata?.nom || doc.metadata?.source_file || doc.title || 'Source non spécifiée';
+        const category = doc.category || doc.metadata?.entity_type || doc.metadata?.type_contenu || 'Général';
+
+        systemPrompt += `\n📄 DOCUMENT ${index + 1} (Score: ${score}%)
+SOURCE : ${source}
+CATÉGORIE : ${category}
+
+CONTENU :
+${doc.content}
+
+---
+`;
+      });
+    } else if (ragDecision.rag && limitedDocuments.length === 0) {
+      systemPrompt += `\n\n📄 RECHERCHE DOCUMENTAIRE : Aucun document pertinent trouvé pour cette question de suivi.
+Base-toi sur le contexte de la conversation et tes connaissances générales. Indique clairement si tu manques d'informations sourcées.`;
+    }
+
+    // 4. Historique limité à 10 messages pour garder le contexte biblio/clinique
     const limitedHistory = conversationHistory.slice(-10);
 
     const messages = [
@@ -795,6 +990,9 @@ RÈGLES :
       { role: 'user', content: message }
     ];
 
+    logger.debug(`📝 Followup - Taille prompt système: ${systemPrompt.length} chars, RAG: ${ragDecision.rag}, docs: ${limitedDocuments.length}`);
+
+    // 5. Appel OpenAI
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages,
@@ -806,26 +1004,36 @@ RÈGLES :
 
     const aiResponse = completion.choices[0].message.content;
 
-    // Sauvegarde dans la table de l'IA SOURCE (biblio -> chatIaBiblio, clinique -> chatIaClinique)
+    // 6. Sauvegarde dans la table de l'IA SOURCE (biblio -> chatIaBiblio, clinique -> chatIaClinique)
     await saveToCorrectTable(sourceIa, kineId, message, aiResponse);
     logger.debug(`💾 Followup sauvegardé dans table ${sourceIa}`);
 
-    return {
+    // 7. Calcul de la confiance (uniquement si RAG activé)
+    const overallConfidence = limitedDocuments.length > 0
+      ? knowledgeService.calculateOverallConfidence(limitedDocuments)
+      : null;
+
+    // 8. Réponse finale
+    const response = {
       success: true,
       message: aiResponse,
-      sources: [],
-      confidence: null,
+      sources: limitedDocuments.length > 0 ? knowledgeService.formatSources(selectedSources) : [],
+      confidence: overallConfidence,
       metadata: {
         model: 'gpt-4o-mini',
         iaType: 'followup',
         sourceIa: sourceIa,
+        ragActivated: ragDecision.rag,
         kineId: kineId,
-        documentsFound: 0,
-        documentsUsedForAI: 0,
-        documentsDisplayed: 0,
+        documentsFound: searchMetadata.totalFound,
+        documentsUsedForAI: limitedDocuments.length,
+        documentsDisplayed: selectedSources.length,
         timestamp: new Date().toISOString()
       }
     };
+
+    logger.debug(`✅ Followup terminé - RAG: ${ragDecision.rag}, docs: ${limitedDocuments.length}, confiance: ${overallConfidence ? Math.round(overallConfidence * 100) + '%' : 'N/A'}`);
+    return response;
 
   } catch (error) {
     logger.error(`❌ Erreur generateFollowupResponse (source: ${sourceIa}):`, error.message);
@@ -835,6 +1043,142 @@ RÈGLES :
       details: error.message
     };
   }
+};
+
+/**
+ * Génère une réponse de suivi en streaming (SSE)
+ * Même logique que generateFollowupResponse mais avec stream: true + onToken callback
+ */
+const generateFollowupResponseStream = async (message, conversationHistory = [], kineId, sourceIa, onToken) => {
+  const validSources = ['biblio', 'clinique'];
+  if (!validSources.includes(sourceIa)) {
+    throw new Error(`sourceIa invalide: ${sourceIa}. Valeurs acceptées: ${validSources.join(', ')}`);
+  }
+
+  logger.debug(`🔄 IA Followup Stream (source: ${sourceIa}) pour kiné ID: ${sanitizeUID(kineId)}`);
+
+  if (!message?.trim()) {
+    throw new Error('Message requis');
+  }
+
+  // 1. Détection du besoin RAG via mini LLM
+  const ragDecision = await shouldUseRAG(message, conversationHistory);
+  logger.debug(`🔍 Followup Stream RAG décision: rag=${ragDecision.rag} (source: ${sourceIa})`);
+
+  // 2. Recherche documentaire si RAG activé
+  let limitedDocuments = [];
+  let selectedSources = [];
+  let searchMetadata = { totalFound: 0, averageScore: 0, categoriesFound: [] };
+
+  if (ragDecision.rag) {
+    const searchResult = await knowledgeService.searchDocuments(message, {
+      filterCategory: null,
+      allowLowerThreshold: true,
+      iaType: sourceIa
+    });
+
+    const docLimits = { 'biblio': 6, 'clinique': 6 };
+    const maxDocs = docLimits[sourceIa] || 6;
+
+    limitedDocuments = (searchResult.allDocuments || []).slice(0, maxDocs);
+    selectedSources = searchResult.selectedSources || [];
+    searchMetadata = searchResult.metadata || searchMetadata;
+  }
+
+  // 3. Construction du prompt système
+  const contextLabel = sourceIa === 'biblio'
+    ? 'bibliographique (études, publications scientifiques)'
+    : 'clinique (tests, diagnostics, cotations)';
+
+  let systemPrompt = `Tu es un assistant IA spécialisé en kinésithérapie. Tu réponds à un kinésithérapeute diplômé.
+
+CONTEXTE : Le kiné a lancé une recherche ${contextLabel} et pose maintenant une question de suivi.
+
+RÔLE :
+- Répondre aux questions de suivi en te basant sur le contexte de la conversation
+- Approfondir, clarifier ou compléter les informations déjà fournies
+- Ton professionnel mais accessible (de kiné à kiné)
+
+TON & STYLE :
+- Format conversationnel, réponses claires et structurées
+- 200-300 mots maximum
+- Utilise le gras (**) pour les points clés
+- 2-3 emojis maximum
+
+RÈGLES :
+- Base-toi sur le contexte de la conversation précédente
+- Si la question sort du cadre de la discussion, dis-le poliment
+- Ne jamais inventer d'études, de chiffres ou de faits
+- Si tu ne sais pas, dis-le clairement
+- JAMAIS poser de diagnostic médical`;
+
+  if (ragDecision.rag && limitedDocuments.length > 0) {
+    systemPrompt += `\n\n📚 DOCUMENTS COMPLÉMENTAIRES (${limitedDocuments.length} document(s)) :
+Utilise-les pour enrichir ta réponse. Si non pertinents, ignore-les et base-toi sur l'historique.
+`;
+    limitedDocuments.forEach((doc, index) => {
+      const score = Math.round((doc.finalScore || doc.relevanceScore || doc.similarity || 0) * 100);
+      const source = doc.metadata?.nom || doc.metadata?.source_file || doc.title || 'Source non spécifiée';
+      const category = doc.category || doc.metadata?.entity_type || doc.metadata?.type_contenu || 'Général';
+      systemPrompt += `\n📄 DOCUMENT ${index + 1} (Score: ${score}%)\nSOURCE : ${source}\nCATÉGORIE : ${category}\n\nCONTENU :\n${doc.content}\n\n---\n`;
+    });
+  } else if (ragDecision.rag && limitedDocuments.length === 0) {
+    systemPrompt += `\n\n📄 RECHERCHE DOCUMENTAIRE : Aucun document pertinent trouvé pour cette question de suivi.
+Base-toi sur le contexte de la conversation et tes connaissances générales. Indique clairement si tu manques d'informations sourcées.`;
+  }
+
+  const limitedHistory = conversationHistory.slice(-10);
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...limitedHistory,
+    { role: 'user', content: message }
+  ];
+
+  // 4. Appel OpenAI en streaming
+  const stream = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages,
+    max_tokens: 750,
+    temperature: 0.5,
+    presence_penalty: 0.1,
+    frequency_penalty: 0.1,
+    stream: true
+  });
+
+  let fullResponse = '';
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta?.content;
+    if (delta) {
+      fullResponse += delta;
+      onToken(delta);
+    }
+  }
+
+  // 5. Sauvegarde
+  await saveToCorrectTable(sourceIa, kineId, message, fullResponse);
+  logger.debug(`💾 Followup (stream) sauvegardé dans table ${sourceIa}`);
+
+  const overallConfidence = limitedDocuments.length > 0
+    ? knowledgeService.calculateOverallConfidence(limitedDocuments)
+    : null;
+
+  return {
+    success: true,
+    message: fullResponse,
+    sources: limitedDocuments.length > 0 ? knowledgeService.formatSources(selectedSources) : [],
+    confidence: overallConfidence,
+    metadata: {
+      model: 'gpt-4o-mini',
+      iaType: 'followup',
+      sourceIa: sourceIa,
+      ragActivated: ragDecision.rag,
+      kineId: kineId,
+      documentsFound: searchMetadata.totalFound,
+      documentsUsedForAI: limitedDocuments.length,
+      documentsDisplayed: selectedSources.length,
+      timestamp: new Date().toISOString()
+    }
+  };
 };
 
 // ========== PROMPTS SYSTÈME SPÉCIALISÉS ==========
@@ -901,17 +1245,15 @@ NE FORCE JAMAIS l'utilisation des documents si ils ne répondent pas à la quest
 `;
 
     contextDocuments.forEach((doc, index) => {
-      const score = Math.round(doc.finalScore * 100);
-      const source = doc.metadata?.source_file || doc.title || 'Source non spécifiée';
-      const category = doc.category || doc.metadata?.type_contenu || 'Général';
+      const score = Math.round((doc.finalScore || doc.relevanceScore || doc.similarity || 0) * 100);
+      const source = doc.metadata?.nom || doc.metadata?.source_file || doc.title || 'Source non spécifiée';
+      const category = doc.metadata?.entity_type || doc.category || doc.metadata?.type_contenu || 'Général';
 
-      systemPrompt += `\n📄 DOCUMENT ${index + 1} (Score: ${score}%)
+      systemPrompt += `\n📄 DOCUMENT ${index + 1} (Score: ${score}%) - ${category}
 SOURCE : ${source}
-TITRE : "${doc.title}"
-CATÉGORIE : ${category}
 
 CONTENU :
-${doc.content.substring(0, 800)}
+${doc.content}
 
 ---
 `;
@@ -1074,264 +1416,67 @@ ${study.sections.map((section, idx) =>
 }
 
 function buildCliniqueSystemPrompt(contextDocuments) {
-  // Calculer la pertinence moyenne des documents
-  const avgSimilarity = contextDocuments.length > 0
-    ? contextDocuments.reduce((acc, doc) => acc + (doc.finalScore || 0), 0) / contextDocuments.length
-    : 0;
+  let systemPrompt = `Tu es un assistant clinique expert en kinésithérapie musculosquelettique. Tu aides les kinés à poser les bonnes hypothèses et choisir les bons tests, dans le bon ordre.
 
-  // Déterminer le mode : RAG strict, assisté ou général
-  const hasHighQualityDocs = contextDocuments.length >= 1 && avgSimilarity >= 0.65;
-  const hasLowQualityDocs = contextDocuments.length > 0 && avgSimilarity < 0.65;
+RÈGLES :
+- Base-toi sur les documents fournis ci-dessous. Tu peux reformuler et synthétiser leur contenu.
+- N'invente jamais de données chiffrées (sensibilité, spécificité, LR) non présentes dans les documents.
+- Si des informations manquent, dis-le clairement.
 
-  // Instructions communes pour la détection des tests déjà réalisés
-  const testsDejaRealises = `
-DÉTECTION DES TESTS DÉJÀ RÉALISÉS :
-- ANALYSE le message du kinésithérapeute pour identifier les tests DÉJÀ EFFECTUÉS (ex: "Neer positif", "Jobe négatif", "test de Hawkins +")
-- Si des tests sont mentionnés avec leurs résultats :
-  1. COMMENCE ta section "HYPOTHÈSES DIAGNOSTIQUES" par : "Les tests réalisés orientent vers [hypothèse basée sur les résultats]..."
-  2. N'INCLUS PAS ces tests dans la section "TESTS CLINIQUES PRINCIPAUX" (ils sont déjà faits)
-  3. Propose UNIQUEMENT des tests COMPLÉMENTAIRES pour affiner le diagnostic
-- Si AUCUN test n'est mentionné dans le message → procède normalement avec les tests recommandés
-`;
+TESTS DÉJÀ RÉALISÉS :
+Si le kiné mentionne des tests avec résultats (ex: "Neer positif", "Jobe négatif") :
+- Utilise ces résultats pour orienter tes hypothèses
+- Ne re-propose pas ces tests, propose uniquement des tests complémentaires`;
 
-  // ========== MODE RAG STRICT : Documents pertinents ==========
-  if (hasHighQualityDocs) {
-    let systemPrompt = `Tu es un assistant clinique expert en kinésithérapie musculosquelettique.
+  // Injection des documents RAG
+  if (contextDocuments.length > 0) {
+    systemPrompt += `\n\nDOCUMENTS CLINIQUES (${contextDocuments.length}) :\n`;
 
-SOURCES VALIDÉES : Cleland, Cook, Magee, Daniels & Worthingham, Physiopedia, Physiotutors, PubMed, Cochrane, PEDro.
+    const groups = {
+      test: { label: 'TESTS', docs: [] },
+      pathologie: { label: 'PATHOLOGIES', docs: [] },
+      presentation: { label: 'PRÉSENTATIONS', docs: [] },
+      cpr: { label: 'CPR', docs: [] },
+      other: { label: 'AUTRES', docs: [] }
+    };
 
-OBJECTIF : Aider le kinésithérapeute à poser les bonnes hypothèses et faire les bons tests, dans le bon ordre, avec des références solides.
-${testsDejaRealises}
-MODE RAG STRICT ACTIVÉ : ${contextDocuments.length} documents pertinents trouvés (pertinence moyenne: ${Math.round(avgSimilarity * 100)}%)
-
-RÈGLES ABSOLUES - MODE STRICT UNIQUEMENT DOCUMENTS :
-- Tu dois utiliser EXCLUSIVEMENT les documents fournis ci-dessous
-- INTERDICTION FORMELLE de mentionner des tests, cotations ou procédures NON présents dans les documents
-- INTERDICTION d'inventer des données chiffrées (sensibilité, spécificité, grades) non mentionnées
-- INTERDICTION d'utiliser tes connaissances générales ou la littérature externe
-- Si un test pertinent n'est PAS dans les documents → NE PAS le mentionner du tout
-- Si des informations manquent → indique "Information non disponible dans notre base"
-- CITE obligatoirement la source exacte pour chaque information : "D'après [source document]"
-
-RÈGLES DE CITATION STRICTES :
-- Pour les tests diagnostiques : utilise UNIQUEMENT les données du document (Sensibilité/Spécificité si présentes)
-- Pour les cotations musculaires : utilise UNIQUEMENT l'échelle présente dans le document
-- Pour toute procédure : détaille UNIQUEMENT ce qui est écrit dans le document (position, geste, critères)
-- Ne jamais compléter ou enrichir avec des connaissances externes
-
-LIMITATION VOLONTAIRE :
-- Si tu n'as qu'UN SEUL test documenté → propose UNIQUEMENT ce test
-- Si tu n'as que DEUX tests documentés → propose UNIQUEMENT ces deux tests
-- Ne suggère JAMAIS de tests qui ne sont pas dans les documents fournis
-- Tu peux conclure par : "D'autres tests pourraient être pertinents mais ne sont pas disponibles dans notre base documentaire"
-
-ADAPTABILITÉ DE LA RÉPONSE :
-- Question SIMPLE (ex: cotation, procédure test unique) → Sections essentielles uniquement (test détaillé + résumé)
-- Cas COMPLEXE (diagnostic différentiel) → Structure complète avec arbre décisionnel basé UNIQUEMENT sur les tests disponibles`;
-
-    systemPrompt += `\n\nDOCUMENTS CLINIQUES DE NOTRE BASE :\n`;
-
-    // Grouper par préfixe dans le contenu pour organisation visuelle
-    const cotationDocs = contextDocuments.filter(doc =>
-      doc.content.includes('[COTATION MUSCULAIRE]')
-    );
-    const testDocs = contextDocuments.filter(doc =>
-      doc.content.includes('[TEST DIAGNOSTIQUE]')
-    );
-    const otherDocs = contextDocuments.filter(doc =>
-      !cotationDocs.includes(doc) && !testDocs.includes(doc)
-    );
-
-    // Afficher les documents de cotation en premier
-    if (cotationDocs.length > 0) {
-      systemPrompt += `\nDOCUMENTS DE COTATION MUSCULAIRE (${cotationDocs.length}) :\n`;
-      cotationDocs.forEach((doc, index) => {
-        const score = Math.round(doc.finalScore * 100);
-        const source = doc.metadata?.source_file || doc.title || 'Source non spécifiée';
-
-        systemPrompt += `\nDOCUMENT ${index + 1} (Pertinence: ${score}%) - ${source}
-TITRE : "${doc.title}"
-
-CONTENU :
-${doc.content.substring(0, 1000)}
-
----
-`;
-      });
-    }
-
-    // Afficher les documents de tests diagnostiques
-    if (testDocs.length > 0) {
-      systemPrompt += `\nDOCUMENTS DE TESTS DIAGNOSTIQUES (${testDocs.length}) :\n`;
-      testDocs.forEach((doc, index) => {
-        const score = Math.round(doc.finalScore * 100);
-        const source = doc.metadata?.source_file || doc.title || 'Source non spécifiée';
-
-        systemPrompt += `\nDOCUMENT ${index + 1} (Pertinence: ${score}%) - ${source}
-TITRE : "${doc.title}"
-
-CONTENU :
-${doc.content.substring(0, 1000)}
-
----
-`;
-      });
-    }
-
-    // Afficher les autres documents cliniques
-    if (otherDocs.length > 0) {
-      systemPrompt += `\nAUTRES DOCUMENTS CLINIQUES (${otherDocs.length}) :\n`;
-      otherDocs.forEach((doc, index) => {
-        const score = Math.round(doc.finalScore * 100);
-        const source = doc.metadata?.source_file || doc.title || 'Source non spécifiée';
-
-        systemPrompt += `\nDOCUMENT ${index + 1} (Pertinence: ${score}%) - ${source}
-
-        TITRE : "${doc.title}"
-
-CONTENU :
-${doc.content.substring(0, 1000)}
-
----
-`;
-      });
-    }
-
-    systemPrompt += `\nINSTRUCTIONS D'EXPLOITATION DES DOCUMENTS :
-- Exploite TOUS les documents fournis ci-dessus, quel que soit leur format ou préfixe
-- CITE toujours la source : "D'après [nom document]" ou "Selon [auteur mentionné]"
-- Si une donnée est manquante (ex: pas de sensibilité/spécificité) → indique-le clairement
-- Si plusieurs documents se contredisent → mentionne les deux points de vue avec leurs sources`;
-
-    return systemPrompt + buildResponseStructure();
-  }
-  // ========== MODE ASSISTÉ : Documents peu pertinents ==========
-  else if (hasLowQualityDocs) {
-    let systemPrompt = `Tu es un assistant clinique expert en kinésithérapie musculosquelettique.
-${testsDejaRealises}
-MODE ASSISTÉ : ${contextDocuments.length} document(s) trouvé(s) mais pertinence faible (${Math.round(avgSimilarity * 100)}%)
-
-Tu vas répondre en combinant :
-1. Les documents fournis ci-dessous (si pertinents)
-2. Tes connaissances générales en kinésithérapie
-
-RÈGLES D'UTILISATION :
-- Priorise les informations des documents fournis quand elles sont pertinentes
-- Complète avec tes connaissances générales si nécessaire
-- TOUJOURS mentionner : "Informations issues de connaissances générales" quand tu n'utilises pas les documents
-- Pour les données chiffrées sans source : indique "Valeurs approximatives issues de la littérature"
-
-DISCLAIMER À INCLURE DANS TA RÉPONSE :
-Commence ta réponse par :
-"Note : Les documents disponibles dans notre base ont une pertinence limitée pour votre question. Cette réponse combine nos sources disponibles et des connaissances générales de la littérature kinésithérapique."
-
-DOCUMENTS DISPONIBLES (pertinence limitée) :\n`;
-
-    contextDocuments.forEach((doc, index) => {
-      const score = Math.round(doc.finalScore * 100);
-      const source = doc.metadata?.source_file || doc.title || 'Source non spécifiée';
-
-      systemPrompt += `\nDOCUMENT ${index + 1} (Pertinence: ${score}%) - ${source}
-TITRE : "${doc.title}"
-
-CONTENU :
-${doc.content.substring(0, 800)}
-
----
-`;
+    contextDocuments.forEach(doc => {
+      const entityType = doc.metadata?.entity_type || doc.entity_type || '';
+      if (groups[entityType]) {
+        groups[entityType].docs.push(doc);
+      } else {
+        groups.other.docs.push(doc);
+      }
     });
 
-    return systemPrompt + buildResponseStructure();
+    for (const [, group] of Object.entries(groups)) {
+      if (group.docs.length === 0) continue;
+      systemPrompt += `\n${group.label} :\n`;
+      group.docs.forEach(doc => {
+        const name = doc.metadata?.nom || doc.title || '';
+        systemPrompt += `\n[${name}]\n${doc.content}\n---\n`;
+      });
+    }
   }
-  // ========== MODE GÉNÉRAL : Aucun document ==========
-  else {
-    let systemPrompt = `Tu es un assistant clinique expert en kinésithérapie musculosquelettique.
-${testsDejaRealises}
-MODE GÉNÉRAL : Aucun document de référence trouvé dans notre base pour cette question.
 
-Tu vas répondre en utilisant tes connaissances générales en kinésithérapie, basées sur :
-- Ouvrages de référence standard (Cleland, Cook, Magee, Daniels & Worthingham)
-- Littérature scientifique courante (PubMed, Cochrane, PEDro)
-- Pratiques cliniques établies
+  systemPrompt += `\n\nFORMAT DE RÉPONSE :
+Adapte selon la complexité. Utilise uniquement les sections pertinentes :
 
-DISCLAIMER OBLIGATOIRE À INCLURE :
-Commence ta réponse par :
-"**Note importante** : Aucun document de référence spécifique n'est disponible dans notre base pour cette question. Cette réponse est basée sur des connaissances générales de la littérature kinésithérapique. Pour plus de précision, nous vous encourageons à enrichir notre base documentaire avec vos sources de référence."
+**Hypothèses diagnostiques** — Causes probables, du plus fréquent au plus grave. Si des tests sont déjà réalisés, commence par interpréter leurs résultats.
 
-RÈGLES DE RÉPONSE :
-- Fournis des réponses cliniquement pertinentes et structurées
-- Pour les données chiffrées : TU PEUX donner des valeurs approximatives de sensibilité/spécificité si tu les connais, mais PRÉCISE toujours : "Valeurs approximatives issues de la littérature (non vérifiées dans notre base)"
-- Pour les red flags : soit SPÉCIFIQUE à la zone anatomique concernée (évite les red flags trop génériques)
-- Pour les procédures : donne les grandes lignes mais indique qu'une source précise serait préférable
-- Si cas COMPLEXE (diagnostic différentiel) : inclus un arbre décisionnel même sans documents
-- Encourage l'enrichissement de la base documentaire`;
+**Tests recommandés** — Pour chaque test :
+- Procédure (position patient, geste, critère de positivité)
+- Interprétation (signification test + ou -)
 
-    return systemPrompt + buildResponseStructure();
-  }
-}
+**Arbre décisionnel** — Seulement si diagnostic différentiel. Enchaînement logique : Si Test A + → faire X. Si Test A - → tester Y.
 
-// Fonction helper pour la structure de réponse (commune aux 3 modes)
-function buildResponseStructure() {
-  return `\n\nSTRUCTURE DE RÉPONSE OBLIGATOIRE (adapte selon complexité) :
+**Red flags** — Uniquement si les documents en mentionnent.
 
-**1. HYPOTHÈSES DIAGNOSTIQUES**
-- Liste les causes les plus fréquentes ou pertinentes, du plus banal au plus grave
-- Explique le raisonnement clinique pour chaque hypothèse
-- Précise les drapeaux jaunes ou mécanismes aggravants associés
+**Synthèse** — Hypothèse principale, prochaine étape, orientation si nécessaire (imagerie, spécialiste).
 
-**2. RED FLAGS**
-- Si des red flags sont mentionnés dans les documents → liste-les
-- Si AUCUN red flag n'est présent dans les documents → écris uniquement "Pas de red flag détecté"
-- N'invente JAMAIS de red flags qui ne sont pas dans les documents fournis
+Format professionnel sobre, sans emojis, markdown avec titres en gras. Question simple → réponse directe. Cas complexe → structure complète.`;
 
-**3. TESTS CLINIQUES PRINCIPAUX** (2 à 5 selon complexité)
-EXCLUS les tests déjà mentionnés par le kinésithérapeute dans sa question (ils sont déjà réalisés, inutile de les re-décrire).
-Propose UNIQUEMENT des tests COMPLÉMENTAIRES pour affiner le diagnostic.
-Si les tests principaux pertinents sont déjà mentionnés et qu'il n'y a pas de test complémentaire utile à ajouter, écris simplement : "Les tests principaux ont déjà été réalisés. Aucun test complémentaire nécessaire à ce stade."
-Pour chaque test proposé, structure OBLIGATOIRE :
-  - Nom du test
-  - Objectif / pathologie ciblée
-  - Procédure clinique (position, geste, résistance - claire sans jargon)
-  - Critère de positivité
-  - Sensibilité / Spécificité (si disponible dans les documents)
-  - Interprétation clinique (signification test + ou -)
-  - Référence bibliographique (source exacte ou "littérature générale")
-
-**4. ARBRE DÉCISIONNEL** (OBLIGATOIRE si diagnostic différentiel ou cas complexe)
-Propose un enchaînement logique de tests selon les résultats :
-  - Si Test A positif → faire Test X
-  - Si Test A négatif → tester Hypothèse 2
-  - Si incertitude → reconsidérer Hypothèse 3 ou orienter imagerie
-But : guider la prise de décision, comme le ferait un collègue expérimenté
-IMPORTANT : Cette section est OBLIGATOIRE pour les cas complexes avec plusieurs hypothèses
-
-**5. CONSEILS CLINIQUES** (uniquement si utiles)
-  - Astuces terrain (pièges d'interprétation, tests peu fiables seuls, variants)
-  - Tests dépassés ou discutés dans la littérature
-  - Contexte d'interprétation (âge, sport, morphotype)
-
-**6. EXAMENS COMPLÉMENTAIRES** (si justifiés)
-  - Type d'examen (IRM, RX, échographie) seulement si justifié
-  - Indication précise et apport diagnostique
-
-**7. TESTS ANNEXES** (si confirmation nécessaire)
-  - Tests secondaires pour confirmer/infirmer selon résultats précédents
-
-**8. RÉSUMÉ DÉCISIONNEL**
-  - Hypothèse principale
-  - Tests clés avec données chiffrées (si disponibles)
-  - Red flag à vérifier
-  - Prochaine étape logique
-
-RÈGLES DE RÉDACTION :
-- Format professionnel sobre, sans emojis
-- Structure markdown claire avec titres en gras
-- Listes à puces pour lisibilité
-- Si une information est incertaine → indique-le clairement
-- Pour question SIMPLE (ex: cotation, procédure test unique) → sections 3 et 8 suffisent
-- Pour cas COMPLEXE (diagnostic différentiel) → TOUTES les sections pertinentes, y compris l'arbre décisionnel (section 4)
-
-RAPPEL : Tu es un assistant clinique, pas un prescripteur. Reste factuel et basé sur les preuves.`;
+  return systemPrompt;
 }
 
 function buildAdministrativeSystemPrompt(contextDocuments) {
@@ -1529,7 +1674,9 @@ ${doc.content.substring(0, 500)}
 module.exports = {
   // Nouvelles fonctions IA Kiné
   generateKineResponse,
+  generateKineResponseStream,
   generateFollowupResponse,
+  generateFollowupResponseStream,
 
   // Anciennes fonctions chat patients (conservées)
   generateChatResponse,

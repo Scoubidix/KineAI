@@ -1,6 +1,9 @@
 # Documentation Claude Code (contexte projet - ne pas versionner)
 CLAUDE.md
 
+# MCP config (contient des credentials)
+.mcp.json
+
 # Dossier configuration Claude
 .claude/
 

@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 body {
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -137,7 +147,7 @@ body {
     box-shadow: 0 6px 28px -4px rgba(0, 0, 0, 0.55);
   }
 
-  /* Bulle chat IA */
+  /* Bulle chat */
   .bubble-ai {
     @apply bg-white dark:bg-card border border-border;
     box-shadow: 0 6px 28px -4px rgba(0, 0, 0, 0.25);
@@ -145,4 +155,5 @@ body {
   .dark .bubble-ai {
     box-shadow: 0 6px 28px -4px rgba(0, 0, 0, 0.55);
   }
+
 }

@@ -19,6 +19,11 @@ const EMBEDDING_CONFIG_BIBLIO = {
   dimensions: 1536
 };
 
+const EMBEDDING_CONFIG_CLINIQUE = {
+  model: 'text-embedding-3-large',
+  dimensions: 1536
+};
+
 // ==========================================
 // 📋 DICTIONNAIRE MÉTADONNÉES - BASÉ SUR LE GUIDE UTILISATEUR
 // ==========================================
@@ -259,9 +264,9 @@ function buildMetadataFilters(detectedMetadata, iaType = 'basique') {
       break;
       
     case 'clinique':
-      // IA Clinique : Filtrage géré par la fonction SQL (type_contenu='clinique' hard-codé)
-      // Pas besoin d'envoyer de filtres, la fonction SQL spécialisée gère tout
-      logger.debug(`🩺 IA Clinique - Filtres gérés par search_documents_clinique (type_contenu='clinique' hard-codé)`);
+      // IA Clinique : Pipeline hybride (Vector + BM25 → RRF → Cohere) sur clinical_chunks
+      // Court-circuité dans searchDocumentsOptimized, ce bloc n'est plus atteint
+      logger.debug(`🩺 IA Clinique - Pipeline hybride sur clinical_chunks`);
       break;
       
     case 'admin':
@@ -291,7 +296,9 @@ function buildMetadataFilters(detectedMetadata, iaType = 'basique') {
 async function generateEmbedding(text, iaType = 'basique') {
   try {
     const optimizedText = preprocessTextForEmbedding(text);
-    const config = iaType === 'biblio' ? EMBEDDING_CONFIG_BIBLIO : EMBEDDING_CONFIG;
+    const config = iaType === 'biblio' ? EMBEDDING_CONFIG_BIBLIO
+                 : iaType === 'clinique' ? EMBEDDING_CONFIG_CLINIQUE
+                 : EMBEDDING_CONFIG;
 
     logger.debug(`🔄 Génération embedding (${config.model}) pour recherche:`, optimizedText.substring(0, 100) + '...');
 
@@ -481,47 +488,146 @@ async function searchDocumentsOptimized(query, options = {}) {
       return reranked;
     }
 
-    // Autres IA (basique, clinique) — analyse metadata + seuil adaptatif
-    let metadataFilters = {};
+    // IA Clinique → pipeline hybride dédié (Vector + BM25 → RRF → Rerank)
+    if (iaType === 'clinique') {
+      logger.debug('🩺 ═══════════════════════════════════════════════════════');
+      logger.debug('🩺 IA CLINIQUE - DÉBUT PIPELINE HYBRIDE');
+      logger.debug(`🩺 Query: "${query}"`);
+      logger.debug('🩺 Table: clinical_chunks | Embedding: text-embedding-3-large (1536d)');
+      logger.debug('🩺 ═══════════════════════════════════════════════════════');
 
-    if (iaType !== 'basique') {
-      const detectedMetadata = analyzeQueryForMetadata(query);
-      metadataFilters = buildMetadataFilters(detectedMetadata, iaType);
-      logger.debug(`🔬 IA ${iaType} - Métadonnées détectées:`, metadataFilters);
-    } else {
-      logger.debug(`💬 IA Basique - Recherche vectorielle pure`);
+      const queryEmbedding = await generateEmbedding(query, iaType);
+      logger.debug(`🩺 [1/4] Embedding généré (${queryEmbedding.length} dimensions)`);
+
+      const [vectorResults, bm25Results] = await Promise.all([
+        searchDocumentsWithEmbedding(queryEmbedding, {
+          matchThreshold: 0.3,
+          matchCount: 15,
+          metadataFilters: {},
+          iaType: 'clinique'
+        }),
+        searchClinicalChunksBM25(query, 15)
+      ]);
+
+      logger.debug(`🩺 [2/4] Vector search: ${vectorResults.length} résultats`);
+      vectorResults.slice(0, 5).forEach((doc, i) => {
+        logger.debug(`🩺   Vector #${i + 1}: ${doc.entity_id || doc.id} | sim=${(doc.similarity || 0).toFixed(3)} | type=${doc.entity_type || '?'} | ${(doc.content || '').substring(0, 80)}...`);
+      });
+
+      logger.debug(`🩺 [2/4] BM25 search: ${bm25Results.length} résultats`);
+      bm25Results.slice(0, 5).forEach((doc, i) => {
+        logger.debug(`🩺   BM25 #${i + 1}: ${doc.entity_id || doc.id} | rank=${doc.similarity?.toFixed(6) || '?'} | type=${doc.entity_type || '?'} | ${(doc.content || '').substring(0, 80)}...`);
+      });
+
+      const fused = fuseWithRRF(vectorResults, bm25Results);
+      logger.debug(`🩺 [3/4] RRF fusion: ${fused.length} candidats uniques`);
+      fused.slice(0, 8).forEach((doc, i) => {
+        logger.debug(`🩺   RRF #${i + 1}: ${doc.entity_id || doc.id} | rrfScore=${doc.rrfScore?.toFixed(4)} | source=${doc.searchSource} | type=${doc.entity_type || doc.metadata?.entity_type || '?'}`);
+      });
+
+      if (fused.length === 0) {
+        logger.debug('🩺 ⚠️ Aucun candidat après fusion — retour vide');
+        logger.debug('🩺 ═══════════════════════════════════════════════════════');
+        await logSearch(query, 0);
+        return [];
+      }
+
+      const reranked = await rerankWithCohere(query, fused, 6);
+      logger.debug(`🩺 [4/4] Cohere rerank: ${reranked.length} résultats finaux`);
+      reranked.forEach((doc, i) => {
+        logger.debug(`🩺   Final #${i + 1}: ${doc.entity_id || doc.id} | cohereScore=${(doc.relevanceScore || doc.similarity || 0).toFixed(3)} | source=${doc.searchSource} | type=${doc.entity_type || doc.metadata?.entity_type || '?'} | ${(doc.metadata?.nom || '').substring(0, 60)}`);
+      });
+
+      logger.debug('🩺 ═══════════════════════════════════════════════════════');
+      logger.info(`✅ Recherche hybride clinique terminée: ${reranked.length} résultats`);
+      await logSearch(query, reranked.length);
+      return reranked;
     }
 
-    const queryEmbedding = await generateEmbedding(query, iaType);
+    // IA Basique → pipeline hybride multi-table (studies_v2 + clinical_chunks)
+    logger.debug('💬 ═══════════════════════════════════════════════════════');
+    logger.debug('💬 IA BASIQUE - DÉBUT PIPELINE HYBRIDE MULTI-TABLE');
+    logger.debug(`💬 Query: "${query}"`);
+    logger.debug('💬 Tables: studies_v2 + clinical_chunks | Embedding: text-embedding-3-large (1536d)');
+    logger.debug('💬 ═══════════════════════════════════════════════════════');
 
-    // Première tentative avec seuil élevé (haute qualité)
-    logger.debug('🔍 Tentative seuil élevé (0.7)...');
-    let results = await searchDocumentsWithEmbedding(queryEmbedding, {
-      matchThreshold: 0.7,
-      matchCount: 3,
-      filterCategory,
-      metadataFilters,
-      iaType  // Passer le type d'IA
+    // Embedding text-embedding-3-large (même modèle que les 2 tables)
+    const queryEmbedding = await generateEmbedding(query, 'biblio');
+    logger.debug(`💬 [1/5] Embedding généré (${queryEmbedding.length} dimensions)`);
+
+    // 4 recherches en parallèle : vector+BM25 sur chaque table
+    const [vectorStudies, bm25Studies, vectorClinical, bm25Clinical] = await Promise.all([
+      searchDocumentsWithEmbedding(queryEmbedding, {
+        matchThreshold: 0.3,
+        matchCount: 5,
+        metadataFilters: {},
+        iaType: 'biblio'
+      }),
+      searchStudiesBM25(query, 5),
+      searchDocumentsWithEmbedding(queryEmbedding, {
+        matchThreshold: 0.3,
+        matchCount: 5,
+        metadataFilters: {},
+        iaType: 'clinique'
+      }),
+      searchClinicalChunksBM25(query, 5)
+    ]);
+
+    logger.debug(`💬 [2/5] studies_v2 — Vector: ${vectorStudies.length} résultats, BM25: ${bm25Studies.length} résultats`);
+    vectorStudies.slice(0, 3).forEach((doc, i) => {
+      logger.debug(`💬   studies Vector #${i + 1}: ${doc.study_id || doc.id} | sim=${(doc.similarity || 0).toFixed(3)} | ${(doc.content || '').substring(0, 80)}...`);
+    });
+    bm25Studies.slice(0, 3).forEach((doc, i) => {
+      logger.debug(`💬   studies BM25 #${i + 1}: ${doc.study_id || doc.id} | rank=${doc.similarity?.toFixed(6) || '?'} | ${(doc.content || '').substring(0, 80)}...`);
     });
 
-    // Si pas assez de résultats, tentative avec seuil plus bas
-    if (results.length < 2 && allowLowerThreshold) {
-      logger.debug('🔄 Seuil élevé: ' + results.length + ' résultats, tentative seuil bas...');
-      logger.debug('🔄 Filtres seuil bas:', JSON.stringify(metadataFilters));
-      
-      results = await searchDocumentsWithEmbedding(queryEmbedding, {
-        matchThreshold: 0.4,
-        matchCount: 6,
-        filterCategory,
-        metadataFilters,
-        iaType  // Passer le type d'IA
-      });
+    logger.debug(`💬 [2/5] clinical_chunks — Vector: ${vectorClinical.length} résultats, BM25: ${bm25Clinical.length} résultats`);
+    vectorClinical.slice(0, 3).forEach((doc, i) => {
+      logger.debug(`💬   clinical Vector #${i + 1}: ${doc.entity_id || doc.id} | sim=${(doc.similarity || 0).toFixed(3)} | type=${doc.entity_type || '?'} | ${(doc.content || '').substring(0, 80)}...`);
+    });
+    bm25Clinical.slice(0, 3).forEach((doc, i) => {
+      logger.debug(`💬   clinical BM25 #${i + 1}: ${doc.entity_id || doc.id} | rank=${doc.similarity?.toFixed(6) || '?'} | type=${doc.entity_type || '?'} | ${(doc.content || '').substring(0, 80)}...`);
+    });
+
+    // RRF par table → top 3 de chaque
+    const fusedStudies = fuseWithRRF(vectorStudies, bm25Studies).slice(0, 3);
+    const fusedClinical = fuseWithRRF(vectorClinical, bm25Clinical).slice(0, 3);
+
+    logger.debug(`💬 [3/5] RRF studies_v2: ${fusedStudies.length} candidats`);
+    fusedStudies.forEach((doc, i) => {
+      logger.debug(`💬   RRF studies #${i + 1}: ${doc.study_id || doc.id} | rrfScore=${doc.rrfScore?.toFixed(4)} | source=${doc.searchSource}`);
+    });
+    logger.debug(`💬 [3/5] RRF clinical: ${fusedClinical.length} candidats`);
+    fusedClinical.forEach((doc, i) => {
+      logger.debug(`💬   RRF clinical #${i + 1}: ${doc.entity_id || doc.id} | rrfScore=${doc.rrfScore?.toFixed(4)} | source=${doc.searchSource} | type=${doc.entity_type || doc.metadata?.entity_type || '?'}`);
+    });
+
+    // Merge les 6 candidats max
+    const allCandidates = [...fusedStudies, ...fusedClinical];
+    logger.debug(`💬 [4/5] Merge: ${allCandidates.length} candidats (${fusedStudies.length} études + ${fusedClinical.length} clinique)`);
+
+    if (allCandidates.length === 0) {
+      logger.debug('💬 ⚠️ Aucun candidat après fusion — retour vide');
+      logger.debug('💬 ═══════════════════════════════════════════════════════');
+      await logSearch(query, 0);
+      return [];
     }
 
-    logger.info(`✅ Recherche optimisée terminée: ${results.length} résultats`);
-    await logSearch(query, results.length);
+    // Cohere rerank → top 3
+    const reranked = await rerankWithCohere(query, allCandidates, 3);
+    logger.debug(`💬 [5/5] Cohere rerank: ${reranked.length} résultats finaux`);
+    reranked.forEach((doc, i) => {
+      const id = doc.study_id || doc.entity_id || doc.id;
+      const type = doc.entity_type || doc.metadata?.entity_type || 'study';
+      const name = doc.metadata?.nom || doc.metadata?.titre || '';
+      logger.debug(`💬   Final #${i + 1}: ${id} | cohereScore=${(doc.relevanceScore || doc.similarity || 0).toFixed(3)} | source=${doc.searchSource} | type=${type}${name ? ` | ${name.substring(0, 50)}` : ''}`);
+    });
 
-    return results;
+    logger.debug('💬 ═══════════════════════════════════════════════════════');
+    logger.info(`✅ Recherche hybride basique terminée: ${reranked.length} résultats`);
+    await logSearch(query, reranked.length);
+
+    return reranked;
   } catch (error) {
     logger.error('❌ Erreur recherche optimisée:', error);
     throw error;
@@ -560,14 +666,12 @@ async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
       error = result.error;
 
     } else if (iaType === 'clinique') {
-      logger.debug(`🩺 IA CLINIQUE - Appel fonction spécialisée search_documents_clinique`);
-      logger.debug(`🩺 Metadata filters IA Clinique:`, JSON.stringify(metadataFilters));
+      logger.debug(`🩺 IA CLINIQUE - Appel search_clinical_chunks (embedding: text-embedding-3-large)`);
 
-      const result = await supabase.rpc('search_documents_clinique', {
+      const result = await supabase.rpc('search_clinical_chunks', {
         query_embedding: queryEmbedding,
         match_threshold: matchThreshold,
-        match_count: matchCount,
-        metadata_filters: JSON.stringify(metadataFilters)
+        match_count: matchCount
       });
 
       data = result.data;
@@ -1017,13 +1121,45 @@ async function searchStudiesBM25(query, matchCount = 15) {
 }
 
 /**
+ * Recherche BM25 (mots-clés) dans clinical_chunks via tsvector
+ */
+async function searchClinicalChunksBM25(query, matchCount = 15) {
+  try {
+    logger.debug(`🔤 Clinical BM25 search: "${query.substring(0, 80)}..." (max ${matchCount})`);
+
+    const { data, error } = await supabase.rpc('search_clinical_chunks_bm25', {
+      query_text: query,
+      match_count: matchCount
+    });
+
+    if (error) {
+      logger.error('❌ Erreur Clinical BM25 search:', error);
+      return [];
+    }
+
+    return (data || []).map((doc, index) => ({
+      ...doc,
+      searchRank: index + 1,
+      similarityPercentage: Math.round((doc.similarity || 0) * 100),
+      contentLength: doc.content ? doc.content.length : 0,
+      hasMetadata: !!doc.metadata,
+      iaType: 'clinique',
+      searchSource: 'bm25'
+    }));
+  } catch (error) {
+    logger.error('❌ Erreur Clinical BM25 search:', error);
+    return [];
+  }
+}
+
+/**
  * Reciprocal Rank Fusion — fusionne vector + BM25, déduplique par study_id
  */
 function fuseWithRRF(vectorResults, bm25Results, k = 60) {
   const scores = new Map();
 
   vectorResults.forEach((doc, rank) => {
-    const key = doc.study_id || doc.id;
+    const key = doc.study_id || doc.entity_id || doc.id;
     const rrf = 1 / (k + rank + 1);
     if (scores.has(key)) {
       scores.get(key).score += rrf;
@@ -1033,7 +1169,7 @@ function fuseWithRRF(vectorResults, bm25Results, k = 60) {
   });
 
   bm25Results.forEach((doc, rank) => {
-    const key = doc.study_id || doc.id;
+    const key = doc.study_id || doc.entity_id || doc.id;
     const rrf = 1 / (k + rank + 1);
     if (scores.has(key)) {
       scores.get(key).score += rrf;

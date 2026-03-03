@@ -31,16 +31,34 @@ const requireFollowupAssistant = (req, res, next) => {
 router.post('/ia-basique', authenticate, requireAssistant('CONVERSATIONNEL'), chatKineController.sendIaBasique);
 
 /**
+ * POST /api/chat/kine/ia-basique-stream
+ * IA conversationnelle basique en streaming SSE
+ */
+router.post('/ia-basique-stream', authenticate, requireAssistant('CONVERSATIONNEL'), chatKineController.sendIaBasiqueStream);
+
+/**
  * POST /api/chat/kine/ia-biblio
  * IA bibliographique spécialisée
  */
 router.post('/ia-biblio', authenticate, requireAssistant('BIBLIOTHEQUE'), chatKineController.sendIaBiblio);
 
 /**
+ * POST /api/chat/kine/ia-biblio-stream
+ * IA bibliographique en streaming SSE
+ */
+router.post('/ia-biblio-stream', authenticate, requireAssistant('BIBLIOTHEQUE'), chatKineController.sendIaBiblioStream);
+
+/**
  * POST /api/chat/kine/ia-clinique
  * IA clinique spécialisée
  */
 router.post('/ia-clinique', authenticate, requireAssistant('CLINIQUE'), chatKineController.sendIaClinique);
+
+/**
+ * POST /api/chat/kine/ia-clinique-stream
+ * IA clinique en streaming SSE
+ */
+router.post('/ia-clinique-stream', authenticate, requireAssistant('CLINIQUE'), chatKineController.sendIaCliniqueStream);
 
 /**
  * POST /api/chat/kine/ia-administrative
@@ -50,10 +68,16 @@ router.post('/ia-administrative', authenticate, requireAssistant('ADMINISTRATIF'
 
 /**
  * POST /api/chat/kine/ia-followup
- * IA de suivi conversationnel (sans RAG) - sauvegarde dans la table source
+ * IA de suivi avec RAG conditionnel (shouldUseRAG décide) - sauvegarde dans la table source
  * Body: { message, conversationHistory, sourceIa: 'biblio' | 'clinique' }
  */
 router.post('/ia-followup', authenticate, requireFollowupAssistant, chatKineController.sendIaFollowup);
+
+/**
+ * POST /api/chat/kine/ia-followup-stream
+ * IA de suivi en streaming SSE
+ */
+router.post('/ia-followup-stream', authenticate, requireFollowupAssistant, chatKineController.sendIaFollowupStream);
 
 // ========== ROUTES HISTORIQUE SPÉCIALISÉES ==========
 
