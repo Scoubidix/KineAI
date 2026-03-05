@@ -653,7 +653,7 @@ const prepareKineRequest = async (type, message, conversationHistory = [], kineI
 /**
  * Génère une réponse IA pour les kinésithérapeutes avec RAG et sauvegarde (bloquant)
  */
-const generateKineResponse = async (type, message, conversationHistory = [], kineId) => {
+const generateKineResponse = async (type, message, conversationHistory = [], kineId, options = {}) => {
   try {
     const { messages, config, limitedDocuments, selectedSources, metadata } =
       await prepareKineRequest(type, message, conversationHistory, kineId);
@@ -669,8 +669,10 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
 
     const aiResponse = completion.choices[0].message.content;
 
-    await saveToCorrectTable(type, kineId, message, aiResponse);
-    logger.debug(`💾 Conversation IA ${type} sauvegardée`);
+    if (!options.skipSave) {
+      await saveToCorrectTable(type, kineId, message, aiResponse);
+      logger.debug(`💾 Conversation IA ${type} sauvegardée`);
+    }
 
     const overallConfidence = type === 'admin' ? 1 : knowledgeService.calculateOverallConfidence(limitedDocuments);
 
@@ -715,7 +717,7 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
  * @param {Function} onToken - Callback appelé pour chaque token (delta string)
  * @returns {Object} Réponse complète (même format que generateKineResponse)
  */
-const generateKineResponseStream = async (type, message, conversationHistory = [], kineId, onToken) => {
+const generateKineResponseStream = async (type, message, conversationHistory = [], kineId, onToken, options = {}) => {
   const { messages, config, limitedDocuments, selectedSources, metadata } =
     await prepareKineRequest(type, message, conversationHistory, kineId);
 
@@ -739,8 +741,10 @@ const generateKineResponseStream = async (type, message, conversationHistory = [
     }
   }
 
-  await saveToCorrectTable(type, kineId, message, fullResponse);
-  logger.debug(`💾 Conversation IA ${type} (stream) sauvegardée`);
+  if (!options.skipSave) {
+    await saveToCorrectTable(type, kineId, message, fullResponse);
+    logger.debug(`💾 Conversation IA ${type} (stream) sauvegardée`);
+  }
 
   const overallConfidence = type === 'admin' ? 1 : knowledgeService.calculateOverallConfidence(limitedDocuments);
 
@@ -879,7 +883,7 @@ Réponds UNIQUEMENT en JSON : {"rag":true|false}`;
  * shouldUseRAG() décide si on lance une recherche documentaire
  * Sauvegarde dans la table de l'IA source (pas dans chatIaBasique)
  */
-const generateFollowupResponse = async (message, conversationHistory = [], kineId, sourceIa) => {
+const generateFollowupResponse = async (message, conversationHistory = [], kineId, sourceIa, options = {}) => {
   try {
     const validSources = ['biblio', 'clinique'];
     if (!validSources.includes(sourceIa)) {
@@ -1005,8 +1009,10 @@ Base-toi sur le contexte de la conversation et tes connaissances générales. In
     const aiResponse = completion.choices[0].message.content;
 
     // 6. Sauvegarde dans la table de l'IA SOURCE (biblio -> chatIaBiblio, clinique -> chatIaClinique)
-    await saveToCorrectTable(sourceIa, kineId, message, aiResponse);
-    logger.debug(`💾 Followup sauvegardé dans table ${sourceIa}`);
+    if (!options.skipSave) {
+      await saveToCorrectTable(sourceIa, kineId, message, aiResponse);
+      logger.debug(`💾 Followup sauvegardé dans table ${sourceIa}`);
+    }
 
     // 7. Calcul de la confiance (uniquement si RAG activé)
     const overallConfidence = limitedDocuments.length > 0
@@ -1049,7 +1055,7 @@ Base-toi sur le contexte de la conversation et tes connaissances générales. In
  * Génère une réponse de suivi en streaming (SSE)
  * Même logique que generateFollowupResponse mais avec stream: true + onToken callback
  */
-const generateFollowupResponseStream = async (message, conversationHistory = [], kineId, sourceIa, onToken) => {
+const generateFollowupResponseStream = async (message, conversationHistory = [], kineId, sourceIa, onToken, options = {}) => {
   const validSources = ['biblio', 'clinique'];
   if (!validSources.includes(sourceIa)) {
     throw new Error(`sourceIa invalide: ${sourceIa}. Valeurs acceptées: ${validSources.join(', ')}`);
@@ -1155,8 +1161,10 @@ Base-toi sur le contexte de la conversation et tes connaissances générales. In
   }
 
   // 5. Sauvegarde
-  await saveToCorrectTable(sourceIa, kineId, message, fullResponse);
-  logger.debug(`💾 Followup (stream) sauvegardé dans table ${sourceIa}`);
+  if (!options.skipSave) {
+    await saveToCorrectTable(sourceIa, kineId, message, fullResponse);
+    logger.debug(`💾 Followup (stream) sauvegardé dans table ${sourceIa}`);
+  }
 
   const overallConfidence = limitedDocuments.length > 0
     ? knowledgeService.calculateOverallConfidence(limitedDocuments)

@@ -3,15 +3,24 @@ const prismaService = require('../services/prismaService');
 const { generateKineResponse, generateKineResponseStream, generateFollowupResponse, generateFollowupResponseStream } = require('../services/openaiService');
 const logger = require('../utils/logger');
 
+// Limites de caractères pour le mode preview (aperçu tronqué)
+const PREVIEW_CHAR_LIMITS = {
+  basique: 250,
+  biblio: 400,
+  clinique: 400,
+  admin: 250
+};
+
 // ========== HANDLER UNIFIÉ ==========
 const handleKineRequest = async (req, res, iaType) => {
   try {
     const { message, conversationHistory = [] } = req.body;
     const firebaseUid = req.uid;
-    
+    const isPreview = req.isPreview === true;
+
     // 1. Validation de l'authentification
     if (!firebaseUid) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Authentification échouée - UID manquant'
       });
     }
@@ -21,10 +30,10 @@ const handleKineRequest = async (req, res, iaType) => {
     const kine = await prisma.kine.findUnique({
       where: { uid: firebaseUid }
     });
-    
+
     if (!kine) {
-      return res.status(404).json({ 
-        error: 'Kiné non trouvé' 
+      return res.status(404).json({
+        error: 'Kiné non trouvé'
       });
     }
 
@@ -34,11 +43,18 @@ const handleKineRequest = async (req, res, iaType) => {
     }
 
     // 4. Appel du service unifié
-    const response = await generateKineResponse(iaType, message, conversationHistory, kine.id);
-    
+    const response = await generateKineResponse(iaType, message, conversationHistory, kine.id, { skipSave: isPreview });
+
     // 5. Ajout du firebaseUid dans les métadonnées
     response.metadata.firebaseUid = firebaseUid;
-    
+
+    // 6. Tronquer si mode preview
+    if (isPreview) {
+      const charLimit = PREVIEW_CHAR_LIMITS[iaType] || 250;
+      response.message = response.message.substring(0, charLimit);
+      response.preview = true;
+    }
+
     res.json(response);
 
   } catch (error) {
@@ -75,6 +91,7 @@ const sendIaAdministrative = async (req, res) => {
 const sendIaBasiqueStream = async (req, res) => {
   let headersSent = false;
   let clientDisconnected = false;
+  const isPreview = req.isPreview === true;
 
   req.on('close', () => {
     clientDisconnected = true;
@@ -109,23 +126,41 @@ const sendIaBasiqueStream = async (req, res) => {
     });
     headersSent = true;
 
-    // 3. Stream avec callback onToken
+    // 3. Stream avec callback onToken + troncature preview
+    let charCount = 0;
+    let previewEnded = false;
+    const charLimit = PREVIEW_CHAR_LIMITS.basique;
+
     const result = await generateKineResponseStream(
       'basique',
       message,
       conversationHistory,
       kine.id,
       (delta) => {
-        if (!clientDisconnected) {
-          res.write(`event: token\ndata: ${JSON.stringify({ content: delta })}\n\n`);
+        if (clientDisconnected || previewEnded) return;
+        if (isPreview) {
+          charCount += delta.length;
+          if (charCount >= charLimit) {
+            const remaining = charLimit - (charCount - delta.length);
+            if (remaining > 0) {
+              res.write(`event: token\ndata: ${JSON.stringify({ content: delta.substring(0, remaining) })}\n\n`);
+            }
+            res.write(`event: preview_end\ndata: ${JSON.stringify({ message: 'Abonnement requis pour la réponse complète', charLimit })}\n\n`);
+            previewEnded = true;
+            return;
+          }
         }
-      }
+        res.write(`event: token\ndata: ${JSON.stringify({ content: delta })}\n\n`);
+      },
+      { skipSave: isPreview }
     );
 
-    // 4. Event done avec réponse complète
-    if (!clientDisconnected) {
+    // 4. Event done avec réponse complète (seulement si pas preview)
+    if (!clientDisconnected && !previewEnded) {
       result.metadata.firebaseUid = firebaseUid;
       res.write(`event: done\ndata: ${JSON.stringify(result)}\n\n`);
+    }
+    if (!clientDisconnected) {
       res.end();
     }
 
@@ -152,6 +187,7 @@ const sendIaBasiqueStream = async (req, res) => {
 const sendIaBiblioStream = async (req, res) => {
   let headersSent = false;
   let clientDisconnected = false;
+  const isPreview = req.isPreview === true;
   req.on('close', () => { clientDisconnected = true; });
 
   try {
@@ -167,15 +203,30 @@ const sendIaBiblioStream = async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
     headersSent = true;
 
-    const result = await generateKineResponseStream('biblio', message, conversationHistory, kine.id, (delta) => {
-      if (!clientDisconnected) res.write(`event: token\ndata: ${JSON.stringify({ content: delta })}\n\n`);
-    });
+    let charCount = 0;
+    let previewEnded = false;
+    const charLimit = PREVIEW_CHAR_LIMITS.biblio;
 
-    if (!clientDisconnected) {
+    const result = await generateKineResponseStream('biblio', message, conversationHistory, kine.id, (delta) => {
+      if (clientDisconnected || previewEnded) return;
+      if (isPreview) {
+        charCount += delta.length;
+        if (charCount >= charLimit) {
+          const remaining = charLimit - (charCount - delta.length);
+          if (remaining > 0) res.write(`event: token\ndata: ${JSON.stringify({ content: delta.substring(0, remaining) })}\n\n`);
+          res.write(`event: preview_end\ndata: ${JSON.stringify({ message: 'Abonnement requis pour la réponse complète', charLimit })}\n\n`);
+          previewEnded = true;
+          return;
+        }
+      }
+      res.write(`event: token\ndata: ${JSON.stringify({ content: delta })}\n\n`);
+    }, { skipSave: isPreview });
+
+    if (!clientDisconnected && !previewEnded) {
       result.metadata.firebaseUid = firebaseUid;
       res.write(`event: done\ndata: ${JSON.stringify(result)}\n\n`);
-      res.end();
     }
+    if (!clientDisconnected) res.end();
   } catch (error) {
     logger.error('❌ Erreur sendIaBiblioStream:', error);
     if (!headersSent) {
@@ -192,6 +243,7 @@ const sendIaBiblioStream = async (req, res) => {
 const sendIaCliniqueStream = async (req, res) => {
   let headersSent = false;
   let clientDisconnected = false;
+  const isPreview = req.isPreview === true;
   req.on('close', () => { clientDisconnected = true; });
 
   try {
@@ -207,15 +259,30 @@ const sendIaCliniqueStream = async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
     headersSent = true;
 
-    const result = await generateKineResponseStream('clinique', message, conversationHistory, kine.id, (delta) => {
-      if (!clientDisconnected) res.write(`event: token\ndata: ${JSON.stringify({ content: delta })}\n\n`);
-    });
+    let charCount = 0;
+    let previewEnded = false;
+    const charLimit = PREVIEW_CHAR_LIMITS.clinique;
 
-    if (!clientDisconnected) {
+    const result = await generateKineResponseStream('clinique', message, conversationHistory, kine.id, (delta) => {
+      if (clientDisconnected || previewEnded) return;
+      if (isPreview) {
+        charCount += delta.length;
+        if (charCount >= charLimit) {
+          const remaining = charLimit - (charCount - delta.length);
+          if (remaining > 0) res.write(`event: token\ndata: ${JSON.stringify({ content: delta.substring(0, remaining) })}\n\n`);
+          res.write(`event: preview_end\ndata: ${JSON.stringify({ message: 'Abonnement requis pour la réponse complète', charLimit })}\n\n`);
+          previewEnded = true;
+          return;
+        }
+      }
+      res.write(`event: token\ndata: ${JSON.stringify({ content: delta })}\n\n`);
+    }, { skipSave: isPreview });
+
+    if (!clientDisconnected && !previewEnded) {
       result.metadata.firebaseUid = firebaseUid;
       res.write(`event: done\ndata: ${JSON.stringify(result)}\n\n`);
-      res.end();
     }
+    if (!clientDisconnected) res.end();
   } catch (error) {
     logger.error('❌ Erreur sendIaCliniqueStream:', error);
     if (!headersSent) {
@@ -232,6 +299,7 @@ const sendIaCliniqueStream = async (req, res) => {
 const sendIaFollowupStream = async (req, res) => {
   let headersSent = false;
   let clientDisconnected = false;
+  const isPreview = req.isPreview === true;
   req.on('close', () => { clientDisconnected = true; });
 
   try {
@@ -250,15 +318,30 @@ const sendIaFollowupStream = async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
     headersSent = true;
 
-    const result = await generateFollowupResponseStream(message, conversationHistory, kine.id, sourceIa, (delta) => {
-      if (!clientDisconnected) res.write(`event: token\ndata: ${JSON.stringify({ content: delta })}\n\n`);
-    });
+    let charCount = 0;
+    let previewEnded = false;
+    const charLimit = PREVIEW_CHAR_LIMITS[sourceIa] || 400;
 
-    if (!clientDisconnected) {
+    const result = await generateFollowupResponseStream(message, conversationHistory, kine.id, sourceIa, (delta) => {
+      if (clientDisconnected || previewEnded) return;
+      if (isPreview) {
+        charCount += delta.length;
+        if (charCount >= charLimit) {
+          const remaining = charLimit - (charCount - delta.length);
+          if (remaining > 0) res.write(`event: token\ndata: ${JSON.stringify({ content: delta.substring(0, remaining) })}\n\n`);
+          res.write(`event: preview_end\ndata: ${JSON.stringify({ message: 'Abonnement requis pour la réponse complète', charLimit })}\n\n`);
+          previewEnded = true;
+          return;
+        }
+      }
+      res.write(`event: token\ndata: ${JSON.stringify({ content: delta })}\n\n`);
+    }, { skipSave: isPreview });
+
+    if (!clientDisconnected && !previewEnded) {
       result.metadata.firebaseUid = firebaseUid;
       res.write(`event: done\ndata: ${JSON.stringify(result)}\n\n`);
-      res.end();
     }
+    if (!clientDisconnected) res.end();
   } catch (error) {
     logger.error('❌ Erreur sendIaFollowupStream:', error);
     if (!headersSent) {
@@ -276,6 +359,7 @@ const sendIaFollowup = async (req, res) => {
   try {
     const { message, conversationHistory = [], sourceIa } = req.body;
     const firebaseUid = req.uid;
+    const isPreview = req.isPreview === true;
 
     if (!firebaseUid) {
       return res.status(401).json({
@@ -300,8 +384,14 @@ const sendIaFollowup = async (req, res) => {
       return res.status(400).json({ error: 'sourceIa requis (biblio ou clinique)' });
     }
 
-    const response = await generateFollowupResponse(message, conversationHistory, kine.id, sourceIa);
+    const response = await generateFollowupResponse(message, conversationHistory, kine.id, sourceIa, { skipSave: isPreview });
     response.metadata.firebaseUid = firebaseUid;
+
+    if (isPreview) {
+      const charLimit = PREVIEW_CHAR_LIMITS[sourceIa] || 400;
+      response.message = response.message.substring(0, charLimit);
+      response.preview = true;
+    }
 
     res.json(response);
 

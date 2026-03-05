@@ -152,6 +152,51 @@ const requireAssistant = (assistantType) => {
 };
 
 /**
+ * Middleware preview : même logique que requireAssistant mais au lieu de 403,
+ * laisse passer en mode preview (req.isPreview = true).
+ * Le controller tronquera la réponse mid-stream.
+ * @param {string} assistantType - Type d'assistant requis
+ */
+const requireAssistantOrPreview = (assistantType) => {
+  return async (req, res, next) => {
+    try {
+      const prisma = prismaService.getInstance();
+      const kine = await prisma.kine.findUnique({
+        where: { uid: req.uid },
+        select: { id: true, planType: true }
+      });
+
+      if (!kine) {
+        return res.status(404).json({ error: 'Kinésithérapeute non trouvé' });
+      }
+
+      const planType = kine.planType || 'FREE';
+
+      const assistantsByPlan = {
+        'FREE': [],
+        'DECLIC': ['CONVERSATIONNEL'],
+        'PRATIQUE': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF'],
+        'PIONNIER': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF', 'TEMPLATES_ADMIN'],
+        'EXPERT': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF', 'TEMPLATES_ADMIN']
+      };
+
+      const availableAssistants = assistantsByPlan[planType] || [];
+      const hasAccess = availableAssistants.includes(assistantType);
+
+      req.kineId = kine.id;
+      req.planType = planType;
+      req.assistantType = assistantType;
+      req.isPreview = !hasAccess;
+      next();
+
+    } catch (error) {
+      logger.error('Erreur vérification assistant IA (preview):', error);
+      res.status(500).json({ error: 'Erreur interne du serveur' });
+    }
+  };
+};
+
+/**
  * Middleware pour vérifier l'accès à une fonctionnalité générale
  * @param {string} feature - Nom de la fonctionnalité
  */
@@ -287,6 +332,7 @@ const requireAdmin = async (req, res, next) => {
 module.exports = {
   canCreateProgramme,
   requireAssistant,
+  requireAssistantOrPreview,
   requireFeature,
   getPlanInfo,
   requireAdmin

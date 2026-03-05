@@ -5,10 +5,10 @@ import AppLayout from '@/components/AppLayout';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Stethoscope, Trash2, Send, Loader2, Lightbulb, Search, X } from 'lucide-react';
+import { Stethoscope, Trash2, Send, Loader2, Lightbulb, Search, X, Lock } from 'lucide-react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
-import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
+import { PaywallModal } from '@/components/PaywallModal';
 import { usePaywall } from '@/hooks/usePaywall';
 import DOMPurify from 'dompurify';
 
@@ -25,6 +25,7 @@ interface HistoryMessage {
   timestamp: string;
   enhanced?: boolean;
   confidence?: number;
+  isPreview?: boolean;
 }
 
 export default function KineChatbotCliniquePage() {
@@ -37,14 +38,16 @@ export default function KineChatbotCliniquePage() {
   const [phase, setPhase] = useState<'initial' | 'conversation'>('initial');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [researchQuery, setResearchQuery] = useState('');
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
 
-  const { isLoading: paywallLoading, canAccessFeature, subscription } = usePaywall();
+  const { subscription } = usePaywall();
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastBotMessageRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
 
   useEffect(() => {
     const auth = getAuth(app);
@@ -59,32 +62,42 @@ export default function KineChatbotCliniquePage() {
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      isNearBottomRef.current = scrollHeight - scrollTop - clientHeight < 80;
+    };
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (isNearBottomRef.current) {
+      scrollToBottom();
+    }
   }, [chatMessages]);
 
   useEffect(() => {
     if (isSending) {
+      isNearBottomRef.current = true;
       scrollToBottom();
     }
   }, [isSending]);
 
   const scrollToBottom = () => {
-    if (messagesContainerRef.current && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'end',
-        inline: 'nearest'
-      });
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     }
   };
 
   const scrollToBotMessage = () => {
-    if (messagesContainerRef.current && lastBotMessageRef.current) {
-      lastBotMessageRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-        inline: 'nearest'
-      });
+    const container = messagesContainerRef.current;
+    const target = lastBotMessageRef.current;
+    if (container && target) {
+      const offsetTop = target.offsetTop - container.offsetTop;
+      container.scrollTo({ top: offsetTop, behavior: 'smooth' });
     }
   };
 
@@ -164,6 +177,12 @@ export default function KineChatbotCliniquePage() {
               setChatMessages(prev => {
                 const updated = [...prev];
                 updated[updated.length - 1] = { ...updated[updated.length - 1], content: current };
+                return updated;
+              });
+            } else if (eventType === 'preview_end') {
+              setChatMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = { ...updated[updated.length - 1], isPreview: true };
                 return updated;
               });
             } else if (eventType === 'done') {
@@ -343,74 +362,48 @@ export default function KineChatbotCliniquePage() {
     }
   };
 
-  if (paywallLoading) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Vérification de vos permissions...</p>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
-
   return (
     <AppLayout>
-      <div className="max-w-6xl mx-auto p-4 overflow-hidden">
-
-        <ChatUpgradeHeader
-          assistantType="CLINIQUE"
-          canAccessFeature={canAccessFeature}
-          isLoading={paywallLoading}
-          subscription={subscription}
-        />
-
-        {/* Header */}
-        <div className="card-hover rounded-lg p-4 sm:p-6 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Stethoscope className="text-[#3899aa] h-7 w-7 shrink-0" />
+      {/* Header compact collé à gauche sous le header principal */}
+      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/40">
+        <Stethoscope className="text-[#3899aa] h-4 w-4 shrink-0" />
+        <h2 className="text-sm font-medium text-[#3899aa]">IA Clinique</h2>
+        <div className="relative group">
+          <div className="flex items-center gap-1.5 bg-[#3899aa]/10 rounded-full px-2.5 py-0.5 cursor-default">
+            <Lightbulb className="w-3 h-3 text-[#3899aa]" />
+            <span className="text-xs text-foreground font-medium">Conseils</span>
+          </div>
+          <div className="absolute left-0 top-full mt-2 w-72 bg-popover border border-border rounded-lg shadow-lg p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+            <div className="text-xs text-foreground space-y-3">
               <div>
-                <h2 className="text-xl font-semibold text-[#3899aa]">IA Clinique</h2>
-                <p className="text-foreground text-sm">Spécialisée en raisonnement clinique et aide au diagnostic - Cas cliniques et protocoles thérapeutiques</p>
+                <p className="font-medium text-foreground mb-2">Questions cliniques :</p>
+                <ul className="space-y-1 pl-2">
+                  <li>&bull; Aide au diagnostic différentiel</li>
+                  <li>&bull; Protocoles thérapeutiques</li>
+                  <li>&bull; Raisonnement clinique complexe</li>
+                </ul>
               </div>
-            </div>
-            <div className="relative group self-start sm:self-auto">
-              <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1 cursor-default">
-                <Lightbulb className="w-4 h-4 text-[#3899aa]" />
-                <span className="text-sm text-foreground font-medium">Conseils</span>
-              </div>
-              <div className="absolute right-0 top-full mt-2 w-72 bg-popover border border-border rounded-lg shadow-lg p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <div className="text-xs text-foreground space-y-3">
-                  <div>
-                    <p className="font-medium text-foreground mb-2">Questions cliniques :</p>
-                    <ul className="space-y-1 pl-2">
-                      <li>&bull; Aide au diagnostic différentiel</li>
-                      <li>&bull; Protocoles thérapeutiques</li>
-                      <li>&bull; Raisonnement clinique complexe</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground mb-2">Exemple optimisé :</p>
-                    <p className="text-xs italic">&quot;Patient 45 ans, sportif amateur. Douleur épaule antérieure depuis 3 semaines après reprise tennis. Limitation flexion active 130°, douleur nocturne.&quot;</p>
-                  </div>
-                </div>
+              <div>
+                <p className="font-medium text-foreground mb-2">Exemple optimisé :</p>
+                <p className="text-xs italic">&quot;Patient 45 ans, sportif amateur. Douleur épaule antérieure depuis 3 semaines après reprise tennis. Limitation flexion active 130°, douleur nocturne.&quot;</p>
               </div>
             </div>
           </div>
         </div>
-
-        {/* Zone de chat */}
-        <ChatDisabledOverlay
-          assistantType="CLINIQUE"
-          canAccessFeature={canAccessFeature}
-          isLoading={paywallLoading}
-          subscription={subscription}
+        <Button
+          onClick={handleNewResearch}
+          disabled={isSending}
+          size="sm"
+          className="h-7 px-3 text-xs btn-teal rounded-full"
         >
-          {/* Raisonnement en cours + Bouton */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+          <Stethoscope className="h-3 w-3 mr-1.5" />
+          {phase === 'conversation' ? 'Nouveau raisonnement' : 'Lancer un raisonnement'}
+        </Button>
+      </div>
+
+      <div className="max-w-6xl mx-auto p-4 overflow-hidden">
+          {/* Raisonnement en cours */}
+          <div className="flex gap-4 mb-4">
             <div className="flex-1">
               <div className="card-hover flex items-stretch h-full px-5 py-3 bg-gradient-to-r from-[#eef7f6] to-[#e4f1f3] dark:from-[#0f1c1b] dark:to-[#132221] rounded-lg">
                 <div className="flex items-center gap-2">
@@ -428,18 +421,9 @@ export default function KineChatbotCliniquePage() {
                 </div>
               </div>
             </div>
-            <Button
-              onClick={handleNewResearch}
-              disabled={isSending}
-              size="lg"
-              className="sm:w-auto btn-teal"
-            >
-              <Stethoscope className="h-5 w-5 mr-2" />
-              {phase === 'conversation' ? 'Nouveau raisonnement' : 'Lancer un raisonnement'}
-            </Button>
           </div>
 
-          <div className={`h-[calc(100vh-320px)] flex flex-col ${phase === 'initial' ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div className={`h-[calc(100vh-280px)] flex flex-col ${phase === 'initial' ? 'opacity-50 pointer-events-none' : ''}`}>
 
             <div
               ref={messagesContainerRef}
@@ -486,7 +470,7 @@ export default function KineChatbotCliniquePage() {
                       <div
                         key={index}
                         ref={isLastBotMessage ? lastBotMessageRef : undefined}
-                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        className={`flex ${msg.role === 'user' ? 'justify-end pr-12 sm:pr-24' : 'justify-start'}`}
                       >
                         <div
                           className={`max-w-[80%] rounded-2xl ${
@@ -495,7 +479,13 @@ export default function KineChatbotCliniquePage() {
                               : 'px-4 py-2 text-foreground'
                           }`}
                         >
-                          <div className="prose prose-sm max-w-none">
+                          <div
+                            className="prose prose-sm max-w-none"
+                            style={msg.isPreview ? {
+                              maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
+                              WebkitMaskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)'
+                            } : undefined}
+                          >
                             <div
                               className="whitespace-pre-wrap text-justify pr-4 sm:pr-10"
                               dangerouslySetInnerHTML={{
@@ -511,6 +501,17 @@ export default function KineChatbotCliniquePage() {
                               }}
                             />
                           </div>
+                          {msg.isPreview && (
+                            <div className="mt-3 pt-3 border-t border-border/40">
+                              <Button
+                                onClick={() => setIsPaywallOpen(true)}
+                                className="btn-teal rounded-full text-sm h-9 px-4"
+                              >
+                                <Lock className="h-3.5 w-3.5 mr-2" />
+                                Débloquer la réponse complète
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -542,23 +543,21 @@ export default function KineChatbotCliniquePage() {
             </div>
 
             {phase === 'conversation' && (
-              <div className="p-4 w-1/2 mx-auto">
-                <div className="flex items-end gap-3">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="Question de suivi sur le raisonnement clinique..."
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      disabled={isSending}
-                      className="min-h-[44px]"
-                    />
-                  </div>
+              <div className="w-2/3 mx-auto px-4 pb-2 pt-2">
+                <div className="relative flex items-center bg-white dark:bg-card border-2 border-border rounded-full px-4 py-1 shadow-sm focus-within:border-[#3899aa]/60 focus-within:shadow-md transition-all">
+                  <Input
+                    placeholder="Question de suivi sur le raisonnement clinique..."
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    disabled={isSending}
+                    className="border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[40px] px-0 placeholder:text-muted-foreground/60"
+                  />
                   <Button
                     onClick={handleAsk}
                     disabled={isSending || !message.trim()}
                     size="icon"
-                    className="min-h-[44px] min-w-[44px] btn-teal"
+                    className="shrink-0 h-8 w-8 rounded-full btn-teal ml-2"
                   >
                     {isSending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -568,31 +567,33 @@ export default function KineChatbotCliniquePage() {
                   </Button>
                 </div>
 
-                <p className="text-[11px] text-red-400 mt-2 text-center">
-                  L&apos;IA peut faire des erreurs, vérifiez les informations importantes.
-                </p>
-
-                <div className="flex justify-between items-center mt-1">
-                  <p className="text-xs text-foreground hidden sm:block">
-                    Entrée pour envoyer - Questions de suivi en mode conversationnel
+                <div className="flex justify-between items-center mt-1.5 px-2">
+                  <p className="text-[11px] text-muted-foreground">
+                    <span className="text-red-400">L&apos;IA peut faire des erreurs.</span>
+                    <span className="hidden sm:inline"> — Entrée pour envoyer</span>
                   </p>
                   {history.length > 0 && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={clearHistory}
-                      className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive"
+                      className="h-5 px-2 text-[11px] text-muted-foreground hover:text-destructive"
                     >
                       <Trash2 className="h-3 w-3 mr-1" />
-                      Effacer l&apos;historique
+                      Effacer
                     </Button>
                   )}
                 </div>
               </div>
             )}
           </div>
-        </ChatDisabledOverlay>
       </div>
+
+      <PaywallModal
+        isOpen={isPaywallOpen}
+        onClose={() => setIsPaywallOpen(false)}
+        subscription={subscription}
+      />
 
       {/* Modal de raisonnement clinique */}
       {isModalOpen && (

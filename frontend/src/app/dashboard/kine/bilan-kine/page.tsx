@@ -5,11 +5,11 @@ import AppLayout from '@/components/AppLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { FileText, Loader2, CheckCircle, Copy, Sparkles, Mail, Download, Search } from 'lucide-react';
+import { FileText, Loader2, Copy, Sparkles, Mail, Download, Search, Lock, Lightbulb } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { getAuth } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
-import { ChatUpgradeHeader, ChatDisabledOverlay } from '@/components/ChatUpgradeHeader';
+import { PaywallModal } from '@/components/PaywallModal';
 import { usePaywall } from '@/hooks/usePaywall';
 import { useToast } from '@/hooks/use-toast';
 
@@ -18,9 +18,11 @@ export default function BilanKinePage() {
   const [motifConsultation, setMotifConsultation] = useState('');
   const [structuredBilan, setStructuredBilan] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPreviewResult, setIsPreviewResult] = useState(false);
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
 
-  // Hook paywall pour vérifier les permissions
-  const { isLoading: paywallLoading, canAccessFeature, subscription } = usePaywall();
+  // Hook paywall pour la modal upgrade
+  const { subscription } = usePaywall();
 
   // Hook toast pour les notifications
   const { toast } = useToast();
@@ -64,6 +66,7 @@ export default function BilanKinePage() {
 
       if (data.success) {
         setStructuredBilan(data.message);
+        setIsPreviewResult(data.preview === true);
       } else {
         toast({
           title: "❌ Erreur",
@@ -242,85 +245,52 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
       .replace(/\n/g, '<br>');
   };
 
-  // Attendre la fin du chargement des permissions avant d'afficher la page
-  if (paywallLoading) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Vérification de vos permissions...</p>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
-
   return (
     <AppLayout>
-      <div className="max-w-7xl mx-auto p-4 overflow-hidden">
-
-        {/* Header Upgrade si pas d'accès */}
-        <ChatUpgradeHeader
-          assistantType="ADMINISTRATIF"
-          canAccessFeature={canAccessFeature}
-          isLoading={paywallLoading}
-          subscription={subscription}
-        />
-
-        {/* Header */}
-        <div className="card-hover rounded-lg p-4 sm:p-6 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <FileText className="text-[#3899aa] h-7 w-7 shrink-0" />
+      {/* Header compact comme les pages IA */}
+      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/40">
+        <FileText className="text-[#3899aa] h-4 w-4 shrink-0" />
+        <h2 className="text-sm font-medium text-[#3899aa]">Bilan Kiné</h2>
+        <div className="relative group">
+          <div className="flex items-center gap-1.5 bg-[#3899aa]/10 rounded-full px-2.5 py-0.5 cursor-default">
+            <Lightbulb className="w-3 h-3 text-[#3899aa]" />
+            <span className="text-xs text-foreground font-medium">Conseils</span>
+          </div>
+          <div className="absolute left-0 top-full mt-2 w-72 bg-popover border border-border rounded-lg shadow-lg p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+            <div className="text-xs text-foreground space-y-3">
               <div>
-                <h2 className="text-xl font-semibold text-[#3899aa]">Bilan Kiné</h2>
-                <p className="text-foreground text-sm">Transformez vos notes cliniques en vrac en un bilan structuré professionnel</p>
+                <p className="font-medium text-foreground mb-2">Transformez vos notes en bilan structuré :</p>
+                <ul className="space-y-1 pl-2">
+                  <li>&bull; Notez vos observations sans vous soucier de la structure</li>
+                  <li>&bull; Incluez : anamnèse, tests, mesures, observations</li>
+                  <li>&bull; Plus vos notes sont détaillées, meilleur sera le bilan</li>
+                </ul>
               </div>
-            </div>
-            <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1 self-start sm:self-auto">
-              <CheckCircle className="w-4 h-4 text-[#3899aa]" />
-              <span className="text-sm text-foreground font-medium">IA Active</span>
+              <div>
+                <p className="font-medium text-foreground mb-2">Envoi :</p>
+                <p className="text-xs">Utilisez votre messagerie cryptée pour transmettre votre bilan au médecin</p>
+              </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Zone principale */}
-        <ChatDisabledOverlay
-          assistantType="ADMINISTRATIF"
-          canAccessFeature={canAccessFeature}
-          isLoading={paywallLoading}
-          subscription={subscription}
-        >
-          {/* Ligne Motif + Conseils */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Motif de consultation */}
-            <div className="card-hover flex items-stretch h-full px-5 py-3 bg-gradient-to-r from-[#eef7f6] to-[#e4f1f3] dark:from-[#0f1c1b] dark:to-[#132221] rounded-lg">
-              <div className="flex items-center gap-3 w-full">
-                <Search className="h-4 w-4 text-[#3899aa] shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm font-bold text-[#3899aa] mb-1">Motif de consultation</p>
-                  <Input
-                    value={motifConsultation}
-                    onChange={(e) => setMotifConsultation(e.target.value)}
-                    placeholder="Ex : Lombalgie chronique, rééducation post-opératoire..."
-                    className="border-0 bg-white/60 dark:bg-gray-800/60 text-sm h-9 focus-visible:ring-[#3899aa]"
-                    disabled={isGenerating}
-                  />
-                </div>
+      <div className="max-w-7xl mx-auto p-4 overflow-hidden">
+
+        {/* Motif de consultation - pleine largeur */}
+          <div className="card-hover flex items-stretch px-5 py-3 mb-6 bg-gradient-to-r from-[#eef7f6] to-[#e4f1f3] dark:from-[#0f1c1b] dark:to-[#132221] rounded-lg">
+            <div className="flex items-center gap-3 w-full">
+              <Search className="h-4 w-4 text-[#3899aa] shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-bold text-[#3899aa] mb-1">Motif de consultation</p>
+                <Input
+                  value={motifConsultation}
+                  onChange={(e) => setMotifConsultation(e.target.value)}
+                  placeholder="Ex : Lombalgie chronique, rééducation post-opératoire..."
+                  className="border-0 bg-white/60 dark:bg-gray-800/60 text-sm h-9 focus-visible:ring-[#3899aa]"
+                  disabled={isGenerating}
+                />
               </div>
-            </div>
-
-            {/* Conseils */}
-            <div className="card-hover text-xs rounded-lg p-4">
-              <p className="font-medium text-[#3899aa] mb-1">💡 Conseils :</p>
-              <ul className="space-y-1 text-foreground">
-                <li>• Notez vos observations sans vous soucier de la structure</li>
-                <li>• Incluez : anamnèse, tests, mesures, observations</li>
-                <li>• L'IA organisera tout selon la structure professionnelle</li>
-                <li>• Plus vos notes sont détaillées, meilleur sera le bilan</li>
-                <li>• Utilisez votre messagerie cryptée pour transmettre votre bilan au médecin</li>
-              </ul>
             </div>
           </div>
 
@@ -349,7 +319,7 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                     disabled={isGenerating}
                   />
 
-                  <div className="flex justify-end">
+                  <div className="flex flex-col items-end gap-1">
                     <Button
                       onClick={handleGenerateBilan}
                       disabled={isGenerating || !rawNotes.trim()}
@@ -368,6 +338,7 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                         </>
                       )}
                     </Button>
+                    <p className="text-[11px] text-red-400">L&apos;IA peut faire des erreurs. Vérifiez les informations importantes.</p>
                   </div>
 
                 </CardContent>
@@ -433,15 +404,35 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
                   ) : (
                     <div className="space-y-4">
                       {/* Bilan éditable */}
-                      <Textarea
-                        value={structuredBilan}
-                        onChange={(e) => setStructuredBilan(e.target.value)}
-                        className="bubble-ai min-h-[250px] sm:min-h-[500px] max-h-[400px] sm:max-h-[600px] text-sm leading-relaxed text-foreground"
-                        placeholder="Le bilan structuré apparaîtra ici..."
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        💡 Vous pouvez modifier le bilan directement avant de l'envoyer ou le télécharger
-                      </p>
+                      <div className="relative">
+                        <Textarea
+                          value={structuredBilan}
+                          onChange={(e) => { if (!isPreviewResult) setStructuredBilan(e.target.value); }}
+                          readOnly={isPreviewResult}
+                          className="bubble-ai min-h-[250px] sm:min-h-[500px] max-h-[400px] sm:max-h-[600px] text-sm leading-relaxed text-foreground"
+                          placeholder="Le bilan structuré apparaîtra ici..."
+                          style={isPreviewResult ? {
+                            maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
+                            WebkitMaskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)'
+                          } : undefined}
+                        />
+                        {isPreviewResult && (
+                          <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                            <Button
+                              onClick={() => setIsPaywallOpen(true)}
+                              className="btn-teal rounded-full text-sm h-9 px-4 shadow-lg"
+                            >
+                              <Lock className="h-3.5 w-3.5 mr-2" />
+                              Débloquer le bilan complet
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      {!isPreviewResult && (
+                        <p className="text-xs text-muted-foreground">
+                          💡 Vous pouvez modifier le bilan directement avant de l'envoyer ou le télécharger
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -450,18 +441,13 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
             </div>
 
           </div>
-        </ChatDisabledOverlay>
 
-        {/* Avertissement */}
-        <div className="mt-6">
-          <Card className="bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700">
-            <CardContent className="p-4">
-              <p className="text-xs text-red-600 dark:text-red-400 font-medium">
-                ⚠️ L'IA peut faire des erreurs. Vérifiez et complétez le bilan avant utilisation. Ce bilan est généré automatiquement et doit être relu par le kinésithérapeute.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <PaywallModal
+          isOpen={isPaywallOpen}
+          onClose={() => setIsPaywallOpen(false)}
+          subscription={subscription}
+        />
+
 
       </div>
     </AppLayout>
