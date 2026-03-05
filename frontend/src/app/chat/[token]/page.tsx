@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Send, Loader2, AlertCircle, CheckCircle, Trophy, X, Check, ChevronDown } from 'lucide-react';
+import { Send, Loader2, AlertCircle, CheckCircle, Trophy, X, Check, ChevronDown, MessageCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -117,6 +117,13 @@ export default function PatientChatPage() {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [validationDetails, setValidationDetails] = useState<any>(null);
   
+  // États notification kiné
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
+  const [notifyMotif, setNotifyMotif] = useState('');
+  const [isNotifying, setIsNotifying] = useState(false);
+  const [notifyCooldown, setNotifyCooldown] = useState(false);
+  const [showNotifySuccess, setShowNotifySuccess] = useState(false);
+
   // Référence pour le scroll automatique
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -192,6 +199,9 @@ export default function PatientChatPage() {
           setIsValidatedToday(data.isValidatedToday);
           if (data.validation) {
             setValidationDetails(data.validation);
+          }
+          if (data.notifyCooldown) {
+            setNotifyCooldown(true);
           }
         }
       }
@@ -355,6 +365,41 @@ export default function PatientChatPage() {
     }
   };
 
+  const handleNotifyKine = async () => {
+    if (!notifyMotif.trim() || isNotifying) return;
+    try {
+      setIsNotifying(true);
+      const response = await fetch(`${API_URL}/api/patient/notify-kine/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motif: notifyMotif.trim() })
+      });
+
+      if (response.status === 429) {
+        setNotifyCooldown(true);
+        setShowNotifyModal(false);
+        setNotifyMotif('');
+        return;
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setShowNotifyModal(false);
+        setNotifyMotif('');
+        setNotifyCooldown(true);
+        setShowNotifySuccess(true);
+        setTimeout(() => setShowNotifySuccess(false), 3000);
+      } else {
+        alert(data.error || 'Erreur lors de l\'envoi');
+      }
+    } catch (err) {
+      console.error('Erreur notification kiné:', err);
+      alert('Erreur lors de l\'envoi de la notification');
+    } finally {
+      setIsNotifying(false);
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -406,7 +451,17 @@ export default function PatientChatPage() {
 
   // Interface de chat type WhatsApp
   return (
-    <div className="h-screen bg-gray-100 flex flex-col overflow-hidden">
+    <div
+      className="h-screen flex flex-col overflow-hidden"
+      style={{
+        backgroundColor: '#f0f4f8',
+        backgroundImage: `
+          url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%233b82f6' fill-opacity='0.05'%3E%3Cpath d='M20 20h8v8h-8zM32 32h4v4h-4zM48 16h6v6h-6zM64 44h5v5h-5zM12 52h7v7h-7zM60 8h3v3h-3zM40 60h4v4h-4zM8 36h6v6h-6zM56 72h8v8h-8zM24 64h5v5h-5zM72 20h4v4h-4zM16 8h5v5h-5z'/%3E%3C/g%3E%3C/svg%3E"),
+          url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%233b82f6' fill-opacity='0.03'%3E%3Ccircle cx='20' cy='20' r='2'/%3E%3Ccircle cx='80' cy='40' r='1.5'/%3E%3Ccircle cx='40' cy='80' r='3'/%3E%3Ccircle cx='100' cy='100' r='2'/%3E%3Ccircle cx='60' cy='20' r='1'/%3E%3Ccircle cx='20' cy='100' r='2.5'/%3E%3Ccircle cx='100' cy='60' r='1.5'/%3E%3Ccircle cx='40' cy='40' r='1'/%3E%3C/g%3E%3C/svg%3E"),
+          url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%233b82f6' fill-opacity='0.04'%3E%3Cpath d='M25 15l5 8h-10zM70 20l4 6h-8zM45 70l6 10h-12zM80 80l3 5h-6zM15 60l7 12h-14zM90 40l4 7h-8z'/%3E%3C/g%3E%3C/svg%3E")
+        `
+      }}
+    >
       {/* Toast de succès */}
       {showSuccessToast && (
         <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 animate-in slide-in-from-right duration-300">
@@ -508,6 +563,55 @@ export default function PatientChatPage() {
         </div>
       )}
 
+      {/* Modal notification kiné */}
+      {showNotifyModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <MessageCircle className="w-8 h-8 text-teal-600" />
+              </div>
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">Contacter mon kiné</h2>
+              <p className="text-gray-600 text-sm">Décrivez brièvement la raison de votre demande</p>
+            </div>
+
+            <div>
+              <textarea
+                value={notifyMotif}
+                onChange={(e) => setNotifyMotif(e.target.value.slice(0, 200))}
+                placeholder="Ex: J'ai une douleur inhabituelle au genou depuis ce matin..."
+                className="w-full p-3 border rounded-xl text-sm resize-none outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500"
+                rows={3}
+                disabled={isNotifying}
+              />
+              <p className="text-xs text-gray-400 text-right mt-1">{notifyMotif.length}/200</p>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => { setShowNotifyModal(false); setNotifyMotif(''); }}
+                disabled={isNotifying}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleNotifyKine}
+                disabled={isNotifying || !notifyMotif.trim()}
+                className="flex-1 px-4 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isNotifying ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                Envoyer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header - toujours visible */}
       <div className="bg-white text-gray-800 shadow-lg border-b z-30">
         <div className="px-4 py-3">
@@ -516,11 +620,23 @@ export default function PatientChatPage() {
               <h1 className="font-semibold text-lg text-gray-800">Mon Assistant Kiné</h1>
             </div>
             
-            {/* Info programme - aligné avec bordure gauche des bulles */}
-            <div className="mt-2 pt-2 border-t border-gray-200">
+            {/* Info programme + contact kiné */}
+            <div className="mt-2 pt-2 border-t border-gray-200 flex items-center justify-between">
               <p className="text-sm text-gray-600">
                 {patientData?.nom} • Programme : {programmeData?.titre}
               </p>
+              <button
+                onClick={() => !notifyCooldown && setShowNotifyModal(true)}
+                disabled={notifyCooldown}
+                className={`text-xs font-medium flex items-center gap-1 ml-4 shrink-0 transition-colors ${
+                  notifyCooldown
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : 'text-teal-600 hover:text-teal-700'
+                }`}
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                {notifyCooldown ? 'Notification envoyée' : 'Contacter mon kiné'}
+              </button>
             </div>
             
             {/* Warning d'expiration */}
@@ -534,17 +650,7 @@ export default function PatientChatPage() {
       </div>
 
       {/* Zone de chat */}
-      <div 
-        className="flex-1 overflow-y-auto"
-        style={{
-          backgroundColor: '#f0f4f8',
-          backgroundImage: `
-            url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%233b82f6' fill-opacity='0.05'%3E%3Cpath d='M20 20h8v8h-8zM32 32h4v4h-4zM48 16h6v6h-6zM64 44h5v5h-5zM12 52h7v7h-7zM60 8h3v3h-3zM40 60h4v4h-4zM8 36h6v6h-6zM56 72h8v8h-8zM24 64h5v5h-5zM72 20h4v4h-4zM16 8h5v5h-5z'/%3E%3C/g%3E%3C/svg%3E"),
-            url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%233b82f6' fill-opacity='0.03'%3E%3Ccircle cx='20' cy='20' r='2'/%3E%3Ccircle cx='80' cy='40' r='1.5'/%3E%3Ccircle cx='40' cy='80' r='3'/%3E%3Ccircle cx='100' cy='100' r='2'/%3E%3Ccircle cx='60' cy='20' r='1'/%3E%3Ccircle cx='20' cy='100' r='2.5'/%3E%3Ccircle cx='100' cy='60' r='1.5'/%3E%3Ccircle cx='40' cy='40' r='1'/%3E%3C/g%3E%3C/svg%3E"),
-            url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%233b82f6' fill-opacity='0.04'%3E%3Cpath d='M25 15l5 8h-10zM70 20l4 6h-8zM45 70l6 10h-12zM80 80l3 5h-6zM15 60l7 12h-14zM90 40l4 7h-8z'/%3E%3C/g%3E%3C/svg%3E")
-          `
-        }}
-      >
+      <div className="flex-1 overflow-y-auto">
         {isLoadingChat ? (
           // Chargement de l'historique
           <div className="flex items-center justify-center h-full">
@@ -634,7 +740,7 @@ export default function PatientChatPage() {
       </div>
 
       {/* Barre validation séance - sticky au-dessus de l'input */}
-      <div className="bg-white border-t px-4 py-2 shadow-sm">
+      <div className="px-4 py-2">
         <div className="max-w-4xl mx-auto">
           {isValidatedToday ? (
             <div className="flex items-center justify-center gap-2 py-1 text-sm text-green-700">
@@ -653,8 +759,16 @@ export default function PatientChatPage() {
         </div>
       </div>
 
+      {/* Toast notification envoyée */}
+      {showNotifySuccess && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-teal-600 text-white px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+          <CheckCircle className="w-4 h-4" />
+          <span className="text-sm font-medium">Votre kiné a été notifié</span>
+        </div>
+      )}
+
       {/* Zone de saisie - style WhatsApp */}
-      <div className="bg-white border-t p-4 shadow-lg">
+      <div className="px-4 py-3">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-end gap-3">
             <div className="flex-1 bg-gray-100 rounded-full px-4 py-2 border">

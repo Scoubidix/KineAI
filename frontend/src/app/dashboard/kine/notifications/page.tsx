@@ -14,7 +14,8 @@ import {
   Filter,
   Eye,
   EyeOff,
-  Trash2
+  Trash2,
+  MessageCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -24,7 +25,7 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth';
 // Types pour les notifications
 interface NotificationData {
   id: number;
-  type: 'DAILY_VALIDATION' | 'PROGRAM_COMPLETED' | 'PAIN_ALERT';
+  type: 'DAILY_VALIDATION' | 'PROGRAM_COMPLETED' | 'PAIN_ALERT' | 'PATIENT_REQUEST';
   title: string;
   message: string;
   isRead: boolean;
@@ -48,6 +49,7 @@ interface NotificationStats {
     DAILY_VALIDATION?: number;
     PROGRAM_COMPLETED?: number;
     PAIN_ALERT?: number;
+    PATIENT_REQUEST?: number;
   };
 }
 
@@ -304,6 +306,8 @@ export default function KineNotificationsPage() {
         return <Trophy className="inline h-4 w-4 mr-1 text-green-500" />;
       case 'PAIN_ALERT':
         return <AlertCircle className="inline h-4 w-4 mr-1 text-destructive" />;
+      case 'PATIENT_REQUEST':
+        return <MessageCircle className="inline h-4 w-4 mr-1 text-teal-500" />;
       default:
         return <Bell className="inline h-4 w-4 mr-1 text-blue-500" />;
     }
@@ -456,6 +460,7 @@ export default function KineNotificationsPage() {
                 <option value="DAILY_VALIDATION">Validations journée</option>
                 <option value="PAIN_ALERT">Alertes douleur</option>
                 <option value="PROGRAM_COMPLETED">Programmes terminés</option>
+                <option value="PATIENT_REQUEST">Demandes patients</option>
               </select>
             </div>
           </CardContent>
@@ -530,7 +535,11 @@ export default function KineNotificationsPage() {
                     </div>
                     
                     <div className="text-sm text-muted-foreground space-y-2">
-                      <p>{notification.message}</p>
+                      {notification.type === 'PATIENT_REQUEST' && notification.patient?.name ? (
+                        <p><span className="font-semibold text-foreground">{notification.patient.name}</span> souhaite vous contacter : &quot;{notification.metadata?.motif}&quot;</p>
+                      ) : (
+                        <p>{notification.message}</p>
+                      )}
                       
                       {/* Informations spécifiques selon le type */}
                       {notification.type === 'PAIN_ALERT' && notification.metadata?.painLevel && (

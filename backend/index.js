@@ -91,6 +91,7 @@ const exerciceTemplatesRoutes = require('./routes/exerciceTemplates');
 
 // 🎁 NOUVEAU PARRAINAGE : Import des routes parrainage
 const referralRoutes = require('./routes/referral');
+const contactsRoutes = require('./routes/contacts');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -581,6 +582,9 @@ app.use('/api/rgpd', (req, res, next) => {
 
 // 🎁 PARRAINAGE : Routes de parrainage (LIBRES - navigation)
 app.use('/api/referral', referralRoutes);
+
+// 📇 CONTACTS : CRUD contacts kiné (LIBRES - navigation)
+app.use('/api/contacts', contactsRoutes);
 
 // 📧 TEMPLATES ADMIN : Rate limiting sélectif sur envoi WhatsApp
 app.use('/api/templates', (req, res, next) => {

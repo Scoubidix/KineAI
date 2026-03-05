@@ -80,7 +80,8 @@ import {
   CreditCard,
   Trophy,
   AlertCircle,
-  Crown
+  Crown,
+  MessageCircle
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -908,6 +909,7 @@ function NotificationsDropdown() {
       case 'DAILY_VALIDATION': return <Calendar className="h-4 w-4 text-blue-500" />;
       case 'PROGRAM_COMPLETED': return <Trophy className="h-4 w-4 text-green-500" />;
       case 'PAIN_ALERT': return <AlertCircle className="h-4 w-4 text-red-500" />;
+      case 'PATIENT_REQUEST': return <MessageCircle className="h-4 w-4 text-teal-500" />;
       default: return <Bell className="h-4 w-4 text-blue-500" />;
     }
   };

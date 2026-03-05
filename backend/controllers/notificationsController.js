@@ -350,6 +350,12 @@ const notificationsController = {
           label: 'Alerte douleur',
           description: 'Niveau de douleur élevé signalé',
           icon: 'alert-circle'
+        },
+        {
+          value: 'PATIENT_REQUEST',
+          label: 'Demande patient',
+          description: 'Un patient souhaite vous contacter',
+          icon: 'message-circle'
         }
       ];
 

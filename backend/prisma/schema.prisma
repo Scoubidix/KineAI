@@ -63,6 +63,11 @@ model Kine {
   // ========== RELATION TEMPLATES ADMIN ==========
   templatesSentHistory TemplateSentHistory[]
   // ==============================================
+
+  // ========== RELATIONS CONTACTS & TEMPLATES PRIVÉS ==========
+  contacts       Contact[]
+  adminTemplates AdminTemplate[]
+  // ===========================================================
 }
 
 model Patient {
@@ -389,6 +394,7 @@ enum NotificationType {
   DAILY_VALIDATION // Patient valide une journée
   PROGRAM_COMPLETED // Programme terminé
   PAIN_ALERT // Niveau douleur élevé (≥7)
+  PATIENT_REQUEST // Patient demande à contacter son kiné
 
   @@map("notification_type")
 }
@@ -411,8 +417,13 @@ model AdminTemplate {
   body       String   @db.Text // Contenu avec variables [...]
   tags       String[] @default([]) // Tags pour recherche
   usageCount Int      @default(0) // Compteur utilisation
+  isPublic   Boolean  @default(false) // true = template système visible par tous
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  // Relation kiné (null = template système/public)
+  kineId Int?
+  kine   Kine? @relation(fields: [kineId], references: [id], onDelete: Cascade)
 
   // Relations
   templatesSentHistory TemplateSentHistory[]
@@ -420,6 +431,7 @@ model AdminTemplate {
   // Index pour recherche optimisée
   @@index([category])
   @@index([tags])
+  @@index([kineId])
   @@map("admin_templates")
 }
 
@@ -430,27 +442,51 @@ model TemplateSentHistory {
   kineId Int
   kine   Kine @relation(fields: [kineId], references: [id], onDelete: Cascade)
 
-  patientId Int
-  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId Int?
+  patient   Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
-  templateId Int
-  template   AdminTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  contactId Int?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  templateId Int?
+  template   AdminTemplate? @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   // Données de l'envoi
-  templateTitle String              @db.VarChar(255) // Titre template (copie pour historique)
-  subject       String              @db.VarChar(255) // Objet email final
-  body          String              @db.Text // Contenu final personnalisé
-  patientEmail  String?             @db.VarChar(255) // Email patient (si email)
-  patientPhone  String?             @db.VarChar(20) // Téléphone patient (si WhatsApp)
-  method        CommunicationMethod @default(EMAIL) // Méthode d'envoi
+  templateTitle  String              @db.VarChar(255) // Titre template (copie pour historique)
+  subject        String              @db.VarChar(255) // Objet email final
+  body           String              @db.Text // Contenu final personnalisé
+  recipientName  String              @default("Inconnu") @db.VarChar(255) // Nom du destinataire
+  recipientEmail String?             @db.VarChar(255) // Email du destinataire
+  patientEmail   String?             @db.VarChar(255) // Email patient (legacy)
+  patientPhone   String?             @db.VarChar(20) // Téléphone patient (si WhatsApp)
+  method         CommunicationMethod @default(EMAIL) // Méthode d'envoi
 
   sentAt DateTime @default(now())
 
   // Index pour historique
   @@index([kineId, sentAt])
   @@index([patientId])
+  @@index([contactId])
   @@index([templateId])
   @@map("templates_sent_history")
+}
+
+model Contact {
+  id        Int      @id @default(autoincrement())
+  kineId    Int
+  kine      Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  firstName String?  @db.VarChar(100)
+  lastName  String?  @db.VarChar(100)
+  email     String?  @db.VarChar(255)
+  phone     String?  @db.VarChar(20)
+  type      String?  @db.VarChar(100) // Texte libre : "Médecin", "Mutuelle"...
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  templatesSentHistory TemplateSentHistory[]
+
+  @@index([kineId])
+  @@map("contacts")
 }
 
 enum CommunicationMethod {

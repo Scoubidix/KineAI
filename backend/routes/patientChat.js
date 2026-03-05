@@ -437,9 +437,21 @@ router.get('/session-status/:token',
         }
       });
 
+      // Vérifier cooldown notification kiné (12h)
+      const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+      const recentNotif = await prisma.notification.findFirst({
+        where: {
+          type: 'PATIENT_REQUEST',
+          patientId: patientId,
+          programmeId: programmeId,
+          createdAt: { gte: twelveHoursAgo }
+        }
+      });
+
       const response = {
         success: true,
         isValidatedToday: !!existingValidation?.isValidated,
+        notifyCooldown: !!recentNotif,
         validation: existingValidation ? {
           date: existingValidation.date,
           painLevel: existingValidation.painLevel,
@@ -652,6 +664,86 @@ router.post('/validate-session/:token',
         error: 'Erreur serveur lors de la validation',
         details: error.message
       });
+    }
+  }
+);
+
+// ========== POST /api/patient/notify-kine/:token - Notifier le kiné ==========
+
+router.post('/notify-kine/:token',
+  authenticatePatient,
+  async (req, res) => {
+    try {
+      const { motif } = req.body;
+
+      if (!motif || typeof motif !== 'string' || !motif.trim()) {
+        return res.status(400).json({ success: false, error: 'Le motif est requis' });
+      }
+
+      if (motif.length > 200) {
+        return res.status(400).json({ success: false, error: 'Le motif ne peut pas dépasser 200 caractères' });
+      }
+
+      const prisma = prismaService.getInstance();
+      const patient = req.patient;
+      const programme = req.programme;
+
+      // Vérifier cooldown 12h
+      const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+      const recentNotif = await prisma.notification.findFirst({
+        where: {
+          type: 'PATIENT_REQUEST',
+          patientId: patient.id,
+          programmeId: programme.id,
+          createdAt: { gte: twelveHoursAgo }
+        }
+      });
+
+      if (recentNotif) {
+        const nextAvailable = new Date(recentNotif.createdAt.getTime() + 12 * 60 * 60 * 1000);
+        return res.status(429).json({
+          success: false,
+          error: 'Vous avez déjà envoyé une notification récemment',
+          nextAvailableAt: nextAvailable.toISOString()
+        });
+      }
+
+      // Récupérer le kineId
+      let kineId = patient.kineId || programme.patient?.kineId;
+      if (!kineId) {
+        const patientData = await prisma.patient.findUnique({
+          where: { id: patient.id },
+          select: { kineId: true }
+        });
+        kineId = patientData?.kineId;
+      }
+
+      if (!kineId) {
+        return res.status(500).json({ success: false, error: 'Impossible de trouver votre kinésithérapeute' });
+      }
+
+      // Créer la notification via le service existant
+      const notificationService = require('../services/notificationService');
+      await notificationService.createNotification({
+        type: 'PATIENT_REQUEST',
+        title: 'Demande patient',
+        message: `${patient.firstName} ${patient.lastName} souhaite vous contacter : "${motif.trim()}"`,
+        kineId,
+        patientId: patient.id,
+        programmeId: programme.id,
+        metadata: { motif: motif.trim() }
+      });
+
+      logger.info(`Notification PATIENT_REQUEST créée - Patient: ${patient.id}, Programme: ${programme.id}`);
+
+      res.status(201).json({
+        success: true,
+        message: 'Votre kiné a été notifié'
+      });
+
+    } catch (error) {
+      logger.error('Erreur route notify-kine:', error);
+      res.status(500).json({ success: false, error: 'Erreur lors de l\'envoi de la notification' });
     }
   }
 );

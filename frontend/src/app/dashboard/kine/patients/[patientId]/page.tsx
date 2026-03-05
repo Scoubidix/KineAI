@@ -1015,9 +1015,9 @@ export default function PatientDetailPage() {
                 {/* Tout dans un seul bloc ultra-compact */}
                 <div className="rounded-xl p-4">
                   <div className="space-y-2">
-                    {/* Ligne 1 : Avatar + Nom */}
+                    {/* Avatar + Nom + Age + Infos contact */}
                     <div className="flex items-center gap-3">
-                      <div className="relative">
+                      <div className="relative shrink-0">
                         <div className="w-12 h-12 rounded-full bg-[#3899aa]/10 flex items-center justify-center ring-2 ring-[#3899aa]/30">
                           <User className="w-6 h-6 text-[#3899aa]" />
                         </div>
@@ -1027,9 +1027,21 @@ export default function PatientDetailPage() {
                       </div>
 
                       <div className="flex-1">
-                        <h1 className="text-xl font-bold text-[#3899aa] leading-tight">
-                          {patient.firstName} {patient.lastName.toUpperCase()}
-                        </h1>
+                        <div className="flex items-center gap-8">
+                          <h1 className="text-xl font-bold text-[#3899aa] leading-tight">
+                            {patient.firstName} {patient.lastName.toUpperCase()}
+                          </h1>
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Mail className="w-3 h-3 text-[#3899aa]" />
+                              {patient.email}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Phone className="w-3 h-3 text-[#3899aa]" />
+                              {patient.phone}
+                            </span>
+                          </div>
+                        </div>
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Calendar className="w-3 h-3" />
                           <span className="text-xs">
@@ -1039,37 +1051,6 @@ export default function PatientDetailPage() {
                       </div>
                     </div>
 
-                    {/* Ligne 2 : Email */}
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-[#3899aa]/10 rounded-md flex items-center justify-center">
-                        <Mail className="w-4 h-4 text-[#3899aa]" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-foreground text-sm font-medium">{patient.email}</p>
-                      </div>
-                    </div>
-
-                    {/* Ligne 3 : Téléphone */}
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-[#3899aa]/10 rounded-md flex items-center justify-center">
-                        <Phone className="w-4 h-4 text-[#3899aa]" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-foreground text-sm font-medium">{patient.phone}</p>
-                      </div>
-                    </div>
-
-                    {/* Ligne 4 : Objectifs (si présents) */}
-                    {patient.goals && (
-                      <div className="flex items-start gap-2 pt-1 border-t border-border">
-                        <div className="w-8 h-8 bg-[#3899aa]/10 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Target className="w-4 h-4 text-[#3899aa]" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-foreground text-xs leading-relaxed">{patient.goals}</p>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
