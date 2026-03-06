@@ -123,6 +123,7 @@ export default function PatientChatPage() {
   const [isNotifying, setIsNotifying] = useState(false);
   const [notifyCooldown, setNotifyCooldown] = useState(false);
   const [showNotifySuccess, setShowNotifySuccess] = useState(false);
+  const [expandedGif, setExpandedGif] = useState<string | null>(null);
 
   // Référence pour le scroll automatique
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -683,9 +684,10 @@ export default function PatientChatPage() {
                           <img
                             src={src}
                             alt={alt || 'Image'}
-                            className="w-full max-w-[280px] rounded-lg my-2 shadow-sm"
+                            className="max-w-[150px] rounded-lg my-2 shadow-sm cursor-pointer hover:opacity-80 transition-opacity"
                             loading="lazy"
                             style={{ height: 'auto' }}
+                            onClick={() => setExpandedGif(src || null)}
                           />
                         ),
                         p: ({ children }) => (
@@ -809,6 +811,20 @@ export default function PatientChatPage() {
           </div>
         </div>
       </div>
+
+      {expandedGif && (
+        <div
+          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+          onClick={() => setExpandedGif(null)}
+        >
+          <img
+            src={expandedGif}
+            alt="GIF agrandi"
+            className="max-w-full max-h-[85vh] rounded-xl shadow-2xl"
+            style={{ height: 'auto' }}
+          />
+        </div>
+      )}
 
       <style jsx>{`
         .slider::-webkit-slider-thumb {
