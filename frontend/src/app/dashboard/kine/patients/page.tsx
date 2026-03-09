@@ -190,7 +190,7 @@ export default function PatientsPage() {
 
   return (
     <AppLayout>
-      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-hidden">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div className="space-y-2">
             <h2 className="text-xl sm:text-2xl font-bold text-[#3899aa]">Liste des patients</h2>

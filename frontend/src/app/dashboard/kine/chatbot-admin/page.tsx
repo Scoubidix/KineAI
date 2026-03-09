@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import AppLayout from '@/components/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 export default function KineChatbotAdminPage() {
   const { isLoading: paywallLoading, canAccessFeature, subscription } = usePaywall();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const recipientSearch = searchParams.get('recipientSearch') || '';
 
   // Modal states
   const [templatesOpen, setTemplatesOpen] = useState(false);
@@ -82,6 +85,17 @@ export default function KineChatbotAdminPage() {
     }
     setCourrierOpen(true);
   };
+
+  // Ouvrir auto le modal courrier si redirigé depuis notifications (avec vérif abonnement)
+  useEffect(() => {
+    if (recipientSearch && !paywallLoading) {
+      if (hasAccess) {
+        setCourrierOpen(true);
+      } else {
+        setShowPaywallHint(true);
+      }
+    }
+  }, [recipientSearch, paywallLoading, hasAccess]);
 
   // Si l'user a cliqué pendant le loading, ouvrir dès que c'est prêt
   useEffect(() => {
@@ -296,6 +310,7 @@ export default function KineChatbotAdminPage() {
         onOpenChange={setCourrierOpen}
         apiBase={API_BASE}
         getAuthToken={getAuthToken}
+        defaultSearch={recipientSearch}
       />
       <PaywallModal
         isOpen={isPaywallOpen}

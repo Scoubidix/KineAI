@@ -631,7 +631,7 @@ export default function ProgrammesPage() {
   return (
     <AppLayout>
       <AuthGuard role="kine" />
-      <div className="space-y-4 sm:space-y-6 overflow-hidden">
+      <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
         {/* En-tête */}
         <div className="pb-4 border-b border-border flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
           <div>

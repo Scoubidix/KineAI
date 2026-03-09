@@ -378,8 +378,8 @@ export default function KineChatbotPage() {
                 style={{
                   scrollBehavior: 'smooth',
                   overflowAnchor: 'none',
-                  maskImage: 'linear-gradient(to bottom, transparent, black 32px, black calc(100% - 32px), transparent)',
-                  WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 32px, black calc(100% - 32px), transparent)'
+                  maskImage: 'linear-gradient(to bottom, transparent, black 32px)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 32px)'
                 }}
               >
                 {isLoadingHistory ? (
@@ -416,7 +416,7 @@ export default function KineChatbotPage() {
                         <div
                           key={index}
                           ref={isLastBotMessage ? lastBotMessageRef : undefined}
-                          className={`flex ${msg.role === 'user' ? 'justify-end pr-12 sm:pr-24' : 'justify-start'}`}
+                          className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
                             className={`max-w-[80%] rounded-2xl ${
@@ -479,7 +479,7 @@ export default function KineChatbotPage() {
                 )}
               </div>
 
-              <div className="w-2/3 mx-auto px-4 pb-2 pt-2">
+              <div className="px-6 pb-2 pt-0">
                 <div className="relative flex items-center bg-white dark:bg-card border-2 border-border rounded-full px-4 py-1 shadow-sm focus-within:border-[#3899aa]/60 focus-within:shadow-md transition-all">
                   <Input
                     placeholder="Posez votre question ici..."

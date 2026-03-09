@@ -15,3 +15,6 @@ migrateStudiesV2.js
 studies_v2.sql
 migration_processed_ids.json
 migration_error_ids.json
+
+# Scripts PubMed (collecte données + logs)
+scripts/pubmed/

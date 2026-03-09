@@ -519,7 +519,7 @@ export default function KineCreateExercisePage() {
 
   return (
     <AppLayout>
-      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-hidden">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
           <div className="space-y-2">
             <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2 text-[#3899aa]">

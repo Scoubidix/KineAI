@@ -49,10 +49,11 @@ interface NouveauCourrierModalProps {
   onOpenChange: (open: boolean) => void;
   apiBase: string;
   getAuthToken: () => Promise<string | undefined>;
+  defaultSearch?: string;
 }
 
 export default function NouveauCourrierModal({
-  open, onOpenChange, apiBase, getAuthToken
+  open, onOpenChange, apiBase, getAuthToken, defaultSearch
 }: NouveauCourrierModalProps) {
   const { toast } = useToast();
 
@@ -111,7 +112,7 @@ export default function NouveauCourrierModal({
   const resetState = () => {
     setStep(1);
     setRecipientType('patient');
-    setRecipientSearch('');
+    setRecipientSearch(defaultSearch || '');
     setSelectedPatient(null);
     setSelectedContact(null);
     setTemplateSearch('');

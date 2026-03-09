@@ -275,7 +275,7 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-4 overflow-hidden">
+      <div className="max-w-7xl mx-auto p-4 overflow-x-hidden">
 
         {/* Motif de consultation - pleine largeur */}
           <div className="card-hover flex items-stretch px-5 py-3 mb-6 bg-gradient-to-r from-[#eef7f6] to-[#e4f1f3] dark:from-[#0f1c1b] dark:to-[#132221] rounded-lg">

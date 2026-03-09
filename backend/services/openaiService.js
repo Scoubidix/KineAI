@@ -630,7 +630,12 @@ const prepareKineRequest = async (type, message, conversationHistory = [], kineI
     },
     'clinique': {
       model: 'gpt-4.1-mini',
-      max_tokens: 1500,
+      max_tokens: 2000,
+      temperature: 0.3
+    },
+    'biblio': {
+      model: 'gpt-4o-mini',
+      max_tokens: 2000,
       temperature: 0.3
     },
     'admin': {
@@ -827,51 +832,56 @@ const saveToCorrectTable = async (type, kineId, message, response) => {
 const shouldUseRAG = async (message, conversationHistory = []) => {
   try {
     const recentHistory = conversationHistory.slice(-10).map(msg =>
-      `${msg.role}: ${msg.content.substring(0, 200)}`
+      `${msg.role}: ${msg.content.substring(0, 2500)}`
     ).join('\n');
 
-    const ragDetectorPrompt = `Tu es un détecteur de besoin documentaire pour un assistant kiné.
+    const ragDetectorPrompt = `Tu es un query rewriter pour un assistant kiné.
 
 Un kinésithérapeute est en conversation de suivi après une recherche documentaire.
-Il a DÉJÀ reçu une réponse sourcée. Analyse son nouveau message pour déterminer
-s'il nécessite une NOUVELLE recherche dans la base documentaire.
+Il a DÉJÀ reçu une réponse sourcée avec des études numérotées (1), (2), etc.
 
-rag: true SI :
-- Demande une information factuelle ABSENTE de la conversation (nouveau sujet, autre pathologie, autre test)
-- Demande des études, sources, ou données chiffrées supplémentaires
-- Pose une question précise qui nécessite des documents spécifiques
+ANALYSE son nouveau message et décide :
+
+rag: true + query optimisée SI :
+- Demande des détails sur une étude citée (ex: "décris l'étude 2", "détaille la réf 3") → RÉSOUS la référence dans l'historique et génère une query avec auteur + termes clés du titre
+- Demande une info factuelle ABSENTE de la conversation (nouveau sujet, autre pathologie)
+- Demande des études ou sources supplémentaires
 
 rag: false SI :
 - Reformulation, clarification ou vulgarisation de ce qui a déjà été dit
 - Remerciement, salutation, confirmation
-- Approfondissement ou avis sur les informations déjà fournies
 - Question d'opinion ou de pratique clinique générale
+
+IMPORTANT pour la query :
+- Si l'user référence une étude par numéro, RETROUVE le titre/auteur dans l'historique et construis la query avec ces termes
+- La query doit être optimisée pour une recherche vectorielle + BM25 (mots-clés pertinents, pas de mots vides)
+- Langue de la query : français (la base contient des abstracts traduits en FR)
 
 Historique récent :
 ${recentHistory || 'Aucun'}
 
 Message : "${message}"
 
-Réponds UNIQUEMENT en JSON : {"rag":true|false}`;
+Réponds UNIQUEMENT en JSON : {"rag": true|false, "query": "requête optimisée ou null si rag=false"}`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: ragDetectorPrompt }],
-      max_tokens: 20,
+      max_tokens: 100,
       temperature: 0,
       response_format: { type: 'json_object' }
     });
 
     const result = JSON.parse(response.choices[0].message.content);
     const rag = result.rag === true;
+    const query = result.query || null;
 
-    logger.debug(`🔍 shouldUseRAG: rag=${rag} pour message: "${message.substring(0, 80)}..."`);
+    logger.debug(`🔍 shouldUseRAG: rag=${rag}, query="${query}" pour message: "${message.substring(0, 80)}..."`);
 
-    return { rag };
+    return { rag, query };
   } catch (error) {
     logger.error('❌ Erreur shouldUseRAG:', error.message);
-    // Fallback safe : pas de RAG en cas d'erreur (comportement actuel)
-    return { rag: false };
+    return { rag: false, query: null };
   }
 };
 
@@ -898,17 +908,18 @@ const generateFollowupResponse = async (message, conversationHistory = [], kineI
 
     // 1. Détection du besoin RAG via mini LLM
     const ragDecision = await shouldUseRAG(message, conversationHistory);
-    logger.debug(`🔍 Followup RAG décision: rag=${ragDecision.rag} (source: ${sourceIa})`);
+    const searchQuery = ragDecision.query || message;
+    logger.debug(`🔍 Followup RAG décision: rag=${ragDecision.rag}, query="${searchQuery}" (source: ${sourceIa})`);
 
-    // 2. Recherche documentaire si RAG activé
+    // 2. Recherche documentaire si RAG activé (avec query optimisée)
     let limitedDocuments = [];
     let selectedSources = [];
     let searchMetadata = { totalFound: 0, averageScore: 0, categoriesFound: [] };
 
     if (ragDecision.rag) {
-      logger.debug(`📚 Followup RAG activé → recherche dans base ${sourceIa}`);
+      logger.debug(`📚 Followup RAG activé → recherche "${searchQuery}" dans base ${sourceIa}`);
 
-      const searchResult = await knowledgeService.searchDocuments(message, {
+      const searchResult = await knowledgeService.searchDocuments(searchQuery, {
         filterCategory: null,
         allowLowerThreshold: true,
         iaType: sourceIa
@@ -953,6 +964,8 @@ TON & STYLE :
 - 2-3 emojis maximum
 
 RÈGLES :
+- PRIORITÉ À L'HISTORIQUE : quand le kiné référence un élément par numéro ("étude 2", "test 3", "réf 1"), il parle TOUJOURS d'un élément déjà cité dans la conversation. Retrouve-le dans l'historique et base ta réponse dessus.
+- Les documents complémentaires (RAG) servent uniquement à ENRICHIR ta réponse avec des détails supplémentaires, pas à remplacer l'élément référencé par le kiné.
 - Base-toi sur le contexte de la conversation précédente
 - Si la question sort du cadre de la discussion, dis-le poliment
 - Ne jamais inventer d'études, de chiffres ou de faits
@@ -1067,17 +1080,18 @@ const generateFollowupResponseStream = async (message, conversationHistory = [],
     throw new Error('Message requis');
   }
 
-  // 1. Détection du besoin RAG via mini LLM
+  // 1. Détection du besoin RAG + query rewriting via mini LLM
   const ragDecision = await shouldUseRAG(message, conversationHistory);
-  logger.debug(`🔍 Followup Stream RAG décision: rag=${ragDecision.rag} (source: ${sourceIa})`);
+  const searchQuery = ragDecision.query || message;
+  logger.debug(`🔍 Followup Stream RAG décision: rag=${ragDecision.rag}, query="${searchQuery}" (source: ${sourceIa})`);
 
-  // 2. Recherche documentaire si RAG activé
+  // 2. Recherche documentaire si RAG activé (avec query optimisée)
   let limitedDocuments = [];
   let selectedSources = [];
   let searchMetadata = { totalFound: 0, averageScore: 0, categoriesFound: [] };
 
   if (ragDecision.rag) {
-    const searchResult = await knowledgeService.searchDocuments(message, {
+    const searchResult = await knowledgeService.searchDocuments(searchQuery, {
       filterCategory: null,
       allowLowerThreshold: true,
       iaType: sourceIa
@@ -1112,6 +1126,8 @@ TON & STYLE :
 - 2-3 emojis maximum
 
 RÈGLES :
+- PRIORITÉ À L'HISTORIQUE : quand le kiné référence un élément par numéro ("étude 2", "test 3", "réf 1"), il parle TOUJOURS d'un élément déjà cité dans la conversation. Retrouve-le dans l'historique et base ta réponse dessus.
+- Les documents complémentaires (RAG) servent uniquement à ENRICHIR ta réponse avec des détails supplémentaires, pas à remplacer l'élément référencé par le kiné.
 - Base-toi sur le contexte de la conversation précédente
 - Si la question sort du cadre de la discussion, dis-le poliment
 - Ne jamais inventer d'études, de chiffres ou de faits
@@ -1303,117 +1319,97 @@ REDIRECTION VERS AUTRES IA (si pertinent) :
 }
 
 function buildBiblioSystemPrompt(contextDocuments) {
-  let systemPrompt = `Tu es une IA spécialisée dans l'ANALYSE BIBLIOGRAPHIQUE EVIDENCE-BASED pour kinésithérapeutes professionnels.
+  let systemPrompt = `Tu es une IA spécialisée en recherche bibliographique evidence-based pour kinésithérapeutes.
 
-OBJECTIF : Fournir des recommandations cliniques basées UNIQUEMENT sur les ÉTUDES SCIENTIFIQUES de notre base vérifiée.
+OBJECTIF : Synthétiser les études scientifiques de notre base pour répondre aux questions cliniques.
 
 STRUCTURE DE RÉPONSE OBLIGATOIRE :
 
-COMMENCE DIRECTEMENT PAR (sans introduction) :
+COMMENCE DIRECTEMENT PAR une synthèse claire et concise. Cite les études avec des numéros entre parenthèses dans le texte : (1), (2), etc.
 
-**🎯 RECOMMANDATIONS CLINIQUES EVIDENCE-BASED**
-[Synthèse pratique des recommandations pour la prise en charge basées sur les preuves]
+Puis termine TOUJOURS par une section références :
 
-**📊 ANALYSE DES PREUVES SCIENTIFIQUES**
-[Résumé des principaux résultats, statistiques, et conclusions des études]
+**📚 Références**
+(1) Titre de l'étude
+Auteurs (Année)
+Lien PubMed
 
-**📚 RÉFÉRENCES BIBLIOGRAPHIQUES**
-[Liste des études sous la forme : "Titre document, auteurs (année), niveau de preuve"]
+(2) Titre de l'étude
+Auteurs (Année)
+Lien PubMed
 
-**⚠️ QUALITÉ DES PREUVES & LIMITATIONS**
-[Niveau des preuves, limitations méthodologiques, contre-indications mentionnées]
+RÈGLES DE CITATION :
+- Cite les études par numéro dans le texte, ex: "L'exercice excentrique montre des résultats supérieurs (1,3) comparé au travail isométrique (2)"
+- Les numéros correspondent aux références listées en bas
+- Chaque référence = titre + auteurs (année) + URL PubMed sur la ligne suivante
+- Ne jamais inventer de références ou données non mentionnées dans les études fournies
 
-RÈGLES ABSOLUES POUR L'EVIDENCE-BASED PRACTICE :
-- Utilise UNIQUEMENT les ÉTUDES SCIENTIFIQUES fournies ci-dessous (type_contenu=etude)
-- Groupe les sections de la MÊME étude (même source) en une seule référence bibliographique
-- Cite OBLIGATOIREMENT : Auteur + Année + Niveau de preuve
-- Hiérarchise les recommandations selon la FORCE DES PREUVES (Niveau A > B > C > D)
-- Ne jamais inventer de références ou données non mentionnées (IMPORTANT)
-
-RÈGLES D'ANALYSE BIBLIOGRAPHIQUE :
-- PRIORISE les études de haut niveau (A: méta-analyses, B: RCT) dans tes recommandations
-- Indique la FORCE DE RECOMMANDATION basée sur le niveau de preuve
-- Signale les POPULATIONS ÉTUDIÉES et leur pertinence clinique
-- SEULEMENT si tu n'as AUCUN document fourni ci-dessous, indique : "Nous ne disposons pas d'études sur ce sujet dans notre base, si un document vous parait pertinent, n'hésitez pas à le proposer"
-
-RÈGLES DE COHÉRENCE AVEC L'HISTORIQUE :
-- RESTE COHÉRENT avec tes réponses précédentes dans la conversation
-- Si tu as déjà cité une étude, tu as accès à ses informations disponibles
-- Pour des questions de détails sur une étude déjà citée, fouille dans les sections disponibles de cette étude
-- Ne jamais dire "nous n'avons pas accès" à une étude que tu viens d'utiliser dans l'historique`;
+RÈGLES DE SYNTHÈSE :
+- Sois concis et pratique — va droit aux recommandations cliniques
+- Mentionne les résultats chiffrés quand disponibles (p-values, effectifs, durées)
+- Si aucun document fourni → "Nous ne disposons pas d'études sur ce sujet dans notre base."
+- Reste cohérent avec l'historique de conversation`;
 
   if (contextDocuments.length > 0) {
     // 🧪 LOGS SIMPLIFIÉ - Juste le nombre de documents
     logger.debug(`🧪 IA Biblio - ${contextDocuments.length} documents transmis à GPT`);
 
-    // Grouper les documents par source_file (études scientifiques)
-    const groupedBySource = {};
+    // Grouper par pmid (studies_v3 = colonnes plates, pas de metadata jsonb)
+    const groupedByStudy = {};
     contextDocuments.forEach((doc) => {
-      const source = doc.metadata?.source_file || doc.title || 'Document sans titre';
-      if (!groupedBySource[source]) {
-        groupedBySource[source] = {
-          source_file: source,
-          title: (source || 'Document sans titre').replace('.pdf', '').replace(/_/g, ' '),
-          auteur: doc.metadata?.auteur || 'Auteur non spécifié',
-          date: doc.metadata?.date || 'Date non spécifiée',
-          pathologies: doc.metadata?.pathologies || [], // Peut être absent selon l'étude
-          niveau_preuve: doc.metadata?.niveau_preuve || 'Non spécifié',
-          type_contenu: doc.metadata?.type_contenu || 'Non spécifié',
-          sections: [],
-          bestScore: doc.finalScore
+      // Support v3 (colonnes plates) ET v2 legacy (metadata jsonb)
+      const key = doc.pmid || doc.metadata?.source_file || doc.title || 'Document sans titre';
+      if (!groupedByStudy[key]) {
+        groupedByStudy[key] = {
+          pmid: doc.pmid || null,
+          title: doc.title || doc.metadata?.source_file?.replace('.pdf', '').replace(/_/g, ' ') || 'Titre non disponible',
+          authors: doc.authors || doc.metadata?.auteur || 'Auteur non spécifié',
+          year: doc.year || doc.metadata?.date || 'Date non spécifiée',
+          category: doc.category || doc.metadata?.type_contenu || 'Non spécifié',
+          publication_types: doc.publication_types || [],
+          doi_url: doc.doi_url || null,
+          pubmed_url: doc.pubmed_url || null,
+          // Legacy v2 fields
+          niveau_preuve: doc.metadata?.niveau_preuve || null,
+          pathologies: doc.metadata?.pathologies || [],
+          content: doc.content || '',
+          bestScore: doc.finalScore || doc.similarity || 0
         };
-      }
-      groupedBySource[source].sections.push({
-        content: doc.content,
-        title: doc.title,
-        score: Math.round(doc.finalScore * 100)
-      });
-      // Garder le meilleur score
-      if (doc.finalScore > groupedBySource[source].bestScore) {
-        groupedBySource[source].bestScore = doc.finalScore;
+      } else {
+        // Si même étude apparaît plusieurs fois, concaténer le contenu
+        if (doc.content && !groupedByStudy[key].content.includes(doc.content)) {
+          groupedByStudy[key].content += '\n\n' + doc.content;
+        }
+        const score = doc.finalScore || doc.similarity || 0;
+        if (score > groupedByStudy[key].bestScore) {
+          groupedByStudy[key].bestScore = score;
+        }
       }
     });
 
-    // Trier les études par niveau de preuve (A > B > C > D)
-    const preuveOrder = { 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
-    const sortedStudies = Object.values(groupedBySource).sort((a, b) => {
-      const scoreA = preuveOrder[a.niveau_preuve] || 0;
-      const scoreB = preuveOrder[b.niveau_preuve] || 0;
-      return scoreB - scoreA; // Tri décroissant (meilleur niveau en premier)
-    });
+    // Trier par score de pertinence (plus pertinent en premier)
+    const sortedStudies = Object.values(groupedByStudy).sort((a, b) => b.bestScore - a.bestScore);
 
-    systemPrompt += `\n\nÉTUDES SCIENTIFIQUES DE NOTRE BASE (triées par niveau de preuve) :\n`;
+    systemPrompt += `\n\nÉTUDES DISPONIBLES :\n`;
 
     sortedStudies.forEach((study, index) => {
-      const score = Math.round(study.bestScore * 100);
-      const pathologiesText = Array.isArray(study.pathologies) && study.pathologies.length > 0
-        ? study.pathologies.join(', ')
-        : 'Non spécifiées';
+      const num = index + 1;
+      const pubmedLink = study.pubmed_url || (study.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${study.pmid}/` : '');
 
-      systemPrompt += `\n📚 ÉTUDE ${index + 1} (Pertinence: ${score}%) :
-📖 TITRE : "${study.title || 'Titre non disponible'}"
-👥 AUTEUR(S) : ${study.auteur}
-📅 ANNÉE : ${study.date}
-📈 NIVEAU DE PREUVE : ${study.niveau_preuve}
-🎯 PATHOLOGIES ÉTUDIÉES : ${pathologiesText}
-📑 TYPE : ${study.type_contenu}
-
-SECTIONS ANALYSÉES (${study.sections.length} sections) :
-${study.sections.map((section, idx) =>
-  `[Section ${idx + 1}] ${section.content.substring(0, 600)}...`
-).join('\n\n')}
+      systemPrompt += `
+(${num}) "${study.title}"
+Auteurs : ${study.authors} (${study.year})
+PubMed : ${pubmedLink}
+Contenu : ${study.content.substring(0, 1200)}
 
 ---
 `;
     });
 
-    systemPrompt += `\nINSTRUCTIONS EVIDENCE-BASED FINALES :
-- Dans "RÉFÉRENCES BIBLIOGRAPHIQUES", cite : *[TITRE] - [AUTEUR] (ANNÉE)* - Niveau [A/B/C/D]
-- TOUJOURS respecter ce format avec italiques (*texte*) pour titre-auteur-année
-- EXEMPLE : *Revue Systématique BFR et Reconstruction LCA - Colapietro et al. (2023)* - Niveau A
-- HIÉRARCHISE tes recommandations selon les niveaux de preuve ci-dessus
-- BASE-TOI sur le CONTENU des sections pour tes analyses statistiques
-- INDIQUE la force des recommandations selon le niveau des preuves disponibles`;
+    systemPrompt += `\nINSTRUCTIONS FINALES :
+- Cite avec (1), (2), etc. dans ta synthèse
+- En bas, liste les références avec titre, auteurs (année) et lien PubMed
+- Base-toi uniquement sur le contenu des études ci-dessus`;
   } else {
     // Cas où aucun document n'est fourni
     systemPrompt += `\n\nAUCUN DOCUMENT FOURNI - Répondre uniquement :

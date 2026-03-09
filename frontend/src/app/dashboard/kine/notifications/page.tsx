@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import AppLayout from '@/components/AppLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import {
@@ -15,7 +16,9 @@ import {
   Eye,
   EyeOff,
   Trash2,
-  MessageCircle
+  MessageCircle,
+  Send,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -55,6 +58,7 @@ interface NotificationStats {
 
 export default function KineNotificationsPage() {
   const { toast } = useToast();
+  const router = useRouter();
   
   // États de données
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
@@ -236,10 +240,6 @@ export default function KineNotificationsPage() {
         // Recharger les stats
         loadStats();
         
-        toast({
-          title: "Notifications marquées",
-          description: `${data.count} notifications marquées comme lues`
-        });
       }
 
     } catch (error) {
@@ -536,7 +536,28 @@ export default function KineNotificationsPage() {
                     
                     <div className="text-sm text-muted-foreground space-y-2">
                       {notification.type === 'PATIENT_REQUEST' && notification.patient?.name ? (
-                        <p><span className="font-semibold text-foreground">{notification.patient.name}</span> souhaite vous contacter : &quot;{notification.metadata?.motif}&quot;</p>
+                        <>
+                          <p><span className="font-semibold text-foreground">{notification.patient.name}</span> souhaite vous contacter : &quot;{notification.metadata?.motif}&quot;</p>
+                          <div className="flex gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-[#3899aa] border-[#3899aa]/30 hover:bg-[#3899aa]/10"
+                              onClick={() => router.push(`/dashboard/kine/patients/${notification.patient!.id}`)}
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                              Voir patient
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="bg-[#3899aa] hover:bg-[#2d7a88] text-white"
+                              onClick={() => router.push(`/dashboard/kine/chatbot-admin?recipientSearch=${encodeURIComponent(notification.patient!.name)}`)}
+                            >
+                              <Send className="w-3.5 h-3.5 mr-1.5" />
+                              Répondre
+                            </Button>
+                          </div>
+                        </>
                       ) : (
                         <p>{notification.message}</p>
                       )}

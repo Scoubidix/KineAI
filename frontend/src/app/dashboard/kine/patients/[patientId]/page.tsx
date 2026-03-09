@@ -1001,7 +1001,7 @@ export default function PatientDetailPage() {
 
   return (
     <AppLayout>
-      <div className="p-4 sm:p-6 space-y-6 overflow-hidden">
+      <div className="p-4 sm:p-6 space-y-6 overflow-x-hidden">
         {/* Section profil patient NOUVELLE VERSION */}
         <div className="card-hover rounded-lg overflow-hidden">
           <div className="relative">
@@ -1128,6 +1128,20 @@ export default function PatientDetailPage() {
                           </div>
                         </div>
                         <div className="flex gap-2 self-start">
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white border-green-600"
+                            onClick={() => handleGenerateLink(programme.id)}
+                            disabled={generatingLink === programme.id}
+                          >
+                            {generatingLink === programme.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                            ) : (
+                              <Send className="w-4 h-4 mr-1.5" />
+                            )}
+                            Envoyer à mon Patient
+                          </Button>
+
                           <Dialog open={openEditModal && editingProgramme?.id === programme.id} onOpenChange={(open) => {
                             setOpenEditModal(open);
                             if (!open) resetEditForm();
@@ -1144,7 +1158,7 @@ export default function PatientDetailPage() {
                             </DialogTrigger>
                             {renderProgrammeModal(true)}
                           </Dialog>
-                          
+
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button size="sm" variant="outline" className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-200 dark:hover:border-red-700">
@@ -1155,7 +1169,7 @@ export default function PatientDetailPage() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Êtes-vous sûr de vouloir supprimer le programme <strong>"{programme.titre}"</strong> ? 
+                                  Êtes-vous sûr de vouloir supprimer le programme <strong>"{programme.titre}"</strong> ?
                                   Cette action est irréversible et supprimera également l'accès chat du patient.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
@@ -1217,34 +1231,6 @@ export default function PatientDetailPage() {
                         </div>
                       )}
 
-                      {/* Bouton d'envoi du programme */}
-                      <div className="border-t pt-4">
-                        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-green-800 dark:text-green-300 mb-1">
-                                Partager avec le patient
-                              </h4>
-                              <p className="text-sm text-green-700 dark:text-green-400">
-                                Générez un lien sécurisé pour que votre patient accède à son programme via chat
-                              </p>
-                            </div>
-                            <Button
-                              variant="outline"
-                              className="w-full sm:w-auto text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 border-green-300 dark:border-green-600 hover:border-green-400 dark:hover:border-green-500 bg-white dark:bg-green-900/20 hover:bg-green-50 dark:hover:bg-green-900/40"
-                              onClick={() => handleGenerateLink(programme.id)}
-                              disabled={generatingLink === programme.id}
-                            >
-                              {generatingLink === programme.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                              ) : (
-                                <Send className="w-4 h-4 mr-2" />
-                              )}
-                              Générer le lien
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
                     </CardContent>
                   </Card>
                 ))}

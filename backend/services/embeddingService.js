@@ -453,19 +453,14 @@ async function searchDocumentsOptimized(query, options = {}) {
       return [];
     }
 
-    // IA Biblio → pipeline hybride dédié (Vector + BM25 → RRF → Rerank)
+    // IA Biblio → pipeline hybride dédié studies_v3 (Vector + BM25 → RRF → Rerank)
     if (iaType === 'biblio') {
       const queryEmbedding = await generateEmbedding(query, iaType);
-      logger.debug('🔬 IA BIBLIO - Pipeline hybride (Vector + BM25 → RRF → Rerank)');
+      logger.debug('🔬 IA BIBLIO - Pipeline hybride studies_v3 (Vector + BM25 → RRF → Rerank)');
 
       const [vectorResults, bm25Results] = await Promise.all([
-        searchDocumentsWithEmbedding(queryEmbedding, {
-          matchThreshold: 0.3,
-          matchCount: 15,
-          metadataFilters: {},
-          iaType: 'biblio'
-        }),
-        searchStudiesBM25(query, 15)
+        searchStudiesV3Vector(queryEmbedding, 0.3, 15),
+        searchStudiesV3BM25(query, 15)
       ]);
 
       logger.debug(`📊 Vector search: ${vectorResults.length} résultats`);
@@ -1087,6 +1082,71 @@ async function testVectorDatabase() {
 // ==========================================
 // 🔬 PIPELINE HYBRIDE BIBLIO (BM25 + RRF + RERANK)
 // ==========================================
+
+/**
+ * Recherche vectorielle cosine dans studies_v3 (PubMed FR)
+ */
+async function searchStudiesV3Vector(queryEmbedding, matchThreshold = 0.3, matchCount = 15) {
+  try {
+    logger.debug(`🔬 V3 Vector search (threshold: ${matchThreshold}, max ${matchCount})`);
+
+    const { data, error } = await supabase.rpc('search_studies_v3', {
+      query_embedding: queryEmbedding,
+      match_threshold: matchThreshold,
+      match_count: matchCount
+    });
+
+    if (error) {
+      logger.error('❌ Erreur V3 vector search:', error);
+      return [];
+    }
+
+    return (data || []).map((doc, index) => ({
+      ...doc,
+      study_id: doc.pmid,
+      searchRank: index + 1,
+      similarityPercentage: Math.round((doc.similarity || 0) * 100),
+      contentLength: doc.content ? doc.content.length : 0,
+      iaType: 'biblio',
+      searchSource: 'vector'
+    }));
+  } catch (error) {
+    logger.error('❌ Erreur V3 vector search:', error);
+    return [];
+  }
+}
+
+/**
+ * Recherche BM25 (mots-clés) dans studies_v3 via tsvector
+ */
+async function searchStudiesV3BM25(query, matchCount = 15) {
+  try {
+    logger.debug(`🔤 V3 BM25 search: "${query.substring(0, 80)}..." (max ${matchCount})`);
+
+    const { data, error } = await supabase.rpc('search_studies_v3_bm25', {
+      query_text: query,
+      match_count: matchCount
+    });
+
+    if (error) {
+      logger.error('❌ Erreur V3 BM25 search:', error);
+      return [];
+    }
+
+    return (data || []).map((doc, index) => ({
+      ...doc,
+      study_id: doc.pmid,
+      searchRank: index + 1,
+      similarityPercentage: Math.round((doc.similarity || 0) * 100),
+      contentLength: doc.content ? doc.content.length : 0,
+      iaType: 'biblio',
+      searchSource: 'bm25'
+    }));
+  } catch (error) {
+    logger.error('❌ Erreur V3 BM25 search:', error);
+    return [];
+  }
+}
 
 /**
  * Recherche BM25 (mots-clés) dans studies_v2 via tsvector

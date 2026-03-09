@@ -39,6 +39,7 @@ export default function KineChatbotCliniquePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [researchQuery, setResearchQuery] = useState('');
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  const [showFullQuery, setShowFullQuery] = useState(false);
 
   const { subscription } = usePaywall();
 
@@ -401,20 +402,34 @@ export default function KineChatbotCliniquePage() {
         </Button>
       </div>
 
-      <div className="max-w-6xl mx-auto p-4 overflow-hidden">
+      <div className="max-w-6xl mx-auto p-4 h-[calc(100vh-180px)] flex flex-col overflow-hidden">
           {/* Raisonnement en cours */}
-          <div className="flex gap-4 mb-4">
+          <div className="flex gap-4 mb-4 shrink-0">
             <div className="flex-1">
               <div className="card-hover flex items-stretch h-full px-5 py-3 bg-gradient-to-r from-[#eef7f6] to-[#e4f1f3] dark:from-[#0f1c1b] dark:to-[#132221] rounded-lg">
                 <div className="flex items-center gap-2">
                   <Stethoscope className="h-4 w-4 text-[#3899aa] shrink-0" />
                   {phase === 'conversation' && chatMessages.length > 0 ? (
-                    <div>
-                      <p className="text-sm font-bold text-[#3899aa]">Raisonnement en cours</p>
-                      <p className="text-sm text-foreground leading-snug font-semibold">
-                        {chatMessages.find(m => m.role === 'user')?.content || ''}
-                      </p>
-                    </div>
+                    (() => {
+                      const queryText = chatMessages.find(m => m.role === 'user')?.content || '';
+                      const isTruncated = queryText.length > 150 && !showFullQuery;
+                      return (
+                        <div>
+                          <p className="text-sm font-bold text-[#3899aa]">Raisonnement en cours</p>
+                          <p className="text-sm text-foreground leading-snug font-semibold">
+                            {isTruncated ? queryText.substring(0, 150) + '...' : queryText}
+                          </p>
+                          {queryText.length > 150 && (
+                            <button
+                              onClick={() => setShowFullQuery(!showFullQuery)}
+                              className="text-xs text-[#3899aa] hover:underline mt-0.5"
+                            >
+                              {showFullQuery ? 'Réduire' : 'Voir plus'}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()
                   ) : (
                     <p className="text-sm text-muted-foreground/50">Aucun raisonnement en cours</p>
                   )}
@@ -423,7 +438,7 @@ export default function KineChatbotCliniquePage() {
             </div>
           </div>
 
-          <div className={`h-[calc(100vh-280px)] flex flex-col ${phase === 'initial' ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div className={`flex-1 min-h-0 flex flex-col ${phase === 'initial' ? 'opacity-50 pointer-events-none' : ''}`}>
 
             <div
               ref={messagesContainerRef}
@@ -431,8 +446,8 @@ export default function KineChatbotCliniquePage() {
               style={{
                 scrollBehavior: 'smooth',
                 overflowAnchor: 'none',
-                maskImage: 'linear-gradient(to bottom, transparent, black 32px, black calc(100% - 32px), transparent)',
-                WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 32px, black calc(100% - 32px), transparent)'
+                maskImage: 'linear-gradient(to bottom, transparent, black 32px)',
+                WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 32px)'
               }}
             >
               {isLoadingHistory ? (
@@ -470,7 +485,7 @@ export default function KineChatbotCliniquePage() {
                       <div
                         key={index}
                         ref={isLastBotMessage ? lastBotMessageRef : undefined}
-                        className={`flex ${msg.role === 'user' ? 'justify-end pr-12 sm:pr-24' : 'justify-start'}`}
+                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
                           className={`max-w-[80%] rounded-2xl ${
@@ -543,7 +558,7 @@ export default function KineChatbotCliniquePage() {
             </div>
 
             {phase === 'conversation' && (
-              <div className="w-2/3 mx-auto px-4 pb-2 pt-2">
+              <div className="px-6 pb-2 pt-0">
                 <div className="relative flex items-center bg-white dark:bg-card border-2 border-border rounded-full px-4 py-1 shadow-sm focus-within:border-[#3899aa]/60 focus-within:shadow-md transition-all">
                   <Input
                     placeholder="Question de suivi sur le raisonnement clinique..."

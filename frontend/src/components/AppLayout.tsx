@@ -1317,7 +1317,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </header>
 
         {/* Contenu principal */}
-        <div className="relative p-4 md:p-6 lg:p-8 text-foreground min-h-screen overflow-x-hidden">
+        <div className="relative p-4 md:p-6 lg:p-8 text-foreground overflow-x-hidden">
           <div
             className="pointer-events-none absolute top-0 right-0 w-[600px] h-[600px] opacity-[0.07] dark:opacity-[0.12] rounded-full blur-3xl"
             style={{ background: 'radial-gradient(circle, #3899aa, transparent 70%)' }}
@@ -1326,6 +1326,19 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {children}
           </div>
         </div>
+
+        {/* Footer mentions légales */}
+        <footer className="py-2 px-4 text-center opacity-40 hover:opacity-100 transition-opacity duration-300">
+          <div className="text-[10px] text-muted-foreground">
+            <span>© {new Date().getFullYear()} Mon Assistant Kiné</span>
+            <span className="mx-1.5">•</span>
+            <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer" className="hover:underline">CGU</a>
+            <span className="mx-1">•</span>
+            <a href="/legal/politique-confidentialite.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Confidentialité</a>
+            <span className="mx-1">•</span>
+            <a href="/legal/mentions-legales.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Mentions légales</a>
+          </div>
+        </footer>
       </SidebarInset>
 
       {/* PaywallModal pour le bouton Upgrade du header */}
