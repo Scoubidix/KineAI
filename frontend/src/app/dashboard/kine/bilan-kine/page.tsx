@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import AppLayout from '@/components/AppLayout';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { FileText, Loader2, Copy, Sparkles, Mail, Download, Search, Lock, Lightbulb } from 'lucide-react';
+import { FileText, Loader2, Copy, Sparkles, Mail, Download, Lock, Lightbulb, ArrowLeft, Search, Mic, MicOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { getAuth } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
@@ -17,14 +17,18 @@ export default function BilanKinePage() {
   const [rawNotes, setRawNotes] = useState('');
   const [motifConsultation, setMotifConsultation] = useState('');
   const [structuredBilan, setStructuredBilan] = useState('');
+  const [bilanHtml, setBilanHtml] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPreviewResult, setIsPreviewResult] = useState(false);
+  const [showBilan, setShowBilan] = useState(false);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [kineProfile, setKineProfile] = useState<{ firstName: string; lastName: string; adresseCabinet?: string; rpps?: string } | null>(null);
+  const bilanRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  // Hook paywall pour la modal upgrade
   const { subscription } = usePaywall();
-
-  // Hook toast pour les notifications
   const { toast } = useToast();
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
@@ -33,6 +37,78 @@ export default function BilanKinePage() {
     const auth = getAuth(app);
     return await auth.currentUser?.getIdToken();
   };
+
+  // Vérifier le support Speech API au montage
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      setSpeechSupported(true);
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'fr-FR';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    let finalTranscript = '';
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + ' ';
+          setRawNotes(prev => prev + (prev ? ' ' : '') + transcript);
+        } else {
+          interim = transcript;
+        }
+      }
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  };
+
+  // Charger le profil kiné au montage
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = await getAuthToken();
+        if (!token) return;
+        const res = await fetch(`${API_BASE}/kine/profile`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setKineProfile(data);
+        }
+      } catch (error) {
+        console.error('Erreur chargement profil kiné:', error);
+      }
+    };
+    fetchProfile();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleGenerateBilan = async () => {
     if (!rawNotes.trim()) {
@@ -66,10 +142,12 @@ export default function BilanKinePage() {
 
       if (data.success) {
         setStructuredBilan(data.message);
+        setBilanHtml(renderMarkdown(data.message));
         setIsPreviewResult(data.preview === true);
+        setShowBilan(true);
       } else {
         toast({
-          title: "❌ Erreur",
+          title: "Erreur",
           description: data.error || 'Erreur lors de la génération du bilan',
           variant: "destructive",
         });
@@ -78,7 +156,7 @@ export default function BilanKinePage() {
     } catch (error) {
       console.error('Erreur génération bilan:', error);
       toast({
-        title: "❌ Erreur technique",
+        title: "Erreur technique",
         description: 'Une erreur est survenue lors de la génération',
         variant: "destructive",
       });
@@ -87,48 +165,59 @@ export default function BilanKinePage() {
     }
   };
 
+  const handleBackToNotes = () => {
+    setShowBilan(false);
+  };
+
+  // Récupère le texte visible du bilan (sans balises HTML)
+  const getBilanText = () => {
+    if (bilanRef.current) {
+      return bilanRef.current.innerText;
+    }
+    return structuredBilan;
+  };
+
+  // Récupère le HTML édité du bilan, sanitizé
+  const getBilanHtml = () => {
+    if (bilanRef.current) {
+      return DOMPurify.sanitize(bilanRef.current.innerHTML);
+    }
+    return bilanHtml;
+  };
+
   const handleCopyBilan = async () => {
     if (!structuredBilan) return;
 
     try {
-      await navigator.clipboard.writeText(structuredBilan);
+      await navigator.clipboard.writeText(getBilanText());
       toast({
-        title: "📋 Copié !",
+        title: "Copié !",
         description: "Le bilan a été copié dans le presse-papiers",
         variant: "default",
       });
     } catch (error) {
       console.error('Erreur copie:', error);
       toast({
-        title: "❌ Erreur",
+        title: "Erreur",
         description: 'Impossible de copier le bilan',
         variant: "destructive",
       });
     }
   };
 
-
   const handleSendEmail = () => {
     if (!structuredBilan) return;
 
     try {
-      // Créer le lien mailto avec le bilan dans le corps
       const subject = encodeURIComponent('Bilan Kinésithérapique');
-      const body = encodeURIComponent(structuredBilan);
+      const body = encodeURIComponent(getBilanText());
       const mailto = `mailto:?subject=${subject}&body=${body}`;
 
       window.location.href = mailto;
-
-      toast({
-        title: "✉️ Client mail ouvert",
-        description: "Le bilan a été pré-rempli dans votre client mail",
-        variant: "default",
-        duration: 4000,
-      });
     } catch (error) {
       console.error('Erreur ouverture client mail:', error);
       toast({
-        title: "❌ Erreur",
+        title: "Erreur",
         description: 'Erreur lors de l\'ouverture du client mail',
         variant: "destructive",
       });
@@ -139,19 +228,38 @@ export default function BilanKinePage() {
     if (!structuredBilan) return;
 
     try {
-      // Créer une fenêtre d'impression avec le bilan formaté
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
         toast({
-          title: "❌ Erreur",
+          title: "Erreur",
           description: 'Veuillez autoriser les fenêtres pop-up pour télécharger le PDF',
           variant: "destructive",
         });
         return;
       }
 
-      // Convertir le markdown en HTML formaté pour l'impression
-      const formattedHTML = renderMarkdown(structuredBilan);
+      const formattedHTML = getBilanHtml();
+
+      // En-tête praticien conditionnel
+      const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+      let headerHTML = '';
+      if (kineProfile) {
+        const name = `${kineProfile.firstName} ${kineProfile.lastName.toUpperCase()}`;
+        headerHTML = `
+          <div class="header">
+            <div class="header-left">
+              <div class="header-name">${DOMPurify.sanitize(name)}</div>
+              <div>Masseur-Kinésithérapeute D.E.</div>
+              ${kineProfile.rpps ? `<div>RPPS : ${DOMPurify.sanitize(kineProfile.rpps)}</div>` : ''}
+              ${kineProfile.adresseCabinet ? `<div>${DOMPurify.sanitize(kineProfile.adresseCabinet)}</div>` : ''}
+            </div>
+            <div class="header-right">
+              Le ${today}
+            </div>
+          </div>
+          <hr class="header-separator">
+        `;
+      }
 
       printWindow.document.write(`
         <!DOCTYPE html>
@@ -173,6 +281,29 @@ export default function BilanKinePage() {
                 margin: 0 auto;
                 padding: 1cm;
               }
+              .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-bottom: 0.5em;
+              }
+              .header-left {
+                font-size: 11pt;
+                line-height: 1.4;
+              }
+              .header-name {
+                font-weight: bold;
+                font-size: 13pt;
+              }
+              .header-right {
+                font-size: 11pt;
+                text-align: right;
+              }
+              .header-separator {
+                border: none;
+                border-top: 1px solid #000;
+                margin: 0.8em 0 1.2em 0;
+              }
               h1, h2, h3 {
                 font-weight: bold;
                 margin-top: 1em;
@@ -185,25 +316,21 @@ export default function BilanKinePage() {
                 margin-bottom: 0.5em;
                 text-align: justify;
               }
-              strong {
-                font-weight: bold;
-              }
-              em {
-                font-style: italic;
-              }
+              strong { font-weight: bold; }
+              u { text-decoration: underline; font-weight: 600; }
+              em { font-style: italic; }
               hr {
                 border: none;
                 border-top: 1px solid #000;
                 margin: 1em 0;
               }
               @media print {
-                body {
-                  padding: 0;
-                }
+                body { padding: 0; }
               }
             </style>
           </head>
           <body>
+            ${headerHTML}
             ${formattedHTML}
           </body>
         </html>
@@ -211,7 +338,6 @@ export default function BilanKinePage() {
 
       printWindow.document.close();
 
-      // Attendre que le contenu soit chargé puis ouvrir la boîte de dialogue d'impression
       setTimeout(() => {
         printWindow.focus();
         printWindow.print();
@@ -220,20 +346,20 @@ export default function BilanKinePage() {
     } catch (error) {
       console.error('Erreur génération PDF:', error);
       toast({
-        title: "❌ Erreur",
+        title: "Erreur",
         description: 'Erreur lors de la génération du PDF',
         variant: "destructive",
       });
     }
   };
 
-  const placeholderText = `Exemple de notes en vrac :
+  const placeholderText = `Notez vos observations en vrac...
 
-patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. ATCD : hernie discale L4-L5 opérée 2018. Douleur bas du dos irradiant fesse droite, EVA 5/10 repos 7/10 effort. Flexion lombaire limitée 40°, Lasègue négatif, paravertébraux contracturés. Difficulté à se pencher, ne peut plus porter charges >10kg. Objectif : retour au travail. Traitement prévu : massages décontracturants, McKenzie, renforcement, 2x/semaine 6 semaines.`;
+Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. ATCD : hernie discale L4-L5 opérée 2018. Douleur bas du dos irradiant fesse droite, EVA 5/10 repos 7/10 effort. Flexion lombaire limitée 40°, Lasègue négatif, paravertébraux contracturés...`;
 
-  // Fonction pour convertir le markdown en HTML
+  // Fonction pour convertir le markdown/HTML en HTML sécurisé
   const renderMarkdown = (text: string) => {
-    return text
+    const html = text
       .replace(/═+/g, '<hr class="my-2 border-gray-300" />')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -243,11 +369,12 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
       .replace(/^- (.*$)/gim, '<li class="ml-4">• $1</li>')
       .replace(/^\d+\. (.*$)/gim, '<li class="ml-4 list-decimal">$1</li>')
       .replace(/\n/g, '<br>');
+    return DOMPurify.sanitize(html);
   };
 
   return (
     <AppLayout>
-      {/* Header compact comme les pages IA */}
+      {/* Header compact */}
       <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/40">
         <FileText className="text-[#3899aa] h-4 w-4 shrink-0" />
         <h2 className="text-sm font-medium text-[#3899aa]">Bilan Kiné</h2>
@@ -275,181 +402,136 @@ patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. 
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-4 overflow-x-hidden">
+      {/* Zone centrale unique */}
+      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-4 sm:p-6">
 
-        {/* Motif de consultation - pleine largeur */}
-          <div className="card-hover flex items-stretch px-5 py-3 mb-6 bg-gradient-to-r from-[#eef7f6] to-[#e4f1f3] dark:from-[#0f1c1b] dark:to-[#132221] rounded-lg">
-            <div className="flex items-center gap-3 w-full">
-              <Search className="h-4 w-4 text-[#3899aa] shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-bold text-[#3899aa] mb-1">Motif de consultation</p>
-                <Input
-                  value={motifConsultation}
-                  onChange={(e) => setMotifConsultation(e.target.value)}
-                  placeholder="Ex : Lombalgie chronique, rééducation post-opératoire..."
-                  className="border-0 bg-white/60 dark:bg-gray-800/60 text-sm h-9 focus-visible:ring-[#3899aa]"
+        {/* Vue Notes */}
+        <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${showBilan ? 'opacity-0 absolute pointer-events-none' : 'opacity-100'}`}>
+          {/* Motif de consultation */}
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <Search className="h-3.5 w-3.5 text-[#3899aa] shrink-0" />
+            <span className="text-xs font-medium text-[#3899aa] shrink-0">Motif</span>
+            <Input
+              value={motifConsultation}
+              onChange={(e) => setMotifConsultation(e.target.value)}
+              placeholder="Ex : Lombalgie chronique, rééducation post-opératoire..."
+              className="border-0 border-b border-border/60 rounded-none bg-transparent text-sm h-8 px-2 focus-visible:ring-0 focus-visible:border-[#3899aa]/60"
+              disabled={isGenerating}
+            />
+          </div>
+
+          <Textarea
+            value={rawNotes}
+            onChange={(e) => setRawNotes(e.target.value)}
+            placeholder={placeholderText}
+            className="flex-1 min-h-[300px] sm:min-h-[400px] text-sm leading-relaxed text-foreground resize-none rounded-xl border-2 border-border/60 bg-white dark:bg-card p-4 focus-visible:ring-[#3899aa]/50 focus-visible:border-[#3899aa]/60 transition-all"
+            disabled={isGenerating}
+          />
+
+          <div className="flex flex-col items-end gap-1 mt-3">
+            <div className="flex items-center gap-2">
+              {speechSupported && (
+                <Button
+                  onClick={toggleListening}
                   disabled={isGenerating}
-                />
+                  variant="outline"
+                  className={`rounded-full h-10 w-10 p-0 transition-all ${isListening ? 'border-red-400 text-red-500 animate-pulse bg-red-50 dark:bg-red-950/30' : 'text-muted-foreground hover:text-[#3899aa] hover:border-[#3899aa]/60'}`}
+                  title={isListening ? 'Arrêter la dictée' : 'Dicter vos notes'}
+                >
+                  {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
+              )}
+              <Button
+                onClick={handleGenerateBilan}
+                disabled={isGenerating || !rawNotes.trim()}
+                className="btn-teal rounded-full px-6 h-10"
+              >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Génération en cours...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Générer le bilan
+                </>
+              )}
+            </Button>
+            </div>
+            <p className="text-[11px] text-red-400">L&apos;IA peut faire des erreurs. Vérifiez les informations importantes.</p>
+          </div>
+        </div>
+
+        {/* Vue Bilan */}
+        <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${showBilan ? 'opacity-100' : 'opacity-0 absolute pointer-events-none'}`}>
+          {/* Barre d'actions */}
+          <div className="flex items-center justify-between mb-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBackToNotes}
+              className="text-muted-foreground hover:text-foreground h-8 px-3"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+              Revenir aux notes
+            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleCopyBilan} className="btn-teal h-8 rounded-full px-3">
+                <Copy className="h-3 w-3 sm:mr-1.5" />
+                <span className="hidden sm:inline">Copier</span>
+              </Button>
+              <Button size="sm" onClick={handleSendEmail} className="btn-teal h-8 rounded-full px-3">
+                <Mail className="h-3 w-3 sm:mr-1.5" />
+                <span className="hidden sm:inline">Mail</span>
+              </Button>
+              <Button size="sm" onClick={handleDownloadPDF} className="btn-teal h-8 rounded-full px-3">
+                <Download className="h-3 w-3 sm:mr-1.5" />
+                <span className="hidden sm:inline">PDF</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Bilan contentEditable */}
+          <div className="relative flex-1">
+            <div
+              ref={bilanRef}
+              contentEditable={!isPreviewResult}
+              suppressContentEditableWarning
+              className="min-h-[300px] sm:min-h-[400px] overflow-y-auto text-sm leading-relaxed text-foreground p-4 rounded-xl border-2 border-border/60 bg-white dark:bg-card focus:outline-none focus:border-[#3899aa]/60 transition-all"
+              style={isPreviewResult ? {
+                maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)'
+              } : undefined}
+              dangerouslySetInnerHTML={{ __html: bilanHtml }}
+            />
+            {isPreviewResult && (
+              <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                <Button
+                  onClick={() => setIsPaywallOpen(true)}
+                  className="btn-teal rounded-full text-sm h-9 px-4 shadow-lg"
+                >
+                  <Lock className="h-3.5 w-3.5 mr-2" />
+                  Débloquer le bilan complet
+                </Button>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Grille Notes + Bilan */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-            {/* Colonne gauche: Saisie des notes */}
-            <div>
-              <Card className="card-hover h-full">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2 text-foreground">
-                    <Sparkles className="h-5 w-5 text-[#3899aa]" />
-                    Notes cliniques en vrac
-                  </CardTitle>
-                  <CardDescription className="text-foreground">
-                    Entrez vos observations, mesures, tests... L'IA structurera le tout
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-
-                  <Textarea
-                    value={rawNotes}
-                    onChange={(e) => setRawNotes(e.target.value)}
-                    placeholder={placeholderText}
-                    className="bubble-ai min-h-[250px] sm:min-h-[500px] font-mono text-sm text-foreground"
-                    disabled={isGenerating}
-                  />
-
-                  <div className="flex flex-col items-end gap-1">
-                    <Button
-                      onClick={handleGenerateBilan}
-                      disabled={isGenerating || !rawNotes.trim()}
-                      size="lg"
-                      className="btn-teal w-full sm:w-auto"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Génération en cours...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          Générer le bilan structuré
-                        </>
-                      )}
-                    </Button>
-                    <p className="text-[11px] text-red-400">L&apos;IA peut faire des erreurs. Vérifiez les informations importantes.</p>
-                  </div>
-
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Colonne droite: Résultat structuré */}
-            <div>
-              <Card className="card-hover h-full">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-foreground">
-                      <FileText className="h-5 w-5 text-[#3899aa]" />
-                      Bilan structuré
-                    </div>
-                    {structuredBilan && (
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          onClick={handleCopyBilan}
-                          className="btn-teal h-8"
-                        >
-                          <Copy className="h-3 w-3 sm:mr-1" />
-                          <span className="hidden sm:inline">Copier</span>
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleSendEmail}
-                          className="btn-teal h-8"
-                        >
-                          <Mail className="h-3 w-3 sm:mr-1" />
-                          <span className="hidden sm:inline">Envoyer par mail</span>
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleDownloadPDF}
-                          className="btn-teal h-8"
-                        >
-                          <Download className="h-3 w-3 sm:mr-1" />
-                          <span className="hidden sm:inline">Télécharger PDF</span>
-                        </Button>
-                      </div>
-                    )}
-                  </CardTitle>
-                  <CardDescription className="text-foreground">
-                    Votre bilan professionnel prêt à l'emploi
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-
-                  {!structuredBilan ? (
-                    <div className="flex items-center justify-center min-h-[200px] sm:min-h-[500px] text-center">
-                      <div>
-                        <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                        <p className="text-muted-foreground mb-2">
-                          Votre bilan structuré apparaîtra ici
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Entrez vos notes et cliquez sur "Générer"
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Bilan éditable */}
-                      <div className="relative">
-                        <Textarea
-                          value={structuredBilan}
-                          onChange={(e) => { if (!isPreviewResult) setStructuredBilan(e.target.value); }}
-                          readOnly={isPreviewResult}
-                          className="bubble-ai min-h-[250px] sm:min-h-[500px] max-h-[400px] sm:max-h-[600px] text-sm leading-relaxed text-foreground"
-                          placeholder="Le bilan structuré apparaîtra ici..."
-                          style={isPreviewResult ? {
-                            maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
-                            WebkitMaskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)'
-                          } : undefined}
-                        />
-                        {isPreviewResult && (
-                          <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-                            <Button
-                              onClick={() => setIsPaywallOpen(true)}
-                              className="btn-teal rounded-full text-sm h-9 px-4 shadow-lg"
-                            >
-                              <Lock className="h-3.5 w-3.5 mr-2" />
-                              Débloquer le bilan complet
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                      {!isPreviewResult && (
-                        <p className="text-xs text-muted-foreground">
-                          💡 Vous pouvez modifier le bilan directement avant de l'envoyer ou le télécharger
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                </CardContent>
-              </Card>
-            </div>
-
-          </div>
-
-        <PaywallModal
-          isOpen={isPaywallOpen}
-          onClose={() => setIsPaywallOpen(false)}
-          subscription={subscription}
-        />
-
+          {!isPreviewResult && (
+            <p className="text-[11px] text-muted-foreground mt-2 text-right">
+              Vous pouvez modifier le bilan directement avant export
+            </p>
+          )}
+        </div>
 
       </div>
+
+      <PaywallModal
+        isOpen={isPaywallOpen}
+        onClose={() => setIsPaywallOpen(false)}
+        subscription={subscription}
+      />
     </AppLayout>
   );
 }
