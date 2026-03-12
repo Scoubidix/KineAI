@@ -5,7 +5,7 @@ import DOMPurify from 'dompurify';
 import AppLayout from '@/components/AppLayout';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { FileText, Loader2, Copy, Sparkles, Mail, Download, Lock, Lightbulb, ArrowLeft, Search, Mic, MicOff } from 'lucide-react';
+import { FileText, Loader2, Copy, Sparkles, Mail, Download, Lock, Lightbulb, ArrowLeft, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { getAuth } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
@@ -22,11 +22,8 @@ export default function BilanKinePage() {
   const [isPreviewResult, setIsPreviewResult] = useState(false);
   const [showBilan, setShowBilan] = useState(false);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
   const [kineProfile, setKineProfile] = useState<{ firstName: string; lastName: string; adresseCabinet?: string; rpps?: string } | null>(null);
   const bilanRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const { subscription } = usePaywall();
   const { toast } = useToast();
@@ -36,57 +33,6 @@ export default function BilanKinePage() {
   const getAuthToken = async () => {
     const auth = getAuth(app);
     return await auth.currentUser?.getIdToken();
-  };
-
-  // Vérifier le support Speech API au montage
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      setSpeechSupported(true);
-    }
-  }, []);
-
-  const toggleListening = () => {
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      return;
-    }
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'fr-FR';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-
-    let finalTranscript = '';
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript + ' ';
-          setRawNotes(prev => prev + (prev ? ' ' : '') + transcript);
-        } else {
-          interim = transcript;
-        }
-      }
-    };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
   };
 
   // Charger le profil kiné au montage
@@ -429,23 +375,11 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
           />
 
           <div className="flex flex-col items-end gap-1 mt-3">
-            <div className="flex items-center gap-2">
-              {speechSupported && (
-                <Button
-                  onClick={toggleListening}
-                  disabled={isGenerating}
-                  variant="outline"
-                  className={`rounded-full h-10 w-10 p-0 transition-all ${isListening ? 'border-red-400 text-red-500 animate-pulse bg-red-50 dark:bg-red-950/30' : 'text-muted-foreground hover:text-[#3899aa] hover:border-[#3899aa]/60'}`}
-                  title={isListening ? 'Arrêter la dictée' : 'Dicter vos notes'}
-                >
-                  {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                </Button>
-              )}
-              <Button
-                onClick={handleGenerateBilan}
-                disabled={isGenerating || !rawNotes.trim()}
-                className="btn-teal rounded-full px-6 h-10"
-              >
+            <Button
+              onClick={handleGenerateBilan}
+              disabled={isGenerating || !rawNotes.trim()}
+              className="btn-teal rounded-full px-6 h-10"
+            >
               {isGenerating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -458,7 +392,6 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
                 </>
               )}
             </Button>
-            </div>
             <p className="text-[11px] text-red-400">L&apos;IA peut faire des erreurs. Vérifiez les informations importantes.</p>
           </div>
         </div>
