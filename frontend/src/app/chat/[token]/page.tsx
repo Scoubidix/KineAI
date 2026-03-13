@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Send, Loader2, AlertCircle, CheckCircle, Trophy, X, Check, ChevronDown, MessageCircle } from 'lucide-react';
+import { Send, Loader2, AlertCircle, CheckCircle, Trophy, X, Check, MessageCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -453,7 +453,7 @@ export default function PatientChatPage() {
   // Interface de chat type WhatsApp
   return (
     <div
-      className="h-screen flex flex-col overflow-hidden"
+      className="h-[100dvh] flex flex-col overflow-hidden"
       style={{
         backgroundColor: '#f0f4f8',
         backgroundImage: `
@@ -613,40 +613,29 @@ export default function PatientChatPage() {
         </div>
       )}
 
-      {/* Header - toujours visible */}
-      <div className="bg-white text-gray-800 shadow-lg border-b z-30">
-        <div className="px-4 py-3">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-center justify-center">
-              <h1 className="font-semibold text-lg text-gray-800">Mon Assistant Kiné</h1>
-            </div>
-            
-            {/* Info programme + contact kiné */}
-            <div className="mt-2 pt-2 border-t border-gray-200 flex items-center justify-between">
-              <p className="text-sm text-gray-600">
-                {patientData?.nom} • Programme : {programmeData?.titre}
-              </p>
-              <button
-                onClick={() => !notifyCooldown && setShowNotifyModal(true)}
-                disabled={notifyCooldown}
-                className={`text-xs font-medium flex items-center gap-1 ml-4 shrink-0 transition-colors ${
-                  notifyCooldown
-                    ? 'text-gray-400 cursor-not-allowed'
-                    : 'text-teal-600 hover:text-teal-700'
-                }`}
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                {notifyCooldown ? 'Notification envoyée' : 'Contacter mon kiné'}
-              </button>
-            </div>
-            
-            {/* Warning d'expiration */}
-            {warning && (
-              <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-sm text-amber-700">⚠️ {warning}</p>
-              </div>
-            )}
+      {/* Header minimal */}
+      <div className="bg-white text-gray-800 shadow-sm border-b z-30">
+        <div className="px-3 py-2">
+          <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <h1 className="font-semibold text-sm text-gray-800">Mon Assistant Kiné</h1>
+            <button
+              onClick={() => !notifyCooldown && setShowNotifyModal(true)}
+              disabled={notifyCooldown}
+              className={`text-xs font-medium flex items-center gap-1 shrink-0 transition-colors ${
+                notifyCooldown
+                  ? 'text-gray-400 cursor-not-allowed'
+                  : 'text-teal-600 hover:text-teal-700'
+              }`}
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              {notifyCooldown ? 'Envoyé' : 'Contacter mon kiné'}
+            </button>
           </div>
+          {warning && (
+            <div className="max-w-4xl mx-auto mt-1 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-xs text-amber-700">⚠️ {warning}</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -661,7 +650,7 @@ export default function PatientChatPage() {
             </div>
           </div>
         ) : (
-          <div className="p-4 space-y-3 max-w-4xl mx-auto">
+          <div className="px-3 py-2 space-y-2 max-w-4xl mx-auto">
             {messages.map((message, index) => (
               <div
                 key={index}
@@ -669,10 +658,10 @@ export default function PatientChatPage() {
               >
                 <div
                   className={`
-                    max-w-[80%] px-4 py-2 rounded-2xl shadow-sm relative
+                    max-w-[85%] px-3 py-1.5 rounded-2xl shadow-sm relative
                     ${message.role === 'user'
-                      ? 'bg-primary text-primary-foreground rounded-br-md ml-12'
-                      : 'bg-white text-gray-800 rounded-bl-md mr-12 border'
+                      ? 'bg-primary text-primary-foreground rounded-br-md ml-8'
+                      : 'bg-white text-gray-800 rounded-bl-md mr-8 border'
                     }
                   `}
                 >
@@ -741,11 +730,19 @@ export default function PatientChatPage() {
         )}
       </div>
 
-      {/* Barre validation séance - sticky au-dessus de l'input */}
-      <div className="px-4 py-2">
-        <div className="max-w-4xl mx-auto">
+      {/* Toast notification envoyée */}
+      {showNotifySuccess && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-teal-600 text-white px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+          <CheckCircle className="w-4 h-4" />
+          <span className="text-sm font-medium">Votre kiné a été notifié</span>
+        </div>
+      )}
+
+      {/* Validation + saisie - collés */}
+      <div className="px-4 pt-1 pb-2">
+        <div className="max-w-4xl mx-auto space-y-1">
           {isValidatedToday ? (
-            <div className="flex items-center justify-center gap-2 py-1 text-sm text-green-700">
+            <div className="flex items-center justify-center gap-2 text-sm text-green-700">
               <CheckCircle className="w-4 h-4" />
               <span className="font-medium">Séance validée aujourd&apos;hui</span>
             </div>
@@ -758,20 +755,7 @@ export default function PatientChatPage() {
               Valider ma séance
             </button>
           )}
-        </div>
-      </div>
 
-      {/* Toast notification envoyée */}
-      {showNotifySuccess && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-teal-600 text-white px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
-          <CheckCircle className="w-4 h-4" />
-          <span className="text-sm font-medium">Votre kiné a été notifié</span>
-        </div>
-      )}
-
-      {/* Zone de saisie - style WhatsApp */}
-      <div className="px-4 py-3">
-        <div className="max-w-4xl mx-auto">
           <div className="flex items-end gap-3">
             <div className="flex-1 bg-gray-100 rounded-full px-4 py-2 border">
               <textarea
@@ -797,17 +781,6 @@ export default function PatientChatPage() {
                 <Send className="w-5 h-5" />
               )}
             </button>
-          </div>
-          
-          <div className="flex justify-between items-center mt-2 px-1">
-            <p className="text-xs text-gray-500">
-              Appuyez sur Entrée pour envoyer
-            </p>
-            {messages.length > 1 && (
-              <p className="text-xs text-gray-400">
-                {messages.length - 1} messages échangés
-              </p>
-            )}
           </div>
         </div>
       </div>

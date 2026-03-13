@@ -1347,7 +1347,7 @@ RÈGLES DE CITATION :
 RÈGLES DE SYNTHÈSE :
 - Sois concis et pratique — va droit aux recommandations cliniques
 - Mentionne les résultats chiffrés quand disponibles (p-values, effectifs, durées)
-- Si aucun document fourni → "Nous ne disposons pas d'études sur ce sujet dans notre base."
+- Si aucun document fourni → "Je n'ai pas encore d'études disponibles sur ce sujet. Je lance une recherche, n'hésite pas à me reposer la question dans 1 minute."
 - Reste cohérent avec l'historique de conversation`;
 
   if (contextDocuments.length > 0) {
@@ -1411,9 +1411,9 @@ Contenu : ${study.content.substring(0, 1200)}
 - En bas, liste les références avec titre, auteurs (année) et lien PubMed
 - Base-toi uniquement sur le contenu des études ci-dessus`;
   } else {
-    // Cas où aucun document n'est fourni
+    // Cas où aucun document n'est fourni — l'enrichissement PubMed tourne en background
     systemPrompt += `\n\nAUCUN DOCUMENT FOURNI - Répondre uniquement :
-"Nous ne disposons pas d'études sur ce sujet dans notre base, si un document vous parait pertinent, n'hésitez pas à le proposer"`;
+"Je n'ai pas encore d'études disponibles sur ce sujet. Je lance une recherche, n'hésite pas à me reposer la question dans 1 minute."`;
   }
 
   return systemPrompt;
