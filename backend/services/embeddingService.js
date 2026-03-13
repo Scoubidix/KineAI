@@ -437,6 +437,70 @@ async function searchDocumentsLegacy(query, options = {}) {
  * Essaie d'abord un seuil élevé, puis réduit si peu de résultats
  * OPTIMISÉ: Génère l'embedding une seule fois + filtres par type d'IA
  */
+/**
+ * Query Rewriter — traduit une question kiné FR en query EN optimisée pour PubMed.
+ * Expanse les termes médicaux (MeSH, synonymes) pour maximiser le recall.
+ * ~50-100 tokens, coût ~$0.0002/requête.
+ */
+async function rewriteQueryToEnglish(queryFR) {
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      temperature: 0,
+      max_tokens: 150,
+      messages: [
+        {
+          role: 'system',
+          content: `You are a medical search query optimizer for physiotherapy/physical therapy research.
+
+TASK: Rewrite the French physiotherapy question as an optimized English PubMed search query.
+
+RULES:
+- Translate to English with precise medical terminology
+- Expand with MeSH terms and clinical synonyms (e.g., "épaule" → "shoulder rotator cuff subacromial")
+- Include relevant intervention terms (e.g., "exercise therapy", "manual therapy", "rehabilitation")
+- Keep it concise (max 20 words) — this is a search query, not a sentence
+- Return ONLY the English query, nothing else
+- Do NOT add boolean operators (AND/OR)
+
+EXAMPLES:
+"tendinopathie coiffe des rotateurs exercices" → "rotator cuff tendinopathy exercise therapy eccentric strengthening rehabilitation"
+"lombalgie chronique McKenzie" → "chronic low back pain McKenzie method directional preference exercise therapy"
+"rééducation post LCA" → "ACL reconstruction rehabilitation physiotherapy return to sport protocol"
+"BPCO réhabilitation respiratoire" → "COPD pulmonary rehabilitation respiratory physiotherapy exercise training"`
+        },
+        {
+          role: 'user',
+          content: queryFR
+        }
+      ]
+    });
+
+    const queryEN = response.choices[0].message.content.trim();
+    logger.debug(`🌐 Query rewriter: "${queryFR}" → "${queryEN}"`);
+    return queryEN;
+  } catch (error) {
+    logger.error('❌ Query rewriter failed, using original query:', error.message);
+    return queryFR; // Fallback: utiliser la query FR originale
+  }
+}
+
+/**
+ * Fire-and-forget : lance l'enrichissement PubMed en background.
+ * Ne bloque pas la réponse user.
+ */
+function triggerOnDemandEnrich(queryEN) {
+  try {
+    const { onDemandEnrich } = require('./pubmedService');
+    onDemandEnrich(queryEN).catch(err => {
+      logger.error('❌ On-demand enrichment failed (background):', err.message);
+    });
+    logger.info(`🔄 Enrichissement on-demand lancé en background pour: "${queryEN.substring(0, 60)}..."`);
+  } catch (err) {
+    logger.error('❌ Failed to trigger on-demand enrichment:', err.message);
+  }
+}
+
 async function searchDocumentsOptimized(query, options = {}) {
   try {
     const {
@@ -453,14 +517,18 @@ async function searchDocumentsOptimized(query, options = {}) {
       return [];
     }
 
-    // IA Biblio → pipeline hybride dédié studies_v3 (Vector + BM25 → RRF → Rerank)
+    // IA Biblio → Query Rewriter EN + pipeline hybride studies_v3 (Vector + BM25 → RRF → Rerank)
     if (iaType === 'biblio') {
-      const queryEmbedding = await generateEmbedding(query, iaType);
-      logger.debug('🔬 IA BIBLIO - Pipeline hybride studies_v3 (Vector + BM25 → RRF → Rerank)');
+      // Query Rewriter: traduit la question FR en query EN optimisée pour PubMed
+      const queryEN = await rewriteQueryToEnglish(query);
+      logger.debug(`🔬 IA BIBLIO - Query rewriter: "${query}" → "${queryEN}"`);
+
+      const queryEmbedding = await generateEmbedding(queryEN, iaType);
+      logger.debug('🔬 IA BIBLIO - Pipeline hybride studies_v3 (Vector EN + BM25 EN → RRF → Rerank EN)');
 
       const [vectorResults, bm25Results] = await Promise.all([
         searchStudiesV3Vector(queryEmbedding, 0.3, 15),
-        searchStudiesV3BM25(query, 15)
+        searchStudiesV3BM25(queryEN, 15)
       ]);
 
       logger.debug(`📊 Vector search: ${vectorResults.length} résultats`);
@@ -470,15 +538,27 @@ async function searchDocumentsOptimized(query, options = {}) {
       logger.debug(`📊 RRF fusion: ${fused.length} candidats uniques`);
 
       if (fused.length === 0) {
-        logger.debug('⚠️ Aucun candidat après fusion — retour vide');
+        logger.debug('⚠️ Aucun candidat après fusion — trigger enrichissement on-demand');
         await logSearch(query, 0);
+        triggerOnDemandEnrich(queryEN);
         return [];
       }
 
-      const reranked = await rerankWithCohere(query, fused, 5);
+      // Cohere rerank avec query EN pour matching optimal
+      const reranked = await rerankWithCohere(queryEN, fused, 5);
       logger.debug(`📊 Cohere rerank: top ${reranked.length} renvoyés`);
 
-      logger.info(`✅ Recherche hybride biblio terminée: ${reranked.length} résultats`);
+      // Seuil de pertinence Cohere : si le meilleur score < seuil, trigger enrichissement PubMed en background
+      const RELEVANCE_THRESHOLD = 0.8;
+      const bestScore = reranked[0]?.relevanceScore || reranked[0]?.similarity || 0;
+
+      if (bestScore < RELEVANCE_THRESHOLD) {
+        logger.info(`⚠️ Meilleur score Cohere (${bestScore.toFixed(3)}) < seuil ${RELEVANCE_THRESHOLD} — trigger enrichissement PubMed en background`);
+        triggerOnDemandEnrich(queryEN);
+      }
+
+      // Retourner les résultats même si enrichissement déclenché (réponse immédiate + meilleurs résultats la prochaine fois)
+      logger.info(`✅ Recherche hybride biblio terminée: ${reranked.length} résultats (best score: ${bestScore.toFixed(3)})`);
       await logSearch(query, reranked.length);
       return reranked;
     }
@@ -1265,7 +1345,10 @@ async function rerankWithCohere(query, candidates, topN = 5) {
     const { CohereClient } = require('cohere-ai');
     const cohere = new CohereClient({ token: process.env.COHERE_API_KEY });
 
-    const documents = candidates.map(doc => doc.content);
+    // Utiliser abstract EN si disponible (biblio), sinon content (clinique/basique)
+    const documents = candidates.map(doc =>
+      doc.abstract ? `${doc.title || ''} ${doc.abstract}` : doc.content
+    );
 
     const response = await cohere.rerank({
       model: 'rerank-v3.5',
@@ -1299,6 +1382,7 @@ module.exports = {
   searchDocumentsOptimized,
   generateEmbedding, // Pour les recherches seulement
   preprocessTextForEmbedding, // Utilitaire d'embedding
+  rewriteQueryToEnglish, // Query rewriter FR → EN pour biblio
   
   // Fonctions de gestion
   getDocumentStats,

@@ -68,6 +68,61 @@ exports.getAllProgrammesByKine = async (req, res) => {
   }
 };
 
+// 🔽 GET programmes archivés d'un patient
+exports.getArchivedProgrammesByPatient = async (req, res) => {
+  const patientId = parseInt(req.params.patientId);
+  const firebaseUid = req.uid;
+  try {
+    const prisma = prismaService.getInstance();
+
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    const patient = await prisma.patient.findFirst({
+      where: {
+        id: patientId,
+        kineId: kine.id,
+        isActive: true
+      }
+    });
+
+    if (!patient) {
+      return res.status(404).json({ error: "Patient non trouvé ou accès refusé" });
+    }
+
+    const programmes = await prisma.programme.findMany({
+      where: {
+        patientId,
+        isArchived: true,
+        isActive: true
+      },
+      include: {
+        exercices: {
+          include: { exerciceModele: true }
+        },
+        sessionValidations: {
+          select: {
+            date: true,
+            isValidated: true,
+            painLevel: true,
+            difficultyLevel: true
+          }
+        }
+      },
+      orderBy: { dateDebut: 'desc' }
+    });
+    res.json(programmes);
+  } catch (error) {
+    logger.error("Erreur récupération programmes archivés :", error);
+    res.status(500).json({ error: "Erreur récupération programmes archivés" });
+  }
+};
+
 // 🔽 GET programmes actifs (pas archivés)
 exports.getProgrammesByPatient = async (req, res) => {
   const patientId = parseInt(req.params.patientId);

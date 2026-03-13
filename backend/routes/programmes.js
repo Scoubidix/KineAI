@@ -243,6 +243,9 @@ router.post('/', authenticate, canCreateProgramme, programmesController.createPr
 router.put('/:id', authenticate, programmesController.updateProgramme);
 router.delete('/:id', authenticate, programmesController.deleteProgramme);
 
+// Route programmes archivés d'un patient
+router.get('/:patientId/archived', authenticate, programmesController.getArchivedProgrammesByPatient);
+
 // Route GET avec paramètre EN DERNIER (elle capture tout ce qui n'a pas matché avant)
 router.get('/:patientId', authenticate, programmesController.getProgrammesByPatient);
 

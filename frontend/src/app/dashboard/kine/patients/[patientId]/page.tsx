@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Target, Filter, Dumbbell, Clock, Activity, MessageCircle, CheckCircle, AlertCircle, Search } from 'lucide-react';
+import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Target, Filter, Dumbbell, Clock, Activity, MessageCircle, CheckCircle, AlertCircle, Search, Archive, ArrowLeft, ChevronRight } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Checkbox } from '@/components/ui/checkbox';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -71,6 +72,35 @@ interface ExerciceTemplate {
       id: number;
       nom: string;
     };
+  }>;
+}
+
+interface ArchivedProgramme {
+  id: number;
+  titre: string;
+  description: string;
+  duree: number;
+  dateDebut: string;
+  dateFin: string;
+  archivedAt: string | null;
+  exercices: Array<{
+    id: number;
+    series: number;
+    repetitions: number;
+    pause: number;
+    tempsTravail?: number;
+    consigne: string;
+    exerciceModele: {
+      id: number;
+      nom: string;
+      description: string;
+    };
+  }>;
+  sessionValidations: Array<{
+    date: string;
+    isValidated: boolean;
+    painLevel: number | null;
+    difficultyLevel: number | null;
   }>;
 }
 
@@ -145,6 +175,13 @@ export default function PatientDetailPage() {
   const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus>('idle');
   const [whatsappError, setWhatsappError] = useState<string | null>(null);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+
+  // États programmes archivés
+  const [showArchivedModal, setShowArchivedModal] = useState(false);
+  const [archivedProgrammes, setArchivedProgrammes] = useState<ArchivedProgramme[]>([]);
+  const [selectedArchivedProgramme, setSelectedArchivedProgramme] = useState<ArchivedProgramme | null>(null);
+  const [loadingArchived, setLoadingArchived] = useState(false);
+  const [archivedSearchQuery, setArchivedSearchQuery] = useState('');
 
   useEffect(() => {
     const fetchPatient = async () => {
@@ -563,6 +600,47 @@ export default function PatientDetailPage() {
       alert("Lien copié dans le presse-papiers !");
     }
   };
+
+  // Fetch programmes archivés (lazy, au clic uniquement)
+  const fetchArchivedProgrammes = async () => {
+    setLoadingArchived(true);
+    try {
+      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/programmes/${patientId}/archived`);
+      if (!res.ok) throw new Error('Erreur récupération programmes archivés');
+      const data = await res.json();
+      setArchivedProgrammes(data);
+    } catch (err) {
+      console.error("Erreur récupération programmes archivés :", err);
+      toast({ title: "Erreur", description: "Impossible de récupérer les anciens programmes", variant: "destructive" });
+    } finally {
+      setLoadingArchived(false);
+    }
+  };
+
+  const handleOpenArchivedModal = () => {
+    setShowArchivedModal(true);
+    setSelectedArchivedProgramme(null);
+    setArchivedSearchQuery('');
+    fetchArchivedProgrammes();
+  };
+
+  const getArchivedStats = (programme: ArchivedProgramme) => {
+    const validations = programme.sessionValidations;
+    const totalDays = Math.ceil(
+      (new Date(programme.dateFin).getTime() - new Date(programme.dateDebut).getTime()) / (1000 * 60 * 60 * 24)
+    ) + 1;
+    const validatedDays = validations.filter(v => v.isValidated).length;
+    const painLevels = validations.filter(v => v.painLevel !== null).map(v => v.painLevel as number);
+    const difficultyLevels = validations.filter(v => v.difficultyLevel !== null).map(v => v.difficultyLevel as number);
+    const avgPain = painLevels.length > 0 ? Math.round((painLevels.reduce((a, b) => a + b, 0) / painLevels.length) * 10) / 10 : null;
+    const avgDifficulty = difficultyLevels.length > 0 ? Math.round((difficultyLevels.reduce((a, b) => a + b, 0) / difficultyLevels.length) * 10) / 10 : null;
+    return { totalDays, validatedDays, avgPain, avgDifficulty };
+  };
+
+  const filteredArchivedProgrammes = archivedProgrammes.filter(p =>
+    p.titre.toLowerCase().includes(archivedSearchQuery.toLowerCase()) ||
+    p.description.toLowerCase().includes(archivedSearchQuery.toLowerCase())
+  );
 
   const renderProgrammeModal = (isEdit: boolean) => {
     const title = isEdit ? editTitle : createTitle;
@@ -1049,6 +1127,15 @@ export default function PatientDetailPage() {
                           </span>
                         </div>
                       </div>
+
+                      <Button
+                        variant="outline"
+                        onClick={handleOpenArchivedModal}
+                        className="shrink-0 h-9 text-sm gap-2 border-[#3899aa]/30 text-[#3899aa] hover:bg-[#3899aa]/10"
+                      >
+                        <Archive className="w-4 h-4" />
+                        Anciens Programmes
+                      </Button>
                     </div>
 
                   </div>
@@ -1391,6 +1478,177 @@ export default function PatientDetailPage() {
                 </p>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+        {/* Modal programmes archivés */}
+        <Dialog open={showArchivedModal} onOpenChange={(open) => {
+          setShowArchivedModal(open);
+          if (!open) {
+            setSelectedArchivedProgramme(null);
+            setArchivedSearchQuery('');
+          }
+        }}>
+          <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
+            <DialogHeader className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+              <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
+                {selectedArchivedProgramme ? (
+                  <>
+                    <button onClick={() => setSelectedArchivedProgramme(null)} className="hover:opacity-80 transition-opacity">
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    {selectedArchivedProgramme.titre}
+                  </>
+                ) : (
+                  <>
+                    <Archive className="w-5 h-5" />
+                    Anciens Programmes
+                  </>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+
+            {!selectedArchivedProgramme ? (
+              /* === Étape 1 : Liste de sélection === */
+              <div className="space-y-4 pt-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher un programme..."
+                    value={archivedSearchQuery}
+                    onChange={(e) => setArchivedSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+
+                <div className="max-h-[60vh] overflow-y-auto space-y-2">
+                  {loadingArchived ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="animate-spin h-6 w-6 text-[#3899aa] mx-auto" />
+                      <p className="text-sm text-muted-foreground mt-2">Chargement...</p>
+                    </div>
+                  ) : filteredArchivedProgrammes.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Archive className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">{archivedSearchQuery ? 'Aucun programme trouvé' : 'Aucun ancien programme'}</p>
+                    </div>
+                  ) : (
+                    filteredArchivedProgrammes.map(programme => (
+                      <Card
+                        key={programme.id}
+                        className="p-3 cursor-pointer transition-all duration-300 hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-[#3899aa]/5"
+                        onClick={() => setSelectedArchivedProgramme(programme)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-foreground truncate">{programme.titre}</p>
+                            <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{programme.description}</p>
+                            <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {new Date(programme.dateDebut).toLocaleDateString('fr-FR')}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {programme.duree} jours
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Dumbbell className="w-3 h-3" />
+                                {programme.exercices.length} exercice{programme.exercices.length > 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 ml-2" />
+                        </div>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* === Étape 2 : Détail programme sélectionné === */
+              (() => {
+                const stats = getArchivedStats(selectedArchivedProgramme);
+                const chartData = [
+                  {
+                    name: 'Jours validés',
+                    value: stats.totalDays > 0 ? Math.round((stats.validatedDays / stats.totalDays) * 10) : 0,
+                    label: `${stats.validatedDays}/${stats.totalDays}`,
+                    color: '#3899aa'
+                  },
+                  {
+                    name: 'Douleur moy.',
+                    value: stats.avgPain ?? 0,
+                    label: stats.avgPain !== null ? `${stats.avgPain}/10` : 'N/A',
+                    color: stats.avgPain !== null && stats.avgPain >= 7 ? '#ef4444' : stats.avgPain !== null && stats.avgPain >= 4 ? '#f59e0b' : '#22c55e'
+                  },
+                  {
+                    name: 'Difficulté moy.',
+                    value: stats.avgDifficulty ?? 0,
+                    label: stats.avgDifficulty !== null ? `${stats.avgDifficulty}/10` : 'N/A',
+                    color: stats.avgDifficulty !== null && stats.avgDifficulty >= 7 ? '#ef4444' : stats.avgDifficulty !== null && stats.avgDifficulty >= 4 ? '#f59e0b' : '#22c55e'
+                  }
+                ];
+
+                return (
+                  <div className="space-y-5 pt-2">
+                    {/* Graphique synthétique */}
+                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
+                      <h4 className="text-sm font-medium text-foreground mb-3">Synthèse du programme</h4>
+                      <div className="w-full h-48">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 40, left: 10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.3} />
+                            <XAxis type="number" domain={[0, 10]} ticks={[0, 2, 4, 6, 8, 10]} tick={{ fontSize: 11 }} />
+                            <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }} />
+                            <Tooltip
+                              formatter={(_: any, __: any, props: any) => [props.payload.label, props.payload.name]}
+                              contentStyle={{ borderRadius: '8px', fontSize: '13px' }}
+                            />
+                            <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={28}>
+                              {chartData.map((entry, index) => (
+                                <Cell key={index} fill={entry.color} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="flex justify-center gap-6 mt-2">
+                        {chartData.map((item, i) => (
+                          <div key={i} className="text-center">
+                            <p className="text-lg font-bold" style={{ color: item.color }}>{item.label}</p>
+                            <p className="text-[10px] text-muted-foreground">{item.name}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Liste exercices */}
+                    <div>
+                      <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                        <Dumbbell className="w-4 h-4 text-[#3899aa]" />
+                        Exercices ({selectedArchivedProgramme.exercices.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {selectedArchivedProgramme.exercices.map((ex) => (
+                          <div key={ex.id} className="bg-white dark:bg-gray-800 border rounded-lg p-3">
+                            <p className="font-medium text-sm">{ex.exerciceModele.nom}</p>
+                            <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-muted-foreground">
+                              <span>{ex.series} séries</span>
+                              <span>{ex.repetitions} reps</span>
+                              <span>{ex.pause}s repos</span>
+                              {ex.tempsTravail && ex.tempsTravail > 0 && <span>{ex.tempsTravail}s travail</span>}
+                            </div>
+                            {ex.consigne && (
+                              <p className="text-xs text-muted-foreground mt-1 italic">{ex.consigne}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()
+            )}
           </DialogContent>
         </Dialog>
       </div>

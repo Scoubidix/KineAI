@@ -559,6 +559,19 @@ app.get('/debug/all-imports', (req, res) => {
 // NOUVEAU : Webhook WhatsApp
 app.use('/webhook/whatsapp', whatsappWebhook);
 
+// 🔄 CRON : Pipeline PubMed (appelé par GCP Cloud Scheduler avec OIDC)
+app.get('/api/cron/pubmed-pipeline', async (req, res) => {
+  const { scheduledPipeline } = require('./services/pubmedService');
+  res.json({ status: 'started', message: 'Pipeline PubMed lancé en background' });
+
+  try {
+    const stats = await scheduledPipeline();
+    console.log('[CRON] Pipeline PubMed terminé:', stats);
+  } catch (err) {
+    console.error('[CRON] Pipeline PubMed erreur:', err.message);
+  }
+});
+
 // 🔔 NOUVEAU : Routes notifications (LIBRES - navigation)
 app.use('/api/notifications', notificationRoutes);
 
