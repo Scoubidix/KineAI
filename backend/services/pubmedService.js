@@ -594,49 +594,48 @@ async function onDemandEnrich(queryEN) {
 
   try {
     // ÉTAPE 1 : ESearch ciblé (top 5, filtre article types)
-    const filteredQuery = `(${queryEN}) AND hasabstract AND "humans"[MeSH] AND ("Randomized Controlled Trial"[pt] OR "Systematic Review"[pt] OR "Meta-Analysis"[pt] OR "Review"[pt])`;
+    const filteredQuery = `(${queryEN}) AND hasabstract AND "humans"[MeSH]`;
 
     const { pmids } = await esearch(filteredQuery, { retmax: 5, sort: 'relevance' });
     stats.pmidsFound = pmids.length;
 
-    if (pmids.length === 0) return stats;
+    if (pmids.length > 0) {
+      // ÉTAPE 2 : EFetch
+      const articles = await efetchArticles(pmids);
 
-    // ÉTAPE 2 : EFetch
-    const articles = await efetchArticles(pmids);
+      // ÉTAPE 3 : Dedup via studies_v3 (pas pubmed_candidates)
+      const { data: existingRows } = await supabase
+        .from('studies_v3')
+        .select('pmid')
+        .in('pmid', articles.map(a => a.pmid));
+      const existingPmids = new Set((existingRows || []).map(r => r.pmid));
 
-    // ÉTAPE 3 : Dedup via studies_v3 (pas pubmed_candidates)
-    const { data: existingRows } = await supabase
-      .from('studies_v3')
-      .select('pmid')
-      .in('pmid', articles.map(a => a.pmid));
-    const existingPmids = new Set((existingRows || []).map(r => r.pmid));
+      const toProcess = articles
+        .filter(art => !existingPmids.has(art.pmid) && art.abstract)
+        .map(art => ({ ...art, category: 'Autre' }));
 
-    const toProcess = articles
-      .filter(art => !existingPmids.has(art.pmid) && art.abstract)
-      .map(art => ({ ...art, category: 'Autre' }));
+      stats.inserted = toProcess.length;
 
-    stats.inserted = toProcess.length;
-
-    if (toProcess.length === 0) return stats;
-
-    // ÉTAPE 4 : Translate + Embed en parallèle (pas de scoring, query user = pertinent par définition)
-    const results = await Promise.allSettled(
-      toProcess.map(art => processArticle(art))
-    );
-    for (let k = 0; k < results.length; k++) {
-      if (results[k].status === 'fulfilled') {
-        stats.processed++;
-      } else {
-        stats.errors++;
+      if (toProcess.length > 0) {
+        // ÉTAPE 4 : Translate + Embed en parallèle (pas de scoring, query user = pertinent par définition)
+        const results = await Promise.allSettled(
+          toProcess.map(art => processArticle(art))
+        );
+        for (let k = 0; k < results.length; k++) {
+          if (results[k].status === 'fulfilled') {
+            stats.processed++;
+          } else {
+            stats.errors++;
+          }
+        }
       }
     }
   } catch (err) {
     stats.errors++;
+    logger.error(`[On-demand PubMed] ERREUR: ${err.message}`);
   }
 
-  if (stats.processed > 0) {
-    logger.warn(`[On-demand PubMed] "${queryEN.substring(0, 60)}" — ${stats.processed} articles ajoutés en base`);
-  }
+  logger.warn(`[On-demand PubMed] "${queryEN.substring(0, 60)}" — ${stats.pmidsFound} PubMed, ${stats.inserted} nouveaux, ${stats.processed} insérés${stats.errors > 0 ? `, ${stats.errors} erreurs` : ''}`);
 
   return stats;
 }

@@ -447,27 +447,33 @@ async function rewriteQueryToEnglish(queryFR) {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0,
-      max_tokens: 150,
+      max_tokens: 200,
+      response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
           content: `You are a medical search query optimizer for physiotherapy/physical therapy research.
 
-TASK: Rewrite the French physiotherapy question as an optimized English PubMed search query.
+TASK: Rewrite the French physiotherapy question into TWO English queries:
+
+1. "vector": Expanded query for semantic vector search. Use precise medical terminology, MeSH terms, clinical synonyms, and relevant intervention terms. Max 20 words.
+2. "pubmed": Strict faithful translation for PubMed keyword search. Only the core medical concepts from the original question — NO expansion, NO added terms. Max 6 words.
 
 RULES:
-- Translate to English with precise medical terminology
-- Expand with MeSH terms and clinical synonyms (e.g., "épaule" → "shoulder rotator cuff subacromial")
-- Include relevant intervention terms (e.g., "exercise therapy", "manual therapy", "rehabilitation")
-- Keep it concise (max 20 words) — this is a search query, not a sentence
-- Return ONLY the English query, nothing else
 - Do NOT add boolean operators (AND/OR)
+- "pubmed" must be a strict translation — do not add terms the user did not mention
 
 EXAMPLES:
-"tendinopathie coiffe des rotateurs exercices" → "rotator cuff tendinopathy exercise therapy eccentric strengthening rehabilitation"
-"lombalgie chronique McKenzie" → "chronic low back pain McKenzie method directional preference exercise therapy"
-"rééducation post LCA" → "ACL reconstruction rehabilitation physiotherapy return to sport protocol"
-"BPCO réhabilitation respiratoire" → "COPD pulmonary rehabilitation respiratory physiotherapy exercise training"`
+Input: "tendinopathie coiffe des rotateurs exercices"
+{"vector": "rotator cuff tendinopathy exercise therapy eccentric strengthening rehabilitation", "pubmed": "rotator cuff tendinopathy exercises"}
+
+Input: "impacts des antibiotiques sur les tendinites d'achille"
+{"vector": "antibiotics Achilles tendinopathy fluoroquinolone tendon adverse effects", "pubmed": "antibiotics Achilles tendinopathy"}
+
+Input: "rééducation post LCA"
+{"vector": "ACL reconstruction rehabilitation physiotherapy return to sport protocol", "pubmed": "ACL reconstruction rehabilitation"}
+
+RESPOND IN JSON ONLY.`
         },
         {
           role: 'user',
@@ -476,12 +482,12 @@ EXAMPLES:
       ]
     });
 
-    const queryEN = response.choices[0].message.content.trim();
-    logger.debug(`🌐 Query rewriter: "${queryFR}" → "${queryEN}"`);
-    return queryEN;
+    const result = JSON.parse(response.choices[0].message.content);
+    logger.debug(`🌐 Query rewriter: "${queryFR}" → vector: "${result.vector}" | pubmed: "${result.pubmed}"`);
+    return result;
   } catch (error) {
     logger.error('❌ Query rewriter failed, using original query:', error.message);
-    return queryFR; // Fallback: utiliser la query FR originale
+    return { vector: queryFR, pubmed: queryFR };
   }
 }
 
@@ -519,16 +525,16 @@ async function searchDocumentsOptimized(query, options = {}) {
 
     // IA Biblio → Query Rewriter EN + pipeline hybride studies_v3 (Vector + BM25 → RRF → Rerank)
     if (iaType === 'biblio') {
-      // Query Rewriter: traduit la question FR en query EN optimisée pour PubMed
-      const queryEN = await rewriteQueryToEnglish(query);
-      logger.debug(`🔬 IA BIBLIO - Query rewriter: "${query}" → "${queryEN}"`);
+      // Query Rewriter: traduit la question FR en 2 queries EN (vector élargie + pubmed fidèle)
+      const { vector: queryVector, pubmed: queryPubmed } = await rewriteQueryToEnglish(query);
+      logger.debug(`🔬 IA BIBLIO - Query rewriter: "${query}" → vector: "${queryVector}" | pubmed: "${queryPubmed}"`);
 
-      const queryEmbedding = await generateEmbedding(queryEN, iaType);
+      const queryEmbedding = await generateEmbedding(queryVector, iaType);
       logger.debug('🔬 IA BIBLIO - Pipeline hybride studies_v3 (Vector EN + BM25 EN → RRF → Rerank EN)');
 
       const [vectorResults, bm25Results] = await Promise.all([
         searchStudiesV3Vector(queryEmbedding, 0.3, 15),
-        searchStudiesV3BM25(queryEN, 15)
+        searchStudiesV3BM25(queryVector, 15)
       ]);
 
       logger.debug(`📊 Vector search: ${vectorResults.length} résultats`);
@@ -540,21 +546,21 @@ async function searchDocumentsOptimized(query, options = {}) {
       if (fused.length === 0) {
         logger.debug('⚠️ Aucun candidat après fusion — trigger enrichissement on-demand');
         await logSearch(query, 0);
-        triggerOnDemandEnrich(queryEN);
+        triggerOnDemandEnrich(queryPubmed);
         return [];
       }
 
       // Cohere rerank avec query EN pour matching optimal
-      const reranked = await rerankWithCohere(queryEN, fused, 5);
+      const reranked = await rerankWithCohere(queryVector, fused, 5);
       logger.debug(`📊 Cohere rerank: top ${reranked.length} renvoyés`);
 
       // Seuil de pertinence Cohere : si le meilleur score < seuil, trigger enrichissement PubMed en background
-      const RELEVANCE_THRESHOLD = 0.8;
+      const RELEVANCE_THRESHOLD = 0.75;
       const bestScore = reranked[0]?.relevanceScore || reranked[0]?.similarity || 0;
 
       if (bestScore < RELEVANCE_THRESHOLD) {
         logger.info(`⚠️ Meilleur score Cohere (${bestScore.toFixed(3)}) < seuil ${RELEVANCE_THRESHOLD} — trigger enrichissement PubMed en background`);
-        triggerOnDemandEnrich(queryEN);
+        triggerOnDemandEnrich(queryPubmed);
       }
 
       // Retourner les résultats même si enrichissement déclenché (réponse immédiate + meilleurs résultats la prochaine fois)

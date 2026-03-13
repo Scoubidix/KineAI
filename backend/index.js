@@ -565,8 +565,7 @@ app.get('/api/cron/pubmed-pipeline', async (req, res) => {
   res.json({ status: 'started', message: 'Pipeline PubMed lancé en background' });
 
   try {
-    const stats = await scheduledPipeline();
-    console.log('[CRON] Pipeline PubMed terminé:', stats);
+    await scheduledPipeline();
   } catch (err) {
     console.error('[CRON] Pipeline PubMed erreur:', err.message);
   }
