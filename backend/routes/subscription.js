@@ -201,7 +201,7 @@ router.get('/limits', authenticate, async (req, res) => {
         assistants: ['CONVERSATIONNEL']
       },
       'PRATIQUE': {
-        programmes: 3,
+        programmes: 5,
         assistants: ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE']
       },
       'PIONNIER': {

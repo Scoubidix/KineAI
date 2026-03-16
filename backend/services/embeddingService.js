@@ -333,106 +333,6 @@ function preprocessTextForEmbedding(text) {
 }
 
 /**
- * Recherche sémantique dans la base vectorielle AVEC filtres métadonnées
- * @param {string} query - Requête de recherche
- * @param {object} options - Options de recherche (seuil, nombre, catégorie)
- * @returns {array} Résultats de recherche enrichis
- */
-async function searchDocuments(query, options = {}) {
-  try {
-    const {
-      matchThreshold = 0.3,
-      matchCount = 10,
-      filterCategory = null
-    } = options;
-
-    logger.debug('🔍 Recherche avec filtres métadonnées pour:', query);
-    
-    // 🆕 ÉTAPE 1: Analyser la requête pour extraire les métadonnées
-    const detectedMetadata = analyzeQueryForMetadata(query);
-    const metadataFilters = buildMetadataFilters(detectedMetadata);
-    
-    // Générer l'embedding de la requête
-    const queryEmbedding = await generateEmbedding(query);
-    
-    // 🆕 ÉTAPE 2: Appeler la nouvelle fonction avec filtres métadonnées
-    const { data, error } = await supabase.rpc('search_documents_with_metadata', {
-      query_embedding: queryEmbedding,
-      match_threshold: matchThreshold,
-      match_count: matchCount,
-      filter_category: filterCategory,
-      metadata_filters: JSON.stringify(metadataFilters)  // CONVERSION en JSON string
-    });
-    
-    // DEBUG: Log pour voir exactement ce qui est envoyé
-    logger.debug(`🔬 Metadata filters fonction directe:`, JSON.stringify(metadataFilters));
-
-    if (error) {
-      logger.error('❌ Erreur recherche Supabase:', error);
-      // Si la nouvelle fonction n'existe pas, retourner résultat vide
-      logger.debug('⚠️ Fonction search_documents_with_metadata non trouvée. Créez-la dans Supabase !');
-      return [];
-    }
-
-    if (!data || data.length === 0) {
-      logger.debug('⚠️ Aucun document trouvé avec seuil', matchThreshold);
-      return [];
-    }
-
-    // Enrichissement des résultats avec métadonnées utiles
-    const enrichedResults = data.map((doc, index) => ({
-      ...doc,
-      searchRank: index + 1,
-      similarityPercentage: Math.round(doc.similarity * 100),
-      contentLength: doc.content ? doc.content.length : 0,
-      hasMetadata: !!doc.metadata,
-      created_at: doc.created_at || new Date().toISOString(),
-      ageInDays: doc.created_at ? 
-        Math.floor((new Date() - new Date(doc.created_at)) / (1000 * 60 * 60 * 24)) : 0,
-      metadataFiltered: Object.keys(metadataFilters).length > 0
-    }));
-
-    logger.debug(`✅ ${enrichedResults.length} documents trouvés avec filtres métadonnées`);
-    await logSearch(query, enrichedResults.length);
-    
-    return enrichedResults;
-  } catch (error) {
-    logger.error('❌ Erreur recherche sémantique:', error);
-    throw error;
-  }
-}
-
-/**
- * Ancienne fonction de recherche (fallback)
- */
-async function searchDocumentsLegacy(query, options = {}) {
-  const {
-    matchThreshold = 0.3,
-    matchCount = 10,
-    filterCategory = null
-  } = options;
-
-  logger.debug('🔍 Recherche legacy (sans filtres métadonnées) pour:', query);
-  
-  const queryEmbedding = await generateEmbedding(query);
-  
-  logger.debug('🚨 APPEL LEGACY search_documents (SANS FILTRES) - CECI EXPLIQUE LE BUG !');
-  const { data, error } = await supabase.rpc('search_documents', {
-    query_embedding: queryEmbedding,
-    match_threshold: matchThreshold,
-    match_count: matchCount,
-    filter_category: filterCategory
-  });
-
-  if (error) {
-    logger.error('❌ Erreur recherche legacy:', error);
-    throw error;
-  }
-
-  return data || [];
-}
-
-/**
  * Recherche optimisée avec stratégie de seuils adaptatifs
  * Essaie d'abord un seuil élevé, puis réduit si peu de résultats
  * OPTIMISÉ: Génère l'embedding une seule fois + filtres par type d'IA
@@ -625,11 +525,11 @@ async function searchDocumentsOptimized(query, options = {}) {
       return reranked;
     }
 
-    // IA Basique → pipeline hybride multi-table (studies_v2 + clinical_chunks)
+    // IA Basique → pipeline hybride multi-table (studies_v3 + clinical_chunks)
     logger.debug('💬 ═══════════════════════════════════════════════════════');
     logger.debug('💬 IA BASIQUE - DÉBUT PIPELINE HYBRIDE MULTI-TABLE');
     logger.debug(`💬 Query: "${query}"`);
-    logger.debug('💬 Tables: studies_v2 + clinical_chunks | Embedding: text-embedding-3-large (1536d)');
+    logger.debug('💬 Tables: studies_v3 + clinical_chunks | Embedding: text-embedding-3-large (1536d)');
     logger.debug('💬 ═══════════════════════════════════════════════════════');
 
     // Embedding text-embedding-3-large (même modèle que les 2 tables)
@@ -638,13 +538,8 @@ async function searchDocumentsOptimized(query, options = {}) {
 
     // 4 recherches en parallèle : vector+BM25 sur chaque table
     const [vectorStudies, bm25Studies, vectorClinical, bm25Clinical] = await Promise.all([
-      searchDocumentsWithEmbedding(queryEmbedding, {
-        matchThreshold: 0.3,
-        matchCount: 5,
-        metadataFilters: {},
-        iaType: 'biblio'
-      }),
-      searchStudiesBM25(query, 5),
+      searchStudiesV3Vector(queryEmbedding, 0.3, 5),
+      searchStudiesV3BM25(query, 5),
       searchDocumentsWithEmbedding(queryEmbedding, {
         matchThreshold: 0.3,
         matchCount: 5,
@@ -654,7 +549,7 @@ async function searchDocumentsOptimized(query, options = {}) {
       searchClinicalChunksBM25(query, 5)
     ]);
 
-    logger.debug(`💬 [2/5] studies_v2 — Vector: ${vectorStudies.length} résultats, BM25: ${bm25Studies.length} résultats`);
+    logger.debug(`💬 [2/5] studies_v3 — Vector: ${vectorStudies.length} résultats, BM25: ${bm25Studies.length} résultats`);
     vectorStudies.slice(0, 3).forEach((doc, i) => {
       logger.debug(`💬   studies Vector #${i + 1}: ${doc.study_id || doc.id} | sim=${(doc.similarity || 0).toFixed(3)} | ${(doc.content || '').substring(0, 80)}...`);
     });
@@ -674,7 +569,7 @@ async function searchDocumentsOptimized(query, options = {}) {
     const fusedStudies = fuseWithRRF(vectorStudies, bm25Studies).slice(0, 3);
     const fusedClinical = fuseWithRRF(vectorClinical, bm25Clinical).slice(0, 3);
 
-    logger.debug(`💬 [3/5] RRF studies_v2: ${fusedStudies.length} candidats`);
+    logger.debug(`💬 [3/5] RRF studies_v3: ${fusedStudies.length} candidats`);
     fusedStudies.forEach((doc, i) => {
       logger.debug(`💬   RRF studies #${i + 1}: ${doc.study_id || doc.id} | rrfScore=${doc.rrfScore?.toFixed(4)} | source=${doc.searchSource}`);
     });
@@ -733,20 +628,8 @@ async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
 
     let data, error;
 
-    // 🆕 APPEL SPÉCIALISÉ PAR TYPE D'IA
-    if (iaType === 'biblio') {
-      logger.debug(`🔬 IA BIBLIO - Appel search_studies_v2 (embedding: text-embedding-3-large)`);
-
-      const result = await supabase.rpc('search_studies_v2', {
-        query_embedding: queryEmbedding,
-        match_threshold: matchThreshold,
-        match_count: matchCount
-      });
-
-      data = result.data;
-      error = result.error;
-
-    } else if (iaType === 'clinique') {
+    // Appel spécialisé : seul clinical_chunks utilise encore cette fonction
+    if (iaType === 'clinique') {
       logger.debug(`🩺 IA CLINIQUE - Appel search_clinical_chunks (embedding: text-embedding-3-large)`);
 
       const result = await supabase.rpc('search_clinical_chunks', {
@@ -759,17 +642,8 @@ async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
       error = result.error;
 
     } else {
-      // IA Basique - fonction simple sans filtres
-      logger.debug(`💬 IA ${iaType} - Fonction simple search_documents (sans filtres)`);
-
-      const result = await supabase.rpc('search_documents', {
-        query_embedding: queryEmbedding,
-        match_threshold: matchThreshold,
-        match_count: matchCount
-      });
-
-      data = result.data;
-      error = result.error;
+      logger.warn(`⚠️ searchDocumentsWithEmbedding appelé avec iaType=${iaType} — seul 'clinique' est supporté`);
+      return [];
     }
 
     if (error) {
@@ -815,34 +689,6 @@ async function searchDocumentsWithEmbedding(queryEmbedding, options = {}) {
     logger.error('❌ Erreur recherche avec embedding:', error);
     throw error;
   }
-}
-
-/**
- * Fallback legacy avec embedding pré-généré
- */
-async function searchDocumentsLegacyWithEmbedding(queryEmbedding, options = {}) {
-  const {
-    matchThreshold = 0.3,
-    matchCount = 10,
-    filterCategory = null
-  } = options;
-
-  logger.debug('🔍 Recherche legacy avec embedding pré-généré');
-  
-  logger.debug('🚨 APPEL LEGACY search_documents (SANS FILTRES) - CECI EXPLIQUE LE BUG !');
-  const { data, error } = await supabase.rpc('search_documents', {
-    query_embedding: queryEmbedding,
-    match_threshold: matchThreshold,
-    match_count: matchCount,
-    filter_category: filterCategory
-  });
-
-  if (error) {
-    logger.error('❌ Erreur recherche legacy:', error);
-    throw error;
-  }
-
-  return data || [];
 }
 
 // ==========================================
@@ -1130,14 +976,14 @@ async function testVectorDatabase() {
     // Test fonction de recherche avec embedding
     const testEmbedding = await generateEmbedding('test kinésithérapie');
     
-    const { data: searchTest, error: searchError } = await supabase.rpc('search_documents', {
+    const { data: searchTest, error: searchError } = await supabase.rpc('search_studies_v3', {
       query_embedding: testEmbedding,
       match_threshold: 0.1,
       match_count: 1
     });
 
     if (searchError) {
-      throw new Error(`Fonction search_documents error: ${searchError.message}`);
+      throw new Error(`Fonction search_studies_v3 error: ${searchError.message}`);
     }
 
     logger.info('✅ Base vectorielle opérationnelle');
@@ -1230,38 +1076,6 @@ async function searchStudiesV3BM25(query, matchCount = 15) {
     }));
   } catch (error) {
     logger.error('❌ Erreur V3 BM25 search:', error);
-    return [];
-  }
-}
-
-/**
- * Recherche BM25 (mots-clés) dans studies_v2 via tsvector
- */
-async function searchStudiesBM25(query, matchCount = 15) {
-  try {
-    logger.debug(`🔤 BM25 search: "${query.substring(0, 80)}..." (max ${matchCount})`);
-
-    const { data, error } = await supabase.rpc('search_studies_v2_bm25', {
-      query_text: query,
-      match_count: matchCount
-    });
-
-    if (error) {
-      logger.error('❌ Erreur BM25 search:', error);
-      return [];
-    }
-
-    return (data || []).map((doc, index) => ({
-      ...doc,
-      searchRank: index + 1,
-      similarityPercentage: Math.round((doc.similarity || 0) * 100),
-      contentLength: doc.content ? doc.content.length : 0,
-      hasMetadata: !!doc.metadata,
-      iaType: 'biblio',
-      searchSource: 'bm25'
-    }));
-  } catch (error) {
-    logger.error('❌ Erreur BM25 search:', error);
     return [];
   }
 }
@@ -1384,7 +1198,6 @@ async function rerankWithCohere(query, candidates, topN = 5) {
 
 module.exports = {
   // Fonctions de recherche
-  searchDocuments,
   searchDocumentsOptimized,
   generateEmbedding, // Pour les recherches seulement
   preprocessTextForEmbedding, // Utilitaire d'embedding

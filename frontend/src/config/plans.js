@@ -64,7 +64,7 @@ const PLANS = {
     stripePriceId: 'price_1Rtpv9EHFuBHSJxk20JM0SqR',
     features: {
       // Limites principales
-      maxProgrammes: 3,            // 3 programmes patients avec IA maximum
+      maxProgrammes: 5,            // 5 programmes patients avec IA maximum
       unlimitedPatients: true,     // Patients illimités
       
       // Assistants IA disponibles
@@ -76,11 +76,11 @@ const PLANS = {
       bilanKine: true
     },
     limits: {
-      programmes: 3
+      programmes: 5
     },
     description: 'Pour un suivi professionnel de plusieurs patients',
     highlights: [
-      '3 programmes patients avec IA',
+      '5 programmes patients avec IA',
       'Patients illimités', 
       'Assistant IA conversationnel',
       'Assistant IA bibliographique',
@@ -134,10 +134,10 @@ const PLANS = {
     id: 'EXPERT',
     type: 'EXPERT',
     name: 'Expert',
-    price: 59, 
+    price: 49,
     currency: 'EUR',
     interval: 'month',
-    stripePriceId: 'price_1RuXvmEHFuBHSJxknXv8U4GQ',
+    stripePriceId: 'price_1TAXd7EHFuBHSJxkiRnFSDfi',
     features: {
       // Limites principales  
       maxProgrammes: Infinity,     // Programmes illimités

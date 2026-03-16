@@ -22,7 +22,7 @@ export const usePaywall = () => {
         const limits = {
           'FREE': 0,      // Aucun programme avec IA
           'DECLIC': 1,
-          'PRATIQUE': 3,
+          'PRATIQUE': 5,
           'PIONNIER': Infinity,
           'EXPERT': Infinity
         };

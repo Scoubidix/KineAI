@@ -182,7 +182,7 @@ export default function ParrainagePage() {
       'DECLIC': 'Déclic (9€)',
       'PRATIQUE': 'Pratique (29€)',
       'PIONNIER': 'Pionnier (20€)',
-      'EXPERT': 'Expert (59€)'
+      'EXPERT': 'Expert (49€)'
     };
     return planLabels[plan] || plan;
   };

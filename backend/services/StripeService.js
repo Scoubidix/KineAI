@@ -441,7 +441,7 @@ class StripeService {
       'DECLIC': 900,      // 9€
       'PRATIQUE': 2900,   // 29€
       'PIONNIER': 2000,   // 20€
-      'EXPERT': 5900      // 59€
+      'EXPERT': 4900      // 49€
     };
     return priceMap[planType] || 0;
   }

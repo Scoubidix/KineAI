@@ -348,7 +348,7 @@ enum PlanType {
   DECLIC // 9€/mois - 1 chatbot + IA conversationnel
   PRATIQUE // 19€/mois - 3 chatbots + IA conversationnel + biblio + clinique
   PIONNIER // 20€/mois - Plan Expert à prix réduit (limité à 100 places)
-  EXPERT // 59€/mois - Chatbots illimités + tous les assistants
+  EXPERT // 49€/mois - Chatbots illimités + tous les assistants
 
   @@map("plan_type")
 }

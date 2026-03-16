@@ -46,7 +46,7 @@ const {
   whatsappSendLimiter,
   whatsappTemplatesPatientLimiter,
   whatsappTemplatesKineLimiter,
-  documentSearchLimiter,
+
   rgpdExportLimiter,
   rgpdDeleteLimiter,
   signupLimiter,
@@ -63,8 +63,6 @@ const testOpenAIRoutes = require('./routes/testOpenAI');
 const patientChatRoutes = require('./routes/patientChat');
 const chatKineRoutes = require('./routes/chatKine'); // Route existante améliorée
 
-// NOUVELLES ROUTES VECTORIELLES
-const documentsRoutes = require('./routes/documents');
 
 // NOUVEAU : Import du webhook WhatsApp
 const { router: whatsappWebhook } = require('./routes/webhook/whatsapp');
@@ -660,22 +658,13 @@ app.use('/api/patient', (req, res, next) => {
 
 // 🚦 IA Kinés : Rate limiting sélectif (POST seulement)
 app.use('/api/chat/kine', (req, res, next) => {
-  if (req.method === 'POST' && (req.path.includes('/ia-') || req.path.includes('/search-documents'))) {
+  if (req.method === 'POST' && req.path.includes('/ia-')) {
     // 🚦 Appels IA : Rate limiting (10/min)
     return gptLimiter(req, res, next);
   }
   // ✅ GET historiques, statuts, etc. : LIBRES
   next();
 }, chatKineRoutes);
-
-// 🚦 Documents : Rate limiting recherche vectorielle (10/min)
-app.use('/api/documents', (req, res, next) => {
-  if (req.method === 'POST' && (req.path.includes('/search') || req.path.includes('/search/optimized'))) {
-    return documentSearchLimiter(req, res, next);
-  }
-  // ✅ Autres routes documents (GET stats, etc.) : LIBRES
-  next();
-}, documentsRoutes);
 
 // Middleware auth pour routes cron (Cloud Scheduler via OIDC)
 const { OAuth2Client } = require('google-auth-library');
@@ -773,9 +762,6 @@ app.get('/', (req, res) => {
       clearHistoryBasique: '/api/chat/kine/history-basique [DELETE]',
       clearAllHistory: '/api/chat/kine/all-history [DELETE]',
       // AUTRES ENDPOINTS
-      documents: '/api/documents',
-      upload: '/api/documents/upload',
-      search: '/api/documents/search',
       vectorTest: '/api/test-vector',
       whatsappTest: '/api/test-whatsapp',
       whatsappWebhook: '/webhook/whatsapp',
@@ -829,7 +815,6 @@ app.listen(PORT, '0.0.0.0', () => {
   logger.info(`🤖 IA Administrative: /api/chat/kine/ia-administrative`);
   logger.info(`🤖 Statut 4 IA: /api/chat/kine/ia-status`);
   logger.info(`🤖 Test 4 IA: /api/test-ia`);
-  logger.info(`📄 Documents API: /api/documents`);
   logger.info(`📊 Vector Test: /api/test-vector`);
   logger.info(`📱 WhatsApp Test: /api/test-whatsapp`);
   logger.info(`📱 WhatsApp Webhook: /webhook/whatsapp`);

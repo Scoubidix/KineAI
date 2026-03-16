@@ -58,7 +58,7 @@ export const useCurrentUsage = () => {
     const limits = {
       'FREE': 0,
       'DECLIC': 1,
-      'PRATIQUE': 3,
+      'PRATIQUE': 5,
       'PIONNIER': Infinity,
       'EXPERT': Infinity
     };
@@ -80,7 +80,7 @@ export const useCurrentUsage = () => {
     const limits = {
       'FREE': 0,
       'DECLIC': 1,
-      'PRATIQUE': 3,
+      'PRATIQUE': 5,
       'PIONNIER': Infinity,
       'EXPERT': Infinity
     };
@@ -96,7 +96,7 @@ export const useCurrentUsage = () => {
     const limits = {
       'FREE': 0,
       'DECLIC': 1,
-      'PRATIQUE': 3,
+      'PRATIQUE': 5,
       'PIONNIER': -1, // illimité
       'EXPERT': -1    // illimité
     };

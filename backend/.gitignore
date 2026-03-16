@@ -21,6 +21,11 @@ firebase.local.*
 # 👉 Fichiers temporaires ou systèmes
 .DS_Store
 
+# 👉 Tests d'intégration (local only)
+tests/
+jest.config.js
+coverage/
+
 # 👉 Scripts de preprocessing n8n (ne pas versionner)
 preprocessing*.js
 
