@@ -163,25 +163,27 @@ const gptHeavyLimiter = rateLimit({
 });
 
 /**
- * Rate limiter général pour tous les endpoints
- * Limite de base pour éviter les abus
+ * Rate limiter pour les ecritures CRUD (POST/PUT/DELETE)
+ * 30 ecritures par minute par utilisateur — protege contre le spam
+ * sans bloquer la navigation (GET non limite)
  */
-const generalLimiter = rateLimit({
+const crudWriteLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 60, // 60 requêtes par minute
+  max: 30, // 30 ecritures par minute
   message: {
-    error: 'Trop de requêtes',
+    error: 'Trop d\'operations d\'ecriture',
     details: 'Veuillez patienter 1 minute avant de réessayer',
     retryAfter: 60
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => generateSecureKey(req, 'general'),
+  skip: (req) => req.method === 'GET', // GET libre — seuls POST/PUT/DELETE comptent
+  keyGenerator: (req) => generateSecureKey(req, 'crud_write'),
   handler: (req, res) => {
     const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
-    logger.warn(`🚫 Rate limit dépassé - Général - User: ${safeUser} - Route: ${req.path}`);
+    logger.warn(`🚫 Rate limit dépassé - CRUD Write - User: ${safeUser} - ${req.method} ${req.path}`);
     res.status(429).json({
-      error: 'Trop de requêtes',
+      error: 'Trop d\'operations d\'ecriture',
       details: 'Veuillez patienter 1 minute avant de réessayer',
       retryAfter: 60
     });
@@ -460,7 +462,7 @@ module.exports = {
   stripeWebhookLimiter,
   gptLimiter,
   gptHeavyLimiter,
-  generalLimiter,
+  crudWriteLimiter,
   authLimiter,
   whatsappSendLimiter,
   whatsappTemplatesPatientLimiter,

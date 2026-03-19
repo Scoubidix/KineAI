@@ -41,7 +41,7 @@ const {
   stripeWebhookLimiter,
   gptLimiter,
   gptHeavyLimiter,
-  generalLimiter,
+  crudWriteLimiter,
   authLimiter,
   whatsappSendLimiter,
   whatsappTemplatesPatientLimiter,
@@ -566,8 +566,8 @@ app.get('/debug/all-imports', (req, res) => {
 // NOUVEAU : Webhook WhatsApp
 app.use('/webhook/whatsapp', whatsappWebhook);
 
-// 🔔 NOUVEAU : Routes notifications (LIBRES - navigation)
-app.use('/api/notifications', notificationRoutes);
+// 🔔 Routes notifications — 🚦 30 ecritures/min (GET libre, poll 60s non impacte)
+app.use('/api/notifications', crudWriteLimiter, notificationRoutes);
 
 // 💳 NOUVEAU PAYWALL : Routes système paywall (LIBRES - navigation)
 app.use('/api/kine', subscriptionRoutes);  // /api/kine/subscription, /api/kine/usage, etc. - LIBRES
@@ -587,11 +587,11 @@ app.use('/api/rgpd', (req, res, next) => {
   next();
 }, rgpdRoutes);
 
-// 🎁 PARRAINAGE : Routes de parrainage (LIBRES - navigation)
-app.use('/api/referral', referralRoutes);
+// 🎁 PARRAINAGE : Routes de parrainage — 🚦 30 ecritures/min (GET libre)
+app.use('/api/referral', crudWriteLimiter, referralRoutes);
 
-// 📇 CONTACTS : CRUD contacts kiné (LIBRES - navigation)
-app.use('/api/contacts', contactsRoutes);
+// 📇 CONTACTS : CRUD contacts kiné — 🚦 30 ecritures/min (GET libre)
+app.use('/api/contacts', crudWriteLimiter, contactsRoutes);
 
 // 📧 TEMPLATES ADMIN : Rate limiting sélectif sur envoi WhatsApp
 app.use('/api/templates', (req, res, next) => {
@@ -617,7 +617,7 @@ app.use('/kine', (req, res, next) => {
   }
   next();
 }, kinesRoutes);
-app.use('/patients', patientsRoutes);       // CRUD patients - LIBRES
+app.use('/patients', crudWriteLimiter, patientsRoutes);       // 🚦 CRUD patients - 30 ecritures/min (GET libre)
 
 // Programmes : Rate limiting sélectif par route
 app.use('/programmes', (req, res, next) => {
@@ -632,9 +632,9 @@ app.use('/programmes', (req, res, next) => {
   next();
 }, programmeRoutes);
 
-app.use('/admin/programmes', programmeAdminRoutes);  // Admin - LIBRES
-app.use('/exercices', exerciceRoutes);               // CRUD exercices - LIBRES
-app.use('/exercice-templates', exerciceTemplatesRoutes); // CRUD templates d'exercices - LIBRES
+app.use('/admin/programmes', programmeAdminRoutes);  // Admin - LIBRES (requireAdmin protege)
+app.use('/exercices', crudWriteLimiter, exerciceRoutes);               // 🚦 CRUD exercices - 30 ecritures/min (GET libre)
+app.use('/exercice-templates', crudWriteLimiter, exerciceTemplatesRoutes); // 🚦 CRUD templates - 30 ecritures/min (GET libre)
 app.use('/api/test', testOpenAIRoutes);             // Tests - LIBRES
 
 // ========== ROUTES IA/CHAT - RATE LIMITED ==========
