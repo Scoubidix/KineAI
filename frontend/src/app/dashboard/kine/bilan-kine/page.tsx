@@ -25,6 +25,13 @@ export default function BilanKinePage() {
   const [kineProfile, setKineProfile] = useState<{ firstName: string; lastName: string; adresseCabinet?: string; rpps?: string } | null>(null);
   const bilanRef = useRef<HTMLDivElement>(null);
 
+  // Injecter le HTML dans le div contentEditable sans que React ne contrôle le contenu
+  useEffect(() => {
+    if (bilanRef.current && bilanHtml) {
+      bilanRef.current.innerHTML = bilanHtml;
+    }
+  }, [bilanHtml]);
+
   const { subscription } = usePaywall();
   const { toast } = useToast();
 
@@ -188,6 +195,8 @@ export default function BilanKinePage() {
 
       // En-tête praticien conditionnel
       const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+      const logoUrl = `${window.location.origin}/logo.png`;
+
       let headerHTML = '';
       if (kineProfile) {
         const name = `${kineProfile.firstName} ${kineProfile.lastName.toUpperCase()}`;
@@ -200,10 +209,11 @@ export default function BilanKinePage() {
               ${kineProfile.adresseCabinet ? `<div>${DOMPurify.sanitize(kineProfile.adresseCabinet)}</div>` : ''}
             </div>
             <div class="header-right">
-              Le ${today}
+              <img src="${logoUrl}" alt="Logo" class="header-logo" />
+              <div class="header-app-name">Mon Assistant Kiné</div>
             </div>
           </div>
-          <hr class="header-separator">
+          <div class="header-separator"></div>
         `;
       }
 
@@ -242,18 +252,42 @@ export default function BilanKinePage() {
                 font-size: 13pt;
               }
               .header-right {
-                font-size: 11pt;
-                text-align: right;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+              }
+              .header-logo {
+                width: 40px;
+                height: 40px;
+                border-radius: 8px;
+                object-fit: cover;
+              }
+              .header-app-name {
+                font-family: Arial, Helvetica, sans-serif;
+                font-size: 12pt;
+                font-weight: bold;
+                color: #3899aa;
               }
               .header-separator {
+                height: 3px;
+                background: linear-gradient(to right, #4db3c5, #1f5c6a);
                 border: none;
-                border-top: 1px solid #000;
-                margin: 0.8em 0 1.2em 0;
+                border-radius: 2px;
+                margin: 0.6em 0 1.2em 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
               }
               h1, h2, h3 {
                 font-weight: bold;
                 margin-top: 1em;
                 margin-bottom: 0.5em;
+              }
+              .bilan-date {
+                text-align: right;
+                font-size: 10pt;
+                color: #555;
+                font-family: Arial, Helvetica, sans-serif;
+                margin-bottom: -0.5em;
               }
               h1 { font-size: 16pt; text-align: center; }
               h2 { font-size: 14pt; }
@@ -277,6 +311,7 @@ export default function BilanKinePage() {
           </head>
           <body>
             ${headerHTML}
+            <div class="bilan-date">Le ${today}</div>
             ${formattedHTML}
           </body>
         </html>
@@ -436,7 +471,6 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
                 maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
                 WebkitMaskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)'
               } : undefined}
-              dangerouslySetInnerHTML={{ __html: bilanHtml }}
             />
             {isPreviewResult && (
               <div className="absolute bottom-4 left-0 right-0 flex justify-center">

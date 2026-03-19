@@ -402,7 +402,7 @@ export default function KineChatbotCliniquePage() {
         </Button>
       </div>
 
-      <div className="max-w-6xl mx-auto p-4 h-[calc(100vh-180px)] flex flex-col overflow-hidden">
+      <div className="max-w-6xl mx-auto px-0 sm:px-4 py-0 sm:py-4 h-[calc(100vh-180px)] flex flex-col overflow-hidden">
           {/* Raisonnement en cours */}
           <div className="flex gap-4 mb-4 shrink-0">
             <div className="flex-1">
@@ -442,7 +442,7 @@ export default function KineChatbotCliniquePage() {
 
             <div
               ref={messagesContainerRef}
-              className="flex-1 p-6 overflow-y-auto scroll-smooth scrollbar-hide"
+              className="flex-1 px-2 py-4 sm:p-6 overflow-y-auto scroll-smooth scrollbar-hide"
               style={{
                 scrollBehavior: 'smooth',
                 overflowAnchor: 'none',
@@ -488,7 +488,7 @@ export default function KineChatbotCliniquePage() {
                         className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
-                          className={`max-w-[80%] rounded-2xl ${
+                          className={`max-w-[95%] sm:max-w-[80%] rounded-2xl ${
                             msg.role === 'user'
                               ? 'bubble-ai p-4 rounded-br-md'
                               : 'px-4 py-2 text-foreground'
@@ -558,7 +558,7 @@ export default function KineChatbotCliniquePage() {
             </div>
 
             {phase === 'conversation' && (
-              <div className="px-6 pb-2 pt-0">
+              <div className="px-2 sm:px-6 pb-2 pt-0">
                 <div className="relative flex items-center bg-white dark:bg-card border-2 border-border rounded-full px-4 py-1 shadow-sm focus-within:border-[#3899aa]/60 focus-within:shadow-md transition-all">
                   <Input
                     placeholder="Question de suivi sur le raisonnement clinique..."

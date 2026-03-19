@@ -342,8 +342,30 @@ function preprocessTextForEmbedding(text) {
  * Expanse les termes médicaux (MeSH, synonymes) pour maximiser le recall.
  * ~50-100 tokens, coût ~$0.0002/requête.
  */
+async function lookupGlossary(queryFR) {
+  try {
+    const { data, error } = await supabase.rpc('match_glossary_terms', { query_text: queryFR.toLowerCase() });
+    if (error) {
+      logger.error('❌ Glossary lookup error:', error.message);
+      return [];
+    }
+    return data || [];
+  } catch (err) {
+    logger.error('❌ Glossary lookup failed:', err.message);
+    return [];
+  }
+}
+
 async function rewriteQueryToEnglish(queryFR) {
   try {
+    // Lookup glossaire pour termes spécifiques
+    const glossaryMappings = await lookupGlossary(queryFR);
+    let glossaryHint = '';
+    if (glossaryMappings.length > 0) {
+      const mappings = glossaryMappings.map(m => `- "${m.french_term}" → ${m.english_term}`).join('\n');
+      glossaryHint = `\n\nKNOWN TERM MAPPINGS (use these exact translations if the input contains these terms):\n${mappings}\n`;
+    }
+
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0,
@@ -362,7 +384,7 @@ TASK: Rewrite the French physiotherapy question into TWO English queries:
 RULES:
 - Do NOT add boolean operators (AND/OR)
 - "pubmed" must be a strict translation — do not add terms the user did not mention
-
+${glossaryHint}
 EXAMPLES:
 Input: "tendinopathie coiffe des rotateurs exercices"
 {"vector": "rotator cuff tendinopathy exercise therapy eccentric strengthening rehabilitation", "pubmed": "rotator cuff tendinopathy exercises"}
@@ -1202,6 +1224,7 @@ module.exports = {
   generateEmbedding, // Pour les recherches seulement
   preprocessTextForEmbedding, // Utilitaire d'embedding
   rewriteQueryToEnglish, // Query rewriter FR → EN pour biblio
+  lookupGlossary, // Lookup glossaire termes spécifiques FR → EN
   
   // Fonctions de gestion
   getDocumentStats,

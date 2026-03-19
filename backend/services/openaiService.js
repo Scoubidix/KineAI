@@ -1,5 +1,6 @@
 const { OpenAI } = require('openai');
 const knowledgeService = require('./knowledgeService');
+const { lookupGlossary } = require('./embeddingService');
 const prismaService = require('./prismaService');
 const gcsStorageService = require('./gcsStorageService');
 const logger = require('../utils/logger');
@@ -522,10 +523,10 @@ const getRedirectDirective = (currentPage, routedType) => {
     return `Tu es un assistant kiné conversationnel. Donne un aperçu très court du sujet (2-3 phrases max, sans inventer de chiffres ni d'études), puis termine en suggérant d'utiliser ${targetLabel} pour une réponse complète et sourcée. Sans emoji. Maximum 50 mots.`;
   }
   if (currentPage === 'biblio') {
-    return `Tu es un assistant kiné bibliographique. Dis en une phrase que tu n'as pas d'études disponibles pour cette demande, puis suggère d'utiliser ${targetLabel} pour une réponse adaptée. Sans emoji. Maximum 30 mots.`;
+    return `Tu es un assistant kiné bibliographique. Dis que tu es plutôt spécialisée pour la recherche bibliographique, puis suggère d'utiliser L'${targetLabel} pour une réponse adaptée. Sans emoji. Maximum 30 mots.`;
   }
   if (currentPage === 'clinique') {
-    return `Tu es un assistant kiné clinique. Dis en une phrase qu'il n'y a pas de raisonnement clinique disponible pour cette demande, puis suggère d'utiliser ${targetLabel} pour une réponse adaptée. Sans emoji. Maximum 30 mots.`;
+    return `Tu es un assistant kiné clinique. Dis que tu es plutôt spécialisée pour le raisonnement clinique, puis suggère d'utiliser L'${targetLabel} pour une réponse adaptée. Sans emoji. Maximum 30 mots.`;
   }
   return '';
 };
@@ -596,6 +597,16 @@ const prepareKineRequest = async (type, message, conversationHistory = [], kineI
     systemPrompt = redirectDirective.trim();
   } else {
     systemPrompt = getSystemPromptByType(type, limitedDocuments, shouldDoRAG);
+  }
+
+  // 3b. Glossaire : injecter les équivalences terminologiques pour que le LLM fasse le lien
+  if (shouldDoRAG && (type === 'biblio' || type === 'clinique')) {
+    const glossaryMappings = await lookupGlossary(message);
+    if (glossaryMappings.length > 0) {
+      const mappings = glossaryMappings.map(m => `- "${m.french_term}" = ${m.english_term}`).join('\n');
+      systemPrompt += `\n\nÉQUIVALENCES TERMINOLOGIQUES (le kiné utilise ces termes français, fais le lien avec les études fournies) :\n${mappings}`;
+      logger.debug(`📖 Glossaire injecté dans prompt ${type}: ${glossaryMappings.length} mapping(s)`);
+    }
   }
 
   // 🧪 LOGS DE DEBUG POUR VÉRIFIER LA TRANSMISSION À GPT
@@ -1494,7 +1505,7 @@ STRUCTURE (7 SECTIONS CONDITIONNELLES) :
 
 1. Identification (OBLIGATOIRE)
 • <u>Identification</u>
-[M./Mme] [Nom/Initiales], [âge] ans, [profession si mentionnée], consulte pour [motif de consultation]. Si un motif de consultation est fourni séparément, l'intégrer ici. Si le motif est absent, utiliser le motif principal extrait des notes.
+[M./Mme] [Nom/Initiales si mentionnés], [âge si mentionné] ans, [profession si mentionnée], consulte pour [motif de consultation]. Si un motif de consultation est fourni séparément, l'intégrer ici. Si le motif est absent, utiliser le motif principal extrait des notes.
 
 2. Antécédents (OBLIGATOIRE)
 • <u>Antécédents</u>
