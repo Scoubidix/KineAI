@@ -129,36 +129,43 @@ app.set('trust proxy', true);
 logger.warn('🔧 Configuration proxy activée pour récupération IP correcte');
 
 // Middleware - Headers de sécurité HTTP
-app.use(helmet());
+app.use(helmet({
+  hsts: { maxAge: 63072000 }, // 2 ans (standard OWASP)
+  permissionsPolicy: {
+    features: {
+      camera: ["self"],
+      microphone: ["self"],
+      geolocation: []
+    }
+  }
+}));
 app.use(cors(corsOptions));
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+app.use(bodyParser.json({ limit: '5mb' }));
+app.use(bodyParser.urlencoded({ limit: '5mb', extended: true }));
+
+// Empecher le cache navigateur/proxy sur les reponses API sensibles
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 
 // 🚦 Rate limiter logger seulement (globalLimiter supprimé pour navigation libre)
 app.use(rateLimitLogger);
 
 // ========== ROUTES DE TEST - POUR DEBUG ==========
 
-// Health check simple
+// Health check simple (toujours disponible — utilise par les load balancers)
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    service: 'KineAI Backend with Vector DB + WhatsApp + Notifications + Stripe + Paywall + 4 IA Spécialisées',
-    port: PORT,
-    features: [
-      'Patient Chat',
-      'Programme Management', 
-      'Auto Archive System',
-      '🤖 4 IA Kinés Spécialisées (Basique, Biblio, Clinique, Administrative)',
-      'PDF Upload & Vector Search',
-      'WhatsApp Integration',
-      '🔔 Notification System',
-      '💳 Stripe Subscriptions',
-      '🔒 Paywall System'
-    ]
+    service: 'KineAI Backend',
+    port: PORT
   });
 });
+
+// Routes de debug : uniquement en developpement
+if (process.env.NODE_ENV !== 'production') {
 
 // Test connexion base de données
 app.get('/api/test-db', async (req, res) => {
@@ -552,22 +559,12 @@ app.get('/debug/all-imports', (req, res) => {
   });
 });
 
+} // fin if (NODE_ENV !== 'production')
+
 // ========== ROUTES PRINCIPALES ==========
 
 // NOUVEAU : Webhook WhatsApp
 app.use('/webhook/whatsapp', whatsappWebhook);
-
-// 🔄 CRON : Pipeline PubMed (appelé par GCP Cloud Scheduler avec OIDC)
-app.get('/api/cron/pubmed-pipeline', async (req, res) => {
-  const { scheduledPipeline } = require('./services/pubmedService');
-  res.json({ status: 'started', message: 'Pipeline PubMed lancé en background' });
-
-  try {
-    await scheduledPipeline();
-  } catch (err) {
-    console.error('[CRON] Pipeline PubMed erreur:', err.message);
-  }
-});
 
 // 🔔 NOUVEAU : Routes notifications (LIBRES - navigation)
 app.use('/api/notifications', notificationRoutes);
@@ -725,84 +722,29 @@ app.get('/test-notifications-programs', cronAuth, async (req, res) => {
   }
 });
 
-// Route racine mise à jour
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Bienvenue sur l API KineAI - 4 IA Spécialisées + Base Vectorielle Supabase + WhatsApp + Notifications + Stripe + Paywall',
-    timestamp: new Date().toISOString(),
-    version: '3.0', // Version mise à jour avec 4 IA
-    status: 'running',
-    features: [
-      'Patient Chat',
-      'Programme Management', 
-      'Auto Archive System',
-      '🤖 4 IA Kinés Spécialisées (Basique, Biblio, Clinique, Administrative)',
-      'PDF Upload & Vector Search',
-      'Semantic Knowledge Base',
-      'WhatsApp Business Integration',
-      '🔔 Real-time Notification System',
-      '💳 Stripe Subscription Management',
-      '🔒 Paywall & Feature Gates System'
-    ],
-    endpoints: {
-      // 🤖 NOUVEAUX ENDPOINTS 4 IA SPÉCIALISÉES
-      iaBasique: '/api/chat/kine/ia-basique',
-      iaBiblio: '/api/chat/kine/ia-biblio',
-      iaClinique: '/api/chat/kine/ia-clinique',
-      iaAdministrative: '/api/chat/kine/ia-administrative',
-      iaStatus: '/api/chat/kine/ia-status',
-      iaTest: '/api/test-ia',
-      // HISTORIQUES IA
-      historyBasique: '/api/chat/kine/history-basique',
-      historyBiblio: '/api/chat/kine/history-biblio',
-      historyClinique: '/api/chat/kine/history-clinique',
-      historyAdministrative: '/api/chat/kine/history-administrative',
-      allHistory: '/api/chat/kine/all-history',
-      // SUPPRESSION HISTORIQUES
-      clearHistoryBasique: '/api/chat/kine/history-basique [DELETE]',
-      clearAllHistory: '/api/chat/kine/all-history [DELETE]',
-      // AUTRES ENDPOINTS
-      vectorTest: '/api/test-vector',
-      whatsappTest: '/api/test-whatsapp',
-      whatsappWebhook: '/webhook/whatsapp',
-      corsTest: '/api/test-cors',
-      // 🔔 ENDPOINTS NOTIFICATIONS
-      notifications: '/api/notifications',
-      notificationsUnreadCount: '/api/notifications/unread-count',
-      notificationsStats: '/api/notifications/stats',
-      notificationsTest: '/api/test-notifications',
-      // 💳 ENDPOINTS STRIPE
-      stripeTest: '/api/test-stripe',
-      stripeWebhook: '/webhook/stripe',
-      subscription: '/api/kine/subscription',
-      usage: '/api/kine/usage',
-      // 🔒 ENDPOINTS PAYWALL
-      paywallTest: '/api/test-paywall',
-      plansAvailability: '/api/plans/PIONNIER/availability',
-      stripeCheckout: '/api/stripe/create-checkout',
-      stripePortal: '/api/stripe/create-portal',
-      // 🔒 ENDPOINTS RGPD
-      rgpdExportData: '/api/rgpd/export-data',
-      rgpdDownload: '/api/rgpd/download/:token',
-      rgpdDeleteAccount: '/api/rgpd/delete-account',
-      rgpdStats: '/api/rgpd/stats [DEV]',
-      // ENDPOINTS DEBUG
-      debugPrisma: '/debug/prisma-imports',
-      debugConnections: '/debug/connections',
-      cleanupConnections: '/debug/cleanup-connections [POST]'
-    }
-  });
+// 🔄 CRON : Pipeline PubMed (appelé par GCP Cloud Scheduler avec OIDC)
+app.get('/api/cron/pubmed-pipeline', cronAuth, async (req, res) => {
+  const { scheduledPipeline } = require('./services/pubmedService');
+  res.json({ status: 'started', message: 'Pipeline PubMed lancé en background' });
+
+  try {
+    await scheduledPipeline();
+  } catch (err) {
+    logger.error('[CRON] Pipeline PubMed erreur:', err.message);
+  }
 });
 
 // Démarrage du système d'archivage automatique
 startProgramCleanupCron();
 
-// Gestion gracieuse de l'arrêt
-process.on('SIGINT', async () => {
-  logger.info('🛑 Arrêt du serveur...');
+// Gestion gracieuse de l'arrêt (SIGINT = Ctrl+C local, SIGTERM = Cloud Run)
+const gracefulShutdown = async (signal) => {
+  logger.info(`🛑 ${signal} recu - fermeture connexions DB...`);
   await prismaService.disconnect();
   process.exit(0);
-});
+};
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Démarrage du serveur
 app.listen(PORT, '0.0.0.0', () => {

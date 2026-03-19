@@ -1,20 +1,73 @@
-# Documentation Claude Code (contexte projet - ne pas versionner)
-CLAUDE.md
-
-# MCP config (contient des credentials)
+# ========== SECRETS & CREDENTIALS ==========
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+serviceAccountKey.json
+firebase-admin-sdk.json
 .mcp.json
 
-# Dossier configuration Claude
+# ========== DEPENDANCES ==========
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# ========== BUILD ==========
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.turbo
+backend/lib/
+backend/dist/
+
+# ========== LOGS ==========
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+firebase-debug.log*
+database-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# ========== TESTS & COVERAGE ==========
+backend/tests/
+backend/jest.config.js
+coverage/
+
+# ========== SYSTEME & EDITEUR ==========
+.DS_Store
+.idea
+.vscode
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.sublime-workspace
+
+# ========== FIREBASE ==========
+backend/firebase.local.*
+
+# ========== CLAUDE CODE ==========
+CLAUDE.md
+AUDIT-SECURITE.md
 .claude/
 
-# Dossier upload études (données volumineuses)
-Upload Supabase/
+# ========== NEXT.JS ==========
+frontend/.idx/
+frontend/dev.nix
+frontend/patches/*.patch
+!frontend/patches/genkit+*.patch
 
-# Scripts et données de migration études (one-off)
+# ========== DONNEES & SCRIPTS (one-off) ==========
+Upload Supabase/
+scripts/pubmed/
 migrateStudiesV2.js
 studies_v2.sql
 migration_processed_ids.json
 migration_error_ids.json
-
-# Scripts PubMed (collecte données + logs)
-scripts/pubmed/
+preprocessing*.js
+backend/scripts/importTemplates.js
+backend/data/*.csv

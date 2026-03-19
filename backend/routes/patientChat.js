@@ -147,7 +147,7 @@ router.post('/chat/:token',
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors du chat',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }
@@ -266,7 +266,7 @@ router.get('/welcome/:token',
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la génération du message d\'accueil',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }
@@ -303,7 +303,7 @@ router.get('/chat-history/:token',
       res.status(500).json({
         success: false,
         error: 'Erreur lors de la récupération de l\'historique',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }
@@ -352,7 +352,7 @@ router.get('/programme/:token',
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la récupération du programme',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }
@@ -481,7 +481,7 @@ router.get('/session-status/:token',
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la vérification du statut',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }
@@ -662,7 +662,7 @@ router.post('/validate-session/:token',
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la validation',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }

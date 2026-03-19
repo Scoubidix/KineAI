@@ -44,7 +44,7 @@ router.post('/export-data', authenticate, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la génération de l\'export',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -68,7 +68,7 @@ router.get('/download/:token', async (req, res) => {
       res.status(500).json({
         success: false,
         error: 'Erreur lors du téléchargement',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }
@@ -97,7 +97,7 @@ router.get('/eligibility', authenticate, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la vérification d\'éligibilité',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -208,7 +208,7 @@ router.post('/delete-account', authenticate, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la suppression du compte',
-      details: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
       code: 'SERVER_ERROR'
     });
   }

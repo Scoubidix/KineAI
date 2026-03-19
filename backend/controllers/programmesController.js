@@ -326,7 +326,7 @@ exports.generateProgrammeLink = async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: "Erreur serveur lors de la génération du lien",
-      details: error.message 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

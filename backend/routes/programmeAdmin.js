@@ -70,7 +70,7 @@ router.post('/:id/archive', authenticate, requireAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Erreur lors de l\'archivage du programme',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -124,7 +124,7 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la suppression du programme',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -172,7 +172,7 @@ router.get('/archived', authenticate, requireAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la récupération des programmes archivés',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -199,7 +199,7 @@ router.post('/cleanup/finished', authenticate, requireAdmin, async (req, res) =>
     res.status(500).json({
       success: false,
       error: 'Erreur lors de l\'archivage des programmes terminés',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -226,7 +226,7 @@ router.post('/cleanup/archived', authenticate, requireAdmin, async (req, res) =>
     res.status(500).json({
       success: false,
       error: 'Erreur lors du nettoyage des programmes archivés',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -284,7 +284,7 @@ router.get('/stats', authenticate, requireAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la récupération des statistiques',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });

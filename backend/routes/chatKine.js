@@ -160,7 +160,7 @@ router.get('/all-history', authenticate, async (req, res) => {
       });
     }
 
-    const days = parseInt(req.query.days) || 5;
+    const days = Math.min(parseInt(req.query.days) || 5, 90);
     const daysAgo = new Date();
     daysAgo.setDate(daysAgo.getDate() - days);
 
@@ -214,7 +214,8 @@ router.get('/all-history', authenticate, async (req, res) => {
     logger.error('❌ Erreur all-history:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Erreur serveur',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -276,7 +277,8 @@ router.delete('/all-history', authenticate, async (req, res) => {
     logger.error('❌ Erreur delete all-history:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Erreur serveur',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });

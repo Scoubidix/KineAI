@@ -5,6 +5,7 @@ const router = express.Router();
 const programmesController = require('../controllers/programmesController');
 const { authenticate } = require('../middleware/authenticate');
 const { canCreateProgramme } = require('../middleware/authorization');
+const { validate, createProgrammeSchema, updateProgrammeSchema } = require('../middleware/validate');
 
 // ROUTES SPÉCIFIQUES EN PREMIER (avant les routes avec paramètres)
 
@@ -120,7 +121,7 @@ router.get('/stats', authenticate, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la récupération des statistiques',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -239,8 +240,8 @@ router.post('/:id/send-whatsapp', authenticate, async (req, res) => {
 });
 
 // Routes CRUD standard
-router.post('/', authenticate, canCreateProgramme, programmesController.createProgramme);
-router.put('/:id', authenticate, programmesController.updateProgramme);
+router.post('/', authenticate, canCreateProgramme, validate(createProgrammeSchema), programmesController.createProgramme);
+router.put('/:id', authenticate, validate(updateProgrammeSchema), programmesController.updateProgramme);
 router.delete('/:id', authenticate, programmesController.deleteProgramme);
 
 // Route programmes archivés d'un patient

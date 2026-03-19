@@ -56,7 +56,7 @@ const notificationsController = {
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la récupération des notifications',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   },
@@ -96,7 +96,7 @@ const notificationsController = {
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors du comptage des notifications',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   },
@@ -148,7 +148,7 @@ const notificationsController = {
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors du marquage de la notification',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   },
@@ -189,7 +189,7 @@ const notificationsController = {
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors du marquage des notifications',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   },
@@ -229,7 +229,7 @@ const notificationsController = {
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la récupération des statistiques',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   },
@@ -280,7 +280,7 @@ const notificationsController = {
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors du nettoyage',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   },
@@ -321,7 +321,7 @@ const notificationsController = {
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la suppression des notifications',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   },
@@ -370,7 +370,7 @@ const notificationsController = {
       res.status(500).json({
         success: false,
         error: 'Erreur serveur lors de la récupération des types',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }

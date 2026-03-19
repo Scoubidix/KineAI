@@ -334,7 +334,7 @@ const getAdherenceByDate = async (req, res) => {
     res.status(500).json({ 
       success: false,
       error: 'Erreur serveur lors du calcul de l\'adhérence.',
-      details: err.message
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 };
@@ -515,7 +515,7 @@ const getPatientSessionsByDate = async (req, res) => {
     res.status(500).json({ 
       success: false,
       error: 'Erreur serveur lors de la récupération des sessions patients.',
-      details: err.message
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 };

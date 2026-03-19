@@ -63,7 +63,7 @@ const handleKineRequest = async (req, res, iaType) => {
     const errorResponse = error.success === false ? error : {
       success: false,
       error: `Erreur lors de la génération de la réponse IA ${iaType}`,
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     };
     
     res.status(500).json(errorResponse);
@@ -171,13 +171,13 @@ const sendIaBasiqueStream = async (req, res) => {
       const errorResponse = error.success === false ? error : {
         success: false,
         error: 'Erreur lors de la génération de la réponse IA basique',
-        details: error.message
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       };
       return res.status(500).json(errorResponse);
     }
 
     if (!clientDisconnected) {
-      res.write(`event: error\ndata: ${JSON.stringify({ error: error.message || 'Erreur interne' })}\n\n`);
+      res.write(`event: error\ndata: ${JSON.stringify({ error: process.env.NODE_ENV === 'development' ? error.message : 'Erreur interne' })}\n\n`);
       res.end();
     }
   }
@@ -233,7 +233,7 @@ const sendIaBiblioStream = async (req, res) => {
       return res.status(500).json(error.success === false ? error : { success: false, error: 'Erreur IA biblio', details: error.message });
     }
     if (!clientDisconnected) {
-      res.write(`event: error\ndata: ${JSON.stringify({ error: error.message || 'Erreur interne' })}\n\n`);
+      res.write(`event: error\ndata: ${JSON.stringify({ error: process.env.NODE_ENV === 'development' ? error.message : 'Erreur interne' })}\n\n`);
       res.end();
     }
   }
@@ -289,7 +289,7 @@ const sendIaCliniqueStream = async (req, res) => {
       return res.status(500).json(error.success === false ? error : { success: false, error: 'Erreur IA clinique', details: error.message });
     }
     if (!clientDisconnected) {
-      res.write(`event: error\ndata: ${JSON.stringify({ error: error.message || 'Erreur interne' })}\n\n`);
+      res.write(`event: error\ndata: ${JSON.stringify({ error: process.env.NODE_ENV === 'development' ? error.message : 'Erreur interne' })}\n\n`);
       res.end();
     }
   }
@@ -348,7 +348,7 @@ const sendIaFollowupStream = async (req, res) => {
       return res.status(500).json(error.success === false ? error : { success: false, error: 'Erreur followup', details: error.message });
     }
     if (!clientDisconnected) {
-      res.write(`event: error\ndata: ${JSON.stringify({ error: error.message || 'Erreur interne' })}\n\n`);
+      res.write(`event: error\ndata: ${JSON.stringify({ error: process.env.NODE_ENV === 'development' ? error.message : 'Erreur interne' })}\n\n`);
       res.end();
     }
   }
@@ -401,7 +401,7 @@ const sendIaFollowup = async (req, res) => {
     const errorResponse = error.success === false ? error : {
       success: false,
       error: 'Erreur lors de la génération de la réponse de suivi',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     };
 
     res.status(500).json(errorResponse);
@@ -432,7 +432,7 @@ const getHistoryBasique = async (req, res) => {
     }
     
     const kineId = kine.id;
-    const days = parseInt(req.query.days) || 5;
+    const days = Math.min(parseInt(req.query.days) || 5, 90);
 
       const history = await getHistoryFromTable('chatIaBasique', kineId, days);
     
@@ -445,7 +445,7 @@ const getHistoryBasique = async (req, res) => {
     logger.error('Erreur getHistoryBasique:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
-      details: error.message 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
     });
   }
 };
@@ -473,7 +473,7 @@ const getHistoryBiblio = async (req, res) => {
     }
     
     const kineId = kine.id;
-    const days = parseInt(req.query.days) || 5;
+    const days = Math.min(parseInt(req.query.days) || 5, 90);
 
     const history = await getHistoryFromTable('chatIaBiblio', kineId, days);
     
@@ -486,7 +486,7 @@ const getHistoryBiblio = async (req, res) => {
     logger.error('Erreur getHistoryBiblio:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
-      details: error.message 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
     });
   }
 };
@@ -514,7 +514,7 @@ const getHistoryClinique = async (req, res) => {
     }
     
     const kineId = kine.id;
-    const days = parseInt(req.query.days) || 5;
+    const days = Math.min(parseInt(req.query.days) || 5, 90);
 
     const history = await getHistoryFromTable('chatIaClinique', kineId, days);
     
@@ -527,7 +527,7 @@ const getHistoryClinique = async (req, res) => {
     logger.error('Erreur getHistoryClinique:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
-      details: error.message 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
     });
   }
 };
@@ -555,7 +555,7 @@ const getHistoryAdministrative = async (req, res) => {
     }
     
     const kineId = kine.id;
-    const days = parseInt(req.query.days) || 5;
+    const days = Math.min(parseInt(req.query.days) || 5, 90);
 
     const history = await getHistoryFromTable('chatIaAdministrative', kineId, days);
     
@@ -568,7 +568,7 @@ const getHistoryAdministrative = async (req, res) => {
     logger.error('Erreur getHistoryAdministrative:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
-      details: error.message 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
     });
   }
 };
@@ -609,7 +609,7 @@ const clearHistoryBasique = async (req, res) => {
     logger.error('Erreur clearHistoryBasique:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
-      details: error.message 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
     });
   }
 };
@@ -649,7 +649,7 @@ const clearHistoryBiblio = async (req, res) => {
     logger.error('Erreur clearHistoryBiblio:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
-      details: error.message 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
     });
   }
 };
@@ -689,7 +689,7 @@ const clearHistoryClinique = async (req, res) => {
     logger.error('Erreur clearHistoryClinique:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
-      details: error.message 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
     });
   }
 };
@@ -729,7 +729,7 @@ const clearHistoryAdministrative = async (req, res) => {
     logger.error('Erreur clearHistoryAdministrative:', error.message);
     res.status(500).json({ 
       error: 'Erreur serveur',
-      details: error.message 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
     });
   }
 };

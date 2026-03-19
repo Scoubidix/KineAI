@@ -9,6 +9,7 @@ const { sendMessageTemplate } = require('./webhook/whatsapp');
 const prismaService = require('../services/prismaService');
 const { gptLimiter } = require('../middleware/rateLimiter');
 const adminAiService = require('../services/adminAiService');
+const { validate, createTemplateSchema, updateTemplateSchema, personalizeTemplateSchema, templateHistorySchema, sendWhatsappSchema } = require('../middleware/validate');
 
 // Helper: get kineId from Firebase UID
 async function getKineId(uid) {
@@ -53,7 +54,7 @@ router.get('/categories', authenticate, async (req, res) => {
 
 // ========== POST /api/templates/personalize - Personnalise un template ==========
 
-router.post('/personalize', authenticate, async (req, res) => {
+router.post('/personalize', authenticate, validate(personalizeTemplateSchema), async (req, res) => {
   try {
     const { templateId, patientId, contactId } = req.body;
     const kine = await getKineId(req.uid);
@@ -86,7 +87,7 @@ router.post('/personalize', authenticate, async (req, res) => {
 
 // ========== POST /api/templates - Créer un template privé ==========
 
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, validate(createTemplateSchema), async (req, res) => {
   try {
     const kine = await getKineId(req.uid);
     if (!kine) return res.status(404).json({ success: false, error: 'Kiné introuvable' });
@@ -136,7 +137,7 @@ router.post('/generate', gptLimiter, authenticate, requireAssistant('TEMPLATES_A
 
 // ========== PUT /api/templates/:id - Modifier un template privé ==========
 
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, validate(updateTemplateSchema), async (req, res) => {
   try {
     const kine = await getKineId(req.uid);
     if (!kine) return res.status(404).json({ success: false, error: 'Kiné introuvable' });
@@ -155,7 +156,7 @@ router.put('/:id', authenticate, async (req, res) => {
 
 // ========== POST /api/templates/history - Sauvegarde dans l'historique (PAYWALL) ==========
 
-router.post('/history', authenticate, requireAssistant('TEMPLATES_ADMIN'), async (req, res) => {
+router.post('/history', authenticate, requireAssistant('TEMPLATES_ADMIN'), validate(templateHistorySchema), async (req, res) => {
   try {
     const { patientId, contactId, templateId, templateTitle, subject, body, method, recipientName, recipientEmail } = req.body;
     const kine = await getKineId(req.uid);
@@ -199,8 +200,8 @@ router.get('/history', authenticate, async (req, res) => {
     const kine = await getKineId(req.uid);
     if (!kine) return res.status(404).json({ success: false, error: 'Kiné introuvable' });
 
-    const limit = parseInt(req.query.limit) || 50;
-    const offset = parseInt(req.query.offset) || 0;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
     const result = await templateService.getHistory(kine.id, { limit, offset });
     res.json(result);
@@ -246,7 +247,7 @@ router.delete('/history', authenticate, async (req, res) => {
 
 // ========== POST /api/templates/send-whatsapp - Envoie via WhatsApp Business API (PAYWALL) ==========
 
-router.post('/send-whatsapp', authenticate, requireAssistant('TEMPLATES_ADMIN'), async (req, res) => {
+router.post('/send-whatsapp', authenticate, requireAssistant('TEMPLATES_ADMIN'), validate(sendWhatsappSchema), async (req, res) => {
   try {
     const { patientId, templateId, templateTitle, subject, body } = req.body;
     const kine = await getKineId(req.uid);

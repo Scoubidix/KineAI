@@ -3,22 +3,23 @@ const logger = require('../utils/logger');
 const router = express.Router();
 
 const { authenticate } = require('../middleware/authenticate');
-const { 
-  createKine, 
-  getKineProfile, 
+const { validate, createKineSchema, updateKineProfileSchema } = require('../middleware/validate');
+const {
+  createKine,
+  getKineProfile,
   updateKineProfile,
   getAdherenceByDate,        // NOUVELLE FONCTION
   getPatientSessionsByDate   // NOUVELLE FONCTION
 } = require('../controllers/kineController');
 
 // POST /kine - Créer un nouveau kiné (lors de l'inscription)
-router.post('/', createKine);
+router.post('/', validate(createKineSchema), createKine);
 
 // GET /kine/profile - Récupérer le profil du kiné connecté (nécessite auth)
 router.get('/profile', authenticate, getKineProfile);
 
 // PUT /kine/profile - Modifier le profil du kiné connecté (nécessite auth)
-router.put('/profile', authenticate, updateKineProfile);
+router.put('/profile', authenticate, validate(updateKineProfileSchema), updateKineProfile);
 
 // ==========================================
 // NOUVELLES ROUTES POUR LE SUIVI D'ADHÉRENCE
