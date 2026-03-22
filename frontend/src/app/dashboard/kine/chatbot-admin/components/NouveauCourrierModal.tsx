@@ -165,7 +165,7 @@ export default function NouveauCourrierModal({
       .replace(/>/g, '&gt;')
       .replace(/\n/g, '<br>')
       .replace(/\[([^\]]+)\]/g,
-        '<mark class="bg-yellow-300 text-black px-1 rounded cursor-pointer hover:bg-yellow-400">[$1]</mark>');
+        '<mark class="bg-yellow-300 dark:bg-yellow-500/30 text-black dark:text-yellow-200 px-1 rounded cursor-pointer hover:bg-yellow-400 dark:hover:bg-yellow-500/50">[$1]</mark>');
     return DOMPurify.sanitize(raw, { ALLOWED_TAGS: ['mark', 'br'], ALLOWED_ATTR: ['class'] });
   };
 
@@ -309,7 +309,7 @@ export default function NouveauCourrierModal({
         return (
           <mark
             key={i}
-            className="bg-yellow-300 text-black px-1 rounded cursor-pointer hover:bg-yellow-400 transition-colors"
+            className="bg-yellow-300 dark:bg-yellow-500/30 text-black dark:text-yellow-200 px-1 rounded cursor-pointer hover:bg-yellow-400 dark:hover:bg-yellow-500/50 transition-colors"
             onClick={(e) => handleVariableClick(e, part)}
           >
             {part}
@@ -709,13 +709,13 @@ export default function NouveauCourrierModal({
                           const text = e.clipboardData.getData('text/plain');
                           document.execCommand('insertText', false, text);
                         }}
-                        className="p-3 bg-white rounded-lg border text-sm whitespace-pre-wrap min-h-[200px] focus:outline-none focus:ring-2 focus:ring-[#3899aa]/40 focus:border-[#3899aa]"
+                        className="p-3 bg-white dark:bg-card rounded-lg border text-sm whitespace-pre-wrap min-h-[200px] focus:outline-none focus:ring-2 focus:ring-[#3899aa]/40 focus:border-[#3899aa]"
                       />
 
                       {/* Variable popover */}
                       {activeVariable && popoverPos && (
                         <div
-                          className="absolute z-50 bg-white border rounded-lg shadow-lg p-2 flex items-center gap-2"
+                          className="absolute z-50 bg-white dark:bg-popover border rounded-lg shadow-lg p-2 flex items-center gap-2"
                           style={{ top: popoverPos.top, left: popoverPos.left }}
                         >
                           <Input

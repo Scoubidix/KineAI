@@ -278,6 +278,15 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                         </div>
                       )}
 
+                      {/* Badge places restantes Pionnier */}
+                      {plan.type === 'PIONNIER' && pioneerSlotsRemaining !== null && pioneerSlotsRemaining > 0 && (
+                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10">
+                          <Badge className="bg-purple-600 text-white text-xs px-3 py-1 rounded-full shadow-md whitespace-nowrap">
+                            🔥 {pioneerSlotsRemaining} places restantes
+                          </Badge>
+                        </div>
+                      )}
+
                       <CardHeader className="text-center pb-4">
                         <div className={`mx-auto p-3 rounded-full mb-3 ${
                           isCurrentPlan ? 'bg-primary/10' : isRecommended ? 'bg-accent/10' : 'bg-muted/30'
@@ -292,23 +301,14 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                           <span className="text-sm font-normal text-muted-foreground">/mois</span>
                         </div>
                         
-                        {/* Status du plan Pionnier */}
-                        {plan.type === 'PIONNIER' && (
-                          <Badge 
-                            variant={pioneerSlotsRemaining === 0 ? 'destructive' : 'secondary'} 
-                            className="text-xs mt-2 font-medium"
-                          >
-                            {pioneerSlotsRemaining === 0 ? '🔒 Complet' : `🔥 ${pioneerSlotsRemaining || '?'} places restantes`}
-                          </Badge>
-                        )}
                       </CardHeader>
 
                       <CardContent className="flex flex-col flex-grow px-6 space-y-4">
                         {/* Programmes limit */}
                         <div className="text-center py-3 bg-muted/20 rounded-lg border">
                           <span className="text-sm font-semibold text-foreground">
-                            {plan.limits.programmes === -1 
-                              ? '♾️ Programmes illimités' 
+                            {plan.limits.programmes === -1
+                              ? '♾️ Programmes illimités'
                               : `${plan.limits.programmes} programme${plan.limits.programmes > 1 ? 's' : ''} max`
                             }
                           </span>

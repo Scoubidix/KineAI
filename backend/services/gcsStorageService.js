@@ -14,7 +14,15 @@ const logger = require('../utils/logger');
 
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'monassistantkine';
 const EXERCICES_FOLDER = 'exercices/';
+const AVATARS_FOLDER = 'avatars/';
 const DEFAULT_SIGNED_URL_EXPIRATION = 60 * 60 * 1000; // 1 heure en ms
+
+// Magic bytes pour valider le type réel des images
+const IMAGE_MAGIC_BYTES = {
+  'image/jpeg': [Buffer.from([0xFF, 0xD8, 0xFF])],
+  'image/png': [Buffer.from([0x89, 0x50, 0x4E, 0x47])],
+  'image/webp': [Buffer.from('RIFF')], // RIFF....WEBP
+};
 
 // Initialisation GCS avec les credentials Firebase existants
 const storage = new Storage({
@@ -218,6 +226,103 @@ function convertFirebaseUrlToGcsPath(firebaseUrl) {
   }
 }
 
+/**
+ * Valide qu'un buffer est bien une image via ses magic bytes
+ * @param {Buffer} buffer - Buffer du fichier
+ * @returns {{ valid: boolean, detectedType: string|null }}
+ */
+function validateImageBuffer(buffer) {
+  if (!buffer || buffer.length < 12) {
+    return { valid: false, detectedType: null };
+  }
+
+  for (const [mimeType, signatures] of Object.entries(IMAGE_MAGIC_BYTES)) {
+    for (const sig of signatures) {
+      if (mimeType === 'image/webp') {
+        // WEBP : commence par RIFF et contient WEBP à l'offset 8
+        if (buffer.slice(0, 4).equals(sig) && buffer.slice(8, 12).toString() === 'WEBP') {
+          return { valid: true, detectedType: mimeType };
+        }
+      } else if (buffer.slice(0, sig.length).equals(sig)) {
+        return { valid: true, detectedType: mimeType };
+      }
+    }
+  }
+
+  return { valid: false, detectedType: null };
+}
+
+/**
+ * Upload un avatar vers GCS (fichier PRIVE par défaut)
+ * @param {Buffer} fileBuffer - Buffer de l'image
+ * @param {string} fileName - Nom du fichier
+ * @param {string} contentType - MIME type de l'image
+ * @returns {Promise<string>} Le chemin du fichier (avatarPath)
+ */
+async function uploadAvatar(fileBuffer, fileName, contentType) {
+  try {
+    const timestamp = Date.now();
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const uniqueFileName = `${timestamp}_${sanitizedFileName}`;
+    const avatarPath = `${AVATARS_FOLDER}${uniqueFileName}`;
+
+    const file = bucket.file(avatarPath);
+
+    await file.save(fileBuffer, {
+      metadata: {
+        contentType,
+        cacheControl: 'private, max-age=3600',
+        metadata: {
+          uploadedAt: new Date().toISOString(),
+        }
+      },
+      resumable: false,
+    });
+
+    logger.info(`Avatar uploade sur GCS (prive): ${avatarPath}`);
+    return avatarPath;
+
+  } catch (error) {
+    logger.error('Erreur lors de l\'upload de l\'avatar sur GCS:', error);
+    throw new Error(`Echec de l'upload de l'avatar: ${error.message}`);
+  }
+}
+
+/**
+ * Supprimer un avatar de GCS
+ * @param {string} avatarPath - Chemin du fichier (ex: "avatars/123_photo.jpg")
+ * @returns {Promise<void>}
+ */
+async function deleteAvatar(avatarPath) {
+  try {
+    if (!avatarPath) {
+      logger.warn('Tentative de suppression d\'un avatar avec chemin vide');
+      return;
+    }
+
+    // Verification de securite : uniquement dossier avatars/
+    if (!avatarPath.startsWith(AVATARS_FOLDER)) {
+      logger.error('Tentative de suppression hors du dossier avatars:', avatarPath);
+      throw new Error('Chemin de fichier non autorise');
+    }
+
+    const file = bucket.file(avatarPath);
+
+    const [exists] = await file.exists();
+    if (!exists) {
+      logger.warn(`L'avatar n'existe pas sur GCS (deja supprime?): ${avatarPath}`);
+      return;
+    }
+
+    await file.delete();
+    logger.info(`Avatar supprime de GCS: ${avatarPath}`);
+
+  } catch (error) {
+    logger.error('Erreur lors de la suppression de l\'avatar sur GCS:', error);
+    throw new Error(`Echec de la suppression de l'avatar: ${error.message}`);
+  }
+}
+
 module.exports = {
   uploadGif,
   generateSignedUrl,
@@ -225,6 +330,10 @@ module.exports = {
   enrichExercicesWithSignedUrls,
   extractFileNameFromPath,
   convertFirebaseUrlToGcsPath,
+  uploadAvatar,
+  deleteAvatar,
+  validateImageBuffer,
   BUCKET_NAME,
   EXERCICES_FOLDER,
+  AVATARS_FOLDER,
 };

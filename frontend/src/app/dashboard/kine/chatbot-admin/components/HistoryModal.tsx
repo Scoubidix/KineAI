@@ -208,7 +208,7 @@ export default function HistoryModal({
                       {entry.subject && (
                         <p className="text-sm"><span className="font-medium">Objet :</span> {entry.subject}</p>
                       )}
-                      <div className="p-3 bg-white rounded-lg border text-sm whitespace-pre-wrap">
+                      <div className="p-3 bg-white dark:bg-card rounded-lg border text-sm whitespace-pre-wrap">
                         {entry.body}
                       </div>
                     </div>

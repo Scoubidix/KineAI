@@ -35,7 +35,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { sendPasswordReset } from "@/lib/auth-utils";
 import { useToast } from "@/hooks/use-toast"; // Test réactivé
 import { useSubscription } from "@/hooks/useSubscription";
@@ -81,7 +81,8 @@ import {
   Trophy,
   AlertCircle,
   Crown,
-  MessageCircle
+  MessageCircle,
+  Camera
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -1137,16 +1138,23 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [headerInitials, setHeaderInitials] = useState('');
   const [headerName, setHeaderName] = useState('');
   const [headerEmail, setHeaderEmail] = useState('');
+  const [headerAvatarUrl, setHeaderAvatarUrl] = useState('');
+  const [isAvatarUploading, setIsAvatarUploading] = useState(false);
+  const [isPlanPopoverOpen, setIsPlanPopoverOpen] = useState(false);
+  const planPopoverTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const avatarInputRef = React.useRef<HTMLInputElement>(null);
 
   // Lecture cache localStorage au montage (après hydratation)
   React.useEffect(() => {
     const cachedInitials = localStorage.getItem('kine_initials');
     const cachedName = localStorage.getItem('kine_name');
     const cachedEmail = localStorage.getItem('kine_email');
+    const cachedAvatar = localStorage.getItem('kine_avatar_url');
     if (cachedInitials) setHeaderInitials(cachedInitials);
     if (cachedName) setHeaderName(cachedName);
     if (cachedEmail) setHeaderEmail(cachedEmail);
+    if (cachedAvatar) setHeaderAvatarUrl(cachedAvatar);
   }, []);
 
   React.useEffect(() => {
@@ -1167,12 +1175,19 @@ export default function AppLayout({ children }: AppLayoutProps) {
           const initials = first + last;
           const name = `${data.firstName || ''} ${data.lastName || ''}`.trim();
           const email = data.email || '';
+          const avatarUrl = data.avatarUrl || '';
           setHeaderInitials(initials);
           setHeaderName(name);
           setHeaderEmail(email);
+          setHeaderAvatarUrl(avatarUrl);
           localStorage.setItem('kine_initials', initials);
           localStorage.setItem('kine_name', name);
           localStorage.setItem('kine_email', email);
+          if (avatarUrl) {
+            localStorage.setItem('kine_avatar_url', avatarUrl);
+          } else {
+            localStorage.removeItem('kine_avatar_url');
+          }
         }
       } catch (error) {
         // Silencieux
@@ -1181,11 +1196,63 @@ export default function AppLayout({ children }: AppLayoutProps) {
     fetchProfile();
   }, [role]);
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input pour permettre de re-sélectionner le même fichier
+    e.target.value = '';
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('L\'image ne doit pas dépasser 2 Mo.');
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Format non supporté. Utilisez JPEG, PNG ou WebP.');
+      return;
+    }
+
+    setIsAvatarUploading(true);
+    try {
+      const auth = getAuth(app);
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile/avatar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.avatarUrl) {
+          setHeaderAvatarUrl(data.avatarUrl);
+          localStorage.setItem('kine_avatar_url', data.avatarUrl);
+        }
+      } else {
+        const err = await response.json().catch(() => null);
+        alert(err?.error || 'Erreur lors de l\'upload de l\'avatar.');
+      }
+    } catch {
+      alert('Erreur réseau lors de l\'upload.');
+    } finally {
+      setIsAvatarUploading(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       localStorage.removeItem('kine_initials');
       localStorage.removeItem('kine_name');
       localStorage.removeItem('kine_email');
+      localStorage.removeItem('kine_avatar_url');
       const auth = getAuth(app);
       await signOut(auth);
       router.replace('/login');
@@ -1265,11 +1332,103 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   Passer à Premium
                 </button>
               )}
+              {role === 'kine' && headerSubscription && headerSubscription.planType && headerSubscription.planType !== 'FREE' && (() => {
+                const currentPlan = getPlanByType(headerSubscription.planType);
+                const canUpgrade = ['DECLIC', 'PRATIQUE'].includes(headerSubscription.planType);
+                return (
+                  <Popover open={isPlanPopoverOpen} onOpenChange={setIsPlanPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sky-400 text-white text-xs font-bold shadow-md cursor-default"
+                        onMouseEnter={() => {
+                          if (planPopoverTimeout.current) clearTimeout(planPopoverTimeout.current);
+                          setIsPlanPopoverOpen(true);
+                        }}
+                        onMouseLeave={() => {
+                          planPopoverTimeout.current = setTimeout(() => setIsPlanPopoverOpen(false), 150);
+                        }}
+                      >
+                        {headerSubscription.planType}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-72 p-0"
+                      align="end"
+                      sideOffset={8}
+                      onMouseEnter={() => {
+                        if (planPopoverTimeout.current) clearTimeout(planPopoverTimeout.current);
+                      }}
+                      onMouseLeave={() => {
+                        planPopoverTimeout.current = setTimeout(() => setIsPlanPopoverOpen(false), 150);
+                      }}
+                    >
+                      <div className="p-4 border-b bg-gradient-to-r from-[#eef7f6] to-white dark:from-[#0f1c1b] dark:to-[#141414]">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Crown className="h-4 w-4 text-[#3899aa]" />
+                          <p className="text-sm font-bold text-foreground">Plan {currentPlan.name}</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{currentPlan.price}€/mois</p>
+                      </div>
+                      <div className="p-3">
+                        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Inclus dans votre plan</p>
+                        <ul className="space-y-1.5">
+                          <li className="flex items-center gap-2 text-xs text-foreground">
+                            <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                            {currentPlan.features.maxProgrammes === Infinity ? 'Programmes illimités' : `${currentPlan.features.maxProgrammes} programme${currentPlan.features.maxProgrammes > 1 ? 's' : ''} patient`}
+                          </li>
+                          {currentPlan.features.assistants.includes('CONVERSATIONNEL') && (
+                            <li className="flex items-center gap-2 text-xs text-foreground">
+                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                              Assistant conversationnel
+                            </li>
+                          )}
+                          {currentPlan.features.assistants.includes('BIBLIOTHEQUE') && (
+                            <li className="flex items-center gap-2 text-xs text-foreground">
+                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                              Assistant bibliographique
+                            </li>
+                          )}
+                          {currentPlan.features.assistants.includes('CLINIQUE') && (
+                            <li className="flex items-center gap-2 text-xs text-foreground">
+                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                              Assistant clinique
+                            </li>
+                          )}
+                          {currentPlan.features.assistants.includes('ADMINISTRATIF') && (
+                            <li className="flex items-center gap-2 text-xs text-foreground">
+                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                              Assistant administratif
+                            </li>
+                          )}
+                          {currentPlan.features.bilanKine && (
+                            <li className="flex items-center gap-2 text-xs text-foreground">
+                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                              Bilan kiné
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                      {canUpgrade && (
+                        <div className="border-t p-3">
+                          <button
+                            onClick={() => setIsPaywallHeaderOpen(true)}
+                            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#3899aa] hover:bg-[#2d7a88] text-white text-xs font-bold transition-colors"
+                          >
+                            <Crown className="h-3.5 w-3.5" />
+                            Passer au plan supérieur
+                          </button>
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                );
+              })()}
               {role === 'kine' && <NotificationsDropdown />}
               <Popover>
                 <PopoverTrigger asChild>
                   <button className="rounded-full hover:ring-2 hover:ring-white/40 transition-all">
                     <Avatar className="h-8 w-8 border-2 border-white/30 cursor-pointer">
+                      {headerAvatarUrl && <AvatarImage src={headerAvatarUrl} alt="Avatar" />}
                       <AvatarFallback className="bg-white/20 text-white text-xs font-semibold">
                         {headerInitials || displayInitials}
                       </AvatarFallback>
@@ -1279,11 +1438,33 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <PopoverContent className="w-64 p-0" align="end" sideOffset={8}>
                   {/* Profil */}
                   <div className="flex flex-col items-center gap-2 p-4 border-b">
-                    <Avatar className="h-16 w-16 border-2 border-[#3899aa]/30">
-                      <AvatarFallback className="bg-[#eef7f6] text-[#1f5c6a] text-lg font-semibold">
-                        {headerInitials || displayInitials}
-                      </AvatarFallback>
-                    </Avatar>
+                    <button
+                      type="button"
+                      className="relative group cursor-pointer"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={isAvatarUploading}
+                    >
+                      <Avatar className="h-16 w-16 border-2 border-[#3899aa]/30">
+                        {headerAvatarUrl && <AvatarImage src={headerAvatarUrl} alt="Avatar" />}
+                        <AvatarFallback className="bg-[#eef7f6] text-[#1f5c6a] text-lg font-semibold">
+                          {headerInitials || displayInitials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {isAvatarUploading ? (
+                          <Loader2 className="h-5 w-5 text-white animate-spin" />
+                        ) : (
+                          <Camera className="h-5 w-5 text-white" />
+                        )}
+                      </div>
+                    </button>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={handleAvatarUpload}
+                    />
                     <div className="text-center min-w-0 w-full">
                       <p className="text-sm font-semibold text-foreground truncate">{headerName || 'Mon compte'}</p>
                       <p className="text-xs text-muted-foreground truncate">{headerEmail}</p>

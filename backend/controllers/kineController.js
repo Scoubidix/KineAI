@@ -5,6 +5,8 @@
 const prismaService = require('../services/prismaService');
 const logger = require('../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../utils/logSanitizer');
+const { uploadAvatar, deleteAvatar, generateSignedUrl, validateImageBuffer } = require('../services/gcsStorageService');
+const fs = require('fs');
 
 const createKine = async (req, res) => {
   const {
@@ -99,9 +101,15 @@ const getKineProfile = async (req, res) => {
       return res.status(404).json({ error: 'Kiné non trouvé dans la base de données.' });
     }
 
+    // Générer signed URL pour l'avatar si présent
+    let avatarUrl = null;
+    if (kine.avatarPath) {
+      avatarUrl = await generateSignedUrl(kine.avatarPath);
+    }
+
     logger.info("✅ Profil kiné récupéré - ID:", sanitizeId(kine.id));
 
-    return res.status(200).json(kine);
+    return res.status(200).json({ ...kine, avatarUrl });
   } catch (err) {
     logger.error("❌ Erreur récupération profil kiné:", err.message);
     return res.status(500).json({ error: 'Erreur serveur lors de la récupération du profil.' });
@@ -527,10 +535,122 @@ function calculateAge(birthDateStr) {
   return Math.floor(ageDiff / (1000 * 60 * 60 * 24 * 365.25));
 }
 
-module.exports = { 
-  createKine, 
-  getKineProfile, 
+/**
+ * POST /kine/profile/avatar
+ * Upload ou remplacement de l'avatar du kiné
+ */
+const uploadKineAvatar = async (req, res) => {
+  const uid = req.uid;
+
+  logger.info("Upload avatar pour UID:", sanitizeUID(uid));
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Aucun fichier fourni.' });
+    }
+
+    // Lire le buffer du fichier uploadé par multer (diskStorage)
+    const fileBuffer = fs.readFileSync(req.file.path);
+
+    // Validation magic bytes
+    const { valid, detectedType } = validateImageBuffer(fileBuffer);
+    if (!valid) {
+      // Supprimer le fichier temporaire
+      fs.unlinkSync(req.file.path);
+      logger.warn("Avatar rejete: magic bytes invalides pour UID:", sanitizeUID(uid));
+      return res.status(400).json({ success: false, error: 'Le fichier n\'est pas une image valide (JPEG, PNG ou WebP).' });
+    }
+
+    const prisma = prismaService.getInstance();
+
+    const kine = await prisma.kine.findUnique({ where: { uid }, select: { id: true, avatarPath: true } });
+    if (!kine) {
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({ success: false, error: 'Kine non trouve.' });
+    }
+
+    // Supprimer l'ancien avatar s'il existe
+    if (kine.avatarPath) {
+      try {
+        await deleteAvatar(kine.avatarPath);
+      } catch (err) {
+        logger.warn("Impossible de supprimer l'ancien avatar:", err.message);
+      }
+    }
+
+    // Upload le nouvel avatar
+    const avatarPath = await uploadAvatar(fileBuffer, req.file.originalname, detectedType);
+
+    // Supprimer le fichier temporaire
+    fs.unlinkSync(req.file.path);
+
+    // Sauvegarder en DB
+    await prisma.kine.update({
+      where: { uid },
+      data: { avatarPath },
+    });
+
+    // Générer signed URL pour la réponse
+    const avatarUrl = await generateSignedUrl(avatarPath);
+
+    logger.info("Avatar mis a jour pour kine ID:", sanitizeId(kine.id));
+
+    return res.status(200).json({ success: true, avatarPath, avatarUrl });
+
+  } catch (err) {
+    // Nettoyage du fichier temporaire en cas d'erreur
+    if (req.file?.path) {
+      try { fs.unlinkSync(req.file.path); } catch (e) { logger.warn('Nettoyage fichier tmp echoue:', e.message); }
+    }
+    logger.error("Erreur upload avatar:", err.message);
+    return res.status(500).json({ success: false, error: 'Erreur serveur lors de l\'upload de l\'avatar.' });
+  }
+};
+
+/**
+ * DELETE /kine/profile/avatar
+ * Supprimer l'avatar du kiné
+ */
+const deleteKineAvatar = async (req, res) => {
+  const uid = req.uid;
+
+  logger.info("Suppression avatar pour UID:", sanitizeUID(uid));
+
+  try {
+    const prisma = prismaService.getInstance();
+
+    const kine = await prisma.kine.findUnique({ where: { uid }, select: { id: true, avatarPath: true } });
+    if (!kine) {
+      return res.status(404).json({ success: false, error: 'Kine non trouve.' });
+    }
+
+    if (!kine.avatarPath) {
+      return res.status(200).json({ success: true, message: 'Aucun avatar a supprimer.' });
+    }
+
+    await deleteAvatar(kine.avatarPath);
+
+    await prisma.kine.update({
+      where: { uid },
+      data: { avatarPath: null },
+    });
+
+    logger.info("Avatar supprime pour kine ID:", sanitizeId(kine.id));
+
+    return res.status(200).json({ success: true, message: 'Avatar supprime.' });
+
+  } catch (err) {
+    logger.error("Erreur suppression avatar:", err.message);
+    return res.status(500).json({ success: false, error: 'Erreur serveur lors de la suppression de l\'avatar.' });
+  }
+};
+
+module.exports = {
+  createKine,
+  getKineProfile,
   updateKineProfile,
-  getAdherenceByDate,      // NOUVELLE FONCTION AVEC LOGIQUE CONDITIONNELLE
-  getPatientSessionsByDate // NOUVELLE FONCTION AVEC LOGIQUE CONDITIONNELLE
+  uploadKineAvatar,
+  deleteKineAvatar,
+  getAdherenceByDate,
+  getPatientSessionsByDate
 };

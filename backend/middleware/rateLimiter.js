@@ -412,6 +412,32 @@ const videoUploadLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter pour l'upload d'avatar
+ * 5 uploads par minute max
+ */
+const avatarUploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: {
+    error: 'Trop d\'uploads d\'avatar',
+    details: 'Maximum 5 avatars par minute. Veuillez patienter avant de réessayer.',
+    retryAfter: 60
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'avatar_upload'),
+  handler: (req, res) => {
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`Rate limit depasse - Upload avatar - User: ${safeUser}`);
+    res.status(429).json({
+      error: 'Trop d\'uploads d\'avatar',
+      details: 'Maximum 5 avatars par minute. Veuillez patienter avant de réessayer.',
+      retryAfter: 60
+    });
+  }
+});
+
+/**
  * Rate limiter pour l'inscription (POST /kine)
  * 5 inscriptions par heure par IP - anti-bot/spam
  */
@@ -471,6 +497,7 @@ module.exports = {
   rgpdExportLimiter,
   rgpdDeleteLimiter,
   videoUploadLimiter,
+  avatarUploadLimiter,
   signupLimiter,
   rateLimitLogger
 };

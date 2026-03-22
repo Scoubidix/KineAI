@@ -107,7 +107,7 @@ export default function TemplatesManagementModal({
   const highlightVariables = (text: string) => {
     if (!text) return '';
     const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const highlighted = escaped.replace(/\[([^\]]+)\]/g, '<mark class="bg-yellow-300 text-black px-1 rounded">[$1]</mark>');
+    const highlighted = escaped.replace(/\[([^\]]+)\]/g, '<mark class="bg-yellow-300 dark:bg-yellow-500/30 text-black dark:text-yellow-200 px-1 rounded">[$1]</mark>');
     return DOMPurify.sanitize(highlighted, { ALLOWED_TAGS: ['mark'], ALLOWED_ATTR: ['class'] });
   };
 
@@ -331,7 +331,7 @@ function TemplateList({ templates, isLoading, readOnly, highlightVariables, onEd
             <div className="flex-1">
               <p className="font-medium text-sm">{template.title}</p>
               <div className="flex items-center gap-2 mt-1">
-                <Badge variant="outline" className="text-xs bg-white">{template.category}</Badge>
+                <Badge variant="outline" className="text-xs bg-white dark:bg-card">{template.category}</Badge>
                 {template.usageCount > 0 && <span className="text-xs text-muted-foreground">{template.usageCount}x utilisé</span>}
               </div>
             </div>
@@ -353,7 +353,7 @@ function TemplateList({ templates, isLoading, readOnly, highlightVariables, onEd
                   <span className="font-medium">Objet :</span> {template.subject}
                 </p>
               )}
-              <div className="p-3 bg-white rounded-lg border text-sm whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: highlightVariables(template.body) }} />
+              <div className="p-3 bg-white dark:bg-card rounded-lg border text-sm whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: highlightVariables(template.body) }} />
             </div>
           )}
         </div>
