@@ -6,6 +6,7 @@ const prismaService = require('../../services/prismaService');
 const stripeService = require('../../services/StripeService');
 const logger = require('../../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../../utils/logSanitizer');
+const { notifyNewSubscription } = require('../../services/telegramService');
 
 const router = express.Router();
 const prisma = prismaService.getInstance();
@@ -328,6 +329,14 @@ async function handleCheckoutCompleted(session, eventId) {
 
       logger.info(`📋 ${successMessage}`);
       logger.debug(`[${eventId}] Détails: ${sanitizeEmail(kine.email)}, Customer: ${session.customer}, Subscription: ${session.subscription} (${duration}ms)`);
+
+      // ========== NOTIFICATION TELEGRAM ==========
+      try {
+        await notifyNewSubscription(planType);
+      } catch (telegramError) {
+        logger.error(`⚠️ [${eventId}] Erreur Telegram (non bloquante):`, telegramError.message);
+      }
+      // ============================================
 
       // ========== TRAITEMENT PARRAINAGE ==========
       const referralCode = session.metadata?.referralCode;

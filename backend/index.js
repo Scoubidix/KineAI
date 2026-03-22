@@ -633,6 +633,7 @@ app.use('/programmes', (req, res, next) => {
 }, programmeRoutes);
 
 app.use('/admin/programmes', programmeAdminRoutes);  // Admin - LIBRES (requireAdmin protege)
+app.use('/admin/dashboard', require('./routes/adminDashboard'));  // Admin dashboard stats
 app.use('/exercices', crudWriteLimiter, exerciceRoutes);               // 🚦 CRUD exercices - 30 ecritures/min (GET libre)
 app.use('/exercice-templates', crudWriteLimiter, exerciceTemplatesRoutes); // 🚦 CRUD templates - 30 ecritures/min (GET libre)
 app.use('/api/test', testOpenAIRoutes);             // Tests - LIBRES

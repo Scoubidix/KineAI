@@ -89,8 +89,6 @@ router.post('/create-checkout', authenticate, async (req, res) => {
     }
     
     // Nouveau checkout pour utilisateurs sans abonnement actif
-    logger.warn(`🆕 Nouveau checkout pour utilisateur ${kine.planType || 'FREE'}`);
-    logger.warn(`🎁 Code parrainage reçu du frontend: "${referralCode || 'AUCUN'}"`);
 
     // Valider le code de parrainage si fourni
     let validatedReferralCode = null;
