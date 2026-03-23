@@ -599,13 +599,19 @@ const prepareKineRequest = async (type, message, conversationHistory = [], kineI
     systemPrompt = getSystemPromptByType(type, limitedDocuments, shouldDoRAG);
   }
 
-  // 3b. Glossaire : injecter les équivalences terminologiques pour que le LLM fasse le lien
+  // 3b. Glossaire : enrichir le message user avec les équivalences terminologiques
+  let enrichedMessage = message;
   if (shouldDoRAG && (type === 'biblio' || type === 'clinique')) {
     const glossaryMappings = await lookupGlossary(message);
     if (glossaryMappings.length > 0) {
-      const mappings = glossaryMappings.map(m => `- "${m.french_term}" = ${m.english_term}`).join('\n');
-      systemPrompt += `\n\nÉQUIVALENCES TERMINOLOGIQUES (le kiné utilise ces termes français, fais le lien avec les études fournies) :\n${mappings}`;
-      logger.debug(`📖 Glossaire injecté dans prompt ${type}: ${glossaryMappings.length} mapping(s)`);
+      // Enrichir le message user : ajouter l'équivalence entre parenthèses
+      glossaryMappings.forEach(m => {
+        const regex = new RegExp(`\\b${m.french_term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+        enrichedMessage = enrichedMessage.replace(regex, `${m.english_term} (${m.french_term})`);
+      });
+      logger.debug(`📖 Glossaire enrichi dans message ${type}: ${glossaryMappings.length} mapping(s)`);
+      logger.debug(`📖 Message original: "${message.substring(0, 80)}"`);
+      logger.debug(`📖 Message enrichi: "${enrichedMessage.substring(0, 120)}"`);
     }
   }
 
@@ -621,6 +627,7 @@ const prepareKineRequest = async (type, message, conversationHistory = [], kineI
     logger.debug(`📤   Doc #${i + 1}: ${id} | score=${score}% | type=${entityType} | source=${source} | content=${doc.content?.length || 0} chars | ${name.substring(0, 50)}`);
   });
   logger.debug(`📝 Taille prompt système: ${systemPrompt.length} caractères`);
+  logger.debug(`📤 Message user envoyé au LLM: "${enrichedMessage.substring(0, 200)}"`);
   logger.debug(`📤 ═══════════════════════════════════════════════════════`);
 
   // 4. Préparation des messages pour OpenAI
@@ -629,7 +636,7 @@ const prepareKineRequest = async (type, message, conversationHistory = [], kineI
   const messages = [
     { role: 'system', content: systemPrompt },
     ...limitedHistory,
-    { role: 'user', content: message }
+    { role: 'user', content: enrichedMessage }
   ];
 
   // 5. Config modèle selon le type d'IA
@@ -1359,7 +1366,8 @@ RÈGLES DE SYNTHÈSE :
 - Sois concis et pratique — va droit aux recommandations cliniques
 - Mentionne les résultats chiffrés quand disponibles (p-values, effectifs, durées)
 - Si aucun document fourni → "Je n'ai pas encore d'études disponibles sur ce sujet. Je lance une recherche, n'hésite pas à me reposer la question dans 1 minute."
-- Reste cohérent avec l'historique de conversation`;
+- Reste cohérent avec l'historique de conversation
+- Le kiné peut utiliser des abréviations ou termes français (ex: "bfr", "Kenneth Jones"). Si le terme est suivi d'une équivalence entre parenthèses, utilise-la pour faire le lien avec les études fournies en anglais.`;
 
   if (contextDocuments.length > 0) {
     // 🧪 LOGS SIMPLIFIÉ - Juste le nombre de documents
