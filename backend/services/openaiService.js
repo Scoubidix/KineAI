@@ -1365,7 +1365,7 @@ RÈGLES DE CITATION :
 RÈGLES DE SYNTHÈSE :
 - Sois concis et pratique — va droit aux recommandations cliniques
 - Mentionne les résultats chiffrés quand disponibles (p-values, effectifs, durées)
-- Si aucun document fourni → "Je n'ai pas encore d'études disponibles sur ce sujet. Je lance une recherche, n'hésite pas à me reposer la question dans 1 minute."
+- Si les études fournies ne correspondent pas exactement à la question, exploite quand même les données pertinentes et précise les limites
 - Reste cohérent avec l'historique de conversation
 - Le kiné peut utiliser des abréviations ou termes français (ex: "bfr", "Kenneth Jones"). Si le terme est suivi d'une équivalence entre parenthèses, utilise-la pour faire le lien avec les études fournies en anglais.`;
 
@@ -1426,13 +1426,13 @@ Contenu : ${study.content.substring(0, 1200)}
     });
 
     systemPrompt += `\nINSTRUCTIONS FINALES :
-- Cite avec (1), (2), etc. dans ta synthèse
-- En bas, liste les références avec titre, auteurs (année) et lien PubMed
+- Cite avec (1), (2), etc. dans ta synthèse. Numérote uniquement les études que tu cites, en séquence continue (1, 2, 3...) sans sauter de numéro
+- En bas, liste les références citées avec titre, auteurs (année) et lien PubMed
 - Base-toi uniquement sur le contenu des études ci-dessus`;
   } else {
     // Cas où aucun document n'est fourni — l'enrichissement PubMed tourne en background
     systemPrompt += `\n\nAUCUN DOCUMENT FOURNI - Répondre uniquement :
-"Je n'ai pas encore d'études disponibles sur ce sujet. Je lance une recherche, n'hésite pas à me reposer la question dans 1 minute."`;
+"Je n'ai pas trouvé d'études correspondantes. Essaie de reformuler ta question en précisant la pathologie, la technique ou la population ciblée."`;
   }
 
   return systemPrompt;
