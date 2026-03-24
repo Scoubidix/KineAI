@@ -5,7 +5,7 @@ import DOMPurify from 'dompurify';
 import AppLayout from '@/components/AppLayout';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { FileText, Loader2, Copy, Sparkles, Mail, Download, Lock, Lightbulb, ArrowLeft, Search } from 'lucide-react';
+import { FileText, FilePlus2, Loader2, Copy, Sparkles, Mail, Download, Lock, Lightbulb, ArrowLeft, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { getAuth } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
@@ -381,6 +381,23 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
             </div>
           </div>
         </div>
+        <Button
+          onClick={() => {
+            setRawNotes('');
+            setMotifConsultation('');
+            setStructuredBilan('');
+            setBilanHtml('');
+            setShowBilan(false);
+            setIsPreviewResult(false);
+            if (bilanRef.current) bilanRef.current.innerHTML = '';
+          }}
+          disabled={isGenerating}
+          size="sm"
+          className="h-7 px-3 text-xs btn-teal rounded-full"
+        >
+          <FilePlus2 className="h-3 w-3 mr-1.5" />
+          Nouveau Bilan
+        </Button>
       </div>
 
       {/* Zone centrale unique */}

@@ -525,7 +525,7 @@ export default function KineHomePage() {
                     rel="noopener noreferrer"
                   >
                     <AlertCircle className="h-4 w-4" />
-                    Remarques/idées/Bug pour la Beta
+                    Remarques / idées / Bug
                   </a>
                 </Button>
               </div>

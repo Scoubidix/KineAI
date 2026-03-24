@@ -181,7 +181,7 @@ export default function ParrainagePage() {
     const planLabels: Record<string, string> = {
       'DECLIC': 'Déclic (9€)',
       'PRATIQUE': 'Pratique (29€)',
-      'PIONNIER': 'Pionnier (20€)',
+      'PIONNIER': 'Pionnier (19€)',
       'EXPERT': 'Expert (49€)'
     };
     return planLabels[plan] || plan;
