@@ -93,7 +93,7 @@ const PLANS = {
     id: 'PIONNIER',
     type: 'PIONNIER',
     name: 'Pionnier', 
-    price: 20,
+    price: 19,
     currency: 'EUR',
     interval: 'month',
     stripePriceId: 'price_1RuXvBEHFuBHSJxkyXom9QGe',
