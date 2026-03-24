@@ -463,6 +463,58 @@ const signupLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter pour les tickets support
+ * 3 tickets par heure par utilisateur
+ */
+const supportTicketLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 3, // 3 tickets par heure
+  message: {
+    error: 'Trop de requêtes support',
+    details: 'Maximum 3 tickets par heure. Veuillez patienter avant de réessayer.',
+    retryAfter: 3600
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'support_ticket'),
+  handler: (req, res) => {
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`Rate limit depasse - Support ticket - User: ${safeUser}`);
+    res.status(429).json({
+      error: 'Trop de requêtes support',
+      details: 'Maximum 3 tickets par heure. Veuillez patienter avant de réessayer.',
+      retryAfter: 3600
+    });
+  }
+});
+
+/**
+ * Rate limiter pour les messages sur tickets support
+ * 10 messages par 15 minutes par utilisateur
+ */
+const supportMessageLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: {
+    error: 'Trop de messages support',
+    details: 'Maximum 10 messages par 15 minutes. Veuillez patienter.',
+    retryAfter: 900
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'support_message'),
+  handler: (req, res) => {
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`Rate limit depasse - Support message - User: ${safeUser}`);
+    res.status(429).json({
+      error: 'Trop de messages support',
+      details: 'Maximum 10 messages par 15 minutes. Veuillez patienter.',
+      retryAfter: 900
+    });
+  }
+});
+
+/**
  * Middleware pour afficher les informations de rate limiting
  * Utile pour le debugging
  */
@@ -499,5 +551,7 @@ module.exports = {
   videoUploadLimiter,
   avatarUploadLimiter,
   signupLimiter,
+  supportTicketLimiter,
+  supportMessageLimiter,
   rateLimitLogger
 };

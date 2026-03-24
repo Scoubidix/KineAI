@@ -69,6 +69,10 @@ model Kine {
   contacts       Contact[]
   adminTemplates AdminTemplate[]
   // ===========================================================
+
+  // ========== RELATION SUPPORT ==========
+  supportTickets SupportTicket[]
+  // ======================================
 }
 
 model Patient {
@@ -396,6 +400,7 @@ enum NotificationType {
   PROGRAM_COMPLETED // Programme terminé
   PAIN_ALERT // Niveau douleur élevé (≥7)
   PATIENT_REQUEST // Patient demande à contacter son kiné
+  SUPPORT_REPLY // Réponse admin à un ticket support
 
   @@map("notification_type")
 }
@@ -549,3 +554,45 @@ enum ReferralStatus {
 }
 
 // ============================================
+
+// ========== SYSTÈME DE SUPPORT ==========
+
+model SupportTicket {
+  id         Int          @id @default(autoincrement())
+  subject    String       @db.VarChar(255)
+  status     TicketStatus @default(OPEN)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  resolvedAt DateTime?
+
+  kineId Int
+  kine   Kine @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
+  messages TicketMessage[]
+
+  @@index([kineId, status])
+  @@index([status, createdAt])
+  @@map("support_tickets")
+}
+
+model TicketMessage {
+  id        Int      @id @default(autoincrement())
+  body      String   @db.Text
+  isAdmin   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  ticketId Int
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_messages")
+}
+
+enum TicketStatus {
+  OPEN
+  RESOLVED
+
+  @@map("ticket_status")
+}
+
+// =========================================

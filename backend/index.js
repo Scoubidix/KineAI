@@ -50,6 +50,8 @@ const {
   rgpdExportLimiter,
   rgpdDeleteLimiter,
   signupLimiter,
+  supportTicketLimiter,
+  supportMessageLimiter,
   rateLimitLogger
 } = require('./middleware/rateLimiter');
 
@@ -90,6 +92,9 @@ const exerciceTemplatesRoutes = require('./routes/exerciceTemplates');
 // 🎁 NOUVEAU PARRAINAGE : Import des routes parrainage
 const referralRoutes = require('./routes/referral');
 const contactsRoutes = require('./routes/contacts');
+
+// 🎫 SUPPORT : Import des routes support
+const supportRoutes = require('./routes/support');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -634,6 +639,17 @@ app.use('/programmes', (req, res, next) => {
 
 app.use('/admin/programmes', programmeAdminRoutes);  // Admin - LIBRES (requireAdmin protege)
 app.use('/admin/dashboard', require('./routes/adminDashboard'));  // Admin dashboard stats
+
+// 🎫 SUPPORT : Rate limiting selectif (POST creation = 3/heure, messages = 10/15min)
+app.use('/api/support', (req, res, next) => {
+  if (req.method === 'POST' && req.path === '/tickets') {
+    return supportTicketLimiter(req, res, next);
+  }
+  if (req.method === 'POST' && req.path.match(/^\/tickets\/\d+\/messages$/)) {
+    return supportMessageLimiter(req, res, next);
+  }
+  next();
+}, supportRoutes);
 app.use('/exercices', crudWriteLimiter, exerciceRoutes);               // 🚦 CRUD exercices - 30 ecritures/min (GET libre)
 app.use('/exercice-templates', crudWriteLimiter, exerciceTemplatesRoutes); // 🚦 CRUD templates - 30 ecritures/min (GET libre)
 app.use('/api/test', testOpenAIRoutes);             // Tests - LIBRES

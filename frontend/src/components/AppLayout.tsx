@@ -82,7 +82,8 @@ import {
   AlertCircle,
   Crown,
   MessageCircle,
-  Camera
+  Camera,
+  HelpCircle
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -94,6 +95,7 @@ import { fr } from 'date-fns/locale';
 import { RGPDExportModal } from './RGPDExportModal';
 import { RGPDDeleteModal } from './RGPDDeleteModal';
 import { PaywallModal } from './PaywallModal';
+import { SupportModal } from './SupportModal';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -839,16 +841,6 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                       </CardContent>
                     </Card>
 
-                    <Card className="card-hover">
-                      <CardHeader>
-                        <CardTitle className="text-base text-foreground">Consentements</CardTitle>
-                        <CardDescription className="text-foreground">
-                          Gérez vos consentements pour le traitement des données
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                      </CardContent>
-                    </Card>
                   </div>
                 </div>
               </TabsContent>
@@ -1143,6 +1135,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [isPlanPopoverOpen, setIsPlanPopoverOpen] = useState(false);
   const planPopoverTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
   const avatarInputRef = React.useRef<HTMLInputElement>(null);
 
   // Lecture cache localStorage au montage (après hydratation)
@@ -1348,6 +1341,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                           planPopoverTimeout.current = setTimeout(() => setIsPlanPopoverOpen(false), 150);
                         }}
                       >
+                        {headerSubscription.planType === 'PIONNIER' && <Crown className="h-3 w-3" />}
                         {headerSubscription.planType}
                       </button>
                     </PopoverTrigger>
@@ -1479,6 +1473,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       <Settings className="h-4 w-4 text-muted-foreground" />
                       Paramètres
                     </button>
+                    <button
+                      onClick={() => setIsSupportOpen(true)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-muted/50 rounded-md transition-colors"
+                    >
+                      <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                      Support / Aide
+                    </button>
                   </div>
                   {/* Déconnexion */}
                   <div className="border-t p-1">
@@ -1493,6 +1494,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </PopoverContent>
               </Popover>
               <SettingsModal open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+              <SupportModal open={isSupportOpen} onOpenChange={setIsSupportOpen} />
             </div>
           </div>
         </header>

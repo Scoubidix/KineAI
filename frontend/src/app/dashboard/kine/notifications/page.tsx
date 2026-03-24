@@ -18,17 +18,20 @@ import {
   Trash2,
   MessageCircle,
   Send,
-  ExternalLink
+  ExternalLink,
+  Headset
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { SupportModal } from '@/components/SupportModal';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 // Types pour les notifications
 interface NotificationData {
   id: number;
-  type: 'DAILY_VALIDATION' | 'PROGRAM_COMPLETED' | 'PAIN_ALERT' | 'PATIENT_REQUEST';
+  type: 'DAILY_VALIDATION' | 'PROGRAM_COMPLETED' | 'PAIN_ALERT' | 'PATIENT_REQUEST' | 'SUPPORT_REPLY';
   title: string;
   message: string;
   isRead: boolean;
@@ -72,6 +75,10 @@ export default function KineNotificationsPage() {
   // États de filtres
   const [showOnlyUnread, setShowOnlyUnread] = useState(false);
   const [selectedType, setSelectedType] = useState<string>('all');
+
+  // Support modal
+  const [supportModalOpen, setSupportModalOpen] = useState(false);
+  const [supportTicketId, setSupportTicketId] = useState<number | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -308,6 +315,8 @@ export default function KineNotificationsPage() {
         return <AlertCircle className="inline h-4 w-4 mr-1 text-destructive" />;
       case 'PATIENT_REQUEST':
         return <MessageCircle className="inline h-4 w-4 mr-1 text-teal-500" />;
+      case 'SUPPORT_REPLY':
+        return <Headset className="inline h-4 w-4 mr-1 text-violet-500" />;
       default:
         return <Bell className="inline h-4 w-4 mr-1 text-blue-500" />;
     }
@@ -461,6 +470,7 @@ export default function KineNotificationsPage() {
                 <option value="PAIN_ALERT">Alertes douleur</option>
                 <option value="PROGRAM_COMPLETED">Programmes terminés</option>
                 <option value="PATIENT_REQUEST">Demandes patients</option>
+                <option value="SUPPORT_REPLY">Reponses support</option>
               </select>
             </div>
           </CardContent>
@@ -558,6 +568,24 @@ export default function KineNotificationsPage() {
                             </Button>
                           </div>
                         </>
+                      ) : notification.type === 'SUPPORT_REPLY' ? (
+                        <>
+                          <p>{notification.message}</p>
+                          <div className="mt-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-violet-600 border-violet-300 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-700 dark:hover:bg-violet-950/20"
+                              onClick={() => {
+                                setSupportTicketId(notification.metadata?.ticketId ?? null);
+                                setSupportModalOpen(true);
+                              }}
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                              Voir le ticket
+                            </Button>
+                          </div>
+                        </>
                       ) : (
                         <p>{notification.message}</p>
                       )}
@@ -618,6 +646,15 @@ export default function KineNotificationsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <SupportModal
+        open={supportModalOpen}
+        onOpenChange={(open) => {
+          setSupportModalOpen(open);
+          if (!open) setSupportTicketId(null);
+        }}
+        initialTicketId={supportTicketId}
+      />
     </AppLayout>
   );
 }
