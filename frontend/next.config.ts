@@ -1,4 +1,10 @@
+import withSerwistInit from "@serwist/next";
 import type {NextConfig} from 'next';
+
+const withSerwist = withSerwistInit({
+  swSrc: "src/app/sw.ts",
+  swDest: "public/sw.js",
+});
 
 // Extraire l'origin de l'URL API backend pour le CSP
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
@@ -22,6 +28,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   // Connexions API : backend + Firebase Auth + GCS
   `connect-src 'self' ${apiOrigin} *.googleapis.com *.firebaseapp.com storage.googleapis.com`,
+  "worker-src 'self'",
   // Images : GCS (GIFs exercices) + picsum (placeholder) + data: (SVG inline)
   "img-src 'self' data: blob: picsum.photos storage.googleapis.com www.google.com",
   // Fonts : next/font auto-heberge au build, gstatic en fallback
@@ -70,4 +77,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig);

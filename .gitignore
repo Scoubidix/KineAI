@@ -55,6 +55,13 @@ CLAUDE.md
 AUDIT-SECURITE.md
 .claude/
 
+# ========== PWA (genere au build) ==========
+frontend/public/sw.js
+frontend/public/sw.js.map
+frontend/public/swe-worker-*.js
+frontend/public/workbox-*.js
+frontend/public/workbox-*.js.map
+
 # ========== NEXT.JS ==========
 frontend/.idx/
 frontend/dev.nix
@@ -71,3 +78,7 @@ migration_error_ids.json
 preprocessing*.js
 backend/scripts/importTemplates.js
 backend/data/*.csv
+kines-*.csv
+kines-*.json
+ps-libreacces-*.txt
+scripts/

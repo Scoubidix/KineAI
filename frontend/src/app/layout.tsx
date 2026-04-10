@@ -10,7 +10,17 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
   title: 'Mon Assistant Kiné',
-  description: 'Personalized exercise programs and AI support for patients.',
+  description: 'Application pour kinésithérapeutes — programmes d\'exercices personnalisés et IA',
+  manifest: '/manifest.json',
+  themeColor: '#4a9a8e',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Assistant Kiné',
+  },
+  icons: {
+    apple: '/Logo192.png',
+  },
 };
 
 export default function RootLayout({

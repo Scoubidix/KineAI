@@ -11,6 +11,7 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
+  SidebarFooter,
 } from '@/components/ui/sidebar';
 import {
   Dialog,
@@ -96,6 +97,7 @@ import { RGPDExportModal } from './RGPDExportModal';
 import { RGPDDeleteModal } from './RGPDDeleteModal';
 import { PaywallModal } from './PaywallModal';
 import { SupportModal } from './SupportModal';
+import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -1061,6 +1063,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const router = useRouter();
   const role = getRoleFromPath(currentPathname);
   const [loading, setLoading] = React.useState(false);
+  const { canInstall, install } = usePWAInstall();
 
   // ✨ Vérification email obligatoire
   React.useEffect(() => {
@@ -1304,6 +1307,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
             ))}
           </SidebarMenu>
         </SidebarContent>
+        {canInstall && (
+          <SidebarFooter className="p-2 border-t border-primary/20">
+            <button
+              onClick={install}
+              className="flex items-center gap-2 w-full rounded-md px-3 py-2 text-sm text-white bg-[#3899aa] hover:bg-[#2d7a88] shadow-sm transition-all"
+            >
+              <Download className="h-4 w-4 shrink-0" />
+              <span className="group-data-[state=collapsed]:hidden">Installer l'application</span>
+            </button>
+          </SidebarFooter>
+        )}
       </Sidebar>
 
       <SidebarInset className="min-w-0">

@@ -1,0 +1,30 @@
+{
+  "name": "Mon Assistant Kiné",
+  "short_name": "Assistant Kiné",
+  "description": "Application pour kinésithérapeutes — programmes d'exercices personnalisés et IA",
+  "start_url": "/dashboard/kine/home",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4a9a8e",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/Logo192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/Logo512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/Logo512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
