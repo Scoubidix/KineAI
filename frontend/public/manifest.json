@@ -1,6 +1,6 @@
 {
   "name": "Mon Assistant Kiné",
-  "short_name": "Assistant Kiné",
+  "short_name": "Mon Assistant Kiné",
   "description": "Application pour kinésithérapeutes — programmes d'exercices personnalisés et IA",
   "start_url": "/dashboard/kine/home",
   "display": "standalone",

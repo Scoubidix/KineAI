@@ -12,7 +12,6 @@ export function usePWAInstall() {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    // Detecter si l'app est deja installee (mode standalone)
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsInstalled(true);
       return;
@@ -25,7 +24,6 @@ export function usePWAInstall() {
 
     window.addEventListener('beforeinstallprompt', handler);
 
-    // Detecter l'installation
     window.addEventListener('appinstalled', () => {
       setIsInstalled(true);
       setDeferredPrompt(null);

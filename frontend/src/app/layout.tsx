@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
@@ -12,7 +12,6 @@ export const metadata: Metadata = {
   title: 'Mon Assistant Kiné',
   description: 'Application pour kinésithérapeutes — programmes d\'exercices personnalisés et IA',
   manifest: '/manifest.json',
-  themeColor: '#4a9a8e',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -21,6 +20,10 @@ export const metadata: Metadata = {
   icons: {
     apple: '/Logo192.png',
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#4a9a8e',
 };
 
 export default function RootLayout({
