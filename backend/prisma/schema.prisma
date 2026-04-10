@@ -73,6 +73,10 @@ model Kine {
   // ========== RELATION SUPPORT ==========
   supportTickets SupportTicket[]
   // ======================================
+
+  // ========== RELATION BILANS ==========
+  bilans BilanKine[]
+  // =====================================
 }
 
 model Patient {
@@ -104,6 +108,7 @@ model Patient {
   sessionValidations   SessionValidation[]
   notifications        Notification[]
   templatesSentHistory TemplateSentHistory[]
+  bilans               BilanKine[]
 }
 
 model ExerciceModele {
@@ -596,3 +601,30 @@ enum TicketStatus {
 }
 
 // =========================================
+
+// ========== BILANS KINÉSITHÉRAPIQUES ==========
+
+model BilanKine {
+  id        Int      @id @default(autoincrement())
+  motif     String?  @db.VarChar(500) // Motif de consultation
+  rawNotes  String   @db.Text // Notes brutes du kiné
+  bilanHtml String   @db.Text // HTML structuré généré par l'IA
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Soft delete
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+
+  // Relations
+  kineId    Int
+  kine      Kine    @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  patientId Int
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([kineId, createdAt])
+  @@index([patientId, createdAt])
+  @@map("bilans_kine")
+}
+
+// ==============================================

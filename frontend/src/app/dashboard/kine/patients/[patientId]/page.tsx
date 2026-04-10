@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Target, Filter, Dumbbell, Clock, Activity, MessageCircle, CheckCircle, AlertCircle, Search, Archive, ArrowLeft, ChevronRight } from 'lucide-react';
+import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Target, Filter, Dumbbell, Clock, Activity, MessageCircle, CheckCircle, AlertCircle, Search, Archive, ArrowLeft, ChevronRight, FileText, Download, Eye, EyeOff } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Checkbox } from '@/components/ui/checkbox';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
@@ -73,6 +74,18 @@ interface ExerciceTemplate {
       nom: string;
     };
   }>;
+}
+
+interface BilanSummary {
+  id: number;
+  motif: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface BilanFull extends BilanSummary {
+  rawNotes: string;
+  bilanHtml: string;
 }
 
 interface ArchivedProgramme {
@@ -183,6 +196,17 @@ export default function PatientDetailPage() {
   const [loadingArchived, setLoadingArchived] = useState(false);
   const [archivedSearchQuery, setArchivedSearchQuery] = useState('');
 
+  // États bilans
+  const [bilans, setBilans] = useState<BilanSummary[]>([]);
+  const [selectedBilan, setSelectedBilan] = useState<BilanFull | null>(null);
+  const [showBilansModal, setShowBilansModal] = useState(false);
+  const [loadingBilans, setLoadingBilans] = useState(false);
+  const [loadingBilanDetail, setLoadingBilanDetail] = useState(false);
+  const [editingBilanId, setEditingBilanId] = useState<number | null>(null);
+  const [editBilanHtml, setEditBilanHtml] = useState('');
+  const editBilanRef = useRef<HTMLDivElement>(null);
+  const [kineProfile, setKineProfile] = useState<{ firstName: string; lastName: string; adresseCabinet?: string; rpps?: string } | null>(null);
+
   useEffect(() => {
     const fetchPatient = async () => {
       try {
@@ -281,6 +305,185 @@ export default function PatientDetailPage() {
 
     setFilteredExercises(filtered);
   }, [allExercises, typeFilters, tagFilters, exerciseSearchQuery, selectedExercises]);
+
+  // Charger les bilans du patient
+  useEffect(() => {
+    const fetchBilans = async () => {
+      if (!patientId) return;
+      try {
+        setLoadingBilans(true);
+        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patientId}/bilans`);
+        const data = await res.json();
+        if (data.success) setBilans(data.bilans);
+      } catch (err) {
+        console.error('Erreur chargement bilans:', err);
+      } finally {
+        setLoadingBilans(false);
+      }
+    };
+    fetchBilans();
+  }, [patientId]);
+
+  // Charger le profil kiné pour le PDF
+  useEffect(() => {
+    const fetchKineProfile = async () => {
+      try {
+        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile`);
+        if (res.ok) {
+          const data = await res.json();
+          setKineProfile(data);
+        }
+      } catch (err) {
+        console.error('Erreur chargement profil kiné:', err);
+      }
+    };
+    fetchKineProfile();
+  }, []);
+
+  const handleViewBilan = async (bilanId: number) => {
+    try {
+      setLoadingBilanDetail(true);
+      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patientId}/bilans/${bilanId}`);
+      const data = await res.json();
+      if (data.success) {
+        setSelectedBilan(data.bilan);
+        setEditingBilanId(null);
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de charger le bilan', variant: 'destructive' });
+    } finally {
+      setLoadingBilanDetail(false);
+    }
+  };
+
+  const handleStartEditBilan = () => {
+    if (!selectedBilan) return;
+    setEditingBilanId(selectedBilan.id);
+    setEditBilanHtml(selectedBilan.bilanHtml);
+    setTimeout(() => {
+      if (editBilanRef.current) {
+        editBilanRef.current.innerHTML = selectedBilan.bilanHtml;
+      }
+    }, 50);
+  };
+
+  const handleSaveEditBilan = async () => {
+    if (!selectedBilan || !editBilanRef.current) return;
+    try {
+      const newHtml = DOMPurify.sanitize(editBilanRef.current.innerHTML);
+      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patientId}/bilans/${selectedBilan.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ bilanHtml: newHtml }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSelectedBilan({ ...selectedBilan, bilanHtml: newHtml });
+        setEditingBilanId(null);
+        toast({ title: 'Bilan modifié', description: 'Les modifications ont été sauvegardées' });
+      } else {
+        toast({ title: 'Erreur', description: data.error || 'Erreur modification', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Erreur lors de la modification', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteBilan = async (bilanId: number) => {
+    try {
+      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patientId}/bilans/${bilanId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBilans(prev => prev.filter(b => b.id !== bilanId));
+        if (selectedBilan?.id === bilanId) setSelectedBilan(null);
+        toast({ title: 'Bilan supprimé', description: 'Le bilan a été supprimé' });
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Erreur lors de la suppression', variant: 'destructive' });
+    }
+  };
+
+  const handleDownloadBilanPDF = (bilan: BilanFull) => {
+    if (!patient) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ title: 'Erreur', description: 'Veuillez autoriser les fenêtres pop-up', variant: 'destructive' });
+      return;
+    }
+
+    const today = new Date(bilan.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    const logoUrl = `${window.location.origin}/logo.png`;
+    const patientBirthDate = new Date(patient.birthDate).toLocaleDateString('fr-FR');
+
+    let headerHTML = '';
+    if (kineProfile) {
+      const name = `${kineProfile.firstName} ${kineProfile.lastName.toUpperCase()}`;
+      headerHTML = `
+        <div class="header">
+          <div class="header-left">
+            <div class="header-name">${DOMPurify.sanitize(name)}</div>
+            <div>Masseur-Kinésithérapeute D.E.</div>
+            ${kineProfile.rpps ? `<div>RPPS : ${DOMPurify.sanitize(kineProfile.rpps)}</div>` : ''}
+            ${kineProfile.adresseCabinet ? `<div>${DOMPurify.sanitize(kineProfile.adresseCabinet)}</div>` : ''}
+          </div>
+          <div class="header-right">
+            <img src="${logoUrl}" alt="Logo" class="header-logo" />
+            <div class="header-app-name">Mon Assistant Kiné</div>
+          </div>
+        </div>
+        <div class="header-separator"></div>
+      `;
+    }
+
+    const patientInfoHTML = `
+      <div class="patient-info">
+        <strong>Patient :</strong> ${DOMPurify.sanitize(patient.firstName)} ${DOMPurify.sanitize(patient.lastName.toUpperCase())}
+        &nbsp;&bull;&nbsp; Né(e) le ${patientBirthDate}
+      </div>
+    `;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Bilan Kinésithérapique - ${DOMPurify.sanitize(patient.firstName)} ${DOMPurify.sanitize(patient.lastName)}</title>
+          <style>
+            @page { margin: 2cm; size: A4; }
+            body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6; color: #000; max-width: 21cm; margin: 0 auto; padding: 1cm; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5em; }
+            .header-left { font-size: 11pt; line-height: 1.4; }
+            .header-name { font-weight: bold; font-size: 13pt; }
+            .header-right { display: flex; align-items: center; gap: 10px; }
+            .header-logo { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
+            .header-app-name { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; font-weight: bold; color: #3899aa; }
+            .header-separator { height: 3px; background: linear-gradient(to right, #4db3c5, #1f5c6a); border: none; border-radius: 2px; margin: 0.6em 0 1.2em 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .patient-info { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; margin-bottom: 1em; padding: 0.5em 0; border-bottom: 1px solid #ccc; }
+            .bilan-date { text-align: right; font-size: 10pt; color: #555; font-family: Arial, Helvetica, sans-serif; margin-bottom: -0.5em; }
+            h1, h2, h3 { font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
+            h1 { font-size: 16pt; text-align: center; }
+            h2 { font-size: 14pt; }
+            h3 { font-size: 12pt; }
+            p, li { margin-bottom: 0.5em; text-align: justify; }
+            strong { font-weight: bold; }
+            u { text-decoration: underline; font-weight: 600; }
+            em { font-style: italic; }
+            hr { border: none; border-top: 1px solid #000; margin: 1em 0; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          ${headerHTML}
+          <div class="bilan-date">Le ${today}</div>
+          ${patientInfoHTML}
+          ${DOMPurify.sanitize(bilan.bilanHtml)}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    setTimeout(() => { printWindow.focus(); printWindow.print(); }, 250);
+  };
 
   // Fonctions de gestion des filtres chips
   const toggleTypeFilter = (type: string) => {
@@ -1128,14 +1331,29 @@ export default function PatientDetailPage() {
                         </div>
                       </div>
 
-                      <Button
-                        variant="outline"
-                        onClick={handleOpenArchivedModal}
-                        className="shrink-0 h-9 text-sm gap-2 border-[#3899aa]/30 text-[#3899aa] hover:bg-[#3899aa]/10"
-                      >
-                        <Archive className="w-4 h-4" />
-                        Anciens Programmes
-                      </Button>
+                      <div className="flex gap-2 shrink-0">
+                        <Button
+                          variant="outline"
+                          onClick={() => { setShowBilansModal(true); }}
+                          className="h-9 text-sm gap-2 border-[#3899aa]/30 text-[#3899aa] hover:bg-[#3899aa]/10"
+                        >
+                          <FileText className="w-4 h-4" />
+                          Bilans
+                          {bilans.length > 0 && (
+                            <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs bg-[#3899aa]/10 text-[#3899aa]">
+                              {bilans.length}
+                            </Badge>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleOpenArchivedModal}
+                          className="h-9 text-sm gap-2 border-[#3899aa]/30 text-[#3899aa] hover:bg-[#3899aa]/10"
+                        >
+                          <Archive className="w-4 h-4" />
+                          Anciens Programmes
+                        </Button>
+                      </div>
                     </div>
 
                   </div>
@@ -1325,6 +1543,158 @@ export default function PatientDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Modal Bilans */}
+        <Dialog open={showBilansModal} onOpenChange={(open) => {
+          setShowBilansModal(open);
+          if (!open) {
+            setSelectedBilan(null);
+            setEditingBilanId(null);
+          }
+        }}>
+          <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
+            <DialogHeader className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
+              <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
+                {selectedBilan ? (
+                  <>
+                    <button onClick={() => { setSelectedBilan(null); setEditingBilanId(null); }} className="hover:opacity-80 transition-opacity">
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    {selectedBilan.motif || 'Bilan kinésithérapique'}
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-5 h-5" />
+                    Bilans kinésithérapiques
+                  </>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+
+            {!selectedBilan ? (
+              <div className="space-y-4 pt-2">
+                {loadingBilans ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="animate-spin h-6 w-6 text-[#3899aa] mx-auto" />
+                    <p className="text-sm text-muted-foreground mt-2">Chargement...</p>
+                  </div>
+                ) : bilans.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">Aucun bilan associé à ce patient</p>
+                    <p className="text-xs mt-1">Générez un bilan depuis l'outil "Bilan Kiné" et associez-le à ce patient</p>
+                  </div>
+                ) : (
+                  <div className="max-h-[60vh] overflow-y-auto space-y-2">
+                    {bilans.map(bilan => (
+                      <Card
+                        key={bilan.id}
+                        className="p-3 cursor-pointer transition-all duration-300 hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-[#3899aa]/5"
+                        onClick={() => handleViewBilan(bilan.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-foreground truncate">
+                              {bilan.motif || 'Bilan kinésithérapique'}
+                            </p>
+                            <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {new Date(bilan.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0 ml-2">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Supprimer ce bilan ?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Cette action supprimera le bilan &quot;{bilan.motif || 'Bilan kinésithérapique'}&quot; de manière définitive.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteBilan(bilan.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Supprimer
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4 pt-2">
+                {/* Actions bilan */}
+                <div className="flex items-center justify-end gap-2">
+                  {editingBilanId === selectedBilan.id ? (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => setEditingBilanId(null)} className="h-8 text-xs">
+                        Annuler
+                      </Button>
+                      <Button size="sm" onClick={handleSaveEditBilan} className="h-8 text-xs btn-teal">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Sauvegarder
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button size="sm" variant="outline" onClick={handleStartEditBilan} className="h-8 text-xs">
+                        <Edit className="w-3 h-3 mr-1" />
+                        Modifier
+                      </Button>
+                      <Button size="sm" onClick={() => handleDownloadBilanPDF(selectedBilan)} className="h-8 text-xs btn-teal">
+                        <Download className="w-3 h-3 mr-1" />
+                        PDF
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                <div className="text-xs text-muted-foreground">
+                  Créé le {new Date(selectedBilan.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </div>
+
+                {loadingBilanDetail ? (
+                  <div className="text-center py-6">
+                    <Loader2 className="animate-spin h-5 w-5 text-[#3899aa] mx-auto" />
+                  </div>
+                ) : editingBilanId === selectedBilan.id ? (
+                  <div
+                    ref={editBilanRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    className="min-h-[200px] max-h-[50vh] overflow-y-auto text-sm leading-relaxed p-4 rounded-lg border-2 border-[#3899aa]/40 bg-white dark:bg-card focus:outline-none"
+                  />
+                ) : (
+                  <div
+                    className="text-sm leading-relaxed p-4 rounded-lg border bg-gray-50 dark:bg-gray-800/50 max-h-[50vh] overflow-y-auto"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedBilan.bilanHtml) }}
+                  />
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Modal pour afficher le lien généré avec WhatsApp */}
         <Dialog open={showLinkModal} onOpenChange={setShowLinkModal}>

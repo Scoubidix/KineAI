@@ -96,6 +96,9 @@ const contactsRoutes = require('./routes/contacts');
 // 🎫 SUPPORT : Import des routes support
 const supportRoutes = require('./routes/support');
 
+// 📋 BILANS : Import des routes bilans
+const bilansRoutes = require('./routes/bilans');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -623,6 +626,7 @@ app.use('/kine', (req, res, next) => {
   next();
 }, kinesRoutes);
 app.use('/patients', crudWriteLimiter, patientsRoutes);       // 🚦 CRUD patients - 30 ecritures/min (GET libre)
+app.use('/api/patients', crudWriteLimiter, bilansRoutes);     // 🚦 CRUD bilans - 30 ecritures/min (GET libre)
 
 // Programmes : Rate limiting sélectif par route
 app.use('/programmes', (req, res, next) => {

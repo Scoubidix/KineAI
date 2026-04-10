@@ -5,13 +5,22 @@ import DOMPurify from 'dompurify';
 import AppLayout from '@/components/AppLayout';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { FileText, FilePlus2, Loader2, Copy, Sparkles, Mail, Download, Lock, Lightbulb, ArrowLeft, Search } from 'lucide-react';
+import { FileText, FilePlus2, Loader2, Copy, Sparkles, Mail, Download, Lock, Lightbulb, ArrowLeft, Search, UserPlus, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getAuth } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { PaywallModal } from '@/components/PaywallModal';
 import { usePaywall } from '@/hooks/usePaywall';
 import { useToast } from '@/hooks/use-toast';
+
+interface PatientOption {
+  id: number;
+  firstName: string;
+  lastName: string;
+  birthDate: string;
+}
 
 export default function BilanKinePage() {
   const [rawNotes, setRawNotes] = useState('');
@@ -23,6 +32,11 @@ export default function BilanKinePage() {
   const [showBilan, setShowBilan] = useState(false);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const [kineProfile, setKineProfile] = useState<{ firstName: string; lastName: string; adresseCabinet?: string; rpps?: string } | null>(null);
+  const [showPatientModal, setShowPatientModal] = useState(false);
+  const [patients, setPatients] = useState<PatientOption[]>([]);
+  const [patientSearch, setPatientSearch] = useState('');
+  const [savingBilan, setSavingBilan] = useState(false);
+  const [savedPatient, setSavedPatient] = useState<PatientOption | null>(null);
   const bilanRef = useRef<HTMLDivElement>(null);
 
   // Injecter le HTML dans le div contentEditable sans que React ne contrôle le contenu
@@ -117,6 +131,138 @@ export default function BilanKinePage() {
       setIsGenerating(false);
     }
   };
+
+  const handleOpenPatientModal = async () => {
+    try {
+      const token = await getAuthToken();
+      if (!token) return;
+      // Récupérer le kineId depuis le profil déjà chargé, puis les patients
+      const res = await fetchWithAuth(`${API_BASE}/kine/profile`);
+      if (!res.ok) throw new Error();
+      const profile = await res.json();
+      const patientsRes = await fetchWithAuth(`${API_BASE}/patients/kine/${profile.id}`);
+      if (!patientsRes.ok) throw new Error();
+      const data = await patientsRes.json();
+      setPatients(data);
+      setPatientSearch('');
+      setSavedPatient(null);
+      setShowPatientModal(true);
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de charger la liste des patients', variant: 'destructive' });
+    }
+  };
+
+  const handleSaveBilanToPatient = async (patient: PatientOption) => {
+    try {
+      setSavingBilan(true);
+      const res = await fetchWithAuth(`${API_BASE}/api/patients/${patient.id}/bilans`, {
+        method: 'POST',
+        body: JSON.stringify({
+          motif: motifConsultation.trim() || undefined,
+          rawNotes,
+          bilanHtml: getBilanHtml(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSavedPatient(patient);
+      } else {
+        toast({ title: 'Erreur', description: data.error || 'Erreur lors de la sauvegarde', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Erreur lors de la sauvegarde du bilan', variant: 'destructive' });
+    } finally {
+      setSavingBilan(false);
+    }
+  };
+
+  const handleDownloadPatientPDF = () => {
+    if (!savedPatient) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ title: 'Erreur', description: 'Veuillez autoriser les fenêtres pop-up', variant: 'destructive' });
+      return;
+    }
+
+    const formattedHTML = getBilanHtml();
+    const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    const logoUrl = `${window.location.origin}/logo.png`;
+    const patientBirthDate = new Date(savedPatient.birthDate).toLocaleDateString('fr-FR');
+
+    let headerHTML = '';
+    if (kineProfile) {
+      const name = `${kineProfile.firstName} ${kineProfile.lastName.toUpperCase()}`;
+      headerHTML = `
+        <div class="header">
+          <div class="header-left">
+            <div class="header-name">${DOMPurify.sanitize(name)}</div>
+            <div>Masseur-Kinésithérapeute D.E.</div>
+            ${kineProfile.rpps ? `<div>RPPS : ${DOMPurify.sanitize(kineProfile.rpps)}</div>` : ''}
+            ${kineProfile.adresseCabinet ? `<div>${DOMPurify.sanitize(kineProfile.adresseCabinet)}</div>` : ''}
+          </div>
+          <div class="header-right">
+            <img src="${logoUrl}" alt="Logo" class="header-logo" />
+            <div class="header-app-name">Mon Assistant Kiné</div>
+          </div>
+        </div>
+        <div class="header-separator"></div>
+      `;
+    }
+
+    const patientInfoHTML = `
+      <div class="patient-info">
+        <strong>Patient :</strong> ${DOMPurify.sanitize(savedPatient.firstName)} ${DOMPurify.sanitize(savedPatient.lastName.toUpperCase())}
+        &nbsp;&bull;&nbsp; Né(e) le ${patientBirthDate}
+      </div>
+    `;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Bilan Kinésithérapique - ${DOMPurify.sanitize(savedPatient.firstName)} ${DOMPurify.sanitize(savedPatient.lastName)}</title>
+          <style>
+            @page { margin: 2cm; size: A4; }
+            body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6; color: #000; max-width: 21cm; margin: 0 auto; padding: 1cm; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5em; }
+            .header-left { font-size: 11pt; line-height: 1.4; }
+            .header-name { font-weight: bold; font-size: 13pt; }
+            .header-right { display: flex; align-items: center; gap: 10px; }
+            .header-logo { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
+            .header-app-name { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; font-weight: bold; color: #3899aa; }
+            .header-separator { height: 3px; background: linear-gradient(to right, #4db3c5, #1f5c6a); border: none; border-radius: 2px; margin: 0.6em 0 1.2em 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .patient-info { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; margin-bottom: 1em; padding: 0.5em 0; border-bottom: 1px solid #ccc; }
+            .bilan-date { text-align: right; font-size: 10pt; color: #555; font-family: Arial, Helvetica, sans-serif; margin-bottom: -0.5em; }
+            h1, h2, h3 { font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
+            h1 { font-size: 16pt; text-align: center; }
+            h2 { font-size: 14pt; }
+            h3 { font-size: 12pt; }
+            p, li { margin-bottom: 0.5em; text-align: justify; }
+            strong { font-weight: bold; }
+            u { text-decoration: underline; font-weight: 600; }
+            em { font-style: italic; }
+            hr { border: none; border-top: 1px solid #000; margin: 1em 0; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          ${headerHTML}
+          <div class="bilan-date">Le ${today}</div>
+          ${patientInfoHTML}
+          ${formattedHTML}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    setTimeout(() => { printWindow.focus(); printWindow.print(); }, 250);
+  };
+
+  const filteredPatients = patients.filter(p => {
+    if (!patientSearch.trim()) return true;
+    const search = patientSearch.toLowerCase();
+    return p.firstName.toLowerCase().includes(search) || p.lastName.toLowerCase().includes(search);
+  });
 
   const handleBackToNotes = () => {
     setShowBilan(false);
@@ -462,6 +608,15 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
               Revenir aux notes
             </Button>
             <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={handleOpenPatientModal}
+                disabled={isPreviewResult}
+                className="h-8 rounded-full px-4 bg-[#3899aa] hover:bg-[#2d7a88] text-white font-medium shadow-sm"
+              >
+                <UserPlus className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Associer à un patient</span>
+              </Button>
               <Button size="sm" onClick={handleCopyBilan} className="btn-teal h-8 rounded-full px-3">
                 <Copy className="h-3 w-3 sm:mr-1.5" />
                 <span className="hidden sm:inline">Copier</span>
@@ -510,6 +665,80 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
         </div>
 
       </div>
+
+      {/* Modale sélection patient */}
+      <Dialog open={showPatientModal} onOpenChange={setShowPatientModal}>
+        <DialogContent className="w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#3899aa]">
+              <UserPlus className="w-5 h-5" />
+              Associer à un patient
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder="Rechercher un patient..."
+              value={patientSearch}
+              onChange={(e) => setPatientSearch(e.target.value)}
+              className="h-9"
+              autoFocus
+            />
+            {savedPatient ? (
+              <div className="space-y-4 py-4">
+                <div className="flex items-center justify-center gap-2 text-green-600">
+                  <Check className="w-5 h-5" />
+                  <span className="font-medium">Bilan associé à {savedPatient.firstName} {savedPatient.lastName.toUpperCase()}</span>
+                </div>
+                <div className="flex justify-center gap-3">
+                  <Button
+                    size="sm"
+                    onClick={handleDownloadPatientPDF}
+                    className="h-9 px-4 bg-[#3899aa] hover:bg-[#2d7a88] text-white rounded-full"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Télécharger le PDF patient
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowPatientModal(false)}
+                    className="h-9 px-4 rounded-full"
+                  >
+                    Fermer
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="max-h-64 overflow-y-auto space-y-1">
+                {filteredPatients.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Aucun patient trouvé</p>
+                ) : (
+                  filteredPatients.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => handleSaveBilanToPatient(p)}
+                      disabled={savingBilan}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#3899aa]/10 transition-colors text-left disabled:opacity-50"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-[#3899aa]/10 flex items-center justify-center shrink-0">
+                        <span className="text-xs font-medium text-[#3899aa]">
+                          {p.firstName[0]}{p.lastName[0]}
+                        </span>
+                      </div>
+                      <span className="text-sm font-medium">
+                        {p.firstName} {p.lastName.toUpperCase()}
+                      </span>
+                      {savingBilan && (
+                        <Loader2 className="w-4 h-4 animate-spin ml-auto text-[#3899aa]" />
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <PaywallModal
         isOpen={isPaywallOpen}

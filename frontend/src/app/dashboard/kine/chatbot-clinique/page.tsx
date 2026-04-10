@@ -400,6 +400,12 @@ export default function KineChatbotCliniquePage() {
           <Stethoscope className="h-3 w-3 mr-1.5" />
           {phase === 'conversation' ? 'Nouveau raisonnement' : 'Lancer un raisonnement'}
         </Button>
+        <span className="text-[11px] text-red-500 font-medium leading-tight ml-auto hidden sm:block">
+          Outil informatif uniquement — ne constitue en aucun cas un diagnostic médical
+        </span>
+        <span className="text-[10px] text-red-500 font-medium leading-tight ml-auto sm:hidden">
+          Ne constitue pas un diagnostic médical
+        </span>
       </div>
 
       <div className="max-w-6xl mx-auto px-0 sm:px-4 py-0 sm:py-4 h-[calc(100vh-180px)] flex flex-col overflow-hidden">
