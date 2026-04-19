@@ -367,7 +367,7 @@ export default function KineChatbotBiblioPage() {
   return (
     <AppLayout>
       {/* Header compact collé à gauche sous le header principal */}
-      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/40">
+      <div className="flex flex-wrap items-center gap-2 px-4 py-1.5 border-b border-border/40">
         <BookOpen className="text-[#3899aa] h-4 w-4 shrink-0" />
         <h2 className="text-sm font-medium text-[#3899aa]">IA Bibliographique</h2>
         <div className="relative group">

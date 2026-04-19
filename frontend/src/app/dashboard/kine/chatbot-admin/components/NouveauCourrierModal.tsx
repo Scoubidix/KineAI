@@ -742,11 +742,11 @@ export default function NouveauCourrierModal({
                 </div>
 
                 {/* Send buttons */}
-                <div className="flex items-center gap-3 pt-4 border-t">
+                <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t">
                   <Button
                     onClick={handleSendEmail}
                     disabled={!canSendEmail() || isSending || !editedBody.trim()}
-                    className={`flex-1 ${canSendEmail() && editedBody.trim() ? 'btn-teal' : ''}`}
+                    className={`w-full sm:flex-1 ${canSendEmail() && editedBody.trim() ? 'btn-teal' : ''}`}
                     variant={canSendEmail() && editedBody.trim() ? 'default' : 'secondary'}
                   >
                     {isSending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
@@ -757,7 +757,7 @@ export default function NouveauCourrierModal({
                     <Button
                       onClick={handleSendWhatsApp}
                       disabled={!canSendWhatsApp() || isSending || !editedBody.trim()}
-                      className={`flex-1 ${canSendWhatsApp() && editedBody.trim() ? 'btn-teal' : ''}`}
+                      className={`w-full sm:flex-1 ${canSendWhatsApp() && editedBody.trim() ? 'btn-teal' : ''}`}
                       variant={canSendWhatsApp() && editedBody.trim() ? 'default' : 'secondary'}
                     >
                       {isSending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-2" />}
