@@ -133,12 +133,12 @@ export default function TemplatesManagementModal({
     try {
       setIsSaving(true);
       const token = await getAuthToken();
-      const payload = {
+      const payload: Record<string, string> = {
         title: formTitle,
         category: formCategory,
-        subject: formSubject || null,
         body: formBody
       };
+      if (formSubject) payload.subject = formSubject;
 
       if (editingTemplate) {
         await fetch(`${apiBase}/api/templates/${editingTemplate.id}`, {
