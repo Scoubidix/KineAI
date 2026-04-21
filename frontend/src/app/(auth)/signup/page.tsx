@@ -153,7 +153,7 @@ export default function SignupPage() {
             <p className="text-sm text-gray-500">
               Cliquez sur le lien dans l'email pour activer votre compte.
               <br />
-              <span className="text-xs">Pensez à vérifier vos spams.</span>
+              <span className="text-sm font-semibold text-amber-600">⚠️ Pensez à vérifier vos spams / indésirables.</span>
             </p>
           </div>
 

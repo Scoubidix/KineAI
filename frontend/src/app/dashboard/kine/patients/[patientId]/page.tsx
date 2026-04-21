@@ -1308,16 +1308,16 @@ export default function PatientDetailPage() {
                       </div>
 
                       <div className="flex-1">
-                        <div className="flex items-center gap-8">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-8">
                           <h1 className="text-xl font-bold text-[#3899aa] leading-tight">
                             {patient.firstName} {patient.lastName.toUpperCase()}
                           </h1>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Mail className="w-3 h-3 text-[#3899aa]" />
-                              {patient.email}
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground min-w-0">
+                            <span className="flex items-center gap-1 truncate">
+                              <Mail className="w-3 h-3 text-[#3899aa] shrink-0" />
+                              <span className="truncate">{patient.email}</span>
                             </span>
-                            <span className="flex items-center gap-1">
+                            <span className="flex items-center gap-1 shrink-0">
                               <Phone className="w-3 h-3 text-[#3899aa]" />
                               {patient.phone}
                             </span>
