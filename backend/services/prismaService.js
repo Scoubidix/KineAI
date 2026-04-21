@@ -31,6 +31,7 @@ class PrismaService {
       dbUrl.searchParams.set('connection_limit', '5');  // 5 connexions pour gérer cron + requêtes users
       dbUrl.searchParams.set('pool_timeout', '30');     // 30s pour obtenir une connexion du pool
       dbUrl.searchParams.set('connect_timeout', '20');  // 20s pour établir la connexion
+      dbUrl.searchParams.set('idle_timeout', '180');    // 3min - recycle avant que Cloud SQL ne tue (~5min)
       
       prismaInstance = new PrismaClient({
         log: ['error', 'warn'], // Seulement erreurs et warnings
