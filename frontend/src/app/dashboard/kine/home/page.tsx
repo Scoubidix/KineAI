@@ -512,7 +512,7 @@ export default function KineHomePage() {
                     Votre avis compte !
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Partagez vos remarques, idées ou signalez un bug pour améliorer l'application.
+                    Partagez vos remarques ou idées pour améliorer l'application.
                   </p>
                 </div>
                 <Button
@@ -525,7 +525,7 @@ export default function KineHomePage() {
                     rel="noopener noreferrer"
                   >
                     <AlertCircle className="h-4 w-4" />
-                    Remarques / idées / Bug
+                    Remarques / idées
                   </a>
                 </Button>
               </div>
