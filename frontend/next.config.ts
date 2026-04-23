@@ -51,6 +51,14 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      {
+        source: '/api-proxy/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL}/:path*`,
+      },
+    ];
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -86,5 +94,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-// export default withSerwist(nextConfig);  // Désactivé temporairement pour debug perf
-export default nextConfig;
+export default withSerwist(nextConfig);
