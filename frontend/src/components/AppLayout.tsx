@@ -1528,7 +1528,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         {/* Bannière d'avertissement hébergement */}
         <div className="bg-amber-500 text-white px-4 py-2.5 text-center text-sm font-medium flex items-center justify-center gap-2">
           <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-          <span>Notre prestataire d&apos;hébergement expérience des soucis avec le navigateur Chrome, les pages peuvent être plus longues à charger. Le problème est en cours de résolution, merci pour votre patience.</span>
+          <span>Notre prestataire d&apos;hébergement expérimente des soucis avec le navigateur Chrome, les pages peuvent être plus longues à charger. Le problème est en cours de résolution, merci pour votre patience.</span>
         </div>
 
         {/* Contenu principal */}
