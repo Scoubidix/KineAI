@@ -41,13 +41,14 @@ import { sendPasswordReset } from "@/lib/auth-utils";
 import { useToast } from "@/hooks/use-toast"; // Test réactivé
 import { useSubscription } from "@/hooks/useSubscription";
 import { PLANS, getPlanByType } from "@/config/plans";
-import { 
-  Settings, 
-  BarChart2, 
-  Home, 
-  Users, 
-  DollarSign, 
-  Bell, 
+import {
+  Settings,
+  BarChart2,
+  Home,
+  Users,
+  DollarSign,
+  Bell,
+  AlertTriangle,
   ClipboardList, 
   LogOut, 
   Library, 
@@ -1523,6 +1524,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </div>
           </div>
         </header>
+
+        {/* Bannière d'avertissement hébergement */}
+        <div className="bg-amber-500 text-white px-4 py-2.5 text-center text-sm font-medium flex items-center justify-center gap-2">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <span>Notre prestataire d&apos;hébergement expérience des soucis avec le navigateur Chrome, les pages peuvent être plus longues à charger. Le problème est en cours de résolution, merci pour votre patience.</span>
+        </div>
 
         {/* Contenu principal */}
         <div className="relative p-4 md:p-6 lg:p-8 text-foreground overflow-x-hidden">
