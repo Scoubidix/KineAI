@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail } from 'lucide-react';
+import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface LastPayout {
@@ -44,16 +44,6 @@ interface DashboardStats {
   cancelsThisWeek: number;
   cancelsThisMonth: number;
   planChanges: PlanChange[];
-}
-
-interface UnverifiedKine {
-  id: number;
-  uid: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  planType: string | null;
-  createdAt: string;
 }
 
 interface TicketMessage {
@@ -101,11 +91,6 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Emails non vérifiés
-  const [unverifiedKines, setUnverifiedKines] = useState<UnverifiedKine[]>([]);
-  const [unverifiedLoading, setUnverifiedLoading] = useState(false);
-  const [verifyingUid, setVerifyingUid] = useState<string | null>(null);
-
   // Support state
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [ticketsLoading, setTicketsLoading] = useState(false);
@@ -132,38 +117,6 @@ export default function AdminDashboardPage() {
       setError('Impossible de charger les statistiques.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchUnverified = async () => {
-    setUnverifiedLoading(true);
-    try {
-      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/admin/dashboard/unverified-emails`);
-      if (res.ok) {
-        const json = await res.json();
-        setUnverifiedKines(json.data);
-      }
-    } catch {
-      // Silencieux
-    } finally {
-      setUnverifiedLoading(false);
-    }
-  };
-
-  const handleVerifyEmail = async (uid: string) => {
-    setVerifyingUid(uid);
-    try {
-      const res = await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL}/admin/dashboard/verify-email/${uid}`,
-        { method: 'POST' }
-      );
-      if (res.ok) {
-        setUnverifiedKines(prev => prev.filter(k => k.uid !== uid));
-      }
-    } catch {
-      // Silencieux
-    } finally {
-      setVerifyingUid(null);
     }
   };
 
@@ -224,8 +177,6 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (activeTab === 'support') {
       fetchTickets();
-    } else if (activeTab === 'emails') {
-      fetchUnverified();
     }
   }, [activeTab]);
 
@@ -273,8 +224,8 @@ export default function AdminDashboardPage() {
               <ShieldCheck className="h-6 w-6 text-primary" />
               <h1 className="text-2xl font-bold">Dashboard Admin</h1>
             </div>
-            <Button variant="outline" size="sm" onClick={activeTab === 'support' ? fetchTickets : activeTab === 'emails' ? fetchUnverified : fetchStats} disabled={loading || ticketsLoading || unverifiedLoading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${(loading || ticketsLoading || unverifiedLoading) ? 'animate-spin' : ''}`} />
+            <Button variant="outline" size="sm" onClick={activeTab === 'support' ? fetchTickets : fetchStats} disabled={loading || ticketsLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${(loading || ticketsLoading) ? 'animate-spin' : ''}`} />
               Actualiser
             </Button>
           </div>
@@ -288,15 +239,6 @@ export default function AdminDashboardPage() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value="dashboard">Statistiques</TabsTrigger>
-              <TabsTrigger value="emails" className="gap-1.5">
-                <Mail className="h-3.5 w-3.5" />
-                Emails
-                {unverifiedKines.length > 0 && (
-                  <Badge variant="destructive" className="text-[10px] px-1.5 py-0 ml-1">
-                    {unverifiedKines.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
               <TabsTrigger value="support" className="gap-1.5">
                 <MessageSquare className="h-3.5 w-3.5" />
                 Support
@@ -497,63 +439,6 @@ export default function AdminDashboardPage() {
               </Card>
             </>
           )}
-            </TabsContent>
-
-            {/* Onglet Emails non vérifiés */}
-            <TabsContent value="emails" className="space-y-4 mt-4">
-              {unverifiedLoading ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : unverifiedKines.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <MailCheck className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                  <p>Tous les emails sont verifies</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    {unverifiedKines.length} kine{unverifiedKines.length > 1 ? 's' : ''} avec email non verifie
-                  </p>
-                  {unverifiedKines.map((kine) => (
-                    <Card key={kine.uid}>
-                      <CardContent className="pt-4 pb-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm">
-                              {kine.firstName} {kine.lastName}
-                            </p>
-                            <p className="text-sm text-muted-foreground truncate">{kine.email}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              {kine.planType && (
-                                <Badge className={`text-[10px] px-1.5 py-0 ${PLAN_COLORS[kine.planType] || ''}`}>
-                                  {kine.planType}
-                                </Badge>
-                              )}
-                              <span className="text-xs text-muted-foreground">
-                                Inscrit le {new Date(kine.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </span>
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => handleVerifyEmail(kine.uid)}
-                            disabled={verifyingUid === kine.uid}
-                            className="shrink-0"
-                          >
-                            {verifyingUid === kine.uid ? (
-                              <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                            ) : (
-                              <MailCheck className="h-4 w-4 mr-1.5" />
-                            )}
-                            Valider
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
             </TabsContent>
 
             {/* Onglet Support */}

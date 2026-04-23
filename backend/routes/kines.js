@@ -7,9 +7,7 @@ const router = express.Router();
 
 const { authenticate } = require('../middleware/authenticate');
 const { validate, createKineSchema, updateKineProfileSchema } = require('../middleware/validate');
-const { avatarUploadLimiter, signupLimiter, supportTicketLimiter } = require('../middleware/rateLimiter');
-const { sendNotification } = require('../services/telegramService');
-const { sanitizeEmail } = require('../utils/logSanitizer');
+const { avatarUploadLimiter, signupLimiter } = require('../middleware/rateLimiter');
 const {
   createKine,
   getKineProfile,
@@ -77,22 +75,5 @@ router.get('/adherence/:date', authenticate, getAdherenceByDate);
 // GET /kine/patients-sessions/:date - Liste détaillée des patients et leur statut de validation
 // Exemple: GET /kine/patients-sessions/2025-07-02
 router.get('/patients-sessions/:date', authenticate, getPatientSessionsByDate);
-
-// Demande de vérification manuelle d'email
-router.post('/request-manual-verification', authenticate, supportTicketLimiter, async (req, res) => {
-  try {
-    const email = req.userEmail || 'inconnu';
-    logger.info(`Demande de vérification manuelle pour ${sanitizeEmail(email)}`);
-
-    await sendNotification(
-      `📧 <b>Demande de vérification manuelle mail demandée</b>\n\n🕐 ${new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`
-    );
-
-    res.json({ success: true });
-  } catch (error) {
-    logger.error('Erreur demande vérification manuelle', { error: error.message });
-    res.status(500).json({ success: false, error: 'Erreur lors de la demande' });
-  }
-});
 
 module.exports = router;

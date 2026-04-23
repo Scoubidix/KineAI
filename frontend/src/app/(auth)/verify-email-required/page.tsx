@@ -14,8 +14,6 @@ export default function VerifyEmailRequiredPage() {
   const [emailSent, setEmailSent] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const [checkingStatus, setCheckingStatus] = useState(false);
-  const [manualRequested, setManualRequested] = useState(false);
-  const [manualLoading, setManualLoading] = useState(false);
 
   const router = useRouter();
   const { toast } = useToast();
@@ -79,29 +77,6 @@ export default function VerifyEmailRequiredPage() {
       toast({ variant: "destructive", title: "Erreur", description: "Impossible de vérifier le statut." });
     } finally {
       setCheckingStatus(false);
-    }
-  };
-
-  const handleManualVerification = async () => {
-    setManualLoading(true);
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-      const token = await user.getIdToken();
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine/request-manual-verification`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (res.ok) {
-        setManualRequested(true);
-      }
-    } catch {
-      // Silencieux
-    } finally {
-      setManualLoading(false);
     }
   };
 
@@ -189,30 +164,6 @@ export default function VerifyEmailRequiredPage() {
             <p className="text-sm text-green-600 text-center">
               Email renvoyé ! Vérifiez votre boîte de réception.
             </p>
-          )}
-
-          {/* Demande de vérification manuelle */}
-          {manualRequested ? (
-            <div className="bg-teal-50 border border-teal-200 p-4 rounded-lg">
-              <p className="text-sm text-teal-800 text-center">
-                Nous allons vérifier votre compte manuellement, cette opération ne prend en général que quelques minutes.
-              </p>
-            </div>
-          ) : (
-            <button
-              onClick={handleManualVerification}
-              disabled={manualLoading}
-              className="w-full h-11 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              {manualLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Envoi de la demande...
-                </span>
-              ) : (
-                "Je ne reçois pas de lien"
-              )}
-            </button>
           )}
         </div>
 
