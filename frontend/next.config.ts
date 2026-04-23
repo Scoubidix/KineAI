@@ -86,4 +86,5 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSerwist(nextConfig);
+// export default withSerwist(nextConfig);  // Désactivé temporairement pour debug perf
+export default nextConfig;
