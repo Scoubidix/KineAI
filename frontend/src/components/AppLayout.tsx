@@ -48,8 +48,7 @@ import {
   Users,
   DollarSign,
   Bell,
-  AlertTriangle,
-  ClipboardList, 
+  ClipboardList,
   LogOut, 
   Library, 
   Dumbbell, 
@@ -99,6 +98,8 @@ import { RGPDDeleteModal } from './RGPDDeleteModal';
 import { PaywallModal } from './PaywallModal';
 import { SupportModal } from './SupportModal';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import LegalAcceptanceModal from './LegalAcceptanceModal';
+import { useLegalAcceptance } from '@/hooks/useLegalAcceptance';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -1130,6 +1131,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { subscription: headerSubscription } = useSubscription();
   const [isPaywallHeaderOpen, setIsPaywallHeaderOpen] = useState(false);
 
+  // Vérification acceptations légales
+  const { pendingDocuments, needsAcceptance, refresh: refreshLegalStatus } = useLegalAcceptance();
+  const [legalModalDismissed, setLegalModalDismissed] = useState(false);
+
   // Profil kiné pour l'avatar header (cache localStorage pour éviter flash)
   const [headerInitials, setHeaderInitials] = useState('');
   const [headerName, setHeaderName] = useState('');
@@ -1525,12 +1530,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
         </header>
 
-        {/* Bannière d'avertissement hébergement */}
-        <div className="bg-amber-500 text-white px-4 py-2.5 text-center text-sm font-medium flex items-center justify-center gap-2">
-          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-          <span>Notre prestataire d&apos;hébergement expérimente des soucis avec le navigateur Chrome, les pages peuvent être plus longues à charger. Le problème est en cours de résolution, merci pour votre patience.</span>
-        </div>
-
         {/* Contenu principal */}
         <div className="relative p-4 md:p-6 lg:p-8 text-foreground overflow-x-hidden">
           <div
@@ -1551,10 +1550,21 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <span className="mx-1">•</span>
             <a href="/legal/politique-confidentialite.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Confidentialité</a>
             <span className="mx-1">•</span>
+            <a href="/legal/dpa.html" target="_blank" rel="noopener noreferrer" className="hover:underline">DPA</a>
+            <span className="mx-1">•</span>
             <a href="/legal/mentions-legales.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Mentions légales</a>
           </div>
         </footer>
       </SidebarInset>
+
+      {/* Modal de réacceptation des documents légaux */}
+      {needsAcceptance && !legalModalDismissed && (
+        <LegalAcceptanceModal
+          pendingDocuments={pendingDocuments}
+          onAccepted={refreshLegalStatus}
+          onClose={() => setLegalModalDismissed(true)}
+        />
+      )}
 
       {/* PaywallModal pour le bouton Upgrade du header */}
       <PaywallModal

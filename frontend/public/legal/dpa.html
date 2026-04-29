@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contrat de Sous-traitance (DPA) - Mon Assistant Kiné</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+            background-color: #fff;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        h1 {
+            color: #1e40af;
+            font-size: 2.2em;
+            margin-bottom: 10px;
+        }
+        .version-info {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+            padding-left: 15px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        h3 {
+            color: #1f2937;
+            margin-top: 25px;
+        }
+        .plan-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: #f8fafc;
+        }
+        .plan-table th, .plan-table td {
+            border: 1px solid #e2e8f0;
+            padding: 12px;
+            text-align: left;
+        }
+        .plan-table th {
+            background-color: #1e40af;
+            color: white;
+            font-weight: bold;
+        }
+        .plan-table tr:nth-child(even) {
+            background-color: #f1f5f9;
+        }
+        .highlight-box {
+            background-color: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .warning-box {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .contact-info {
+            background-color: #f3f4f6;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 5px;
+        }
+        .legal-ref {
+            font-size: 0.9em;
+            color: #6b7280;
+            font-style: italic;
+        }
+        @media print {
+            body { font-size: 12px; }
+            .plan-table { font-size: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Contrat de Sous-traitance</h1>
+    <p style="font-size: 1.1em; color: #4b5563;">Data Processing Agreement (DPA) — Article 28 du RGPD</p>
+    <div class="version-info">
+        <strong>Version 1.0</strong><br>
+        Dernière mise à jour : 29 avril 2026<br>
+        Lien permanent : <a href="https://monassistantkine.vercel.app/legal/dpa.html">https://monassistantkine.vercel.app/legal/dpa.html</a>
+    </div>
+</div>
+
+<!-- ==================== PRÉAMBULE ==================== -->
+
+<h2>Préambule</h2>
+
+<p>Le présent Contrat de Sous-traitance (ci-après le « DPA ») est conclu entre :</p>
+
+<p><strong>Le Responsable de Traitement (ci-après « le RT ») :</strong><br>
+Le kinésithérapeute titulaire d'un compte sur la plateforme Mon Assistant Kiné, agissant dans le cadre de son activité professionnelle libérale ou en tant que représentant de sa structure d'exercice.</p>
+
+<p><strong>Le Sous-traitant (ci-après « le ST ») :</strong><br>
+<strong>Mon Assistant Kiné (SAS)</strong><br>
+SIRET : 38936059900017<br>
+Siège social : 7 Rue des Filatures, 50300 Saint-Senier-sous-Avranches<br>
+Représentée par Sylvain BAUX, Directeur Général<br>
+DPO désigné auprès de la CNIL : Valentin JEAN — monassistantkine@gmail.com</p>
+
+<div class="highlight-box">
+    <strong>Cadre juridique :</strong> Le présent DPA est établi conformément à l'article 28 du Règlement (UE) 2016/679 (RGPD) et complète les <a href="cgu.html">Conditions Générales d'Utilisation</a>. En cas de contradiction entre les CGU et le présent DPA, les dispositions du DPA prévalent pour ce qui concerne le traitement des données patients.
+</div>
+
+<!-- ==================== ARTICLE 1 ==================== -->
+
+<h2>Article 1 — Objet</h2>
+
+<p>Le présent DPA a pour objet de définir les conditions dans lesquelles le ST s'engage à effectuer, pour le compte du RT, les opérations de traitement de données à caractère personnel nécessaires au fonctionnement de la plateforme Mon Assistant Kiné.</p>
+
+<p>Le ST agit exclusivement sur instruction documentée du RT et ne traite les données patients que dans le cadre strictement nécessaire à la fourniture du service.</p>
+
+<!-- ==================== ARTICLE 2 ==================== -->
+
+<h2>Article 2 — Qualification des parties</h2>
+
+<h3>2.1 Statut mixte</h3>
+<p>Les parties reconnaissent que :</p>
+<ul>
+    <li><strong>Pour les données patients</strong> (identification, données de santé, données de communication) : le kinésithérapeute est <strong>Responsable de Traitement</strong> et Mon Assistant Kiné est <strong>Sous-traitant</strong> au sens de l'article 28 du RGPD.</li>
+    <li><strong>Pour les données propres du kinésithérapeute</strong> (compte, facturation, données techniques, logs de connexion) : Mon Assistant Kiné est <strong>Responsable de Traitement</strong>, conformément à la <a href="politique-confidentialite.html">Politique de Confidentialité</a>.</li>
+</ul>
+
+<h3>2.2 Responsabilités du RT</h3>
+<p>En sa qualité de Responsable de Traitement des données patients, le kinésithérapeute est tenu de :</p>
+<ul>
+    <li>Disposer d'une base légale pour le traitement des données de ses patients (contrat de soins, consentement éclairé)</li>
+    <li>Informer ses patients de l'utilisation de la plateforme Mon Assistant Kiné comme sous-traitant</li>
+    <li>Répondre aux demandes d'exercice de droits RGPD de ses patients, avec l'assistance du ST</li>
+    <li>S'assurer de la licéité et de la pertinence des données saisies sur la plateforme</li>
+</ul>
+
+<!-- ==================== ARTICLE 3 ==================== -->
+
+<h2>Article 3 — Durée</h2>
+
+<p>Le présent DPA prend effet à la date d'acceptation par le kinésithérapeute lors de son inscription ou de la mise à jour des documents légaux. Il reste en vigueur pendant toute la durée d'utilisation de la plateforme, y compris les périodes d'abonnement gratuit.</p>
+
+<p>Les obligations du ST relatives à la confidentialité et à la restitution ou suppression des données survivent à la fin du contrat, conformément à l'article 10 du présent DPA.</p>
+
+<!-- ==================== ARTICLE 4 ==================== -->
+
+<h2>Article 4 — Nature et finalité du traitement</h2>
+
+<h3>4.1 Finalités</h3>
+<p>Le ST traite les données patients exclusivement pour les finalités suivantes :</p>
+<ul>
+    <li>Hébergement et stockage sécurisé des données patients sur infrastructure certifiée HDS</li>
+    <li>Mise à disposition des données au kinésithérapeute via l'interface de la plateforme</li>
+    <li>Création et gestion de programmes de rééducation personnalisés</li>
+    <li>Aide à la rédaction de programmes et bilans via intelligence artificielle (données pseudonymisées)</li>
+    <li>Communication avec les patients via le chatbot intégré</li>
+    <li>Suivi de l'adhérence et validation des séances par les patients</li>
+</ul>
+
+<h3>4.2 Types de données traitées</h3>
+
+<table class="plan-table">
+    <thead>
+        <tr>
+            <th>Catégorie</th>
+            <th>Données concernées</th>
+            <th>Sensibilité</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Identification patient</strong></td>
+            <td>Prénom, nom, date de naissance, téléphone, email</td>
+            <td>Données personnelles</td>
+        </tr>
+        <tr>
+            <td><strong>Données de santé</strong></td>
+            <td>Pathologies, objectifs thérapeutiques, programmes d'exercices, bilans kinésithérapiques</td>
+            <td>Données sensibles (art. 9 RGPD)</td>
+        </tr>
+        <tr>
+            <td><strong>Données de suivi</strong></td>
+            <td>Validations de séances, niveaux de douleur, niveaux de difficulté</td>
+            <td>Données sensibles (art. 9 RGPD)</td>
+        </tr>
+        <tr>
+            <td><strong>Données de communication</strong></td>
+            <td>Messages échangés via le chatbot patient</td>
+            <td>Données personnelles</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>4.3 Catégories de personnes concernées</h3>
+<p>Les patients du kinésithérapeute utilisant la plateforme Mon Assistant Kiné.</p>
+
+<!-- ==================== ARTICLE 5 ==================== -->
+
+<h2>Article 5 — Obligations du Sous-traitant</h2>
+
+<h3>5.1 Instructions documentées</h3>
+<p>Le ST s'engage à traiter les données patients uniquement sur instruction documentée du RT, y compris en ce qui concerne les transferts de données vers un pays tiers. Si le ST estime qu'une instruction constitue une violation du RGPD, il en informe immédiatement le RT.</p>
+
+<h3>5.2 Confidentialité</h3>
+<p>Le ST s'assure que les personnes autorisées à traiter les données patients se sont engagées à respecter la confidentialité ou sont soumises à une obligation légale appropriée de confidentialité. L'accès aux données patients est strictement limité au personnel technique nécessaire à la maintenance et au bon fonctionnement de la plateforme.</p>
+
+<h3>5.3 Mesures de sécurité (article 32 RGPD)</h3>
+<p>Le ST met en œuvre les mesures techniques et organisationnelles suivantes :</p>
+
+<p><strong>Chiffrement :</strong></p>
+<ul>
+    <li>Chiffrement en transit : TLS 1.2+ sur toutes les communications</li>
+    <li>Chiffrement au repos : chiffrement des bases de données (géré par Clever Cloud)</li>
+</ul>
+
+<p><strong>Contrôle d'accès :</strong></p>
+<ul>
+    <li>Authentification Firebase avec vérification d'email obligatoire</li>
+    <li>Tokens JWT avec expiration automatique</li>
+    <li>Vérification systématique de l'ownership (un kinésithérapeute n'accède qu'à ses propres patients)</li>
+    <li>Rate limiting à 7 niveaux pour prévenir les abus</li>
+</ul>
+
+<p><strong>Journalisation :</strong></p>
+<ul>
+    <li>Logs d'accès et d'opérations avec sanitization des données personnelles</li>
+    <li>Traçabilité des acceptations légales (horodatage, IP, version du document)</li>
+</ul>
+
+<p><strong>Sauvegardes :</strong></p>
+<ul>
+    <li>Sauvegardes automatiques quotidiennes de la base de données</li>
+    <li>Rétention des sauvegardes selon la politique de Clever Cloud</li>
+</ul>
+
+<p><strong>Pseudonymisation pour l'IA :</strong></p>
+<ul>
+    <li>Les données transmises aux modèles d'intelligence artificielle font l'objet d'une pseudonymisation rigoureuse préalable</li>
+    <li>Aucun nom, prénom, adresse ou identifiant direct n'est transmis aux fournisseurs d'IA</li>
+    <li>Seules les informations strictement nécessaires à l'assistance rédactionnelle sont communiquées (âge, pathologie, objectifs)</li>
+</ul>
+
+<div class="warning-box">
+    <strong>Précision importante :</strong> La pseudonymisation n'est pas une anonymisation au sens du RGPD. Les données pseudonymisées restent des données personnelles et sont traitées comme telles. Le kinésithérapeute conserve les éléments permettant la ré-identification de ses patients.
+</div>
+
+<h3>5.4 Assistance au Responsable de Traitement</h3>
+<p>Le ST assiste le RT, dans la mesure du possible, par des mesures techniques et organisationnelles appropriées, pour :</p>
+<ul>
+    <li>Répondre aux demandes d'exercice des droits des patients (articles 12 à 22 du RGPD) : accès, rectification, effacement, portabilité, limitation, opposition</li>
+    <li>Réaliser les analyses d'impact relatives à la protection des données (DPIA) lorsque nécessaire</li>
+    <li>Assurer la consultation préalable de la CNIL si une DPIA révèle un risque résiduel élevé</li>
+</ul>
+
+<p>Le RT peut exercer les droits RGPD de ses patients directement depuis la plateforme (export de données, suppression de compte patient) ou en contactant le DPO du ST.</p>
+
+<h3>5.5 Notification des violations de données</h3>
+<p>En cas de violation de données à caractère personnel concernant les données patients, le ST s'engage à :</p>
+<ul>
+    <li><strong>Notifier le RT dans un délai de 24 heures</strong> après en avoir pris connaissance, par email à l'adresse du kinésithérapeute enregistrée sur la plateforme</li>
+    <li>Fournir les informations suivantes : nature de la violation, catégories et nombre de personnes concernées, conséquences probables, mesures prises ou proposées</li>
+    <li>Assister le RT dans sa notification à la CNIL (dans les 72 heures) et, le cas échéant, aux personnes concernées</li>
+    <li>Documenter toute violation dans un registre interne conformément à l'article 33.5 du RGPD</li>
+</ul>
+
+<!-- ==================== ARTICLE 6 ==================== -->
+
+<h2>Article 6 — Sous-traitance ultérieure</h2>
+
+<h3>6.1 Liste des sous-traitants ultérieurs</h3>
+<p>Le RT autorise le ST à recourir aux sous-traitants ultérieurs suivants, nécessaires au fonctionnement de la plateforme :</p>
+
+<table class="plan-table">
+    <thead>
+        <tr>
+            <th>Sous-traitant</th>
+            <th>Rôle</th>
+            <th>Localisation</th>
+            <th>Garanties</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Clever Cloud</strong></td>
+            <td>Hébergement infrastructure, base de données PostgreSQL, stockage fichiers</td>
+            <td>France (Union Européenne)</td>
+            <td>Certifié HDS (Hébergeur de Données de Santé), ISO 27001</td>
+        </tr>
+        <tr>
+            <td><strong>OpenAI</strong></td>
+            <td>Génération IA (programmes, chatbot, bilans) — données pseudonymisées uniquement</td>
+            <td>États-Unis</td>
+            <td>DPA signé, EU-US Data Privacy Framework, données non utilisées pour l'entraînement des modèles</td>
+        </tr>
+        <tr>
+            <td><strong>Stripe</strong></td>
+            <td>Traitement des paiements par carte bancaire</td>
+            <td>Irlande (Union Européenne)</td>
+            <td>PCI DSS Level 1, certifié SOC 2</td>
+        </tr>
+        <tr>
+            <td><strong>Firebase Authentication (Google)</strong></td>
+            <td>Authentification des kinésithérapeutes</td>
+            <td>Union Européenne</td>
+            <td>ISO 27001, SOC 2, Google DPA</td>
+        </tr>
+        <tr>
+            <td><strong>Vercel</strong></td>
+            <td>Hébergement du frontend statique (interface web)</td>
+            <td>États-Unis</td>
+            <td>Aucun accès aux données patients — hébergement de fichiers statiques uniquement</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="highlight-box">
+    <strong>Transferts hors UE :</strong> Les données pseudonymisées transmises à OpenAI (États-Unis) sont protégées par le EU-US Data Privacy Framework et les Clauses Contractuelles Types (CCT). Les données ne sont pas utilisées pour l'entraînement des modèles et ne sont pas stockées au-delà du traitement de la requête. Vercel n'a accès à aucune donnée patient (hébergement statique uniquement).
+</div>
+
+<h3>6.2 Obligations relatives aux sous-traitants ultérieurs</h3>
+<p>Le ST s'engage à :</p>
+<ul>
+    <li>Imposer à chaque sous-traitant ultérieur, par voie contractuelle, les mêmes obligations de protection des données que celles prévues au présent DPA</li>
+    <li>Rester pleinement responsable devant le RT de l'exécution des obligations par ses sous-traitants ultérieurs</li>
+    <li>Vérifier régulièrement que les garanties de ses sous-traitants ultérieurs sont maintenues</li>
+</ul>
+
+<h3>6.3 Modification de la liste des sous-traitants</h3>
+<p>En cas d'ajout ou de remplacement d'un sous-traitant ultérieur :</p>
+<ul>
+    <li>Le ST informe le RT par email avec un <strong>préavis de 30 jours</strong></li>
+    <li>Le RT dispose d'un délai de 15 jours pour émettre des objections motivées</li>
+    <li>En cas d'objection légitime non résolue, le RT peut résilier le contrat sans pénalité</li>
+</ul>
+
+<!-- ==================== ARTICLE 7 ==================== -->
+
+<h2>Article 7 — Localisation et transferts de données</h2>
+
+<h3>7.1 Localisation principale</h3>
+<p>Les données patients sont stockées en <strong>France</strong>, sur l'infrastructure Clever Cloud, certifiée Hébergeur de Données de Santé (HDS).</p>
+
+<h3>7.2 Transferts vers les États-Unis</h3>
+<p>Des transferts de données pseudonymisées sont effectués vers les États-Unis uniquement pour la génération par intelligence artificielle (OpenAI). Ces transferts sont encadrés par :</p>
+<ul>
+    <li>Le <strong>EU-US Data Privacy Framework</strong> (décision d'adéquation de la Commission Européenne du 10 juillet 2023)</li>
+    <li>Les <strong>Clauses Contractuelles Types</strong> (CCT) de la Commission Européenne</li>
+    <li>La <strong>pseudonymisation préalable</strong> des données (aucune donnée directement identifiante n'est transmise)</li>
+    <li>La <strong>non-utilisation des données pour l'entraînement</strong> des modèles et l'absence de stockage au-delà du traitement</li>
+</ul>
+
+<!-- ==================== ARTICLE 8 ==================== -->
+
+<h2>Article 8 — Audits</h2>
+
+<h3>8.1 Droit d'audit</h3>
+<p>Le ST met à la disposition du RT toutes les informations nécessaires pour démontrer le respect des obligations prévues au présent DPA et pour permettre la réalisation d'audits.</p>
+
+<h3>8.2 Modalités pratiques</h3>
+<p>L'audit peut prendre la forme de :</p>
+<ul>
+    <li>Mise à disposition des certifications et attestations des sous-traitants ultérieurs (HDS Clever Cloud, ISO 27001, PCI DSS Stripe, DPA OpenAI)</li>
+    <li>Réponse à un questionnaire écrit de conformité, dans un délai de 30 jours</li>
+    <li>Audit sur site ou à distance, sur demande motivée du RT, avec un préavis de 30 jours et à la charge du RT</li>
+</ul>
+
+<p>Le ST informera immédiatement le RT s'il estime qu'une instruction d'audit viole le RGPD ou d'autres dispositions applicables.</p>
+
+<!-- ==================== ARTICLE 9 ==================== -->
+
+<h2>Article 9 — Responsabilité</h2>
+
+<h3>9.1 Responsabilité du ST</h3>
+<p>Le ST est responsable des dommages causés par un traitement qu'il a effectué en violation du présent DPA ou du RGPD, ou lorsqu'il a agi en dehors des instructions licites du RT.</p>
+
+<h3>9.2 Limitation de responsabilité</h3>
+<p>La responsabilité financière du ST au titre du présent DPA est limitée conformément aux dispositions des <a href="cgv.html">Conditions Générales de Vente</a>. Cette limitation ne s'applique pas en cas de faute intentionnelle ou de négligence grave du ST.</p>
+
+<!-- ==================== ARTICLE 10 ==================== -->
+
+<h2>Article 10 — Sort des données en fin de contrat</h2>
+
+<h3>10.1 Restitution</h3>
+<p>À la fin du contrat (résiliation, suppression de compte), le RT peut demander la restitution de l'ensemble des données patients dans un format structuré, couramment utilisé et lisible par machine (export JSON), via la fonctionnalité d'export RGPD intégrée à la plateforme ou sur demande au DPO.</p>
+
+<h3>10.2 Suppression</h3>
+<p>À défaut de demande de restitution, le ST procède à la suppression certifiée de toutes les données patients dans un <strong>délai de 30 jours</strong> suivant la fin du contrat, sauf obligation légale de conservation.</p>
+
+<h3>10.3 Attestation</h3>
+<p>Le ST fournit au RT, sur demande, une attestation de suppression des données.</p>
+
+<!-- ==================== ARTICLE 11 ==================== -->
+
+<h2>Article 11 — Dispositions générales</h2>
+
+<h3>11.1 Droit applicable</h3>
+<p>Le présent DPA est soumis au droit français et au Règlement (UE) 2016/679 (RGPD).</p>
+
+<h3>11.2 Juridiction compétente</h3>
+<p>En cas de litige relatif à l'interprétation ou à l'exécution du présent DPA, les tribunaux de Coutances (50200) seront seuls compétents.</p>
+
+<h3>11.3 Modification du DPA</h3>
+<p>Toute modification du présent DPA fera l'objet d'une nouvelle version, notifiée au RT via la plateforme. L'acceptation de la nouvelle version sera requise pour la poursuite de l'utilisation du service.</p>
+
+<h3>11.4 Nullité partielle</h3>
+<p>Si une clause du présent DPA était déclarée nulle ou inapplicable, les autres clauses resteraient pleinement en vigueur.</p>
+
+<h3>11.5 Documents contractuels</h3>
+<p>Le présent DPA complète les documents suivants, qui forment ensemble le cadre contractuel :</p>
+<ul>
+    <li><a href="cgu.html">Conditions Générales d'Utilisation (CGU)</a></li>
+    <li><a href="cgv.html">Conditions Générales de Vente (CGV)</a></li>
+    <li><a href="politique-confidentialite.html">Politique de Confidentialité</a></li>
+    <li><a href="mentions-legales.html">Mentions Légales</a></li>
+</ul>
+
+<div class="contact-info">
+    <h3>Contact DPO</h3>
+    <p>
+        Pour toute question relative au présent Contrat de Sous-traitance :<br><br>
+        <strong>Valentin JEAN</strong> — Délégué à la Protection des Données<br>
+        📧 <strong>monassistantkine@gmail.com</strong><br>
+        📍 <strong>7 Rue des Filatures, 50300 Saint-Senier-sous-Avranches</strong>
+    </p>
+</div>
+
+<hr>
+
+<p style="text-align: center; font-size: 0.9em; color: #666; margin-top: 30px;">
+    <em>Ce Contrat de Sous-traitance est effectif depuis le 29 avril 2026</em><br>
+    <strong>Mon Assistant Kiné (SAS) - SIRET : 38936059900017</strong>
+</p>
+
+</body>
+</html>

@@ -87,9 +87,18 @@
 
         .form-row .line {
             flex: 1;
+            border: none;
             border-bottom: 1px solid #333;
             min-width: 200px;
-            height: 20px;
+            height: 24px;
+            font-size: 15px;
+            font-family: inherit;
+            padding: 2px 4px;
+            outline: none;
+        }
+
+        .form-row .line:focus {
+            border-bottom: 2px solid #2563eb;
         }
 
         .checkbox-group {
@@ -229,7 +238,7 @@
     </style>
 </head>
 <body>
-    <button class="print-button no-print" onclick="window.print()">🖨️ Imprimer</button>
+    <button class="print-button no-print" onclick="window.print()">Imprimer</button>
 
     <div class="document">
         <h1>FORMULAIRE DE CONSENTEMENT PATIENT</h1>
@@ -246,32 +255,27 @@
 
             <div class="form-row">
                 <label>Nom :</label>
-                <div class="line"></div>
+                <input type="text" class="line" />
             </div>
 
             <div class="form-row">
                 <label>Prénom :</label>
-                <div class="line"></div>
+                <input type="text" class="line" />
             </div>
 
             <div class="form-row">
                 <label>Date de naissance :</label>
-                <div class="line"></div>
-            </div>
-
-            <div class="form-row">
-                <label>Adresse :</label>
-                <div class="line"></div>
+                <input type="text" class="line" placeholder="JJ/MM/AAAA" />
             </div>
 
             <div class="form-row">
                 <label>Téléphone :</label>
-                <div class="line"></div>
+                <input type="text" class="line" />
             </div>
 
             <div class="form-row">
                 <label>Email :</label>
-                <div class="line"></div>
+                <input type="text" class="line" />
             </div>
         </div>
 
@@ -284,10 +288,9 @@
         <h3>2.2 Finalités du traitement</h3>
         <p>Vos données personnelles sont collectées et traitées pour les finalités suivantes :</p>
         <ul>
-            <li>Assurer votre prise en charge kinésithérapique (rendez-vous, programmes d'exercices, suivi thérapeutique)</li>
+            <li>Assurer votre prise en charge kinésithérapique (programmes d'exercices, suivi thérapeutique)</li>
             <li>Gérer votre dossier patient (historique des séances, bilans, objectifs thérapeutiques)</li>
-            <li>Facturer les actes réalisés et gérer les relations avec l'Assurance Maladie</li>
-            <li>Vous adresser des communications liées à votre traitement (rappels de rendez-vous, consignes, informations administratives)</li>
+            <li>Vous adresser des communications liées à votre traitement (consignes, informations administratives)</li>
             <li>Respecter les obligations légales et réglementaires</li>
         </ul>
 
@@ -295,29 +298,27 @@
         <p>Le traitement de vos données repose sur :</p>
         <ul>
             <li>L'exécution d'un contrat de soins (prise en charge thérapeutique)</li>
-            <li>Le respect d'obligations légales (facturation, conservation des dossiers médicaux)</li>
+            <li>Le respect d'obligations légales (conservation des dossiers médicaux)</li>
             <li>Votre consentement pour les communications non strictement nécessaires</li>
         </ul>
 
         <h3>2.4 Données collectées</h3>
         <p>Les données collectées comprennent :</p>
         <ul>
-            <li><strong>Données d'identification :</strong> nom, prénom, date de naissance, adresse, téléphone, email</li>
-            <li><strong>Données de santé :</strong> antécédents, pathologies, bilans kinésithérapiques, programmes d'exercices, évolution thérapeutique</li>
-            <li><strong>Données administratives :</strong> numéro de sécurité sociale, carte Vitale, ordonnances médicales, factures</li>
+            <li><strong>Données d'identification :</strong> nom, prénom, date de naissance, téléphone, email</li>
+            <li><strong>Données de santé :</strong> pathologies, bilans kinésithérapiques, programmes d'exercices, évolution thérapeutique</li>
             <li><strong>Contenus visuels :</strong> vidéos et images vous représentant, utilisées exclusivement dans le cadre de votre prise en charge thérapeutique (démonstration d'exercices personnalisés, suivi de votre évolution)</li>
         </ul>
 
         <h3>2.5 Durée de conservation</h3>
-        <p><strong>Vos données personnelles sont conservées pendant une durée de 10 ans</strong> à compter de la dernière consultation, conformément aux recommandations de l'Ordre des Masseurs-Kinésithérapeutes et aux obligations légales en matière de conservation des dossiers médicaux.</p>
+        <p><strong>Vos données personnelles sont conservées pendant une durée de 20 ans</strong> à compter de la dernière consultation, conformément à l'article R.1112-7 du Code de santé publique et aux obligations légales en matière de conservation des dossiers médicaux.</p>
 
         <h3>2.6 Destinataires des données</h3>
         <p>Vos données peuvent être communiquées aux destinataires suivants :</p>
         <ul>
             <li>Médecins prescripteurs (pour les comptes-rendus de prise en charge)</li>
-            <li>Organismes de sécurité sociale et mutuelles (pour la facturation)</li>
             <li>Autorités sanitaires (en cas d'obligation légale)</li>
-            <li>Prestataires techniques hébergeurs de l'application (sous engagement de confidentialité)</li>
+            <li><strong>Mon Assistant Kiné</strong> (SAS, SIRET 38936059900017), agissant en qualité de sous-traitant de votre kinésithérapeute au sens de l'article 28 du RGPD, pour la gestion de votre dossier et la création de programmes thérapeutiques personnalisés. Vos données sont hébergées en France (Clever Cloud, certifié HDS) et chiffrées. Les données transmises aux outils d'intelligence artificielle font l'objet d'une pseudonymisation préalable. Vous pouvez exercer vos droits RGPD auprès de votre kinésithérapeute (responsable de traitement) ou directement auprès du DPO de Mon Assistant Kiné à l'adresse <a href="mailto:monassistantkine@gmail.com">monassistantkine@gmail.com</a>.</li>
         </ul>
 
         <h3>2.7 Sécurité des données</h3>
@@ -340,7 +341,7 @@
         <p><strong>Pour exercer vos droits</strong>, vous pouvez contacter le cabinet par email ou courrier postal. Une réponse vous sera apportée dans un délai d'un mois.</p>
 
         <div class="important">
-            <strong>⚠️ Important :</strong> En cas de difficulté ou de litige, vous avez le droit d'introduire une réclamation auprès de la Commission Nationale de l'Informatique et des Libertés (CNIL) - <a href="https://www.cnil.fr">www.cnil.fr</a>
+            En cas de difficulté ou de litige, vous avez le droit d'introduire une réclamation auprès de la Commission Nationale de l'Informatique et des Libertés (CNIL) - <a href="https://www.cnil.fr">www.cnil.fr</a>
         </div>
 
         <!-- SECTION 4: CONSENTEMENTS SPÉCIFIQUES -->
@@ -350,39 +351,39 @@
 
         <div class="checkbox-group">
             <div class="checkbox-item">
-                <input type="checkbox" id="consent-traitement" disabled>
+                <input type="checkbox" id="consent-traitement">
                 <label for="consent-traitement">
-                    <strong>☐ J'accepte</strong> que mes données personnelles et de santé soient collectées et traitées par le cabinet de kinésithérapie dans le cadre de ma prise en charge thérapeutique, conformément aux finalités décrites ci-dessus.
+                    <strong>J'accepte</strong> que mes données personnelles et de santé soient collectées et traitées par le cabinet de kinésithérapie dans le cadre de ma prise en charge thérapeutique, conformément aux finalités décrites ci-dessus.
                     <br><em style="color: #64748b; font-size: 14px;">(Ce consentement est obligatoire pour votre prise en charge)</em>
                 </label>
             </div>
 
             <div class="checkbox-item">
-                <input type="checkbox" id="consent-email" disabled>
+                <input type="checkbox" id="consent-email">
                 <label for="consent-email">
-                    <strong>☐ J'accepte</strong> de recevoir des communications par <strong>email</strong> liées à mon traitement (rappels de rendez-vous, consignes thérapeutiques, informations administratives, demandes de documents, alertes).
+                    <strong>J'accepte</strong> de recevoir des communications par <strong>email</strong> liées à mon traitement (consignes thérapeutiques, informations administratives, demandes de documents, alertes).
                 </label>
             </div>
 
             <div class="checkbox-item">
-                <input type="checkbox" id="consent-whatsapp" disabled>
+                <input type="checkbox" id="consent-whatsapp">
                 <label for="consent-whatsapp">
-                    <strong>☐ J'accepte</strong> de recevoir des communications par <strong>WhatsApp</strong> liées à mon traitement (rappels de rendez-vous, consignes thérapeutiques, informations administratives).
-                    <br><em style="color: #64748b; font-size: 14px;">Note : Les communications WhatsApp sont réservées aux messages non-médicaux de gestion de rendez-vous et informations pratiques.</em>
+                    <strong>J'accepte</strong> de recevoir des communications par <strong>WhatsApp</strong> liées à mon traitement (consignes thérapeutiques, informations administratives).
+                    <br><em style="color: #64748b; font-size: 14px;">Note : Les communications WhatsApp sont réservées aux messages non-médicaux et informations pratiques.</em>
                 </label>
             </div>
 
             <div class="checkbox-item">
-                <input type="checkbox" id="consent-video" disabled>
+                <input type="checkbox" id="consent-video">
                 <label for="consent-video">
-                    <strong>☐ J'accepte</strong> que des <strong>vidéos et images me représentant</strong> soient enregistrées et utilisées exclusivement dans le cadre de ma prise en charge thérapeutique (démonstration d'exercices personnalisés, suivi de mon évolution, programmes de rééducation).
+                    <strong>J'accepte</strong> que des <strong>vidéos et images me représentant</strong> soient enregistrées et utilisées exclusivement dans le cadre de ma prise en charge thérapeutique (démonstration d'exercices personnalisés, suivi de mon évolution, programmes de rééducation).
                     <br><em style="color: #64748b; font-size: 14px;">Ces contenus sont strictement confidentiels, stockés de manière sécurisée et ne seront jamais diffusés à des tiers sans mon accord explicite.</em>
                 </label>
             </div>
         </div>
 
         <div class="important">
-            <strong>📌 Précision importante :</strong> Vous pouvez retirer votre consentement pour les communications par email ou WhatsApp à tout moment en contactant le cabinet. Ce retrait n'affectera pas la poursuite de votre prise en charge thérapeutique.
+            Vous pouvez retirer votre consentement pour les communications par email ou WhatsApp à tout moment en contactant le cabinet. Ce retrait n'affectera pas la poursuite de votre prise en charge thérapeutique.
         </div>
 
         <!-- SECTION 5: DÉCLARATION ET SIGNATURES -->
@@ -401,18 +402,18 @@
             <div class="signature-box">
                 <p>Signature du Patient</p>
                 <p style="font-size: 14px; color: #64748b;">(Précédée de la mention "Lu et approuvé")</p>
-                <div class="signature-space"></div>
+                <div class="signature-space" contenteditable="true" style="cursor: text;"></div>
                 <div class="date">
-                    <p>Date : ____________________</p>
+                    <p>Date : <input type="date" style="border: none; border-bottom: 1px solid #333; font-family: inherit; font-size: 14px; outline: none;" /></p>
                 </div>
             </div>
 
             <div class="signature-box">
                 <p>Signature du Praticien</p>
                 <p style="font-size: 14px; color: #64748b;">(Masseur-Kinésithérapeute)</p>
-                <div class="signature-space"></div>
+                <div class="signature-space" contenteditable="true" style="cursor: text;"></div>
                 <div class="date">
-                    <p>Date : ____________________</p>
+                    <p>Date : <input type="date" style="border: none; border-bottom: 1px solid #333; font-family: inherit; font-size: 14px; outline: none;" /></p>
                 </div>
             </div>
         </div>
@@ -424,8 +425,13 @@
     </div>
 
     <script>
-        // Fonction pour imprimer automatiquement au chargement (optionnel)
-        // window.onload = function() { window.print(); }
+        // Pré-remplir les dates de signature avec la date du jour
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.querySelectorAll('input[type="date"]').forEach(function(input) {
+                input.value = today;
+            });
+        });
     </script>
 </body>
 </html>

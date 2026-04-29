@@ -99,6 +99,9 @@ const supportRoutes = require('./routes/support');
 // 📋 BILANS : Import des routes bilans
 const bilansRoutes = require('./routes/bilans');
 
+// ⚖️ LEGAL : Import des routes acceptations legales
+const legalAcceptancesRoutes = require('./routes/legalAcceptances');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -594,6 +597,9 @@ app.use('/api/rgpd', (req, res, next) => {
   // ✅ Autres routes RGPD (téléchargement, stats) : LIBRES
   next();
 }, rgpdRoutes);
+
+// ⚖️ LEGAL : Acceptations documents legaux — rate limiting selectif dans le routeur
+app.use('/api/legal-acceptances', legalAcceptancesRoutes);
 
 // 🎁 PARRAINAGE : Routes de parrainage — 🚦 30 ecritures/min (GET libre)
 app.use('/api/referral', crudWriteLimiter, referralRoutes);

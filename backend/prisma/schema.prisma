@@ -77,6 +77,10 @@ model Kine {
   // ========== RELATION BILANS ==========
   bilans BilanKine[]
   // =====================================
+
+  // ========== RELATION TRAÇABILITÉ LÉGALE ==========
+  legalAcceptances LegalAcceptance[]
+  // =================================================
 }
 
 model Patient {
@@ -601,6 +605,23 @@ enum TicketStatus {
 }
 
 // =========================================
+
+// ========== TRAÇABILITÉ LÉGALE ==========
+
+model LegalAcceptance {
+  id              Int      @id @default(autoincrement())
+  kineId          Int
+  kine            Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  documentType    String   @db.VarChar(50) // "CGU", "POLITIQUE_CONFIDENTIALITE", "DPA"
+  documentVersion String   @db.VarChar(10) // "1.0", "2.0", "3.0"
+  acceptedAt      DateTime @default(now())
+  ipAddress       String? // IP au moment de l'acceptation (audit trail RGPD)
+
+  @@index([kineId, documentType])
+  @@map("legal_acceptances")
+}
+
+// =============================================
 
 // ========== BILANS KINÉSITHÉRAPIQUES ==========
 

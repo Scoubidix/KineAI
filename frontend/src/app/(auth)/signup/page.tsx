@@ -26,6 +26,7 @@ export default function SignupPage() {
   const [resendLoading, setResendLoading] = useState(false);
   const [acceptedCgu, setAcceptedCgu] = useState(false);
   const [acceptedPolitiqueConfidentialite, setAcceptedPolitiqueConfidentialite] = useState(false);
+  const [acceptedDpa, setAcceptedDpa] = useState(false);
 
   const router = useRouter();
   const { toast } = useToast();
@@ -87,11 +88,12 @@ export default function SignupPage() {
       const user = userCredential.user;
 
       const now = new Date().toISOString();
+      const token = await user.getIdToken();
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${await user.getIdToken()}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           uid: user.uid,
@@ -101,8 +103,8 @@ export default function SignupPage() {
           website,
           acceptedCguAt: acceptedCgu ? now : null,
           acceptedPolitiqueConfidentialiteAt: acceptedPolitiqueConfidentialite ? now : null,
-          cguVersion: acceptedCgu ? "2.0" : null,
-          politiqueConfidentialiteVersion: acceptedPolitiqueConfidentialite ? "1.0" : null,
+          cguVersion: acceptedCgu ? "3.0" : null,
+          politiqueConfidentialiteVersion: acceptedPolitiqueConfidentialite ? "3.0" : null,
         }),
       });
 
@@ -110,6 +112,22 @@ export default function SignupPage() {
         const errorData = await response.json();
         throw new Error(errorData.error || "Erreur lors de la création du profil");
       }
+
+      // Enregistrer les acceptations dans la table legal_acceptances
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/legal-acceptances`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          acceptances: [
+            { documentType: "CGU", version: "3.0" },
+            { documentType: "POLITIQUE_CONFIDENTIALITE", version: "3.0" },
+            { documentType: "DPA", version: "1.0" },
+          ],
+        }),
+      });
 
       const emailResult = await sendEmailVerification(user);
       if (emailResult.success) {
@@ -190,6 +208,8 @@ export default function SignupPage() {
               <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer" className="hover:underline">CGU</a>
               {" • "}
               <a href="/legal/politique-confidentialite.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Politique de confidentialité</a>
+              {" • "}
+              <a href="/legal/dpa.html" target="_blank" rel="noopener noreferrer" className="hover:underline">DPA</a>
               {" • "}
               <a href="/legal/mentions-legales.html" target="_blank" rel="noopener noreferrer" className="hover:underline">Mentions légales</a>
             </p>
@@ -359,12 +379,31 @@ export default function SignupPage() {
                 <span className="text-red-500 ml-1">*</span>
               </label>
             </div>
+
+            <div className="flex items-start space-x-3">
+              <input
+                type="checkbox"
+                id="acceptDpa"
+                checked={acceptedDpa}
+                onChange={(e) => setAcceptedDpa(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
+                required
+                disabled={loading}
+              />
+              <label htmlFor="acceptDpa" className="text-sm text-gray-700 cursor-pointer">
+                J'ai lu et j'accepte le{" "}
+                <a href="/legal/dpa.html" target="_blank" rel="noopener noreferrer" className="text-teal-600 underline hover:text-teal-800">
+                  Contrat de Sous-traitance (DPA)
+                </a>
+                <span className="text-red-500 ml-1">*</span>
+              </label>
+            </div>
           </div>
 
           {/* Bouton Créer mon compte */}
           <button
             type="submit"
-            disabled={loading || !passwordValidation.isValid || !acceptedCgu || !acceptedPolitiqueConfidentialite}
+            disabled={loading || !passwordValidation.isValid || !acceptedCgu || !acceptedPolitiqueConfidentialite || !acceptedDpa}
             className="btn-teal w-full h-11 rounded-lg text-sm font-medium disabled:opacity-50"
           >
             {loading ? (
