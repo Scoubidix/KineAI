@@ -1,5 +1,7 @@
 {
   "scripts": {
+    "start": "prisma migrate deploy && node index.js",
+    "postinstall": "prisma generate",
     "test": "jest --verbose",
     "test:watch": "jest --watch --verbose"
   },
