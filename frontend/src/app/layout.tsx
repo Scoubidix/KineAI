@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { UserProvider } from '@/context/UserContext'; // ✅ Import du contexte utilisateur
+import Analytics from '@/components/Analytics';
+import CookieBanner from '@/components/CookieBanner';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -39,6 +41,7 @@ export default function RootLayout({
           inter.variable
         )}
       >
+        <Analytics />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -48,6 +51,7 @@ export default function RootLayout({
           <UserProvider> {/* ✅ Contexte utilisateur ajouté ici */}
             {children}
             <Toaster />
+            <CookieBanner />
           </UserProvider>
         </ThemeProvider>
       </body>

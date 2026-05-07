@@ -104,7 +104,7 @@ export default function SignupPage() {
           acceptedCguAt: acceptedCgu ? now : null,
           acceptedPolitiqueConfidentialiteAt: acceptedPolitiqueConfidentialite ? now : null,
           cguVersion: acceptedCgu ? "3.0" : null,
-          politiqueConfidentialiteVersion: acceptedPolitiqueConfidentialite ? "3.0" : null,
+          politiqueConfidentialiteVersion: acceptedPolitiqueConfidentialite ? "3.1" : null,
         }),
       });
 
@@ -123,7 +123,7 @@ export default function SignupPage() {
         body: JSON.stringify({
           acceptances: [
             { documentType: "CGU", version: "3.0" },
-            { documentType: "POLITIQUE_CONFIDENTIALITE", version: "3.0" },
+            { documentType: "POLITIQUE_CONFIDENTIALITE", version: "3.1" },
             { documentType: "DPA", version: "1.0" },
           ],
         }),
@@ -135,6 +135,10 @@ export default function SignupPage() {
         toast({ title: "Compte créé avec succès !", description: `Bienvenue ${firstName}. Un email de vérification a été envoyé.` });
       } else {
         toast({ title: "Compte créé", description: `Bienvenue ${firstName}. Problème d'envoi de l'email de vérification.`, variant: "destructive" });
+      }
+
+      if (typeof window !== "undefined" && typeof window.gtag === "function") {
+        window.gtag("event", "sign_up", { method: "email" });
       }
 
       setSignupComplete(true);

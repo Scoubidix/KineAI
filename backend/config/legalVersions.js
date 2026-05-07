@@ -5,6 +5,6 @@
 
 module.exports = {
   CGU: '3.0',
-  POLITIQUE_CONFIDENTIALITE: '3.0',
+  POLITIQUE_CONFIDENTIALITE: '3.1',
   DPA: '1.0'
 };

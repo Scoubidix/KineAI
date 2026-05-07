@@ -188,17 +188,42 @@
 
 <h2>Cookies</h2>
 
-<p>Pour les informations détaillées sur l'utilisation des cookies (notamment ceux de nos prestataires de paiement), consultez notre <strong>Politique des cookies</strong> disponible sur la plateforme.</p>
+<p>Pour les informations détaillées sur l'utilisation des cookies, consultez notre <a href="politique-confidentialite.html">Politique de confidentialité</a>.</p>
 
 <div class="info-box">
     <p><strong>Notre approche cookies :</strong></p>
     <ul>
-        <li>Utilisation minimale des cookies</li>
         <li>Cookies strictement nécessaires au fonctionnement</li>
         <li>Cookies de paiement sécurisé (Stripe)</li>
-        <li>Pas de cookies publicitaires ou de tracking</li>
+        <li>Cookies de mesure d'audience (Google Analytics 4) — soumis à votre consentement explicite</li>
+        <li>Pas de cookies publicitaires ni de profilage commercial</li>
     </ul>
 </div>
+
+<div class="highlight-box">
+    <p><strong>Gérer mes cookies</strong></p>
+    <p>Vous pouvez à tout moment modifier vos préférences concernant les cookies de mesure d'audience.</p>
+    <p>
+        <a href="#" id="manage-cookies-link" style="display: inline-block; background-color: #2563eb; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 10px;">Gérer mes cookies</a>
+    </p>
+</div>
+
+<script>
+    document.getElementById('manage-cookies-link').addEventListener('click', function(e) {
+        e.preventDefault();
+        // Supprimer le cookie cookie_consent (sur le domaine courant)
+        var domains = [window.location.hostname, '.' + window.location.hostname];
+        var paths = ['/', window.location.pathname];
+        domains.forEach(function(d) {
+            paths.forEach(function(p) {
+                document.cookie = 'cookie_consent=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=' + p + '; domain=' + d;
+            });
+        });
+        document.cookie = 'cookie_consent=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+        // Redirection vers l'accueil pour réafficher la bannière
+        window.location.href = '/';
+    });
+</script>
 
 <h2>Conditions d'Utilisation</h2>
 

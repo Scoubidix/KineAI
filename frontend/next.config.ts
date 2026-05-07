@@ -21,16 +21,17 @@ const isDev = process.env.NODE_ENV === 'development';
 const csp = [
   "default-src 'self'",
   // Scripts : 'unsafe-inline' requis par Next.js (hydratation), 'unsafe-eval' en dev uniquement (HMR)
+  // www.googletagmanager.com : Google Analytics 4 (mesure d'audience, soumis a consentement)
   isDev
-    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-    : "script-src 'self' 'unsafe-inline'",
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com"
+    : "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com",
   // Styles : 'unsafe-inline' requis par React inline styles + Tailwind
   "style-src 'self' 'unsafe-inline'",
-  // Connexions API : backend + Firebase Auth + GCS
-  `connect-src 'self' ${apiOrigin} *.googleapis.com *.firebaseapp.com storage.googleapis.com`,
+  // Connexions API : backend + Firebase Auth + GCS + GA4
+  `connect-src 'self' ${apiOrigin} *.googleapis.com *.firebaseapp.com storage.googleapis.com https://www.google-analytics.com https://*.analytics.google.com https://*.google-analytics.com`,
   "worker-src 'self'",
-  // Images : GCS (GIFs exercices) + picsum (placeholder) + data: (SVG inline)
-  "img-src 'self' data: blob: picsum.photos storage.googleapis.com www.google.com",
+  // Images : GCS (GIFs exercices) + picsum (placeholder) + data: (SVG inline) + GA4 (pixels)
+  "img-src 'self' data: blob: picsum.photos storage.googleapis.com www.google.com https://www.google-analytics.com",
   // Fonts : next/font auto-heberge au build, gstatic en fallback
   "font-src 'self' fonts.gstatic.com",
   // Frames : aucun iframe autorise
