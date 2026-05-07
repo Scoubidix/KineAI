@@ -1,4 +1,4 @@
-﻿-- CreateEnum
+-- CreateEnum
 CREATE TYPE "communication_method" AS ENUM ('EMAIL', 'WHATSAPP');
 
 -- CreateEnum
@@ -466,4 +466,3 @@ ALTER TABLE "bilans_kine" ADD CONSTRAINT "bilans_kine_kineId_fkey" FOREIGN KEY (
 
 -- AddForeignKey
 ALTER TABLE "bilans_kine" ADD CONSTRAINT "bilans_kine_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
