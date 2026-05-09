@@ -167,10 +167,12 @@ export default function BilanKinePage() {
   const escapeHtml = (s: string): string =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-  // Construit déterministiquement le tableau HTML d'évolution des mesures.
-  // Supporte 1 à N bilans antérieurs + le bilan en cours. Le tableau a 1 colonne
-  // par bilan (triés par date) + une colonne "Évolution" (delta total = dernier - premier).
-  // Retourne une chaîne vide si aucune mesure n'est exploitable.
+  // Construit déterministiquement les tableaux HTML d'évolution des mesures.
+  // Supporte 1 à N bilans antérieurs + le bilan en cours. Génère un tableau par
+  // catégorie (depuis BilanCanonicalField.category) + section "Mesures libres"
+  // pour les customs. Chaque tableau a 1 colonne par bilan (triés par date) +
+  // une colonne "Évolution" (delta total = dernier - premier).
+  // page-break-inside: avoid sur chaque tableau pour éviter les coupures PDF.
   const buildComparisonTableHtml = (
     current: StructuredData,
     previousBilansList: SelectedBilan[],
@@ -178,6 +180,9 @@ export default function BilanKinePage() {
     currentType: BilanType,
   ): string => {
     if (previousBilansList.length === 0) return '';
+
+    const CUSTOM_CATEGORY = 'Mesures libres';
+    const UNKNOWN_CATEGORY = 'Autres';
 
     const cellStyle = 'border:1px solid #999;padding:4px 8px;text-align:left';
     const headerStyle = `${cellStyle};background:#f0f0f0;font-weight:bold`;
@@ -215,29 +220,64 @@ export default function BilanKinePage() {
       return found.value;
     };
 
-    // Collecte tous les keys canoniques rencontrés dans n'importe quel bilan
-    const allCanonicalKeys = new Set<string>();
-    for (const b of allBilans) {
+    // Collecte des keys/labels présents dans au moins un bilan, en préservant
+    // l'ordre d'apparition (commencer par le bilan actuel pour que les mesures
+    // ajoutées récemment apparaissent en haut de leur catégorie).
+    const allCanonicalKeys: string[] = [];
+    const seenKeys = new Set<string>();
+    for (const b of [...allBilans].reverse()) {
       for (const key of Object.keys(b.data.canonical)) {
-        if (getCanonicalValue(b.data, key) !== null) allCanonicalKeys.add(key);
-      }
-    }
-    // Collecte tous les labels customs rencontrés
-    const allCustomLabels = new Set<string>();
-    for (const b of allBilans) {
-      for (const c of b.data.custom) {
-        if (c.value.trim()) allCustomLabels.add(c.label.trim());
+        if (seenKeys.has(key)) continue;
+        if (getCanonicalValue(b.data, key) !== null) {
+          seenKeys.add(key);
+          allCanonicalKeys.push(key);
+        }
       }
     }
 
-    const rows: string[] = [];
+    const allCustomLabels: string[] = [];
+    const seenLabels = new Set<string>();
+    for (const b of [...allBilans].reverse()) {
+      for (const c of b.data.custom) {
+        const lk = c.label.trim().toLowerCase();
+        if (seenLabels.has(lk)) continue;
+        if (c.value.trim()) {
+          seenLabels.add(lk);
+          allCustomLabels.push(c.label.trim());
+        }
+      }
+    }
+
+    // Regrouper par catégorie en préservant l'ordre d'apparition (Map JS)
+    const groups = new Map<string, { canonical: string[]; custom: string[] }>();
+    for (const key of allCanonicalKeys) {
+      const field = fieldsByKey.get(key);
+      const cat = field?.category ?? UNKNOWN_CATEGORY;
+      if (!groups.has(cat)) groups.set(cat, { canonical: [], custom: [] });
+      groups.get(cat)!.canonical.push(key);
+    }
+    if (allCustomLabels.length > 0) {
+      groups.set(CUSTOM_CATEGORY, { canonical: [], custom: allCustomLabels });
+    }
+
+    if (groups.size === 0) return '';
+
+    // En-tête de tableau (identique pour chaque section)
+    const headerCells: string[] = [`<th style="${headerStyle}">Mesure</th>`];
+    for (const b of allBilans) {
+      const dateStr = new Date(b.createdAt).toLocaleDateString('fr-FR');
+      headerCells.push(`<th style="${headerStyle}">${escapeHtml(BILAN_TYPE_LABELS[b.type])} (${dateStr})</th>`);
+    }
+    headerCells.push(`<th style="${headerStyle}">Évolution</th>`);
+    const tableHeader = `<thead><tr>${headerCells.join('')}</tr></thead>`;
+
     const cellsForRow = (cells: string[]) =>
       cells.map((c) => `<td style="${cellStyle}">${c}</td>`).join('');
 
-    // Lignes canoniques
-    for (const key of allCanonicalKeys) {
+    // Génère une ligne pour une mesure canonique
+    const renderCanonicalRow = (key: string): string | null => {
       const field = fieldsByKey.get(key);
-      if (!field) continue;
+      if (!field) return null;
       const cells: string[] = [escapeHtml(field.label)];
       const numericValues: number[] = [];
 
@@ -251,14 +291,12 @@ export default function BilanKinePage() {
         }
       }
 
-      // Évolution totale
       let delta = '—';
       if (field.type === 'NUMERIC' && numericValues.length >= 2) {
         const diff = numericValues[numericValues.length - 1] - numericValues[0];
         if (diff === 0) delta = '=';
         else delta = `${diff > 0 ? '+' : ''}${diff}${field.unit ? ` ${field.unit}` : ''}`;
       } else {
-        // Pour BOOLEAN/TEXT/ENUM : = si toutes valeurs identiques, → sinon
         const presentValues = allBilans
           .map((b) => getCanonicalValue(b.data, key))
           .filter((v) => v !== null);
@@ -268,11 +306,11 @@ export default function BilanKinePage() {
         }
       }
       cells.push(escapeHtml(delta));
-      rows.push(`<tr>${cellsForRow(cells)}</tr>`);
-    }
+      return `<tr>${cellsForRow(cells)}</tr>`;
+    };
 
-    // Lignes customs
-    for (const label of allCustomLabels) {
+    // Génère une ligne pour une mesure custom
+    const renderCustomRow = (label: string): string => {
       const cells: string[] = [escapeHtml(label)];
       const presentValues: string[] = [];
 
@@ -292,20 +330,29 @@ export default function BilanKinePage() {
         delta = allEqual ? '=' : '→';
       }
       cells.push(escapeHtml(delta));
-      rows.push(`<tr>${cellsForRow(cells)}</tr>`);
+      return `<tr>${cellsForRow(cells)}</tr>`;
+    };
+
+    // Construction des sections par catégorie
+    const sections: string[] = [];
+    for (const [category, content] of groups.entries()) {
+      const rows: string[] = [];
+      for (const key of content.canonical) {
+        const row = renderCanonicalRow(key);
+        if (row) rows.push(row);
+      }
+      for (const label of content.custom) rows.push(renderCustomRow(label));
+      if (rows.length === 0) continue;
+
+      sections.push(
+        `<h3 style="font-size:12pt;font-weight:bold;margin-top:0.8em;margin-bottom:0.3em">${escapeHtml(category)}</h3>` +
+          `<table style="border-collapse:collapse;width:100%;margin:0.2em 0 0.6em 0;font-size:11pt;page-break-inside:avoid">${tableHeader}<tbody>${rows.join('')}</tbody></table>`
+      );
     }
 
-    if (rows.length === 0) return '';
+    if (sections.length === 0) return '';
 
-    // En-tête : 1 colonne par bilan + colonne Évolution
-    const headerCells: string[] = [`<th style="${headerStyle}">Mesure</th>`];
-    for (const b of allBilans) {
-      const dateStr = new Date(b.createdAt).toLocaleDateString('fr-FR');
-      headerCells.push(`<th style="${headerStyle}">${escapeHtml(BILAN_TYPE_LABELS[b.type])} (${dateStr})</th>`);
-    }
-    headerCells.push(`<th style="${headerStyle}">Évolution</th>`);
-
-    return `<h2 style="font-size:14pt;font-weight:bold;margin-top:1.2em;margin-bottom:0.5em">Évolution des mesures</h2><table style="border-collapse:collapse;width:100%;margin:0.3em 0 0.6em 0;font-size:11pt"><thead><tr>${headerCells.join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
+    return `<h2 style="font-size:14pt;font-weight:bold;margin-top:1.2em;margin-bottom:0.5em">Évolution des mesures</h2>${sections.join('')}`;
   };
 
   const handleGenerateBilan = async () => {

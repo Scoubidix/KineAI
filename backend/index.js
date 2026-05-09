@@ -100,6 +100,7 @@ const supportRoutes = require('./routes/support');
 const bilansRoutes = require('./routes/bilans');
 const bilansGlobalRoutes = require('./routes/bilansGlobal');
 const bilanFieldsRoutes = require('./routes/bilanFields');
+const bilanTemplatesRoutes = require('./routes/bilanTemplates');
 
 // ⚖️ LEGAL : Import des routes acceptations legales
 const legalAcceptancesRoutes = require('./routes/legalAcceptances');
@@ -638,6 +639,7 @@ app.use('/patients', crudWriteLimiter, patientsRoutes);       // 🚦 CRUD patie
 app.use('/api/patients', crudWriteLimiter, bilansRoutes);     // 🚦 CRUD bilans - 30 ecritures/min (GET libre)
 app.use('/api/bilans', bilansGlobalRoutes);                   // ✅ Routes globales bilans (GET uniquement)
 app.use('/api', bilanFieldsRoutes);                           // ✅ Champs canoniques bilan : GET libre, CRUD admin
+app.use('/api', bilanTemplatesRoutes);                        // ✅ Templates bilan : GET libre, CRUD privé kiné, CRUD admin pour publics
 
 // Programmes : Rate limiting sélectif par route
 app.use('/programmes', (req, res, next) => {

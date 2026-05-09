@@ -43,3 +43,24 @@ export const BILAN_TYPE_COLORS: Record<BilanType, { bg: string; text: string; bo
   INTERMEDIAIRE: { bg: 'bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-500/30' },
   FINAL: { bg: 'bg-green-500/10', text: 'text-green-600 dark:text-green-400', border: 'border-green-500/30' },
 };
+
+// ==================== TEMPLATES ====================
+// Un template = liste ordonnée d'items (canoniques + customs) pour pré-remplir
+// la composition de structuredData d'un bilan, sans valeur initiale.
+
+export type TemplateItem =
+  | { kind: 'canonical'; key: string }
+  | { kind: 'custom'; label: string };
+
+export interface BilanTemplate {
+  id: number;
+  name: string;
+  description: string | null;
+  category: string;
+  items: TemplateItem[];
+  isPublic: boolean;
+  kineId: number | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

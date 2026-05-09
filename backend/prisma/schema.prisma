@@ -75,7 +75,8 @@ model Kine {
   // ======================================
 
   // ========== RELATION BILANS ==========
-  bilans BilanKine[]
+  bilans         BilanKine[]
+  bilanTemplates BilanTemplate[]
   // =====================================
 
   // ========== RELATION TRAÇABILITÉ LÉGALE ==========
@@ -682,6 +683,35 @@ model BilanCanonicalField {
 
   @@index([isActive, category, order])
   @@map("bilan_canonical_fields")
+}
+
+// ==== Templates de bilan (publics gérés par admin, privés par kiné) ====
+// Un template = liste ordonnée d'items à pré-remplir dans structuredData
+// (pas de valeurs, uniquement la composition).
+// items JSON : [{ kind: "canonical", key: "eva_repos" } | { kind: "custom", label: "Test de Neer" }]
+
+model BilanTemplate {
+  id          Int       @id @default(autoincrement())
+  name        String    @db.VarChar(150)
+  description String?   @db.VarChar(500)
+  category    String    @db.VarChar(80) // libre, ex: "Rachis lombaire"
+  items       Json // Liste ordonnée d'items (canonical|custom)
+  isPublic    Boolean   @default(false)
+
+  // Soft delete
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // null si template public (créé via /dashboard/admin)
+  kineId Int?
+  kine   Kine? @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
+  @@index([isPublic, isActive])
+  @@index([kineId, isActive])
+  @@map("bilan_templates")
 }
 
 // ==============================================

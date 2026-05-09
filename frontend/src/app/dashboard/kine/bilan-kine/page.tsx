@@ -3,22 +3,15 @@
 import React, { useState } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
-import { FileText, Sparkles, Search, Layers, ArrowRight, CheckCircle, Clock } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { FileText, Sparkles, Search, Layers, ArrowRight, CheckCircle } from 'lucide-react';
 import NouveauBilanModal from './components/NouveauBilanModal';
 import PatientBilansModal from './components/PatientBilansModal';
+import TemplatesModal from './components/TemplatesModal';
 
 export default function BilanHubPage() {
-  const { toast } = useToast();
   const [nouveauOpen, setNouveauOpen] = useState(false);
   const [bilansRealisesOpen, setBilansRealisesOpen] = useState(false);
-
-  const handleTemplates = () => {
-    toast({
-      title: 'Prochainement',
-      description: 'Les templates de bilan seront disponibles dans une prochaine mise à jour.',
-    });
-  };
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   return (
     <AppLayout>
@@ -82,8 +75,8 @@ export default function BilanHubPage() {
           </Card>
 
           <Card
-            className="card-hover cursor-pointer transition-all duration-300 hover:shadow-lg border-[#3899aa]/30 hover:border-[#3899aa]/60 opacity-70"
-            onClick={handleTemplates}
+            className="card-hover cursor-pointer transition-all duration-300 hover:shadow-lg border-[#3899aa]/30 hover:border-[#3899aa]/60 hover:shadow-[0_0_20px_rgba(56,153,170,0.15)]"
+            onClick={() => setTemplatesOpen(true)}
           >
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
@@ -91,10 +84,7 @@ export default function BilanHubPage() {
                   <Layers className="h-4.5 w-4.5 text-[#3899aa]" />
                   <h3 className="font-semibold text-base text-[#3899aa]">Templates bilans</h3>
                 </div>
-                <span className="text-xs bg-[#3899aa]/10 text-[#3899aa] rounded-full px-2 py-0.5 font-medium flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  Prochainement
-                </span>
+                <ArrowRight className="h-4 w-4 text-[#3899aa]/40" />
               </div>
               <p className="text-sm text-muted-foreground mt-2">
                 Modèles de bilan par pathologie pour gagner du temps
@@ -106,6 +96,7 @@ export default function BilanHubPage() {
 
       <NouveauBilanModal open={nouveauOpen} onOpenChange={setNouveauOpen} />
       <PatientBilansModal open={bilansRealisesOpen} onOpenChange={setBilansRealisesOpen} />
+      <TemplatesModal open={templatesOpen} onOpenChange={setTemplatesOpen} />
     </AppLayout>
   );
 }
