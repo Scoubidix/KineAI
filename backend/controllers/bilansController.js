@@ -35,13 +35,15 @@ exports.createBilan = async (req, res) => {
     if (!ctx) return;
     const { kine, patient, prisma } = ctx;
 
-    const { motif, rawNotes, bilanHtml } = req.body;
+    const { motif, rawNotes, bilanHtml, type, structuredData } = req.body;
 
     const bilan = await prisma.bilanKine.create({
       data: {
         motif: motif || null,
         rawNotes,
         bilanHtml,
+        type: type || 'INITIAL',
+        structuredData: structuredData ?? null,
         kineId: kine.id,
         patientId: patient.id,
       }
@@ -67,6 +69,7 @@ exports.getBilans = async (req, res) => {
       select: {
         id: true,
         motif: true,
+        type: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -128,7 +131,7 @@ exports.updateBilan = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Bilan non trouvé ou accès refusé', code: 'BILAN_NOT_FOUND' });
     }
 
-    const { motif, rawNotes, bilanHtml } = req.body;
+    const { motif, rawNotes, bilanHtml, type, structuredData } = req.body;
 
     const updated = await prisma.bilanKine.update({
       where: { id: bilanId },
@@ -136,6 +139,8 @@ exports.updateBilan = async (req, res) => {
         ...(motif !== undefined && { motif }),
         ...(rawNotes !== undefined && { rawNotes }),
         ...(bilanHtml !== undefined && { bilanHtml }),
+        ...(type !== undefined && { type }),
+        ...(structuredData !== undefined && { structuredData }),
       }
     });
 

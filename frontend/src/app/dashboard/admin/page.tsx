@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail } from 'lucide-react';
+import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText } from 'lucide-react';
+import BilanFieldsTab from './components/BilanFieldsTab';
 import { Button } from '@/components/ui/button';
 
 interface LastPayout {
@@ -305,6 +306,10 @@ export default function AdminDashboardPage() {
                     {tickets.filter(t => t.messages.length > 0 && !t.messages[t.messages.length - 1].isAdmin).length}
                   </Badge>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="bilan-fields" className="gap-1.5">
+                <FileText className="h-3.5 w-3.5" />
+                Champs bilans
               </TabsTrigger>
             </TabsList>
 
@@ -691,6 +696,10 @@ export default function AdminDashboardPage() {
                   })}
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="bilan-fields" className="space-y-4 mt-4">
+              <BilanFieldsTab />
             </TabsContent>
           </Tabs>
         </div>

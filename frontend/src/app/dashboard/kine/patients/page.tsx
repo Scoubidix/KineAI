@@ -13,6 +13,7 @@ import AppLayout from '@/components/AppLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useRouter } from 'next/navigation';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { matchesAllTokens } from '@/utils/textSearch';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -178,12 +179,10 @@ export default function PatientsPage() {
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.toLowerCase();
+    const value = e.target.value;
     setSearch(value);
     const filtered = patients.filter(p =>
-      `${p.firstName} ${p.lastName}`.toLowerCase().includes(value) ||
-      p.email.toLowerCase().includes(value) ||
-      p.phone.includes(value)
+      matchesAllTokens(`${p.firstName} ${p.lastName} ${p.email} ${p.phone}`, value)
     );
     setFilteredPatients(sortPatients(filtered));
   };

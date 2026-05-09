@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { handleProgrammeCreationError } from '@/utils/handleProgrammeError';
+import { matchesAllTokens } from '@/utils/textSearch';
 import { 
   Search, 
   Calendar, 
@@ -367,9 +368,11 @@ export default function ProgrammesPage() {
 
   // Filtrage des programmes
   const filteredProgrammes = programmes.filter(programme => {
-    const matchesSearch = programme.titre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         `${programme.patient.firstName} ${programme.patient.lastName}`.toLowerCase().includes(searchQuery.toLowerCase());
-    
+    const matchesSearch = matchesAllTokens(
+      `${programme.titre} ${programme.patient.firstName} ${programme.patient.lastName}`,
+      searchQuery
+    );
+
     if (!matchesSearch) return false;
     
     if (statusFilter === 'all') return true;
@@ -380,8 +383,7 @@ export default function ProgrammesPage() {
 
   // Filtrage des patients pour la sélection
   const filteredPatients = patients.filter(patient =>
-    `${patient.lastName.toUpperCase()} ${patient.firstName}`.toLowerCase().includes(patientSearchQuery.toLowerCase()) ||
-    patient.email.toLowerCase().includes(patientSearchQuery.toLowerCase())
+    matchesAllTokens(`${patient.lastName} ${patient.firstName} ${patient.email}`, patientSearchQuery)
   );
 
   // Fonctions de gestion des filtres

@@ -98,6 +98,8 @@ const supportRoutes = require('./routes/support');
 
 // 📋 BILANS : Import des routes bilans
 const bilansRoutes = require('./routes/bilans');
+const bilansGlobalRoutes = require('./routes/bilansGlobal');
+const bilanFieldsRoutes = require('./routes/bilanFields');
 
 // ⚖️ LEGAL : Import des routes acceptations legales
 const legalAcceptancesRoutes = require('./routes/legalAcceptances');
@@ -112,10 +114,11 @@ const corsOptions = {
     if (!origin) return callback(null, false);
 
     const allowedOrigins = [
-      'https://monassistantkine.vercel.app',
-      'http://localhost:3000',  // Pour ton HTML de test
-      'http://localhost:3001',  // Pour ton frontend principal
-    ];
+      process.env.FRONTEND_URL,
+      ...(process.env.NODE_ENV !== 'production'
+        ? ['http://localhost:3000', 'http://localhost:3001']
+        : []),
+    ].filter(Boolean);
 
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -633,6 +636,8 @@ app.use('/kine', (req, res, next) => {
 }, kinesRoutes);
 app.use('/patients', crudWriteLimiter, patientsRoutes);       // 🚦 CRUD patients - 30 ecritures/min (GET libre)
 app.use('/api/patients', crudWriteLimiter, bilansRoutes);     // 🚦 CRUD bilans - 30 ecritures/min (GET libre)
+app.use('/api/bilans', bilansGlobalRoutes);                   // ✅ Routes globales bilans (GET uniquement)
+app.use('/api', bilanFieldsRoutes);                           // ✅ Champs canoniques bilan : GET libre, CRUD admin
 
 // Programmes : Rate limiting sélectif par route
 app.use('/programmes', (req, res, next) => {

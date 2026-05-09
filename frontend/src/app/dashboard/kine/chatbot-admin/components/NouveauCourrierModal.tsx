@@ -12,6 +12,7 @@ import {
   User, Users, FileText, ArrowLeft, ArrowRight, CheckCircle, Sparkles
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { matchesAllTokens } from '@/utils/textSearch';
 import DOMPurify from 'dompurify';
 
 
@@ -197,17 +198,13 @@ export default function NouveauCourrierModal({
   };
 
   // Filters
-  const filteredPatients = patients.filter(p => {
-    if (!recipientSearch.trim()) return true;
-    const q = recipientSearch.toLowerCase();
-    return `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
-  });
+  const filteredPatients = patients.filter(p =>
+    matchesAllTokens(`${p.firstName} ${p.lastName} ${p.email}`, recipientSearch)
+  );
 
-  const filteredContacts = contacts.filter(c => {
-    if (!recipientSearch.trim()) return true;
-    const q = recipientSearch.toLowerCase();
-    return `${c.firstName || ''} ${c.lastName || ''}`.toLowerCase().includes(q) || (c.email && c.email.toLowerCase().includes(q));
-  });
+  const filteredContacts = contacts.filter(c =>
+    matchesAllTokens(`${c.firstName || ''} ${c.lastName || ''} ${c.email || ''}`, recipientSearch)
+  );
 
   const filteredTemplates = templates.filter(t => {
     if (selectedCategory && t.category !== selectedCategory) return false;
