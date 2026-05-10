@@ -20,17 +20,28 @@ export interface CanonicalField {
 // → ne sera PAS envoyée à l'IA. Les vraies valeurs (0, false, '') sont envoyées.
 export type CanonicalValue = number | boolean | string | null;
 
+export interface CanonicalMeasurement {
+  kind: 'canonical';
+  key: string;
+  value: CanonicalValue;
+}
+
 export interface CustomMeasurement {
+  kind: 'custom';
   label: string;
   value: string;
 }
 
+export type Measurement = CanonicalMeasurement | CustomMeasurement;
+
+// Liste plate ordonnée. L'ordre est la source de vérité unique pour l'affichage
+// (l'ordre des catégories est dérivé de la première apparition de chaque cat
+// dans measurements).
 export interface StructuredData {
-  canonical: Record<string, CanonicalValue>;
-  custom: CustomMeasurement[];
+  measurements: Measurement[];
 }
 
-export const EMPTY_STRUCTURED_DATA: StructuredData = { canonical: {}, custom: [] };
+export const EMPTY_STRUCTURED_DATA: StructuredData = { measurements: [] };
 
 export const BILAN_TYPE_LABELS: Record<BilanType, string> = {
   INITIAL: 'Initial',

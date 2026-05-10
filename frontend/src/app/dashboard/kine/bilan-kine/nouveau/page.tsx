@@ -6,7 +6,7 @@ import DOMPurify from 'dompurify';
 import AppLayout from '@/components/AppLayout';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { FileText, FilePlus2, Loader2, Copy, Sparkles, Mail, Download, Lock, Lightbulb, ArrowLeft, Search, UserPlus, Check, History, ArrowRight } from 'lucide-react';
+import { FileText, FilePlus2, Loader2, Copy, Sparkles, Mail, Download, Lock, Lightbulb, ArrowLeft, Search, UserPlus, Check, History, ArrowRight, Save } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getAuth } from 'firebase/auth';
@@ -17,7 +17,8 @@ import { usePaywall } from '@/hooks/usePaywall';
 import { useToast } from '@/hooks/use-toast';
 import MeasurementsPanel from '../components/MeasurementsPanel';
 import CompareWithPreviousModal, { SelectedBilan } from '../components/CompareWithPreviousModal';
-import { BilanType, StructuredData, EMPTY_STRUCTURED_DATA, BILAN_TYPE_LABELS, BILAN_TYPE_COLORS, CanonicalField } from '@/types/bilan';
+import TemplateEditorModal from '../components/TemplateEditorModal';
+import { BilanType, StructuredData, EMPTY_STRUCTURED_DATA, BILAN_TYPE_LABELS, BILAN_TYPE_COLORS, CanonicalField, TemplateItem } from '@/types/bilan';
 
 interface PatientOption {
   id: number;
@@ -63,6 +64,9 @@ export default function BilanKinePage() {
   const [previousBilans, setPreviousBilans] = useState<SelectedBilan[]>([]);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [canonicalFields, setCanonicalFields] = useState<CanonicalField[]>([]);
+  // Sauvegarde en template privé depuis la composition de mesures actuelle
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [saveTemplateInitialItems, setSaveTemplateInitialItems] = useState<TemplateItem[]>([]);
 
   // Injecter le HTML dans le div contentEditable sans que React ne contrôle le contenu
   useEffect(() => {
@@ -148,17 +152,19 @@ export default function BilanKinePage() {
 
   // Formate les mesures structurées en texte pour l'envoyer à l'IA dans le message.
   // Les valeurs null (champ ajouté mais non saisi) ou strings vides sont ignorées.
+  // L'ordre suit data.measurements (= ordre choisi via template ou ajout manuel).
   const formatStructuredDataAsText = (data: StructuredData, fieldsByKey: Map<string, CanonicalField>): string => {
     const lines: string[] = [];
-    for (const [key, value] of Object.entries(data.canonical)) {
-      if (value === null || value === undefined) continue;
-      if (typeof value === 'string' && value.trim() === '') continue;
-      const field = fieldsByKey.get(key);
-      if (!field) continue;
-      lines.push(`- ${field.label} : ${formatCanonicalValue(field, value)}`);
-    }
-    for (const item of data.custom) {
-      if (item.value.trim()) lines.push(`- ${item.label} : ${item.value}`);
+    for (const m of data.measurements) {
+      if (m.kind === 'canonical') {
+        if (m.value === null || m.value === undefined) continue;
+        if (typeof m.value === 'string' && m.value.trim() === '') continue;
+        const field = fieldsByKey.get(m.key);
+        if (!field) continue;
+        lines.push(`- ${field.label} : ${formatCanonicalValue(field, m.value)}`);
+      } else {
+        if (m.value.trim()) lines.push(`- ${m.label} : ${m.value}`);
+      }
     }
     return lines.join('\n');
   };
@@ -207,17 +213,22 @@ export default function BilanKinePage() {
       },
     ];
 
-    // Helpers
+    // Helpers (lookup dans la liste plate measurements)
     const getCanonicalValue = (data: StructuredData, key: string): number | boolean | string | null => {
-      const v = data.canonical?.[key];
+      const m = data.measurements.find((x) => x.kind === 'canonical' && x.key === key);
+      if (!m || m.kind !== 'canonical') return null;
+      const v = m.value;
       if (v === null || v === undefined) return null;
       if (typeof v === 'string' && v.trim() === '') return null;
       return v;
     };
     const getCustomValue = (data: StructuredData, label: string): string | null => {
-      const found = data.custom.find((c) => c.label.trim().toLowerCase() === label.trim().toLowerCase());
-      if (!found || !found.value.trim()) return null;
-      return found.value;
+      const target = label.trim().toLowerCase();
+      const m = data.measurements.find(
+        (x) => x.kind === 'custom' && x.label.trim().toLowerCase() === target,
+      );
+      if (!m || m.kind !== 'custom' || !m.value.trim()) return null;
+      return m.value;
     };
 
     // Collecte des keys/labels présents dans au moins un bilan, en préservant
@@ -226,11 +237,12 @@ export default function BilanKinePage() {
     const allCanonicalKeys: string[] = [];
     const seenKeys = new Set<string>();
     for (const b of [...allBilans].reverse()) {
-      for (const key of Object.keys(b.data.canonical)) {
-        if (seenKeys.has(key)) continue;
-        if (getCanonicalValue(b.data, key) !== null) {
-          seenKeys.add(key);
-          allCanonicalKeys.push(key);
+      for (const m of b.data.measurements) {
+        if (m.kind !== 'canonical') continue;
+        if (seenKeys.has(m.key)) continue;
+        if (getCanonicalValue(b.data, m.key) !== null) {
+          seenKeys.add(m.key);
+          allCanonicalKeys.push(m.key);
         }
       }
     }
@@ -238,12 +250,13 @@ export default function BilanKinePage() {
     const allCustomLabels: string[] = [];
     const seenLabels = new Set<string>();
     for (const b of [...allBilans].reverse()) {
-      for (const c of b.data.custom) {
-        const lk = c.label.trim().toLowerCase();
+      for (const m of b.data.measurements) {
+        if (m.kind !== 'custom') continue;
+        const lk = m.label.trim().toLowerCase();
         if (seenLabels.has(lk)) continue;
-        if (c.value.trim()) {
+        if (m.value.trim()) {
           seenLabels.add(lk);
-          allCustomLabels.push(c.label.trim());
+          allCustomLabels.push(m.label.trim());
         }
       }
     }
@@ -345,14 +358,14 @@ export default function BilanKinePage() {
       if (rows.length === 0) continue;
 
       sections.push(
-        `<h3 style="font-size:12pt;font-weight:bold;margin-top:0.8em;margin-bottom:0.3em">${escapeHtml(category)}</h3>` +
-          `<table style="border-collapse:collapse;width:100%;margin:0.2em 0 0.6em 0;font-size:11pt;page-break-inside:avoid">${tableHeader}<tbody>${rows.join('')}</tbody></table>`
+        `<h3 style="font-weight:bold;margin-top:0.8em;margin-bottom:0.3em">${escapeHtml(category)}</h3>` +
+          `<table style="border-collapse:collapse;width:100%;margin:0.2em 0 0.6em 0;page-break-inside:avoid">${tableHeader}<tbody>${rows.join('')}</tbody></table>`
       );
     }
 
     if (sections.length === 0) return '';
 
-    return `<h2 style="font-size:14pt;font-weight:bold;margin-top:1.2em;margin-bottom:0.5em">Évolution des mesures</h2>${sections.join('')}`;
+    return `<h2 style="font-weight:bold;margin-top:1.2em;margin-bottom:0.5em">Évolution des mesures</h2>${sections.join('')}`;
   };
 
   const handleGenerateBilan = async () => {
@@ -447,6 +460,23 @@ export default function BilanKinePage() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Convertit la composition de mesures en cours en items de template (sans valeurs)
+  // et ouvre la modal de création de template privé. L'ordre du panneau est
+  // préservé tel quel dans le template.
+  const handleOpenSaveTemplateModal = () => {
+    const items: TemplateItem[] = [];
+    for (const m of structuredData.measurements) {
+      if (m.kind === 'canonical') {
+        items.push({ kind: 'canonical', key: m.key });
+      } else {
+        const label = m.label.trim();
+        if (label) items.push({ kind: 'custom', label });
+      }
+    }
+    setSaveTemplateInitialItems(items);
+    setShowSaveTemplateModal(true);
   };
 
   const handleOpenPatientModal = async () => {
@@ -963,23 +993,35 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
           </div>
 
           <div className="flex flex-col items-end gap-1 mt-3">
-            <Button
-              onClick={handleGenerateBilan}
-              disabled={isGenerating || !rawNotes.trim()}
-              className="btn-teal rounded-full px-6 h-10"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Génération en cours...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Générer le bilan
-                </>
-              )}
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleOpenSaveTemplateModal}
+                disabled={isGenerating}
+                className="rounded-full h-10"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Sauvegarder le template
+              </Button>
+              <Button
+                onClick={handleGenerateBilan}
+                disabled={isGenerating || !rawNotes.trim()}
+                className="btn-teal rounded-full px-6 h-10"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Génération en cours...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Générer le bilan
+                  </>
+                )}
+              </Button>
+            </div>
             <p className="text-[11px] text-red-400">L&apos;IA peut faire des erreurs. Vérifiez les informations importantes.</p>
           </div>
         </div>
@@ -1154,6 +1196,15 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
         subscription={subscription}
       />
 
+      <TemplateEditorModal
+        open={showSaveTemplateModal}
+        onOpenChange={setShowSaveTemplateModal}
+        mode="private"
+        template={null}
+        initialItems={saveTemplateInitialItems}
+        onSaved={() => {}}
+      />
+
       {presetPatient && (
         <CompareWithPreviousModal
           open={showCompareModal}
@@ -1170,8 +1221,7 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
               )[0];
               if (mostRecent.structuredData) {
                 setStructuredData({
-                  canonical: { ...mostRecent.structuredData.canonical },
-                  custom: mostRecent.structuredData.custom.map((item) => ({ ...item })),
+                  measurements: mostRecent.structuredData.measurements.map((m) => ({ ...m })),
                 });
               }
             }

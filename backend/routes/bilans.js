@@ -9,13 +9,25 @@ const { z } = require('zod');
 // Schémas de validation
 const bilanTypeSchema = z.enum(['INITIAL', 'INTERMEDIAIRE', 'FINAL']);
 
-// structuredData : objet avec canonical (clé→valeur) + custom (label/value libres)
+// structuredData : liste plate ordonnée d'items (canonical avec key+value,
+// ou custom avec label+value). L'ordre du tableau est la source de vérité
+// pour l'affichage (groupement par catégorie dérivé côté front).
+const measurementSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('canonical'),
+    key: z.string().trim().min(1).max(80),
+    // null = ajouté mais non saisi ; les vraies valeurs (0, false, '') sont valides
+    value: z.union([z.number(), z.boolean(), z.string().max(500), z.null()]),
+  }),
+  z.object({
+    kind: z.literal('custom'),
+    label: z.string().trim().min(1).max(200),
+    value: z.string().max(500), // peut être '' tant que pas saisie
+  }),
+]);
+
 const structuredDataSchema = z.object({
-  canonical: z.record(z.string(), z.union([z.number(), z.boolean(), z.string()])).default({}),
-  custom: z.array(z.object({
-    label: z.string().trim().min(1).max(100),
-    value: z.string().trim().min(1).max(200),
-  })).default([]),
+  measurements: z.array(measurementSchema).max(200).default([]),
 }).nullable().optional();
 
 const createBilanSchema = z.object({

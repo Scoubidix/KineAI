@@ -11,6 +11,7 @@ import {
   StructuredData,
   CanonicalValue,
   EMPTY_STRUCTURED_DATA,
+  Measurement,
   BilanTemplate,
 } from '@/types/bilan';
 import AddMeasureModal from './AddMeasureModal';
@@ -22,9 +23,7 @@ interface MeasurementsPanelProps {
   disabled?: boolean;
 }
 
-// Catégorie virtuelle pour les mesures custom (toujours affichée en dernier)
 const CUSTOM_CATEGORY = 'Mesures libres';
-// Catégorie de fallback pour les canoniques dont le field n'a pas pu être chargé
 const UNKNOWN_CATEGORY = 'Champs inconnus';
 
 // Une valeur canonique est "saisie" si elle n'est ni null/undefined ni string vide.
@@ -35,19 +34,11 @@ const isCanonicalFilled = (v: CanonicalValue): boolean => {
   return true;
 };
 
-interface CanonicalRow {
-  kind: 'canonical';
-  key: string;
-  value: CanonicalValue;
-  field?: CanonicalField;
+interface RowWithIndex {
+  measurement: Measurement;
+  index: number; // index dans data.measurements (clé pour les handlers)
+  field?: CanonicalField; // résolu pour les canoniques
 }
-interface CustomRow {
-  kind: 'custom';
-  index: number;
-  label: string;
-  value: string;
-}
-type Row = CanonicalRow | CustomRow;
 
 export default function MeasurementsPanel({
   structuredData,
@@ -60,11 +51,10 @@ export default function MeasurementsPanel({
   const [applyTemplateOpen, setApplyTemplateOpen] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const previouslyCompleteRef = useRef<Set<string>>(new Set());
-  // Catégories devenues complètes mais en attente de blur pour être repliées.
-  // Évite le collapse prématuré dès le 1er caractère saisi dans le dernier champ.
   const pendingCollapseRef = useRef<Set<string>>(new Set());
 
   const data = structuredData ?? EMPTY_STRUCTURED_DATA;
+  const measurements = data.measurements;
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -82,73 +72,80 @@ export default function MeasurementsPanel({
 
   const fieldsByKey = useMemo(() => new Map(fields.map((f) => [f.key, f])), [fields]);
 
-  const addedKeys = new Set(Object.keys(data.canonical));
-  const addedCustomLabels = new Set(data.custom.map((c) => c.label.trim().toLowerCase()));
+  const addedKeys = useMemo(
+    () =>
+      new Set(
+        measurements
+          .filter((m) => m.kind === 'canonical')
+          .map((m) => (m as Extract<Measurement, { kind: 'canonical' }>).key),
+      ),
+    [measurements],
+  );
+  const addedCustomLabels = useMemo(
+    () =>
+      new Set(
+        measurements
+          .filter((m) => m.kind === 'custom')
+          .map((m) => (m as Extract<Measurement, { kind: 'custom' }>).label.trim().toLowerCase()),
+      ),
+    [measurements],
+  );
 
   const handleAddCanonical = (field: CanonicalField) => {
+    if (addedKeys.has(field.key)) return;
     onChange({
-      ...data,
-      canonical: { ...data.canonical, [field.key]: null },
+      measurements: [...measurements, { kind: 'canonical', key: field.key, value: null }],
     });
   };
 
   const handleAddCustom = (label: string) => {
+    const trimmed = label.trim();
+    if (!trimmed || addedCustomLabels.has(trimmed.toLowerCase())) return;
     onChange({
-      ...data,
-      custom: [...data.custom, { label, value: '' }],
+      measurements: [...measurements, { kind: 'custom', label: trimmed, value: '' }],
     });
   };
 
-  const handleRemoveCanonical = (key: string) => {
-    const next = { ...data.canonical };
-    delete next[key];
-    onChange({ ...data, canonical: next });
+  const handleRemoveAt = (index: number) => {
+    onChange({ measurements: measurements.filter((_, i) => i !== index) });
   };
 
-  const handleRemoveCustom = (index: number) => {
-    onChange({ ...data, custom: data.custom.filter((_, i) => i !== index) });
-  };
-
-  const handleChangeCanonical = (key: string, value: CanonicalValue) => {
-    onChange({ ...data, canonical: { ...data.canonical, [key]: value } });
-  };
-
-  const handleChangeCustom = (index: number, value: string) => {
+  const handleChangeAt = (index: number, value: CanonicalValue | string) => {
     onChange({
-      ...data,
-      custom: data.custom.map((item, i) => (i === index ? { ...item, value } : item)),
+      measurements: measurements.map((m, i) => {
+        if (i !== index) return m;
+        if (m.kind === 'canonical') return { ...m, value: value as CanonicalValue };
+        return { ...m, value: (value ?? '') as string };
+      }),
     });
   };
 
-  // Application non-destructive d'un template : ajoute les items manquants,
-  // ne touche jamais aux valeurs déjà saisies.
+  // Application non-destructive d'un template : ajoute les items du template
+  // qui ne sont pas déjà dans measurements, à la fin, dans l'ordre du template.
+  // Les valeurs déjà saisies dans le bilan en cours ne sont jamais touchées.
   const handleApplyTemplate = (template: BilanTemplate) => {
-    const nextCanonical = { ...data.canonical };
-    const nextCustom = [...data.custom];
-    const existingCustomLabels = new Set(nextCustom.map((c) => c.label.trim().toLowerCase()));
-
-    let added = 0;
+    const existingKeys = new Set(addedKeys);
+    const existingLabels = new Set(addedCustomLabels);
+    const toAdd: Measurement[] = [];
     const touchedCategories = new Set<string>();
+
     for (const item of template.items) {
       if (item.kind === 'canonical') {
-        if (!(item.key in nextCanonical)) {
-          nextCanonical[item.key] = null;
-          const cat = fieldsByKey.get(item.key)?.category ?? UNKNOWN_CATEGORY;
-          touchedCategories.add(cat);
-          added++;
-        }
+        if (existingKeys.has(item.key)) continue;
+        existingKeys.add(item.key);
+        toAdd.push({ kind: 'canonical', key: item.key, value: null });
+        const cat = fieldsByKey.get(item.key)?.category ?? UNKNOWN_CATEGORY;
+        touchedCategories.add(cat);
       } else {
         const labelKey = item.label.trim().toLowerCase();
-        if (!existingCustomLabels.has(labelKey)) {
-          nextCustom.push({ label: item.label, value: '' });
-          existingCustomLabels.add(labelKey);
-          touchedCategories.add(CUSTOM_CATEGORY);
-          added++;
-        }
+        if (existingLabels.has(labelKey)) continue;
+        existingLabels.add(labelKey);
+        toAdd.push({ kind: 'custom', label: item.label, value: '' });
+        touchedCategories.add(CUSTOM_CATEGORY);
       }
     }
 
-    onChange({ canonical: nextCanonical, custom: nextCustom });
+    onChange({ measurements: [...measurements, ...toAdd] });
 
     // Une catégorie où on vient d'ajouter des mesures vides ne doit plus être
     // collapsed (sinon le user ne voit pas où ses nouvelles mesures sont arrivées).
@@ -162,46 +159,37 @@ export default function MeasurementsPanel({
 
     toast({
       title: `Template "${template.name}" appliqué`,
-      description: added === 0
-        ? 'Toutes les mesures du template étaient déjà présentes'
-        : `${added} mesure${added > 1 ? 's ajoutées' : ' ajoutée'}`,
+      description:
+        toAdd.length === 0
+          ? 'Toutes les mesures du template étaient déjà présentes'
+          : `${toAdd.length} mesure${toAdd.length > 1 ? 's ajoutées' : ' ajoutée'}`,
     });
   };
 
-  // Construction des groupes par catégorie en préservant l'ordre d'insertion
-  // dans data.canonical, puis "Mesures libres" en dernier si custom.length > 0.
+  // Groupes par catégorie. L'ordre des catégories suit la première apparition
+  // de chaque cat dans measurements (donc piloté par l'ordre du template ou
+  // par l'ordre d'ajout manuel — c'est la source de vérité unique).
   const groups = useMemo(() => {
-    const map = new Map<string, Row[]>();
-
-    for (const [key, value] of Object.entries(data.canonical)) {
-      const field = fieldsByKey.get(key);
-      const cat = field?.category ?? UNKNOWN_CATEGORY;
+    const map = new Map<string, RowWithIndex[]>();
+    measurements.forEach((m, index) => {
+      const cat = m.kind === 'custom'
+        ? CUSTOM_CATEGORY
+        : fieldsByKey.get(m.key)?.category ?? UNKNOWN_CATEGORY;
       if (!map.has(cat)) map.set(cat, []);
-      map.get(cat)!.push({ kind: 'canonical', key, value, field });
-    }
-
-    if (data.custom.length > 0) {
-      const rows: Row[] = data.custom.map((c, i) => ({
-        kind: 'custom',
-        index: i,
-        label: c.label,
-        value: c.value,
-      }));
-      map.set(CUSTOM_CATEGORY, rows);
-    }
-
+      const field = m.kind === 'canonical' ? fieldsByKey.get(m.key) : undefined;
+      map.get(cat)!.push({ measurement: m, index, field });
+    });
     return map;
-  }, [data.canonical, data.custom, fieldsByKey]);
+  }, [measurements, fieldsByKey]);
 
-  // Compteurs saisies/total par catégorie + global
   const stats = useMemo(() => {
     const cats = new Map<string, { filled: number; total: number }>();
     for (const [cat, rows] of groups.entries()) {
       let filled = 0;
       for (const r of rows) {
-        if (r.kind === 'canonical') {
-          if (isCanonicalFilled(r.value)) filled++;
-        } else if (r.value.trim() !== '') {
+        if (r.measurement.kind === 'canonical') {
+          if (isCanonicalFilled(r.measurement.value)) filled++;
+        } else if (r.measurement.value.trim() !== '') {
           filled++;
         }
       }
@@ -216,23 +204,18 @@ export default function MeasurementsPanel({
     return { cats, globalFilled, globalTotal };
   }, [groups]);
 
-  // Auto-collapse : à la transition incomplet → complet, on marque la catégorie
-  // comme "en attente de blur". Le collapse effectif se fait dans handleCategoryBlur
-  // quand le focus quitte la catégorie — sinon on collapse dès le 1er caractère
-  // saisi dans le dernier champ alors que l'utilisateur n'a pas fini sa saisie
-  // (ex: tape "30" pour une amplitude, on collapse au "3").
+  // Auto-collapse : transition incomplet → complet → en attente, repli au blur
+  // pour ne pas couper la saisie en cours.
   useEffect(() => {
     const currentlyComplete = new Set<string>();
     for (const [cat, s] of stats.cats.entries()) {
       if (s.total > 0 && s.filled === s.total) currentlyComplete.add(cat);
     }
-    // Transition incomplet → complet : mettre en attente
     for (const c of currentlyComplete) {
       if (!previouslyCompleteRef.current.has(c)) {
         pendingCollapseRef.current.add(c);
       }
     }
-    // Transition complet → incomplet : annuler l'attente
     for (const c of previouslyCompleteRef.current) {
       if (!currentlyComplete.has(c)) {
         pendingCollapseRef.current.delete(c);
@@ -248,16 +231,11 @@ export default function MeasurementsPanel({
       else next.add(cat);
       return next;
     });
-    // Si l'utilisateur ouvre/ferme manuellement, on retire l'attente d'auto-collapse
     pendingCollapseRef.current.delete(cat);
   };
 
-  // Déclenché quand le focus quitte le wrapper de la catégorie. Si la catégorie
-  // vient juste de devenir complète (transition récente), on la replie.
   const handleCategoryBlur = (category: string, e: React.FocusEvent<HTMLDivElement>) => {
-    // Le focus reste à l'intérieur (autre input/bouton de la même catégorie) → ignorer
     if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-
     if (pendingCollapseRef.current.has(category)) {
       pendingCollapseRef.current.delete(category);
       setCollapsedCategories((prev) => {
@@ -269,7 +247,11 @@ export default function MeasurementsPanel({
     }
   };
 
-  const renderCanonicalInput = (field: CanonicalField, value: CanonicalValue) => {
+  const renderCanonicalInput = (
+    field: CanonicalField,
+    value: CanonicalValue,
+    index: number,
+  ) => {
     switch (field.type) {
       case 'NUMERIC':
         return (
@@ -279,10 +261,10 @@ export default function MeasurementsPanel({
               value={value === null || value === undefined ? '' : (value as number)}
               onChange={(e) => {
                 if (e.target.value === '') {
-                  handleChangeCanonical(field.key, null);
+                  handleChangeAt(index, null);
                 } else {
                   const n = Number(e.target.value);
-                  if (!Number.isNaN(n)) handleChangeCanonical(field.key, n);
+                  if (!Number.isNaN(n)) handleChangeAt(index, n);
                 }
               }}
               min={field.rangeMin ?? undefined}
@@ -298,7 +280,7 @@ export default function MeasurementsPanel({
           <div className="flex items-center gap-1 flex-1">
             <button
               type="button"
-              onClick={() => handleChangeCanonical(field.key, false)}
+              onClick={() => handleChangeAt(index, false)}
               disabled={disabled}
               className={`px-3 py-1 rounded-l text-xs font-medium transition-colors ${
                 value === false ? 'bg-[#3899aa] text-white' : 'bg-muted text-foreground hover:bg-muted/80'
@@ -308,7 +290,7 @@ export default function MeasurementsPanel({
             </button>
             <button
               type="button"
-              onClick={() => handleChangeCanonical(field.key, true)}
+              onClick={() => handleChangeAt(index, true)}
               disabled={disabled}
               className={`px-3 py-1 rounded-r text-xs font-medium transition-colors ${
                 value === true ? 'bg-[#3899aa] text-white' : 'bg-muted text-foreground hover:bg-muted/80'
@@ -323,7 +305,7 @@ export default function MeasurementsPanel({
           <Input
             type="text"
             value={value === null || value === undefined ? '' : (value as string)}
-            onChange={(e) => handleChangeCanonical(field.key, e.target.value === '' ? null : e.target.value)}
+            onChange={(e) => handleChangeAt(index, e.target.value === '' ? null : e.target.value)}
             disabled={disabled}
             className="h-8 text-sm flex-1"
           />
@@ -332,7 +314,7 @@ export default function MeasurementsPanel({
         return (
           <select
             value={value === null || value === undefined ? '' : (value as string)}
-            onChange={(e) => handleChangeCanonical(field.key, e.target.value === '' ? null : e.target.value)}
+            onChange={(e) => handleChangeAt(index, e.target.value === '' ? null : e.target.value)}
             disabled={disabled}
             className="h-8 text-sm rounded-md border border-input bg-background px-2 flex-1"
           >
@@ -349,20 +331,21 @@ export default function MeasurementsPanel({
     }
   };
 
-  const renderRow = (row: Row) => {
-    if (row.kind === 'canonical') {
+  const renderRow = (row: RowWithIndex) => {
+    const m = row.measurement;
+    if (m.kind === 'canonical') {
       if (!row.field) {
         return (
           <div
-            key={`canonical-${row.key}`}
+            key={`row-${row.index}`}
             className="flex items-center gap-2 px-2 py-1 rounded bg-amber-500/5 border border-amber-500/20"
           >
-            <span className="text-sm flex-1 text-muted-foreground italic">Champ inconnu : {row.key}</span>
+            <span className="text-sm flex-1 text-muted-foreground italic">Champ inconnu : {m.key}</span>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => handleRemoveCanonical(row.key)}
+              onClick={() => handleRemoveAt(row.index)}
               className="h-6 w-6 p-0"
             >
               <X className="h-3 w-3" />
@@ -371,14 +354,14 @@ export default function MeasurementsPanel({
         );
       }
       return (
-        <div key={`canonical-${row.key}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/40">
+        <div key={`row-${row.index}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/40">
           <span className="text-sm font-medium w-36 sm:w-56 shrink-0 truncate">{row.field.label}</span>
-          {renderCanonicalInput(row.field, row.value)}
+          {renderCanonicalInput(row.field, m.value, row.index)}
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => handleRemoveCanonical(row.key)}
+            onClick={() => handleRemoveAt(row.index)}
             disabled={disabled}
             className="h-6 w-6 p-0 shrink-0"
           >
@@ -388,14 +371,14 @@ export default function MeasurementsPanel({
       );
     }
     return (
-      <div key={`custom-${row.index}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/40">
+      <div key={`row-${row.index}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/40">
         <span className="text-sm font-medium w-36 sm:w-56 shrink-0 truncate italic text-muted-foreground">
-          {row.label}
+          {m.label}
         </span>
         <Input
           type="text"
-          value={row.value}
-          onChange={(e) => handleChangeCustom(row.index, e.target.value)}
+          value={m.value}
+          onChange={(e) => handleChangeAt(row.index, e.target.value)}
           placeholder="Valeur libre"
           disabled={disabled}
           className="h-8 text-sm flex-1"
@@ -404,7 +387,7 @@ export default function MeasurementsPanel({
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => handleRemoveCustom(row.index)}
+          onClick={() => handleRemoveAt(row.index)}
           disabled={disabled}
           className="h-6 w-6 p-0 shrink-0"
         >
@@ -462,7 +445,6 @@ export default function MeasurementsPanel({
         </p>
       ) : (
         <>
-          {/* Bandeau de progression global — visible uniquement quand il y a plusieurs mesures */}
           {stats.globalTotal > 1 && (
             <div className="flex items-center gap-2 px-2 py-1">
               <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -478,7 +460,6 @@ export default function MeasurementsPanel({
           )}
 
           {isCompactMode ? (
-            // Rendu plat (petits bilans) : pas de header de catégorie
             <div className="space-y-1">
               {Array.from(groups.values())[0]?.map(renderRow)}
             </div>
