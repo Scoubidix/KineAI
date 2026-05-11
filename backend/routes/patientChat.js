@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const prismaService = require('../services/prismaService');
 const { authenticatePatient, checkTokenExpiry, logPatientAccess } = require('../middleware/patientAuth');
+const { gptLimiter } = require('../middleware/rateLimiter');
 const { generateChatResponse, generateWelcomeMessage } = require('../services/openaiService');
 const notificationTriggers = require('../services/notificationTriggers');
 
@@ -59,8 +60,9 @@ const saveChatMessage = async (patientId, programmeId, message, role) => {
  * POST /api/patient/chat/:token
  * Envoyer un message au chat du patient
  */
-router.post('/chat/:token', 
+router.post('/chat/:token',
   authenticatePatient,
+  gptLimiter,
   checkTokenExpiry(24),
   logPatientAccess,
   async (req, res) => {
@@ -159,6 +161,7 @@ router.post('/chat/:token',
  */
 router.get('/welcome/:token',
   authenticatePatient,
+  gptLimiter,
   checkTokenExpiry(24),
   async (req, res) => {
     try {

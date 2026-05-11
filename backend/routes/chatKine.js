@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const chatKineController = require('../controllers/chatKineController');
 const { authenticate } = require('../middleware/authenticate');
+const { gptLimiter } = require('../middleware/rateLimiter');
 const { requireAdmin, requireAssistant, requireAssistantOrPreview } = require('../middleware/authorization');
 
 // ========== NOUVELLES ROUTES IA SPÉCIALISÉES ==========
@@ -28,56 +29,56 @@ const requireFollowupAssistantOrPreview = (req, res, next) => {
  * POST /api/chat/kine/ia-basique
  * IA conversationnelle basique avec recherche vectorielle
  */
-router.post('/ia-basique', authenticate, requireAssistantOrPreview('CONVERSATIONNEL'), chatKineController.sendIaBasique);
+router.post('/ia-basique', authenticate, gptLimiter, requireAssistantOrPreview('CONVERSATIONNEL'), chatKineController.sendIaBasique);
 
 /**
  * POST /api/chat/kine/ia-basique-stream
  * IA conversationnelle basique en streaming SSE
  */
-router.post('/ia-basique-stream', authenticate, requireAssistantOrPreview('CONVERSATIONNEL'), chatKineController.sendIaBasiqueStream);
+router.post('/ia-basique-stream', authenticate, gptLimiter, requireAssistantOrPreview('CONVERSATIONNEL'), chatKineController.sendIaBasiqueStream);
 
 /**
  * POST /api/chat/kine/ia-biblio
  * IA bibliographique spécialisée
  */
-router.post('/ia-biblio', authenticate, requireAssistantOrPreview('BIBLIOTHEQUE'), chatKineController.sendIaBiblio);
+router.post('/ia-biblio', authenticate, gptLimiter, requireAssistantOrPreview('BIBLIOTHEQUE'), chatKineController.sendIaBiblio);
 
 /**
  * POST /api/chat/kine/ia-biblio-stream
  * IA bibliographique en streaming SSE
  */
-router.post('/ia-biblio-stream', authenticate, requireAssistantOrPreview('BIBLIOTHEQUE'), chatKineController.sendIaBiblioStream);
+router.post('/ia-biblio-stream', authenticate, gptLimiter, requireAssistantOrPreview('BIBLIOTHEQUE'), chatKineController.sendIaBiblioStream);
 
 /**
  * POST /api/chat/kine/ia-clinique
  * IA clinique spécialisée
  */
-router.post('/ia-clinique', authenticate, requireAssistantOrPreview('CLINIQUE'), chatKineController.sendIaClinique);
+router.post('/ia-clinique', authenticate, gptLimiter, requireAssistantOrPreview('CLINIQUE'), chatKineController.sendIaClinique);
 
 /**
  * POST /api/chat/kine/ia-clinique-stream
  * IA clinique en streaming SSE
  */
-router.post('/ia-clinique-stream', authenticate, requireAssistantOrPreview('CLINIQUE'), chatKineController.sendIaCliniqueStream);
+router.post('/ia-clinique-stream', authenticate, gptLimiter, requireAssistantOrPreview('CLINIQUE'), chatKineController.sendIaCliniqueStream);
 
 /**
  * POST /api/chat/kine/ia-administrative
  * IA administrative spécialisée (bilan kiné)
  */
-router.post('/ia-administrative', authenticate, requireAssistantOrPreview('ADMINISTRATIF'), chatKineController.sendIaAdministrative);
+router.post('/ia-administrative', authenticate, gptLimiter, requireAssistantOrPreview('ADMINISTRATIF'), chatKineController.sendIaAdministrative);
 
 /**
  * POST /api/chat/kine/ia-followup
  * IA de suivi avec RAG conditionnel (shouldUseRAG décide) - sauvegarde dans la table source
  * Body: { message, conversationHistory, sourceIa: 'biblio' | 'clinique' }
  */
-router.post('/ia-followup', authenticate, requireFollowupAssistantOrPreview, chatKineController.sendIaFollowup);
+router.post('/ia-followup', authenticate, gptLimiter, requireFollowupAssistantOrPreview, chatKineController.sendIaFollowup);
 
 /**
  * POST /api/chat/kine/ia-followup-stream
  * IA de suivi en streaming SSE
  */
-router.post('/ia-followup-stream', authenticate, requireFollowupAssistantOrPreview, chatKineController.sendIaFollowupStream);
+router.post('/ia-followup-stream', authenticate, gptLimiter, requireFollowupAssistantOrPreview, chatKineController.sendIaFollowupStream);
 
 // ========== ROUTES HISTORIQUE SPÉCIALISÉES ==========
 

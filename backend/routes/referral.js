@@ -6,6 +6,7 @@ const router = express.Router();
 const prismaService = require('../services/prismaService');
 const stripeService = require('../services/StripeService');
 const { authenticate } = require('../middleware/authenticate');
+const { crudWriteLimiter } = require('../middleware/rateLimiter');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 
@@ -37,7 +38,7 @@ async function isCodeUnique(prisma, code) {
  * POST /api/referral/generate-code
  * Génère ou récupère le code de parrainage du kiné connecté
  */
-router.post('/generate-code', authenticate, async (req, res) => {
+router.post('/generate-code', authenticate, crudWriteLimiter, async (req, res) => {
   try {
     const prisma = prismaService.getInstance();
 

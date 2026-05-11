@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const contactService = require('../services/contactService');
 const { authenticate } = require('../middleware/authenticate');
+const { crudWriteLimiter } = require('../middleware/rateLimiter');
 const logger = require('../utils/logger');
 const prismaService = require('../services/prismaService');
 const { sanitizeUID } = require('../utils/logSanitizer');
@@ -28,7 +29,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // POST /api/contacts
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, crudWriteLimiter, async (req, res) => {
   try {
     const kineId = await getKineId(req.uid);
     if (!kineId) return res.status(404).json({ success: false, error: 'Kiné introuvable' });
@@ -46,7 +47,7 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // PUT /api/contacts/:id
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, crudWriteLimiter, async (req, res) => {
   try {
     const kineId = await getKineId(req.uid);
     if (!kineId) return res.status(404).json({ success: false, error: 'Kiné introuvable' });
@@ -64,7 +65,7 @@ router.put('/:id', authenticate, async (req, res) => {
 });
 
 // DELETE /api/contacts/:id
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, crudWriteLimiter, async (req, res) => {
   try {
     const kineId = await getKineId(req.uid);
     if (!kineId) return res.status(404).json({ success: false, error: 'Kiné introuvable' });

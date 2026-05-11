@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const supportController = require('../controllers/supportController');
 const { authenticate } = require('../middleware/authenticate');
+const { supportTicketLimiter, supportMessageLimiter } = require('../middleware/rateLimiter');
 const { requireAdmin } = require('../middleware/authorization');
 
 // ========== ROUTES KINE ==========
@@ -14,10 +15,10 @@ router.get('/tickets', authenticate, supportController.getTickets);
 router.get('/tickets/:id', authenticate, supportController.getTicketById);
 
 // POST /api/support/tickets — creer un ticket
-router.post('/tickets', authenticate, supportController.createTicket);
+router.post('/tickets', authenticate, supportTicketLimiter, supportController.createTicket);
 
 // POST /api/support/tickets/:id/messages — ajouter un message
-router.post('/tickets/:id/messages', authenticate, supportController.addMessage);
+router.post('/tickets/:id/messages', authenticate, supportMessageLimiter, supportController.addMessage);
 
 // PUT /api/support/tickets/:id/close — cloturer un ticket
 router.put('/tickets/:id/close', authenticate, supportController.closeTicket);

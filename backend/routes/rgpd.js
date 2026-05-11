@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const { authenticate } = require('../middleware/authenticate');
+const { rgpdExportLimiter, rgpdDeleteLimiter } = require('../middleware/rateLimiter');
 const rgpdService = require('../services/rgpdService');
 const { sanitizeUID } = require('../utils/logSanitizer');
 
@@ -9,7 +10,7 @@ const { sanitizeUID } = require('../utils/logSanitizer');
  * POST /api/rgpd/export-data
  * Génère un export ZIP des données utilisateur
  */
-router.post('/export-data', authenticate, async (req, res) => {
+router.post('/export-data', authenticate, rgpdExportLimiter, async (req, res) => {
   try {
     const kineUid = req.uid;
     
@@ -106,7 +107,7 @@ router.get('/eligibility', authenticate, async (req, res) => {
  * POST /api/rgpd/delete-account
  * Supprime définitivement un compte utilisateur
  */
-router.post('/delete-account', authenticate, async (req, res) => {
+router.post('/delete-account', authenticate, rgpdDeleteLimiter, async (req, res) => {
   try {
     const kineUid = req.uid;
     const { 

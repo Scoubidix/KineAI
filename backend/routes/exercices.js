@@ -7,7 +7,7 @@ const router = express.Router();
 
 const exercicesController = require('../controllers/exercicesController');
 const { authenticate } = require('../middleware/authenticate');
-const { videoUploadLimiter } = require('../middleware/rateLimiter');
+const { videoUploadLimiter, crudWriteLimiter } = require('../middleware/rateLimiter');
 const { validate, createExerciceSchema, updateExerciceSchema } = require('../middleware/validate');
 
 // Configuration de multer pour l'upload de vidéos
@@ -50,9 +50,9 @@ router.get('/private', authenticate, exercicesController.getPrivateExercices);
 // NOUVELLE ROUTE : Récupérer tous les tags disponibles
 router.get('/tags', authenticate, exercicesController.getAllTags);
 
-router.post('/', authenticate, validate(createExerciceSchema), exercicesController.createExercice);
-router.put('/:id', authenticate, validate(updateExerciceSchema), exercicesController.updateExercice);
-router.delete('/:id', authenticate, exercicesController.deleteExercice);
+router.post('/', authenticate, crudWriteLimiter, validate(createExerciceSchema), exercicesController.createExercice);
+router.put('/:id', authenticate, crudWriteLimiter, validate(updateExerciceSchema), exercicesController.updateExercice);
+router.delete('/:id', authenticate, crudWriteLimiter, exercicesController.deleteExercice);
 
 // Route pour upload vidéo et conversion en GIF
 router.post('/upload-video', authenticate, videoUploadLimiter, upload.single('video'), exercicesController.uploadVideoAndConvert);

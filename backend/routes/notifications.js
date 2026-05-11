@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const notificationsController = require('../controllers/notificationsController');
 const { authenticate } = require('../middleware/authenticate');
+const { crudWriteLimiter } = require('../middleware/rateLimiter');
 
 // ===============================
 // ROUTES DE NOTIFICATIONS
@@ -42,25 +43,25 @@ router.get('/types', authenticate, notificationsController.getTypes);
  * PUT /api/notifications/:id/read
  * Marquer une notification spécifique comme lue
  */
-router.put('/:id/read', authenticate, notificationsController.markAsRead);
+router.put('/:id/read', authenticate, crudWriteLimiter, notificationsController.markAsRead);
 
 /**
  * PUT /api/notifications/mark-all-read
  * Marquer toutes les notifications du kiné comme lues
  */
-router.put('/mark-all-read', authenticate, notificationsController.markAllAsRead);
+router.put('/mark-all-read', authenticate, crudWriteLimiter, notificationsController.markAllAsRead);
 
 /**
  * DELETE /api/notifications
  * Supprimer toutes les notifications du kiné connecté
  */
-router.delete('/', authenticate, notificationsController.deleteAll);
+router.delete('/', authenticate, crudWriteLimiter, notificationsController.deleteAll);
 
 /**
  * POST /api/notifications/cleanup
  * Nettoyer les anciennes notifications lues
  * Body: { daysOld: number } (défaut: 30, minimum: 7)
  */
-router.post('/cleanup', authenticate, notificationsController.cleanup);
+router.post('/cleanup', authenticate, crudWriteLimiter, notificationsController.cleanup);
 
 module.exports = router;

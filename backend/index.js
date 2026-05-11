@@ -34,24 +34,10 @@ const prismaService = require('./services/prismaService');
 // Import du nouveau système d'archivage
 const { startProgramCleanupCron } = require('./utils/chatCleanup');
 
-// 🚦 NOUVEAU : Import des rate limiters
+// 🚦 Rate limiters utilisés au niveau app.use (le reste est déplacé dans les routeurs après authenticate)
 const {
-  stripePaymentLimiter,
-  stripeSubscriptionLimiter,
   stripeWebhookLimiter,
-  gptLimiter,
-  gptHeavyLimiter,
-  crudWriteLimiter,
-  authLimiter,
-  whatsappSendLimiter,
-  whatsappTemplatesPatientLimiter,
-  whatsappTemplatesKineLimiter,
-
-  rgpdExportLimiter,
-  rgpdDeleteLimiter,
   signupLimiter,
-  supportTicketLimiter,
-  supportMessageLimiter,
   rateLimitLogger
 } = require('./middleware/rateLimiter');
 
@@ -581,50 +567,28 @@ app.get('/debug/all-imports', (req, res) => {
 // NOUVEAU : Webhook WhatsApp
 app.use('/webhook/whatsapp', whatsappWebhook);
 
-// 🔔 Routes notifications — 🚦 30 ecritures/min (GET libre, poll 60s non impacte)
-app.use('/api/notifications', crudWriteLimiter, notificationRoutes);
+// Routes notifications — rate limiting dans le routeur APRÈS authenticate
+app.use('/api/notifications', notificationRoutes);
 
-// 💳 NOUVEAU PAYWALL : Routes système paywall (LIBRES - navigation)
-app.use('/api/kine', subscriptionRoutes);  // /api/kine/subscription, /api/kine/usage, etc. - LIBRES
-app.use('/api/stripe', stripePaymentLimiter, checkoutRoutes);    // 🚦 Rate limiter paiements (5/min)
-app.use('/api/plans', plansRoutes);        // /api/plans/PIONNIER/availability, etc. - LIBRES
+// Routes système paywall (LIBRES - navigation)
+app.use('/api/kine', subscriptionRoutes);
+app.use('/api/stripe', checkoutRoutes);     // Rate limiting dans le routeur APRÈS authenticate
+app.use('/api/plans', plansRoutes);
 
-// 🔒 NOUVEAU RGPD : Routes de conformité RGPD (rate limiting sélectif)
-app.use('/api/rgpd', (req, res, next) => {
-  if (req.method === 'POST' && req.path === '/export-data') {
-    // 🚦 Export RGPD : 1 export par heure par utilisateur (ultra sécurisé)
-    return rgpdExportLimiter(req, res, next);
-  } else if (req.method === 'POST' && req.path === '/delete-account') {
-    // 🚦 Suppression compte : 3 tentatives par jour (ultra sécurisé)
-    return rgpdDeleteLimiter(req, res, next);
-  }
-  // ✅ Autres routes RGPD (téléchargement, stats) : LIBRES
-  next();
-}, rgpdRoutes);
+// Routes RGPD — rate limiting dans le routeur APRÈS authenticate
+app.use('/api/rgpd', rgpdRoutes);
 
 // ⚖️ LEGAL : Acceptations documents legaux — rate limiting selectif dans le routeur
 app.use('/api/legal-acceptances', legalAcceptancesRoutes);
 
-// 🎁 PARRAINAGE : Routes de parrainage — 🚦 30 ecritures/min (GET libre)
-app.use('/api/referral', crudWriteLimiter, referralRoutes);
+// 🎁 PARRAINAGE : rate limiting dans le routeur APRÈS authenticate
+app.use('/api/referral', referralRoutes);
 
-// 📇 CONTACTS : CRUD contacts kiné — 🚦 30 ecritures/min (GET libre)
-app.use('/api/contacts', crudWriteLimiter, contactsRoutes);
+// 📇 CONTACTS : rate limiting dans le routeur APRÈS authenticate
+app.use('/api/contacts', contactsRoutes);
 
-// 📧 TEMPLATES ADMIN : Rate limiting sélectif sur envoi WhatsApp
-app.use('/api/templates', (req, res, next) => {
-  if (req.method === 'POST' && req.path === '/send-whatsapp') {
-    // 🚦 Envoi WhatsApp templates : 2 limiteurs en cascade
-    // 1. Limite par patient (2/heure)
-    return whatsappTemplatesPatientLimiter(req, res, (err) => {
-      if (err) return next(err);
-      // 2. Limite par kiné (10/heure)
-      return whatsappTemplatesKineLimiter(req, res, next);
-    });
-  }
-  // ✅ Autres routes templates (GET, personnalisation, etc.) : LIBRES
-  next();
-}, templatesRoutes);
+// 📧 TEMPLATES ADMIN : rate limiting dans le routeur APRÈS authenticate
+app.use('/api/templates', templatesRoutes);
 
 // ========== ROUTES MÉTIER - RATE LIMITING SÉLECTIF ==========
 
@@ -635,67 +599,32 @@ app.use('/kine', (req, res, next) => {
   }
   next();
 }, kinesRoutes);
-app.use('/patients', crudWriteLimiter, patientsRoutes);       // 🚦 CRUD patients - 30 ecritures/min (GET libre)
-app.use('/api/patients', crudWriteLimiter, bilansRoutes);     // 🚦 CRUD bilans - 30 ecritures/min (GET libre)
+app.use('/patients', patientsRoutes);       // Rate limiting dans le routeur APRÈS authenticate
+app.use('/api/patients', bilansRoutes);     // Rate limiting dans le routeur APRÈS authenticate
 app.use('/api/bilans', bilansGlobalRoutes);                   // ✅ Routes globales bilans (GET uniquement)
 app.use('/api', bilanFieldsRoutes);                           // ✅ Champs canoniques bilan : GET libre, CRUD admin
 app.use('/api', bilanTemplatesRoutes);                        // ✅ Templates bilan : GET libre, CRUD privé kiné, CRUD admin pour publics
 
-// Programmes : Rate limiting sélectif par route
-app.use('/programmes', (req, res, next) => {
-  if (req.method === 'POST' && req.path.endsWith('/send-whatsapp')) {
-    // 🚦 Envoi WhatsApp : 1 par programme/heure
-    return whatsappSendLimiter(req, res, next);
-  } else if (req.method === 'POST' && !req.path.includes('/send-whatsapp') && !req.path.includes('/generate-link')) {
-    // 🚦 Création de programmes : Rate limiting heavy (génération IA - 5/5min)
-    return gptHeavyLimiter(req, res, next);
-  }
-  // ✅ Autres routes (GET, generate-link, etc.) : LIBRES
-  next();
-}, programmeRoutes);
+// Programmes : rate limiting appliqué dans le routeur APRÈS authenticate
+// (clé par UID kiné — voir routes/programmes.js)
+app.use('/programmes', programmeRoutes);
 
 app.use('/admin/programmes', programmeAdminRoutes);  // Admin - LIBRES (requireAdmin protege)
 app.use('/admin/dashboard', require('./routes/adminDashboard'));  // Admin dashboard stats
 
-// 🎫 SUPPORT : Rate limiting selectif (POST creation = 3/heure, messages = 10/15min)
-app.use('/api/support', (req, res, next) => {
-  if (req.method === 'POST' && req.path === '/tickets') {
-    return supportTicketLimiter(req, res, next);
-  }
-  if (req.method === 'POST' && req.path.match(/^\/tickets\/\d+\/messages$/)) {
-    return supportMessageLimiter(req, res, next);
-  }
-  next();
-}, supportRoutes);
-app.use('/exercices', crudWriteLimiter, exerciceRoutes);               // 🚦 CRUD exercices - 30 ecritures/min (GET libre)
-app.use('/exercice-templates', crudWriteLimiter, exerciceTemplatesRoutes); // 🚦 CRUD templates - 30 ecritures/min (GET libre)
+// SUPPORT, EXERCICES, EXERCICE-TEMPLATES : rate limiting dans le routeur APRÈS authenticate
+app.use('/api/support', supportRoutes);
+app.use('/exercices', exerciceRoutes);
+app.use('/exercice-templates', exerciceTemplatesRoutes);
 app.use('/api/test', testOpenAIRoutes);             // Tests - LIBRES
 
 // ========== ROUTES IA/CHAT - RATE LIMITED ==========
 
-// 🚦 Patient chat : Rate limiting sélectif
-app.use('/api/patient', (req, res, next) => {
-  // POST /chat/:token → appelle GPT systématiquement (5/min)
-  if (req.method === 'POST' && req.path.includes('/chat/')) {
-    return gptLimiter(req, res, next);
-  }
-  // GET /welcome/:token → GPT appelé 1 seule fois, mais rate limit anti-spam (5/min)
-  if (req.method === 'GET' && req.path.includes('/welcome/')) {
-    return gptLimiter(req, res, next);
-  }
-  // ✅ Autres routes (validate, session-status, etc.) : LIBRES
-  next();
-}, patientChatRoutes);
+// Patient chat : rate limiting dans le routeur APRÈS authenticatePatient
+app.use('/api/patient', patientChatRoutes);
 
-// 🚦 IA Kinés : Rate limiting sélectif (POST seulement)
-app.use('/api/chat/kine', (req, res, next) => {
-  if (req.method === 'POST' && req.path.includes('/ia-')) {
-    // 🚦 Appels IA : Rate limiting (10/min)
-    return gptLimiter(req, res, next);
-  }
-  // ✅ GET historiques, statuts, etc. : LIBRES
-  next();
-}, chatKineRoutes);
+// IA Kinés : rate limiting dans le routeur APRÈS authenticate
+app.use('/api/chat/kine', chatKineRoutes);
 
 // Middleware auth pour routes cron (Cloud Scheduler via OIDC)
 const { OAuth2Client } = require('google-auth-library');

@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 const prismaService = require('../services/prismaService');
 const { authenticate } = require('../middleware/authenticate');
+const { stripePaymentLimiter } = require('../middleware/rateLimiter');
 const StripeService = require('../services/StripeService');
 const logger = require('../utils/logger');
 
 // POST /api/stripe/create-checkout - Créer une session de checkout Stripe OU changer de plan
-router.post('/create-checkout', authenticate, async (req, res) => {
+router.post('/create-checkout', authenticate, stripePaymentLimiter, async (req, res) => {
   try {
     const prisma = prismaService.getInstance();
     const { planType, successUrl, cancelUrl, referralCode } = req.body;
@@ -173,7 +174,7 @@ router.post('/create-checkout', authenticate, async (req, res) => {
 });
 
 // POST /api/stripe/create-portal - Créer une session de portail client Stripe
-router.post('/create-portal', authenticate, async (req, res) => {
+router.post('/create-portal', authenticate, stripePaymentLimiter, async (req, res) => {
   try {
     const prisma = prismaService.getInstance();
     // Récupérer le kiné via son UID Firebase
@@ -214,7 +215,7 @@ router.post('/create-portal', authenticate, async (req, res) => {
 });
 
 // POST /api/stripe/change-plan - Changer de plan pour un abonnement existant
-router.post('/change-plan', authenticate, async (req, res) => {
+router.post('/change-plan', authenticate, stripePaymentLimiter, async (req, res) => {
   try {
     const prisma = prismaService.getInstance();
     const { newPlanType } = req.body;
@@ -327,7 +328,7 @@ router.get('/subscription/:subscriptionId', authenticate, async (req, res) => {
 });
 
 // POST /api/stripe/cancel-subscription - Annuler un abonnement
-router.post('/cancel-subscription', authenticate, async (req, res) => {
+router.post('/cancel-subscription', authenticate, stripePaymentLimiter, async (req, res) => {
   try {
     const prisma = prismaService.getInstance();
     // Récupérer le kiné via son UID Firebase
@@ -370,7 +371,7 @@ router.post('/cancel-subscription', authenticate, async (req, res) => {
 });
 
 // POST /api/stripe/reactivate-subscription - Réactiver un abonnement annulé
-router.post('/reactivate-subscription', authenticate, async (req, res) => {
+router.post('/reactivate-subscription', authenticate, stripePaymentLimiter, async (req, res) => {
   try {
     const prisma = prismaService.getInstance();
     // Récupérer le kiné via son UID Firebase
@@ -468,7 +469,7 @@ router.get('/invoices', authenticate, async (req, res) => {
 });
 
 // POST /api/stripe/refresh-subscription-dates - Forcer la mise à jour des dates depuis Stripe
-router.post('/refresh-subscription-dates', authenticate, async (req, res) => {
+router.post('/refresh-subscription-dates', authenticate, stripePaymentLimiter, async (req, res) => {
   try {
     const prisma = prismaService.getInstance();
     // Récupérer le kiné via son UID Firebase

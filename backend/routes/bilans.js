@@ -3,6 +3,7 @@ const router = express.Router();
 
 const bilansController = require('../controllers/bilansController');
 const { authenticate } = require('../middleware/authenticate');
+const { crudWriteLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validate');
 const { z } = require('zod');
 
@@ -47,10 +48,10 @@ const updateBilanSchema = z.object({
 });
 
 // CRUD bilans — toutes les routes nécessitent authenticate
-router.post('/:patientId/bilans', authenticate, validate(createBilanSchema), bilansController.createBilan);
+router.post('/:patientId/bilans', authenticate, crudWriteLimiter, validate(createBilanSchema), bilansController.createBilan);
 router.get('/:patientId/bilans', authenticate, bilansController.getBilans);
 router.get('/:patientId/bilans/:bilanId', authenticate, bilansController.getBilanById);
-router.put('/:patientId/bilans/:bilanId', authenticate, validate(updateBilanSchema), bilansController.updateBilan);
-router.delete('/:patientId/bilans/:bilanId', authenticate, bilansController.deleteBilan);
+router.put('/:patientId/bilans/:bilanId', authenticate, crudWriteLimiter, validate(updateBilanSchema), bilansController.updateBilan);
+router.delete('/:patientId/bilans/:bilanId', authenticate, crudWriteLimiter, bilansController.deleteBilan);
 
 module.exports = router;

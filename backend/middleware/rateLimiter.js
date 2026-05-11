@@ -12,11 +12,16 @@ const { sanitizeUID, sanitizeIP } = require('../utils/logSanitizer');
  * @returns {string} - Clé sécurisée
  */
 function generateSecureKey(req, prefix) {
-  // Utiliser l'UID Firebase en priorité (plus sécurisé)
+  // Utiliser l'UID Firebase en priorité (kiné authentifié)
   if (req.uid) {
     return `${prefix}_user_${req.uid}`;
   }
-  
+
+  // Patient authentifié via JWT custom (req.patient set par authenticatePatient)
+  if (req.patient?.id) {
+    return `${prefix}_patient_${req.patient.id}`;
+  }
+
   // Fallback sur IP (req.ip gère trust proxy configuré dans Express)
   const ip = req.ip || req.connection.remoteAddress;
   
@@ -126,7 +131,9 @@ const gptLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => generateSecureKey(req, 'gpt'),
   handler: (req, res) => {
-    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    const safeUser = req.uid
+      ? sanitizeUID(req.uid)
+      : (req.patient?.id ? `patient_${req.patient.id}` : sanitizeIP(req.ip));
     logger.warn(`🚫 Rate limit dépassé - Appels GPT - User: ${safeUser}`);
     res.status(429).json({
       error: 'Trop d\'appels à l\'IA',

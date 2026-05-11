@@ -6,6 +6,7 @@ const programmesController = require('../controllers/programmesController');
 const { authenticate } = require('../middleware/authenticate');
 const { canCreateProgramme } = require('../middleware/authorization');
 const { validate, createProgrammeSchema, updateProgrammeSchema } = require('../middleware/validate');
+const { gptHeavyLimiter, whatsappSendLimiter } = require('../middleware/rateLimiter');
 
 // ROUTES SPÉCIFIQUES EN PREMIER (avant les routes avec paramètres)
 
@@ -130,7 +131,8 @@ router.get('/stats', authenticate, async (req, res) => {
 router.post('/:programmeId/generate-link', authenticate, programmesController.generateProgrammeLink);
 
 // NOUVELLE ROUTE : Envoi WhatsApp
-router.post('/:id/send-whatsapp', authenticate, async (req, res) => {
+// 🚦 whatsappSendLimiter APRÈS authenticate pour que la clé soit basée sur req.uid (pas l'IP partagée)
+router.post('/:id/send-whatsapp', authenticate, whatsappSendLimiter, async (req, res) => {
   try {
     const { sendProgramLink } = require('../routes/webhook/whatsapp');
     const prismaService = require('../services/prismaService');
@@ -240,7 +242,8 @@ router.post('/:id/send-whatsapp', authenticate, async (req, res) => {
 });
 
 // Routes CRUD standard
-router.post('/', authenticate, canCreateProgramme, validate(createProgrammeSchema), programmesController.createProgramme);
+// 🚦 gptHeavyLimiter APRÈS authenticate pour que la clé soit basée sur req.uid (pas l'IP partagée — bug CGNAT)
+router.post('/', authenticate, gptHeavyLimiter, canCreateProgramme, validate(createProgrammeSchema), programmesController.createProgramme);
 router.put('/:id', authenticate, validate(updateProgrammeSchema), programmesController.updateProgramme);
 router.delete('/:id', authenticate, programmesController.deleteProgramme);
 

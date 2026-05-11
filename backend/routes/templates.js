@@ -7,7 +7,7 @@ const logger = require('../utils/logger');
 const { sanitizeUID, sanitizeName, sanitizeId } = require('../utils/logSanitizer');
 const { sendMessageTemplate } = require('./webhook/whatsapp');
 const prismaService = require('../services/prismaService');
-const { gptLimiter } = require('../middleware/rateLimiter');
+const { gptLimiter, whatsappTemplatesPatientLimiter, whatsappTemplatesKineLimiter } = require('../middleware/rateLimiter');
 const adminAiService = require('../services/adminAiService');
 const { validate, createTemplateSchema, updateTemplateSchema, personalizeTemplateSchema, templateHistorySchema, sendWhatsappSchema } = require('../middleware/validate');
 
@@ -109,7 +109,7 @@ router.post('/', authenticate, validate(createTemplateSchema), async (req, res) 
 
 // ========== POST /api/templates/generate - Génération IA de message (PAYWALL) ==========
 
-router.post('/generate', gptLimiter, authenticate, requireAssistant('TEMPLATES_ADMIN'), async (req, res) => {
+router.post('/generate', authenticate, gptLimiter, requireAssistant('TEMPLATES_ADMIN'), async (req, res) => {
   try {
     const { prompt } = req.body;
 
@@ -247,7 +247,7 @@ router.delete('/history', authenticate, async (req, res) => {
 
 // ========== POST /api/templates/send-whatsapp - Envoie via WhatsApp Business API (PAYWALL) ==========
 
-router.post('/send-whatsapp', authenticate, requireAssistant('TEMPLATES_ADMIN'), validate(sendWhatsappSchema), async (req, res) => {
+router.post('/send-whatsapp', authenticate, whatsappTemplatesPatientLimiter, whatsappTemplatesKineLimiter, requireAssistant('TEMPLATES_ADMIN'), validate(sendWhatsappSchema), async (req, res) => {
   try {
     const { patientId, templateId, templateTitle, subject, body } = req.body;
     const kine = await getKineId(req.uid);
