@@ -1,10 +1,20 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, X, Activity, Layers, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { X, Activity, Layers, ChevronDown, CheckCircle2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import {
   CanonicalField,
@@ -14,7 +24,7 @@ import {
   Measurement,
   BilanTemplate,
 } from '@/types/bilan';
-import AddMeasureModal from './AddMeasureModal';
+import InlineMeasureSearch from './InlineMeasureSearch';
 import ApplyTemplateModal from './ApplyTemplateModal';
 
 interface MeasurementsPanelProps {
@@ -45,10 +55,9 @@ export default function MeasurementsPanel({
   onChange,
   disabled = false,
 }: MeasurementsPanelProps) {
-  const { toast } = useToast();
   const [fields, setFields] = useState<CanonicalField[]>([]);
-  const [addModalOpen, setAddModalOpen] = useState(false);
   const [applyTemplateOpen, setApplyTemplateOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const previouslyCompleteRef = useRef<Set<string>>(new Set());
   const pendingCollapseRef = useRef<Set<string>>(new Set());
@@ -156,14 +165,6 @@ export default function MeasurementsPanel({
         return next;
       });
     }
-
-    toast({
-      title: `Template "${template.name}" appliqué`,
-      description:
-        toAdd.length === 0
-          ? 'Toutes les mesures du template étaient déjà présentes'
-          : `${toAdd.length} mesure${toAdd.length > 1 ? 's ajoutées' : ' ajoutée'}`,
-    });
   };
 
   // Groupes par catégorie. L'ordre des catégories suit la première apparition
@@ -411,6 +412,16 @@ export default function MeasurementsPanel({
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-[#3899aa]" />
           <span className="text-sm font-medium text-[#3899aa]">Tests & mesures</span>
+          <button
+            type="button"
+            onClick={() => setSearchOpen((v) => !v)}
+            disabled={disabled}
+            aria-label="Ajouter une mesure"
+            aria-pressed={searchOpen}
+            className="inline-flex items-center justify-center h-6 w-6 rounded-full border border-dashed border-[#3899aa]/40 text-[#3899aa] hover:border-[#3899aa] hover:bg-[#3899aa]/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -425,39 +436,65 @@ export default function MeasurementsPanel({
             <Layers className="h-3 w-3 mr-1" />
             Appliquer un template
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setAddModalOpen(true)}
-            disabled={disabled}
-            className="h-7 text-xs rounded-full"
-          >
-            <Plus className="h-3 w-3 mr-1" />
-            Ajouter une mesure
-          </Button>
         </div>
       </div>
 
-      {!hasMeasures ? (
-        <p className="text-xs text-muted-foreground italic px-2 py-1">
-          Aucune mesure ajoutée. Cliquez sur « Ajouter une mesure » pour saisir EVA, amplitudes, tests…
-        </p>
-      ) : (
+      <InlineMeasureSearch
+        fields={fields}
+        addedKeys={addedKeys}
+        addedCustomLabels={addedCustomLabels}
+        onAddCanonical={handleAddCanonical}
+        onAddCustom={handleAddCustom}
+        disabled={disabled}
+        isOpen={searchOpen}
+        onOpenChange={setSearchOpen}
+      />
+
+      {hasMeasures && (
         <>
-          {stats.globalTotal > 1 && (
-            <div className="flex items-center gap-2 px-2 py-1">
-              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-[#3899aa] rounded-full transition-all duration-300"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-              <span className="text-[11px] font-medium text-muted-foreground tabular-nums shrink-0">
-                {stats.globalFilled}/{stats.globalTotal} saisies
-              </span>
+          <div className="flex items-center gap-2 px-2 py-1">
+            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#3899aa] rounded-full transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
             </div>
-          )}
+            <span className="text-[11px] font-medium text-muted-foreground tabular-nums shrink-0">
+              {stats.globalFilled}/{stats.globalTotal} saisies
+            </span>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={disabled}
+                  title="Tout supprimer"
+                  aria-label="Supprimer toutes les mesures"
+                  className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-red-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Supprimer toutes les mesures ?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Les {stats.globalTotal} mesure{stats.globalTotal > 1 ? 's' : ''} et leurs valeurs saisies seront retirées de ce bilan. Cette action est irréversible.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuler</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => onChange({ measurements: [] })}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Tout supprimer
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
 
           {isCompactMode ? (
             <div className="space-y-1">
@@ -517,16 +554,6 @@ export default function MeasurementsPanel({
           )}
         </>
       )}
-
-      <AddMeasureModal
-        open={addModalOpen}
-        onOpenChange={setAddModalOpen}
-        fields={fields}
-        addedKeys={addedKeys}
-        addedCustomLabels={addedCustomLabels}
-        onAddCanonical={handleAddCanonical}
-        onAddCustom={handleAddCustom}
-      />
 
       <ApplyTemplateModal
         open={applyTemplateOpen}

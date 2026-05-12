@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import MeasurementsPanel from '../components/MeasurementsPanel';
 import CompareWithPreviousModal, { SelectedBilan } from '../components/CompareWithPreviousModal';
 import TemplateEditorModal from '../components/TemplateEditorModal';
+import BilanDetailView from '../components/BilanDetailView';
 import { BilanType, StructuredData, EMPTY_STRUCTURED_DATA, BILAN_TYPE_LABELS, BILAN_TYPE_COLORS, CanonicalField, TemplateItem } from '@/types/bilan';
 
 interface PatientOption {
@@ -67,6 +68,8 @@ export default function BilanKinePage() {
   // Sauvegarde en template privé depuis la composition de mesures actuelle
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [saveTemplateInitialItems, setSaveTemplateInitialItems] = useState<TemplateItem[]>([]);
+  // Visualisation d'un bilan antérieur en lecture seule depuis le récap de comparaison
+  const [viewingPreviousBilan, setViewingPreviousBilan] = useState<SelectedBilan | null>(null);
 
   // Injecter le HTML dans le div contentEditable sans que React ne contrôle le contenu
   useEffect(() => {
@@ -960,12 +963,18 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
                     Modifier la sélection
                   </Button>
                   <Button
-                    variant="ghost"
                     size="sm"
-                    onClick={() => setPreviousBilans([])}
-                    className="h-6 px-2 text-xs"
+                    onClick={() => {
+                      // Ouvre le viewer sur le bilan le plus récent ; la navigation
+                      // prev/next permet d'accéder aux autres si plusieurs.
+                      const mostRecent = [...previousBilans].sort(
+                        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+                      )[0];
+                      setViewingPreviousBilan(mostRecent);
+                    }}
+                    className="btn-teal h-6 px-3 text-xs rounded-full"
                   >
-                    Retirer
+                    Voir
                   </Button>
                 </div>
               ) : (
@@ -1228,6 +1237,81 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
           }}
         />
       )}
+
+      <Dialog
+        open={viewingPreviousBilan !== null}
+        onOpenChange={(o) => !o && setViewingPreviousBilan(null)}
+      >
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#3899aa]">
+              <FileText className="w-5 h-5" />
+              Aperçu du bilan
+              {viewingPreviousBilan && previousBilans.length > 1 && (() => {
+                const sorted = [...previousBilans].sort(
+                  (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+                );
+                const idx = sorted.findIndex((b) => b.id === viewingPreviousBilan.id);
+                return (
+                  <span className="text-xs font-normal text-muted-foreground ml-auto tabular-nums">
+                    {idx + 1} / {sorted.length}
+                  </span>
+                );
+              })()}
+            </DialogTitle>
+          </DialogHeader>
+
+          {viewingPreviousBilan && (
+            <BilanDetailView
+              bilan={viewingPreviousBilan}
+              onBack={() => setViewingPreviousBilan(null)}
+              showBackButton={false}
+            />
+          )}
+
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
+            {previousBilans.length > 1 && viewingPreviousBilan ? (() => {
+              const sorted = [...previousBilans].sort(
+                (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+              );
+              const idx = sorted.findIndex((b) => b.id === viewingPreviousBilan.id);
+              const prev = idx > 0 ? sorted[idx - 1] : null;
+              const next = idx < sorted.length - 1 ? sorted[idx + 1] : null;
+              return (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => prev && setViewingPreviousBilan(prev)}
+                    disabled={!prev}
+                    className="rounded-full h-8 text-xs"
+                  >
+                    <ArrowLeft className="h-3 w-3 mr-1" />
+                    Précédent
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => next && setViewingPreviousBilan(next)}
+                    disabled={!next}
+                    className="rounded-full h-8 text-xs"
+                  >
+                    Suivant
+                    <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </div>
+              );
+            })() : <span />}
+            <Button
+              variant="outline"
+              onClick={() => setViewingPreviousBilan(null)}
+              className="rounded-full h-9 text-sm"
+            >
+              Fermer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Plus, X, Loader2, Layers, GripVertical } from 'lucide-react';
+import { X, Loader2, Layers, GripVertical } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -29,7 +29,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
 import { BilanTemplate, TemplateItem, CanonicalField } from '@/types/bilan';
-import AddMeasureModal from './AddMeasureModal';
+import InlineMeasureSearch from './InlineMeasureSearch';
 
 type EditorMode = 'private' | 'public';
 
@@ -217,7 +217,6 @@ export default function TemplateEditorModal({
   const [category, setCategory] = useState('');
   const [groups, setGroups] = useState<CategoryGroup[]>([]);
   const [fields, setFields] = useState<CanonicalField[]>([]);
-  const [addModalOpen, setAddModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   // Garde l'init unique par ouverture : on rebuild les groupes uniquement quand
   // les fields sont chargés ET qu'on n'a pas déjà initialisé pour cette ouverture.
@@ -285,7 +284,7 @@ export default function TemplateEditorModal({
     initRef.current = true;
   }, [open, template, initialItems, fields, fieldsByKey]);
 
-  // Sets dérivés pour empêcher l'ajout de doublons via AddMeasureModal
+  // Sets dérivés pour empêcher l'ajout de doublons via InlineMeasureSearch
   const allItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
   const addedKeys = useMemo(
     () =>
@@ -434,7 +433,6 @@ export default function TemplateEditorModal({
       });
       const json = await res.json();
       if (json.success) {
-        toast({ title: isEdit ? 'Template modifié' : 'Template créé' });
         onSaved(json.template);
         onOpenChange(false);
       } else {
@@ -500,25 +498,21 @@ export default function TemplateEditorModal({
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="mb-2">
                 <Label className="text-xs">Mesures incluses ({totalItems})</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setAddModalOpen(true)}
-                  className="h-7 text-xs rounded-full"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Ajouter une mesure
-                </Button>
               </div>
 
-              {groups.length === 0 ? (
-                <p className="text-xs text-muted-foreground italic px-2 py-3 text-center border border-dashed border-border/60 rounded-lg">
-                  Aucune mesure. Ajoutez les EVA, amplitudes, tests cliniques pour ce type de bilan.
-                </p>
-              ) : (
+              <div className="mb-2">
+                <InlineMeasureSearch
+                  fields={fields}
+                  addedKeys={addedKeys}
+                  addedCustomLabels={addedCustomLabels}
+                  onAddCanonical={handleAddCanonical}
+                  onAddCustom={handleAddCustom}
+                />
+              </div>
+
+              {groups.length > 0 && (
                 <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={handleDragEnd}>
                   <SortableContext items={categoryDndIds} strategy={verticalListSortingStrategy}>
                     <div className="space-y-2 border border-border/60 rounded-lg p-2 max-h-[260px] overflow-y-auto">
@@ -549,16 +543,6 @@ export default function TemplateEditorModal({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <AddMeasureModal
-        open={addModalOpen}
-        onOpenChange={setAddModalOpen}
-        fields={fields}
-        addedKeys={addedKeys}
-        addedCustomLabels={addedCustomLabels}
-        onAddCanonical={handleAddCanonical}
-        onAddCustom={handleAddCustom}
-      />
     </>
   );
 }
