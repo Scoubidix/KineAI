@@ -306,7 +306,7 @@ Format : "📋 Programme du jour :"
 Pour CHAQUE exercice du programme :
 • Nom de l'exercice : séries × répétitions (+ temps de travail si > 0)
 • Immédiatement après : le GIF de démonstration si disponible (syntaxe markdown ![](url))
-Maximum 3-4 exercices affichés (les premiers du programme)
+Afficher TOUS les exercices du programme, sans exception et dans l'ordre fourni
 IMPORTANT: Si un exercice a un temps de travail > 0 secondes, l'afficher après les répétitions
 IMPORTANT: Chaque GIF doit être placé JUSTE APRÈS son exercice correspondant, pas à la fin
 
@@ -323,7 +323,7 @@ RÈGLES DE STYLE :
 - Maximum 150 mots
 - NE PAS ajouter de sections supplémentaires
 
-EXEMPLE DE RÉSULTAT ATTENDU :
+EXEMPLE DE RÉSULTAT ATTENDU (le nombre d'exercices ci-dessous est purement illustratif — toujours afficher TOUS les exercices du programme réel) :
 Bonjour ! 👋
 
 Je suis votre assistant kinésithérapeute virtuel, ici pour vous accompagner dans votre rééducation.
@@ -339,6 +339,8 @@ Je suis votre assistant kinésithérapeute virtuel, ici pour vous accompagner da
 • Gainage : 3 séries × 1 répétition (maintien 45s)
 ![Démonstration](url_gif_gainage)
 
+(... et ainsi de suite pour TOUS les exercices restants du programme)
+
 ✅ Pensez à valider vos exercices une fois terminés - cela aide votre kinésithérapeute à suivre vos progrès !
 
 N'hésitez pas à me poser des questions sur vos exercices. Comment vous sentez-vous aujourd'hui ?
@@ -350,7 +352,7 @@ IMPORTANT - AFFICHAGE DES GIFS :
 - UTILISE LES URLS DES GIFS fournis dans les données des exercices (champ Démonstration)
 - SI un exercice a un GIF (Démonstration : url) → affiche-le IMMÉDIATEMENT après cet exercice avec la syntaxe markdown ![Démonstration](url)
 - Chaque GIF doit être placé JUSTE APRÈS son exercice correspondant (pas groupés à la fin)
-- Affiche 1 à 3 GIFs maximum (ceux des premiers exercices qui en ont)
+- Affiche le GIF de CHAQUE exercice qui en a un (pas de plafond, pas de sélection)
 - SI aucun exercice n'a de GIF → n'affiche PAS de GIF du tout (ne pas utiliser de GIF générique)`;
 
     const response = await openai.chat.completions.create({
@@ -359,7 +361,7 @@ IMPORTANT - AFFICHAGE DES GIFS :
         { role: 'system', content: systemPrompt },
         { role: 'user', content: welcomePrompt }
       ],
-      max_tokens: 800, // GPT génère des pseudo-URLs courtes (https://gif/0) remplacées après
+      max_tokens: 1500, // GPT génère des pseudo-URLs courtes (https://gif/0) remplacées après. 1500 couvre ~20 exos.
       temperature: 0.5
     });
 
@@ -389,7 +391,7 @@ IMPORTANT - AFFICHAGE DES GIFS :
 
     if (programmes.length > 0) {
       fallbackMessage += '📋 Programme du jour :\n\n';
-      const exercices = programmes[0]?.exercices?.slice(0, 3) || [];
+      const exercices = programmes[0]?.exercices || [];
       if (exercices.length > 0) {
         exercices.forEach((ex) => {
           const nom = ex.exerciceModele?.nom || ex.nom;

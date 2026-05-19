@@ -1313,11 +1313,6 @@ export default function ProgrammesPage() {
 
             {/* Section validation */}
             <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
-              {selectedExercises.length > 5 && (
-                <p className="text-sm text-red-500 text-center">
-                  Maximum 5 exercices par programme ({selectedExercises.length} sélectionnés)
-                </p>
-              )}
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button
                   type="button"
@@ -1334,7 +1329,7 @@ export default function ProgrammesPage() {
                 <Button
                   onClick={handleCreateProgramme}
                   className="btn-teal flex-1 text-sm sm:text-base"
-                  disabled={!createTitle || !createDescription || selectedExercises.length === 0 || selectedExercises.length > 5 || creatingProgramme || createDuration <= 0 || createDuration > 30}
+                  disabled={!createTitle || !createDescription || selectedExercises.length === 0 || creatingProgramme || createDuration <= 0 || createDuration > 30}
                 >
                   {creatingProgramme ? (
                     <>

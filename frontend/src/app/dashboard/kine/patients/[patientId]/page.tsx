@@ -1240,15 +1240,10 @@ export default function PatientDetailPage() {
 
           {/* Section validation */}
           <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
-            {selectedExercises.length > 5 && (
-              <p className="text-sm text-red-500 text-center">
-                Maximum 5 exercices par programme ({selectedExercises.length} sélectionnés)
-              </p>
-            )}
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button 
+              <Button
                 type="button"
-                variant="outline" 
+                variant="outline"
                 onClick={() => {
                   if (isEdit) {
                     setOpenEditModal(false);
@@ -1265,7 +1260,7 @@ export default function PatientDetailPage() {
               <Button
                 onClick={handleSubmit}
                 className="flex-1 btn-teal text-sm sm:text-base"
-                disabled={!title || !description || selectedExercises.length === 0 || selectedExercises.length > 5 || duration <= 0 || duration > 30}
+                disabled={!title || !description || selectedExercises.length === 0 || duration <= 0 || duration > 30}
               >
                 {buttonText}
               </Button>
