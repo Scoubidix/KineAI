@@ -394,7 +394,9 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
         return false;
       }
       const updated = await res.json();
-      setProfile(updated);
+      // Le backend renvoie { message, kine: <Kine> } — on extrait le record Kine
+      // pour ne pas écraser le profil avec un objet sans firstName/lastName.
+      setProfile(updated.kine || updated);
       return true;
     } catch {
       toast({ title: 'Erreur', description: 'Sauvegarde profil échouée', variant: 'destructive' });
