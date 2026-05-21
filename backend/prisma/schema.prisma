@@ -8,18 +8,27 @@ datasource db {
 }
 
 model Kine {
-  id             Int      @id @default(autoincrement())
-  uid            String   @unique
-  email          String   @unique
+  id             Int       @id @default(autoincrement())
+  uid            String    @unique
+  email          String    @unique
   firstName      String
   lastName       String
   phone          String?
-  rpps           String?  @unique
+  rpps           String?   @unique
   birthDate      DateTime?
   adresseCabinet String?
-  avatarPath     String?  // Chemin GCS de l'avatar (ex: "avatars/123_photo.jpg")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  avatarPath     String? // Chemin GCS de l'avatar (ex: "avatars/123_photo.jpg")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // ========== INFOS PROFESSIONNELLES CONTRATS (optionnels, complétés au 1er contrat) ==========
+  civilite         String? // "M." | "MME" — utilisé dans la rédaction des contrats
+  birthPlace       String?
+  departementOrdre String?
+  numeroOrdinal    String?
+  numeroUrssaf     String?
+  adresseDomicile  String?
+  // =============================================================================================
 
   // ========== TRAÇABILITÉ LÉGALE ==========
   acceptedCguAt                      DateTime? // Date/heure d'acceptation des CGU
@@ -82,6 +91,14 @@ model Kine {
   // ========== RELATION TRAÇABILITÉ LÉGALE ==========
   legalAcceptances LegalAcceptance[]
   // =================================================
+
+  // ========== RELATIONS CONTRATS ==========
+  contactsKine          ContactKine[]
+  contractsInitiated    Contract[]          @relation("ContractInitiateur")
+  contractsReceived     Contract[]          @relation("ContractDestinataire")
+  contractSignatures    ContractSignature[]
+  lastContractsViewedAt DateTime? // Pour badge "nouveau" sur contrats signés depuis dernière visite
+  // ========================================
 }
 
 model Patient {
@@ -662,8 +679,8 @@ model BilanKine {
 enum CanonicalFieldType {
   NUMERIC // ex: EVA 7/10, flexion 40° → input number + unité
   BOOLEAN // ex: Lasègue positif/négatif → toggle 2 états
-  TEXT    // ex: observation libre → input text
-  ENUM    // ex: testing musculaire 0/5..5/5 → select avec options
+  TEXT // ex: observation libre → input text
+  ENUM // ex: testing musculaire 0/5..5/5 → select avec options
 }
 
 model BilanCanonicalField {
@@ -679,7 +696,7 @@ model BilanCanonicalField {
   order     Int                @default(0) // ordre d'affichage dans la catégorie
   isActive  Boolean            @default(true)
   createdAt DateTime           @default(now())
-  updatedAt DateTime            @updatedAt
+  updatedAt DateTime           @updatedAt
 
   @@index([isActive, category, order])
   @@map("bilan_canonical_fields")
@@ -691,12 +708,12 @@ model BilanCanonicalField {
 // items JSON : [{ kind: "canonical", key: "eva_repos" } | { kind: "custom", label: "Test de Neer" }]
 
 model BilanTemplate {
-  id          Int       @id @default(autoincrement())
-  name        String    @db.VarChar(150)
-  description String?   @db.VarChar(500)
-  category    String    @db.VarChar(80) // libre, ex: "Rachis lombaire"
+  id          Int     @id @default(autoincrement())
+  name        String  @db.VarChar(150)
+  description String? @db.VarChar(500)
+  category    String  @db.VarChar(80) // libre, ex: "Rachis lombaire"
   items       Json // Liste ordonnée d'items (canonical|custom)
-  isPublic    Boolean   @default(false)
+  isPublic    Boolean @default(false)
 
   // Soft delete
   isActive  Boolean   @default(true)
@@ -715,3 +732,157 @@ model BilanTemplate {
 }
 
 // ==============================================
+
+// ========== CONTRATS REMPLACEMENT / ASSISTANAT ==========
+
+enum ContractType {
+  REMPLACEMENT_LIBERAL
+  ASSISTANAT_LIBERAL
+
+  @@map("contract_type")
+}
+
+enum ContractRoleInitiateur {
+  TITULAIRE // Kiné déjà installé qui cherche un remplaçant/assistant
+  REMPLACANT_OU_ASSISTANT // Kiné qui vient remplacer/assister
+
+  @@map("contract_role_initiateur")
+}
+
+enum ContractStatus {
+  BROUILLON // En cours de rédaction
+  SIGNE_INITIATEUR // Initiateur a signé, pas encore envoyé
+  ENVOYE // Lien envoyé au destinataire
+  COMPLETE // Les 2 parties ont signé
+  ARCHIVE // Archivé manuellement
+
+  @@map("contract_status")
+}
+
+enum ContractSignerRole {
+  INITIATEUR
+  DESTINATAIRE
+
+  @@map("contract_signer_role")
+}
+
+enum ContractInviteChannel {
+  EMAIL
+  WHATSAPP
+  BOTH
+
+  @@map("contract_invite_channel")
+}
+
+enum SignerAccountType {
+  EXISTING_KINE // Compte Kine existant matché par email
+  NEW_KINE // Compte Kine créé via le flow magic link
+  GUEST // Signature en invité, sans compte
+
+  @@map("signer_account_type")
+}
+
+// Carnet d'adresses kinés (séparé des Contact médecin/mutuelle existants)
+// Infos minimales : juste pour identifier / contacter. Les vraies données sensibles
+// vivent sur le modèle Kine (pour les inscrits) ou dans Contract.data (snapshot invité).
+model ContactKine {
+  id        Int      @id @default(autoincrement())
+  kineId    Int
+  kine      Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  firstName String   @db.VarChar(100)
+  lastName  String   @db.VarChar(100)
+  email     String   @db.VarChar(255)
+  phone     String?  @db.VarChar(20)
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contracts Contract[]
+
+  @@unique([kineId, email])
+  @@index([kineId])
+  @@map("contacts_kine")
+}
+
+model Contract {
+  id Int @id @default(autoincrement())
+
+  // Initiateur (toujours présent)
+  kineInitiateurId Int
+  kineInitiateur   Kine @relation("ContractInitiateur", fields: [kineInitiateurId], references: [id], onDelete: Cascade)
+
+  // Type et rôle de l'initiateur dans le contrat
+  type           ContractType
+  roleInitiateur ContractRoleInitiateur
+
+  // Destinataire — infos minimales saisies par l'initiateur (nom/prénom/email/tel)
+  contactKineId      Int?
+  contactKine        ContactKine? @relation(fields: [contactKineId], references: [id], onDelete: SetNull)
+  kineDestinataireId Int? // Set si l'email matche un compte Kine existant (lien interne, A ne voit pas les données de B)
+  kineDestinataire   Kine?        @relation("ContractDestinataire", fields: [kineDestinataireId], references: [id], onDelete: SetNull)
+
+  destinataireFirstName String  @db.VarChar(100)
+  destinataireLastName  String  @db.VarChar(100)
+  destinataireEmail     String  @db.VarChar(255)
+  destinatairePhone     String? @db.VarChar(20)
+
+  // Snapshot complet des données du contrat au moment de la complétion
+  // Contient : état civil 2 kinés + infos spécifiques contrat (dates, lieu, %, conditions, etc.)
+  data Json
+
+  status ContractStatus @default(BROUILLON)
+
+  // PDF final scellé après signature des 2 parties
+  pdfFinalUrl         String? // Path GCS interne (ex: "contracts/42/contrat-final.pdf")
+  pdfFinalHash        String? // SHA256 hex du PDF généré (intégrité)
+  pdfFinalGeneratedAt DateTime?
+
+  // Magic link pour l'accès destinataire — on stocke uniquement le HASH du JWT (jamais le brut)
+  accessTokenHash      String?                @unique // SHA256(JWT)
+  accessTokenChannel   ContractInviteChannel? // Canal d'envoi choisi par l'initiateur
+  accessTokenSentAt    DateTime? // Quand l'envoi a été déclenché
+  accessTokenExpiresAt DateTime?
+  accessTokenUsedAt    DateTime? // Set à la signature finale (one-shot)
+  accessTokenRevokedAt DateTime? // Révocation par l'initiateur (avant signature uniquement)
+
+  // Audit log : [{ at, action, by, ip, ua, meta }]
+  auditLog Json?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime? // Horodatage 2e signature
+
+  signatures ContractSignature[]
+
+  @@index([kineInitiateurId, createdAt])
+  @@index([kineDestinataireId, createdAt])
+  @@index([status])
+  @@map("contracts")
+}
+
+model ContractSignature {
+  id         Int      @id @default(autoincrement())
+  contractId Int
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  signerRole      ContractSignerRole
+  signerKineId    Int? // null si invité (sans compte)
+  signerKine      Kine?              @relation(fields: [signerKineId], references: [id], onDelete: SetNull)
+  signerEmail     String             @db.VarChar(255)
+  signerFirstName String             @db.VarChar(100)
+  signerLastName  String             @db.VarChar(100)
+  signatureText   String             @db.VarChar(255) // "Prénom Nom" rendu en cursive dans le PDF
+  mention         String?            @db.VarChar(255) // "Lu et approuvé" — preuve de consentement éclairé
+  accountType     SignerAccountType? // Comment le signataire a accédé (compte existant, nouveau, ou invité)
+  guestData       Json? // Si accountType=GUEST : snapshot des champs Kine étendus saisis pour le contrat
+
+  // Audit trail
+  ip        String?
+  userAgent String?  @db.Text
+  signedAt  DateTime @default(now())
+
+  @@index([contractId, signerRole])
+  @@map("contract_signatures")
+}
+
+// ===========================================================

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import {
   SidebarProvider,
   Sidebar,
@@ -1100,10 +1101,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { href: '/dashboard/kine/chatbot-biblio', label: 'IA Bibliographique', icon: BookOpen, disabled: false },
         { href: '/dashboard/kine/chatbot-clinique', label: 'IA Clinique', icon: Stethoscope, disabled: false },
         { href: '/dashboard/kine/chatbot-admin', label: 'IA Administrative', icon: FileText, disabled: false },
+        { href: '/dashboard/kine/contrats', label: 'Mes Contrats', icon: Briefcase, disabled: false },
         { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, disabled: false },
         { href: '/dashboard/kine/public-programs', label: 'Programmes Publics (Bientôt)', icon: Share2, disabled: false },
         { href: '/dashboard/kine/blog', label: 'Blog Pro (Bientôt)', icon: Library, disabled: false },
-        { href: '/dashboard/kine/jobs', label: 'Annonces Emploi (Bientôt)', icon: Briefcase, disabled: false },
         { href: '/dashboard/kine/revenue', label: 'Revenus (Bientôt)', icon: DollarSign, disabled: false },
         { href: '/dashboard/kine/rewards', label: 'Mes Récompenses (Bientôt)', icon: Gift, disabled: false },
       ];
@@ -1122,6 +1123,24 @@ export default function AppLayout({ children }: AppLayoutProps) {
       { href: '/dashboard/patient/home', label: 'Accès Patient (Dev)', icon: ClipboardList, disabled: false },
     ];
   };
+
+  // Badge "nouveau" sur l'item Mes Contrats quand des contrats viennent d'être signés
+  const [contractsUnreadCount, setContractsUnreadCount] = useState(0);
+  useEffect(() => {
+    if (role !== 'kine') return;
+    let cancelled = false;
+    const fetchCount = async () => {
+      try {
+        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts/unread-count`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setContractsUnreadCount(data.count || 0);
+      } catch { /* silencieux */ }
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 2 * 60 * 1000); // toutes les 2 min
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [role]);
 
   const navigationItems = getNavigationItems();
   const displayName = role === 'kine' ? 'Dr. Kiné (Dev)' : role === 'patient' ? 'Patient (Dev)' : 'Utilisateur (Dev)';
@@ -1307,6 +1326,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   <Link href={item.href}>
                     <item.icon className="h-4 w-4 shrink-0" />
                     <span>{item.label}</span>
+                    {item.href === '/dashboard/kine/contrats' && contractsUnreadCount > 0 && (
+                      <Badge variant="destructive" className="ml-auto h-4 px-1.5 text-[9px] leading-none">
+                        {contractsUnreadCount}
+                      </Badge>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

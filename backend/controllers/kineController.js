@@ -118,7 +118,10 @@ const getKineProfile = async (req, res) => {
 
 const updateKineProfile = async (req, res) => {
   const uid = req.uid; // Récupéré depuis le middleware authenticate
-  const { email, phone, adresseCabinet, rpps } = req.body;
+  const {
+    email, phone, adresseCabinet, rpps,
+    civilite, birthDate, birthPlace, departementOrdre, numeroOrdinal, numeroUrssaf, adresseDomicile
+  } = req.body;
 
   logger.info("📥 Mise à jour profil kiné pour UID:", sanitizeUID(uid));
 
@@ -146,6 +149,14 @@ const updateKineProfile = async (req, res) => {
     if (phone !== undefined) updateData.phone = phone;
     if (adresseCabinet !== undefined) updateData.adresseCabinet = adresseCabinet;
     if (rpps !== undefined) updateData.rpps = rpps;
+    // Champs profil étendus (utilisés pour la génération des contrats)
+    if (civilite !== undefined) updateData.civilite = civilite || null;
+    if (birthDate !== undefined) updateData.birthDate = birthDate ? new Date(birthDate) : null;
+    if (birthPlace !== undefined) updateData.birthPlace = birthPlace || null;
+    if (departementOrdre !== undefined) updateData.departementOrdre = departementOrdre || null;
+    if (numeroOrdinal !== undefined) updateData.numeroOrdinal = numeroOrdinal || null;
+    if (numeroUrssaf !== undefined) updateData.numeroUrssaf = numeroUrssaf || null;
+    if (adresseDomicile !== undefined) updateData.adresseDomicile = adresseDomicile || null;
 
     // Mettre à jour le profil
     const updatedKine = await prisma.kine.update({
@@ -161,6 +172,12 @@ const updateKineProfile = async (req, res) => {
         rpps: true,
         adresseCabinet: true,
         birthDate: true,
+        civilite: true,
+        birthPlace: true,
+        departementOrdre: true,
+        numeroOrdinal: true,
+        numeroUrssaf: true,
+        adresseDomicile: true,
         updatedAt: true
       }
     });

@@ -63,6 +63,14 @@ const updateKineProfileSchema = z.object({
   phone: optionalTrimmedString(20),
   adresseCabinet: optionalTrimmedString(500),
   rpps: optionalTrimmedString(20),
+  // Champs profil étendus pour la génération de contrats
+  civilite: z.enum(['M.', 'MME']).nullable().optional(),
+  birthDate: z.string().optional().or(z.literal('')),
+  birthPlace: optionalTrimmedString(200).or(z.literal('')),
+  departementOrdre: optionalTrimmedString(150).or(z.literal('')),
+  numeroOrdinal: optionalTrimmedString(50).or(z.literal('')),
+  numeroUrssaf: optionalTrimmedString(50).or(z.literal('')),
+  adresseDomicile: optionalTrimmedString(500).or(z.literal('')),
 });
 
 // ========== PROGRAMME ==========

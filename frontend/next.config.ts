@@ -34,8 +34,8 @@ const csp = [
   "img-src 'self' data: blob: picsum.photos storage.googleapis.com www.google.com https://www.google-analytics.com",
   // Fonts : next/font auto-heberge au build, gstatic en fallback
   "font-src 'self' fonts.gstatic.com",
-  // Frames : aucun iframe autorise
-  "frame-src 'none'",
+  // Frames : iframe autorise uniquement vers la meme origine + blob: (preview PDF contrats)
+  "frame-src 'self' blob:",
   // Bloque les plugins (Flash, Java, etc.)
   "object-src 'none'",
   // Empeche le changement de base URL
