@@ -150,6 +150,8 @@ async function listContractsByKine(kineId, { status, role } = {}) {
       createdAt: true,
       updatedAt: true,
       completedAt: true,
+      ordreSentAt: true,
+      ordreRecipientEmail: true,
       kineInitiateur: { select: { firstName: true, lastName: true, email: true } },
     },
     orderBy: { createdAt: 'desc' },
@@ -188,6 +190,21 @@ async function markContractsViewed(kineId) {
   await prisma.kine.update({
     where: { id: kineId },
     data: { lastContractsViewedAt: new Date() }
+  });
+}
+
+/**
+ * Compte les contrats COMPLETE côté initiateur dont l'envoi au CDO n'a pas encore été fait.
+ * Sert au badge "à déclarer" sur la card hub Mes contrats.
+ */
+async function getPendingOrdreCount(kineId) {
+  const prisma = prismaService.getInstance();
+  return prisma.contract.count({
+    where: {
+      kineInitiateurId: kineId,
+      status: 'COMPLETE',
+      ordreSentAt: null,
+    }
   });
 }
 
@@ -345,6 +362,7 @@ module.exports = {
   signInitiator,
   getUnreadCount,
   markContractsViewed,
+  getPendingOrdreCount,
   appendAuditEvent,
   normalizeSignatureText,
 };

@@ -62,7 +62,8 @@ const updateKineProfileSchema = z.object({
   email: z.string().email().optional(),
   phone: optionalTrimmedString(20),
   adresseCabinet: optionalTrimmedString(500),
-  rpps: optionalTrimmedString(20),
+  // Nullable : le front envoie null pour effacer le RPPS (Prisma le stocke en NULL).
+  rpps: optionalTrimmedString(20).nullable(),
   // Champs profil étendus pour la génération de contrats
   civilite: z.enum(['M.', 'MME']).nullable().optional(),
   birthDate: z.string().optional().or(z.literal('')),

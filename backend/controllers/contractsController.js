@@ -1,6 +1,7 @@
 const contractService = require('../services/contractService');
 const contractPdfService = require('../services/contractPdfService');
 const contractInviteService = require('../services/contractInviteService');
+const contractOrdreService = require('../services/contractOrdreService');
 const gcsStorageService = require('../services/gcsStorageService');
 const prismaService = require('../services/prismaService');
 const logger = require('../utils/logger');
@@ -27,6 +28,11 @@ function handleServiceError(err, res, defaultMsg) {
     [contractInviteService.ERROR_CODES.INVALID_CHANNEL]: 400,
     [contractInviteService.ERROR_CODES.TOKEN_USED]: 409,
     [contractInviteService.ERROR_CODES.EMAIL_SEND_FAILED]: 502,
+    [contractOrdreService.ERROR_CODES.NOT_FOUND]: 404,
+    [contractOrdreService.ERROR_CODES.IMMUTABLE_STATUS]: 409,
+    [contractOrdreService.ERROR_CODES.PDF_NOT_READY]: 409,
+    [contractOrdreService.ERROR_CODES.INVALID_EMAIL]: 400,
+    [contractOrdreService.ERROR_CODES.EMAIL_SEND_FAILED]: 502,
   };
   const status = mapping[err.code];
   if (status) {
@@ -100,6 +106,18 @@ exports.getUnreadCount = async (req, res) => {
     res.json({ success: true, count });
   } catch (err) {
     logger.error('Erreur getUnreadCount:', err);
+    res.status(500).json({ success: false, error: 'Erreur', code: 'INTERNAL_ERROR' });
+  }
+};
+
+exports.getPendingOrdreCount = async (req, res) => {
+  try {
+    const kineId = await getKineId(req.uid);
+    if (!kineId) return res.status(404).json({ success: false, error: 'Kiné introuvable', code: 'KINE_NOT_FOUND' });
+    const count = await contractService.getPendingOrdreCount(kineId);
+    res.json({ success: true, count });
+  } catch (err) {
+    logger.error('Erreur getPendingOrdreCount:', err);
     res.status(500).json({ success: false, error: 'Erreur', code: 'INTERNAL_ERROR' });
   }
 };
@@ -285,6 +303,90 @@ exports.getFinalPdfUrl = async (req, res) => {
   } catch (err) {
     logger.error('Erreur getFinalPdfUrl:', err);
     res.status(500).json({ success: false, error: 'Erreur accès PDF final', code: 'INTERNAL_ERROR' });
+  }
+};
+
+/**
+ * GET /api/contracts/recently-completed
+ * Renvoie les contrats récemment signés (status=COMPLETE, completedAt > lastContractsViewedAt)
+ * côté initiateur — utilisé par la modal de félicitation à l'ouverture de la page Contrats.
+ */
+exports.listRecentlyCompleted = async (req, res) => {
+  try {
+    const prisma = prismaService.getInstance();
+    const kine = await prisma.kine.findUnique({
+      where: { uid: req.uid },
+      select: { id: true, lastContractsViewedAt: true }
+    });
+    if (!kine) return res.status(404).json({ success: false, error: 'Kiné introuvable', code: 'KINE_NOT_FOUND' });
+
+    const since = kine.lastContractsViewedAt || new Date(0);
+    const contracts = await prisma.contract.findMany({
+      where: {
+        kineInitiateurId: kine.id,
+        status: 'COMPLETE',
+        completedAt: { gt: since },
+      },
+      select: {
+        id: true,
+        type: true,
+        destinataireFirstName: true,
+        destinataireLastName: true,
+        destinataireEmail: true,
+        completedAt: true,
+        ordreSentAt: true,
+      },
+      orderBy: { completedAt: 'desc' },
+      take: 20,
+    });
+    res.json({ success: true, contracts });
+  } catch (err) {
+    logger.error('Erreur listRecentlyCompleted:', err);
+    res.status(500).json({ success: false, error: 'Erreur', code: 'INTERNAL_ERROR' });
+  }
+};
+
+/**
+ * GET /api/contracts/:id/ordre-email-preview
+ * Renvoie l'aperçu du mail à envoyer au CDO (sans envoi).
+ */
+exports.getOrdreEmailPreview = async (req, res) => {
+  try {
+    const kineId = await getKineId(req.uid);
+    if (!kineId) return res.status(404).json({ success: false, error: 'Kiné introuvable', code: 'KINE_NOT_FOUND' });
+
+    const contractId = parseInt(req.params.id, 10);
+    if (Number.isNaN(contractId)) return res.status(400).json({ success: false, error: 'ID invalide', code: 'INVALID_ID' });
+
+    const preview = await contractOrdreService.previewOrdreEmail({ contractId, kineId });
+    res.json({ success: true, ...preview });
+  } catch (err) {
+    return handleServiceError(err, res, 'Erreur aperçu mail Ordre');
+  }
+};
+
+/**
+ * POST /api/contracts/:id/send-to-ordre
+ * Envoie le contrat signé au CDO via Brevo.
+ */
+exports.sendToOrdre = async (req, res) => {
+  try {
+    const kineId = await getKineId(req.uid);
+    if (!kineId) return res.status(404).json({ success: false, error: 'Kiné introuvable', code: 'KINE_NOT_FOUND' });
+
+    const contractId = parseInt(req.params.id, 10);
+    if (Number.isNaN(contractId)) return res.status(400).json({ success: false, error: 'ID invalide', code: 'INVALID_ID' });
+
+    const { recipientEmail, ccEmail } = req.body;
+    const result = await contractOrdreService.sendToOrdre({
+      contractId,
+      kineId,
+      recipientEmail,
+      ccEmail,
+    });
+    res.json({ success: true, sentTo: result.sentTo, contract: result.contract });
+  } catch (err) {
+    return handleServiceError(err, res, 'Erreur envoi mail Ordre');
   }
 };
 

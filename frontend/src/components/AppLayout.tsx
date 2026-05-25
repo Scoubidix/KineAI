@@ -42,6 +42,7 @@ import { sendPasswordReset } from "@/lib/auth-utils";
 import { useToast } from "@/hooks/use-toast"; // Test réactivé
 import { useSubscription } from "@/hooks/useSubscription";
 import { PLANS, getPlanByType } from "@/config/plans";
+import { DEPARTEMENTS_FR } from '@/app/dashboard/kine/contrats/data/departements-fr';
 import {
   Settings,
   BarChart2,
@@ -142,7 +143,13 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
     phone: '',
     rpps: '',
     adresseCabinet: '',
-    birthDate: ''
+    birthDate: '',
+    civilite: '',
+    birthPlace: '',
+    departementOrdre: '',
+    numeroOrdinal: '',
+    numeroUrssaf: '',
+    adresseDomicile: ''
   });
 
   // 🔒 NOUVEAU : États pour les modales RGPD
@@ -187,7 +194,13 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
           phone: data.phone || '',
           rpps: data.rpps || '',
           adresseCabinet: data.adresseCabinet || '',
-          birthDate: data.birthDate || ''
+          birthDate: data.birthDate ? String(data.birthDate).slice(0, 10) : '',
+          civilite: data.civilite || '',
+          birthPlace: data.birthPlace || '',
+          departementOrdre: data.departementOrdre || '',
+          numeroOrdinal: data.numeroOrdinal || '',
+          numeroUrssaf: data.numeroUrssaf || '',
+          adresseDomicile: data.adresseDomicile || ''
         });
       } else {
         console.error('Erreur lors du chargement du profil');
@@ -237,7 +250,14 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
         body: JSON.stringify({
           phone: kineData.phone,
           adresseCabinet: kineData.adresseCabinet,
-          rpps: kineData.rpps?.trim() || null
+          rpps: kineData.rpps?.trim() || null,
+          birthDate: kineData.birthDate || '',
+          civilite: kineData.civilite || null,
+          birthPlace: kineData.birthPlace || '',
+          departementOrdre: kineData.departementOrdre || '',
+          numeroOrdinal: kineData.numeroOrdinal || '',
+          numeroUrssaf: kineData.numeroUrssaf || '',
+          adresseDomicile: kineData.adresseDomicile || ''
         }),
       });
       
@@ -515,40 +535,138 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                           className="bg-white dark:bg-zinc-900 text-foreground"
                         />
                       </div>
-                      
-                      <div className="flex items-center gap-4 mt-4">
-                        <Button
-                          onClick={handleSaveProfile}
-                          disabled={loading}
-                          className="btn-teal"
-                        >
-                          {loading ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Sauvegarde...
-                            </>
-                          ) : (
-                            <>
-                              <Save className="h-4 w-4 mr-2" />
-                              Sauvegarder les modifications
-                            </>
-                          )}
-                        </Button>
-                        
-                        {/* Message de confirmation */}
-                        {saveMessage && (
-                          <div className={`flex items-center gap-2 text-sm font-medium transition-all duration-300 ${
-                            saveMessage.includes('✅') 
-                              ? 'text-green-600' 
-                              : 'text-red-600'
-                          }`}>
-                            {saveMessage.includes('✅') && <CheckCircle className="h-4 w-4" />}
-                            {saveMessage}
-                          </div>
-                        )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold mb-4 text-[#3899aa]">Informations pour les contrats</h3>
+
+                  <Card className="card-hover">
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="civilite">Civilité</Label>
+                          <Select
+                            value={kineData.civilite || undefined}
+                            onValueChange={(v) => setKineData({ ...kineData, civilite: v })}
+                          >
+                            <SelectTrigger id="civilite" className="bg-white dark:bg-zinc-900 text-foreground">
+                              <SelectValue placeholder="Sélectionner..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="M.">Monsieur</SelectItem>
+                              <SelectItem value="MME">Madame</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="birthDate">Date de naissance</Label>
+                          <Input
+                            id="birthDate"
+                            type="date"
+                            value={kineData.birthDate}
+                            onChange={(e) => setKineData({ ...kineData, birthDate: e.target.value })}
+                            className="bg-white dark:bg-zinc-900 text-foreground"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="birthPlace">Lieu de naissance</Label>
+                        <Input
+                          id="birthPlace"
+                          placeholder="Ville de naissance"
+                          value={kineData.birthPlace}
+                          onChange={(e) => setKineData({ ...kineData, birthPlace: e.target.value })}
+                          className="bg-white dark:bg-zinc-900 text-foreground"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="departementOrdre">Département d'affiliation à l'Ordre</Label>
+                          <Select
+                            value={kineData.departementOrdre || undefined}
+                            onValueChange={(v) => setKineData({ ...kineData, departementOrdre: v })}
+                          >
+                            <SelectTrigger id="departementOrdre" className="bg-white dark:bg-zinc-900 text-foreground">
+                              <SelectValue placeholder="Sélectionner un département..." />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-72">
+                              {DEPARTEMENTS_FR.map((d) => (
+                                <SelectItem key={d.code} value={d.code}>
+                                  {d.code} — {d.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="numeroOrdinal">Numéro ordinal</Label>
+                          <Input
+                            id="numeroOrdinal"
+                            placeholder="Ex: 012345"
+                            value={kineData.numeroOrdinal}
+                            onChange={(e) => setKineData({ ...kineData, numeroOrdinal: e.target.value })}
+                            className="bg-white dark:bg-zinc-900 text-foreground"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="numeroUrssaf">Numéro URSSAF</Label>
+                        <Input
+                          id="numeroUrssaf"
+                          value={kineData.numeroUrssaf}
+                          onChange={(e) => setKineData({ ...kineData, numeroUrssaf: e.target.value })}
+                          className="bg-white dark:bg-zinc-900 text-foreground"
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="adresseDomicile">Adresse de domicile</Label>
+                        <Input
+                          id="adresseDomicile"
+                          placeholder="N°, rue, code postal, ville"
+                          value={kineData.adresseDomicile}
+                          onChange={(e) => setKineData({ ...kineData, adresseDomicile: e.target.value })}
+                          className="bg-white dark:bg-zinc-900 text-foreground"
+                        />
                       </div>
                     </CardContent>
                   </Card>
+                </div>
+
+                <div className="flex items-center gap-4 mt-4">
+                  <Button
+                    onClick={handleSaveProfile}
+                    disabled={loading}
+                    className="btn-teal"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Sauvegarde...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Sauvegarder les modifications
+                      </>
+                    )}
+                  </Button>
+
+                  {saveMessage && (
+                    <div className={`flex items-center gap-2 text-sm font-medium transition-all duration-300 ${
+                      saveMessage.includes('✅')
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    }`}>
+                      {saveMessage.includes('✅') && <CheckCircle className="h-4 w-4" />}
+                      {saveMessage}
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 

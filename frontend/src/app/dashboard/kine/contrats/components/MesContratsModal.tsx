@@ -11,12 +11,13 @@ import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
 import {
   FolderOpen, Loader2, FileText, Trash2, Eye, AlertCircle,
-  FileSearch, ArrowLeft, PenLine, Send, XCircle, Download, Inbox, SendHorizonal
+  FileSearch, ArrowLeft, PenLine, Send, XCircle, Download, Inbox, SendHorizonal, Landmark, CheckCircle2
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { matchesAllTokens } from '@/utils/textSearch';
 import SignatureDialog from './SignatureDialog';
 import EnvoiInvitationDialog from './EnvoiInvitationDialog';
+import EnvoiOrdreDialog from './EnvoiOrdreDialog';
 
 interface ContractRow {
   id: number;
@@ -33,6 +34,8 @@ interface ContractRow {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  ordreSentAt: string | null;
+  ordreRecipientEmail: string | null;
   kineInitiateur?: { firstName: string; lastName: string; email: string };
 }
 
@@ -73,6 +76,7 @@ export default function MesContratsModal({ open, onOpenChange, refreshKey }: Mes
   const [revokingId, setRevokingId] = useState<number | null>(null);
   const [tab, setTab] = useState<TabKey>('INITIATEUR');
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [ordreContractId, setOrdreContractId] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [yearFilter, setYearFilter] = useState<string>('ALL');
 
@@ -336,6 +340,17 @@ export default function MesContratsModal({ open, onOpenChange, refreshKey }: Mes
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-medium text-sm">{TYPE_LABELS[c.type]}</span>
                                 <Badge variant="secondary" className={`text-[10px] ${status.color}`}>{status.label}</Badge>
+                                {isMine && c.status === 'COMPLETE' && (
+                                  c.ordreSentAt ? (
+                                    <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300 inline-flex items-center gap-1">
+                                      <CheckCircle2 className="h-3 w-3" /> Envoyé à l'Ordre
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                                      À déclarer à l'Ordre
+                                    </Badge>
+                                  )
+                                )}
                               </div>
                               <div className="text-xs text-muted-foreground truncate mt-1">
                                 {isMine ? `Avec ${otherParty}` : `Reçu de ${otherParty}`}
@@ -345,12 +360,29 @@ export default function MesContratsModal({ open, onOpenChange, refreshKey }: Mes
                                     <span>Signé le {formatDate(c.completedAt)}</span>
                                   </>
                                 )}
+                                {isMine && c.status === 'COMPLETE' && c.ordreSentAt && (
+                                  <>
+                                    <span className="mx-1.5">•</span>
+                                    <span>Ordre le {formatDate(c.ordreSentAt)}</span>
+                                  </>
+                                )}
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
                               {isMine && c.status !== 'COMPLETE' && (
                                 <Button size="sm" variant="ghost" onClick={() => handlePreview(c.id)} title="Aperçu">
                                   <Eye className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {isMine && c.status === 'COMPLETE' && !c.ordreSentAt && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setOrdreContractId(c.id)}
+                                  title="Envoyer à l'Ordre"
+                                  className="text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                                >
+                                  <Landmark className="h-4 w-4" />
                                 </Button>
                               )}
                               {c.status === 'COMPLETE' && (
@@ -477,6 +509,13 @@ export default function MesContratsModal({ open, onOpenChange, refreshKey }: Mes
         onOpenChange={(o) => { if (!o) { setSendingContract(null); fetchContracts(); } }}
         contractId={sendingContract?.id || null}
         destinataireEmail={sendingContract?.destinataireEmail || ''}
+        onSent={fetchContracts}
+      />
+
+      <EnvoiOrdreDialog
+        open={ordreContractId !== null}
+        onOpenChange={(o) => { if (!o) setOrdreContractId(null); }}
+        contractId={ordreContractId}
         onSent={fetchContracts}
       />
     </Dialog>

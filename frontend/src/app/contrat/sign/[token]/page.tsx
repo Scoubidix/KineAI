@@ -684,48 +684,109 @@ export default function ContractSignPage() {
 
         {/* DONE */}
         {step === 'DONE' && context && (
-          <div className="max-w-lg mx-auto w-full card-hover rounded-2xl p-6 text-center space-y-4">
-            <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-950/30 flex items-center justify-center mx-auto">
-              <Check className="h-7 w-7 text-green-600" />
-            </div>
-            <h2 className="text-xl font-semibold">Contrat signé !</h2>
-            <p className="text-sm text-muted-foreground">
-              {completed
-                ? 'Télécharger le contrat final ci-dessous'
-                : 'Votre signature est enregistrée. Le contrat sera complet une fois la deuxième signature apposée.'}
-            </p>
+          <>
+            <div className="max-w-lg mx-auto w-full card-hover rounded-2xl p-6 text-center space-y-4">
+              <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-950/30 flex items-center justify-center mx-auto">
+                <Check className="h-7 w-7 text-green-600" />
+              </div>
+              <h2 className="text-xl font-semibold">Contrat signé !</h2>
+              <p className="text-sm text-muted-foreground">
+                {completed
+                  ? 'Télécharger le contrat final ci-dessous'
+                  : 'Votre signature est enregistrée. Le contrat sera complet une fois la deuxième signature apposée.'}
+              </p>
 
-            <div className="flex flex-col gap-2 mt-4">
-              <Button onClick={handleDownloadFinal} className="btn-teal" disabled={finalPdfLoading || (!completed && !finalPdfUrl)}>
-                {finalPdfLoading ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Chargement...</> : <><Download className="h-4 w-4 mr-1" /> Télécharger le PDF</>}
-              </Button>
-              {finalPdfError && (
-                <div className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/20 border border-amber-300 rounded p-2 flex items-start gap-2">
-                  <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <div className="flex flex-col gap-2 mt-4">
+                <Button onClick={handleDownloadFinal} className="btn-teal" disabled={finalPdfLoading || (!completed && !finalPdfUrl)}>
+                  {finalPdfLoading ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Chargement...</> : <><Download className="h-4 w-4 mr-1" /> Télécharger le PDF</>}
+                </Button>
+                {finalPdfError && (
+                  <div className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/20 border border-amber-300 rounded p-2 flex items-start gap-2">
+                    <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <div>
+                      {finalPdfError}
+                      <button className="ml-2 underline" onClick={fetchFinalPdfUrl}>Réessayer</button>
+                    </div>
+                  </div>
+                )}
+                {(context.mode === 'EXISTING_KINE' || context.mode === 'NEW_KINE') && (
+                  <Button variant="outline" onClick={goToDashboard}>
+                    <ExternalLink className="h-4 w-4 mr-1" /> Accéder à mon espace Mon Assistant Kiné
+                  </Button>
+                )}
+              </div>
+
+              {(context.mode === 'EXISTING_KINE' || context.mode === 'NEW_KINE') && (
+                <p className="text-xs text-muted-foreground pt-2">
+                  Vous retrouverez ce contrat dans <strong>Mes Contrats → Reçus</strong>.
+                </p>
+              )}
+              {context.mode === 'GUEST' && (
+                <p className="text-xs text-muted-foreground pt-2">
+                  Vous avez signé en tant qu'invité. Conservez ce PDF, c'est votre seul exemplaire personnel.
+                </p>
+              )}
+            </div>
+
+            {/* Encart pub — invités uniquement */}
+            {context.mode === 'GUEST' && (
+              <div className="max-w-2xl mx-auto w-full mt-6 rounded-2xl border-2 border-[#3899aa]/30 bg-gradient-to-br from-[#3899aa]/5 to-transparent p-6 sm:p-8 space-y-5">
+                <div className="flex items-start gap-4">
+                  <Image
+                    src="/logo.jpg"
+                    alt="Mon Assistant Kiné"
+                    width={48}
+                    height={48}
+                    className="rounded-full shrink-0 bg-white p-0.5"
+                  />
                   <div>
-                    {finalPdfError}
-                    <button className="ml-2 underline" onClick={fetchFinalPdfUrl}>Réessayer</button>
+                    <h3 className="font-semibold text-base sm:text-lg leading-tight">🎉 Tu viens de signer en 2 minutes</h3>
+                    <p className="text-sm text-muted-foreground mt-1">ce qui prend habituellement 1h en méthode papier.</p>
                   </div>
                 </div>
-              )}
-              {(context.mode === 'EXISTING_KINE' || context.mode === 'NEW_KINE') && (
-                <Button variant="outline" onClick={goToDashboard}>
-                  <ExternalLink className="h-4 w-4 mr-1" /> Accéder à mon espace Mon Assistant Kiné
-                </Button>
-              )}
-            </div>
 
-            {(context.mode === 'EXISTING_KINE' || context.mode === 'NEW_KINE') && (
-              <p className="text-xs text-muted-foreground pt-2">
-                Vous retrouverez ce contrat dans <strong>Mes Contrats → Reçus</strong>.
-              </p>
+                <p className="text-sm font-medium">Mon Assistant Kiné, c'est aussi :</p>
+
+                <ul className="space-y-2.5 text-sm">
+                  <li className="flex items-start gap-2.5">
+                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[#3899aa] shrink-0" />
+                    <span>Bilans cliniques en 3 min — conformes NGAP</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[#3899aa] shrink-0" />
+                    <span>Aide à la décision clinique grâce à l'IA et 56 000+ études scientifiques</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[#3899aa] shrink-0" />
+                    <span>Création de programmes patients et suivi avec l'IA</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[#3899aa] shrink-0" />
+                    <span>Module administratif qui fait gagner du temps sur les tâches répétitives (courriers, démarches…)</span>
+                  </li>
+                </ul>
+
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  +2h par semaine dégagées. 100h/an récupérées.<br />
+                  Conçu par 2 kinés libéraux, pour des kinés.
+                </p>
+
+                <div className="rounded-lg bg-[#3899aa]/10 border border-[#3899aa]/30 px-3 py-2.5 text-xs text-[#1f5c6a] dark:text-[#4db3c5]">
+                  <strong>Offre Pionnier</strong> — réservée aux 100 premiers inscrits.
+                </div>
+
+                <Button asChild className="btn-teal w-full sm:w-auto">
+                  <a
+                    href="https://www.monassistantkine.fr/?utm_source=contract&utm_medium=guest_signed&utm_campaign=destinataire_ad"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Découvrir Mon Assistant Kiné <ExternalLink className="h-4 w-4 ml-1" />
+                  </a>
+                </Button>
+              </div>
             )}
-            {context.mode === 'GUEST' && (
-              <p className="text-xs text-muted-foreground pt-2">
-                Vous avez signé en tant qu'invité. Conservez ce PDF, c'est votre seul exemplaire personnel.
-              </p>
-            )}
-          </div>
+          </>
         )}
       </main>
 

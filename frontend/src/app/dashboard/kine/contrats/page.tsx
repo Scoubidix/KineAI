@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Briefcase, FileSearch, FolderOpen, UserPlus, Search, ArrowRight, CheckCircle } from 'lucide-react';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import NouveauContratModal from './components/NouveauContratModal';
 import MesContratsModal from './components/MesContratsModal';
+import ContratSigneCelebrationDialog, { RecentlyCompletedContract } from './components/ContratSigneCelebrationDialog';
+import EnvoiOrdreDialog from './components/EnvoiOrdreDialog';
 
 export default function AnnoncesEmploiHubPage() {
   const [nouveauxOpen, setNouveauxOpen] = useState(false);
@@ -14,6 +17,60 @@ export default function AnnoncesEmploiHubPage() {
   const [chercherOpen, setChercherOpen] = useState(false);
   const [contractsRefreshKey, setContractsRefreshKey] = useState(0);
 
+  // Modal de félicitation : déclenchée à l'ouverture de la page si des contrats viennent d'être signés.
+  const [recentlyCompleted, setRecentlyCompleted] = useState<RecentlyCompletedContract[]>([]);
+  const [celebrationOpen, setCelebrationOpen] = useState(false);
+  const [ordreDialogContractId, setOrdreDialogContractId] = useState<number | null>(null);
+
+  // Compteur de contrats COMPLETE non encore déclarés à l'Ordre (badge sur la card "Mes contrats").
+  const [pendingOrdreCount, setPendingOrdreCount] = useState(0);
+
+  const fetchPendingOrdreCount = React.useCallback(async () => {
+    try {
+      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts/pending-ordre-count`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setPendingOrdreCount(data.count || 0);
+    } catch { /* silencieux */ }
+  }, []);
+
+  useEffect(() => { fetchPendingOrdreCount(); }, [fetchPendingOrdreCount]);
+
+  const markContractsViewed = () => {
+    fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts/mark-viewed`, { method: 'POST' }).catch(() => {});
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts/recently-completed`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const list: RecentlyCompletedContract[] = Array.isArray(data.contracts) ? data.contracts : [];
+        if (list.length > 0) {
+          setRecentlyCompleted(list);
+          setCelebrationOpen(true);
+        }
+      } catch { /* silencieux */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleCelebrationClose = () => {
+    setCelebrationOpen(false);
+    markContractsViewed();
+  };
+
+  const handleSendToOrdreFromCelebration = (contractId: number) => {
+    setOrdreDialogContractId(contractId);
+  };
+
+  const handleOrdreDialogChange = (open: boolean) => {
+    if (!open) setOrdreDialogContractId(null);
+  };
+
   const cards = [
     {
       title: 'Nouveau contrat',
@@ -21,6 +78,7 @@ export default function AnnoncesEmploiHubPage() {
       icon: FileSearch,
       onClick: () => setNouveauxOpen(true),
       comingSoon: false,
+      pendingOrdre: 0,
     },
     {
       title: 'Mes contrats',
@@ -28,6 +86,7 @@ export default function AnnoncesEmploiHubPage() {
       icon: FolderOpen,
       onClick: () => setMesContratsOpen(true),
       comingSoon: false,
+      pendingOrdre: pendingOrdreCount,
     },
     {
       title: 'Proposer une annonce',
@@ -35,6 +94,7 @@ export default function AnnoncesEmploiHubPage() {
       icon: UserPlus,
       onClick: () => setProposerOpen(true),
       comingSoon: true,
+      pendingOrdre: 0,
     },
     {
       title: 'Je cherche un Remplacement/Assistanat',
@@ -42,6 +102,7 @@ export default function AnnoncesEmploiHubPage() {
       icon: Search,
       onClick: () => setChercherOpen(true),
       comingSoon: true,
+      pendingOrdre: 0,
     },
   ];
 
@@ -87,6 +148,10 @@ export default function AnnoncesEmploiHubPage() {
                     <span className="text-[10px] font-medium uppercase tracking-wide text-[#3899aa] bg-[#3899aa]/10 rounded-full px-2 py-0.5 whitespace-nowrap">
                       Bientôt disponible
                     </span>
+                  ) : card.pendingOrdre > 0 ? (
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-amber-800 bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 rounded-full px-2 py-0.5 whitespace-nowrap">
+                      {card.pendingOrdre} à déclarer
+                    </span>
                   ) : (
                     <ArrowRight className="h-4 w-4 text-[#3899aa]/40" />
                   )}
@@ -105,8 +170,31 @@ export default function AnnoncesEmploiHubPage() {
       />
       <MesContratsModal
         open={mesContratsOpen}
-        onOpenChange={setMesContratsOpen}
+        onOpenChange={(o) => {
+          setMesContratsOpen(o);
+          if (!o) fetchPendingOrdreCount();
+        }}
         refreshKey={contractsRefreshKey}
+      />
+
+      <ContratSigneCelebrationDialog
+        open={celebrationOpen}
+        contracts={recentlyCompleted}
+        onClose={handleCelebrationClose}
+        onSendToOrdre={handleSendToOrdreFromCelebration}
+      />
+
+      <EnvoiOrdreDialog
+        open={ordreDialogContractId !== null}
+        onOpenChange={handleOrdreDialogChange}
+        contractId={ordreDialogContractId}
+        onSent={() => {
+          // Met à jour l'état local pour afficher le badge "déjà envoyé à l'Ordre" dans la modal de célébration.
+          setRecentlyCompleted(prev => prev.map(c =>
+            c.id === ordreDialogContractId ? { ...c, ordreSentAt: new Date().toISOString() } : c
+          ));
+          fetchPendingOrdreCount();
+        }}
       />
     </AppLayout>
   );

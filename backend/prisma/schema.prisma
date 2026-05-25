@@ -852,6 +852,12 @@ model Contract {
   updatedAt   DateTime  @updatedAt
   completedAt DateTime? // Horodatage 2e signature
 
+  // Déclaration au Conseil départemental de l'Ordre (obligation déontologique).
+  // L'envoi ne se fait qu'après status=COMPLETE et est tracé pour audit + UI (badge "envoyé").
+  ordreSentAt         DateTime?
+  ordreRecipientEmail String?   @db.VarChar(255)
+  ordreMessageId      String?
+
   signatures ContractSignature[]
 
   @@index([kineInitiateurId, createdAt])

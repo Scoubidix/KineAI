@@ -48,6 +48,8 @@ function getConfig() {
  * @param {string} params.textContent - Corps texte (fallback)
  * @param {Object} [params.replyTo] - { email, name } pour Reply-To
  * @param {string} [params.senderDisplayName] - Si fourni, override le BREVO_FROM_NAME (ex: "Jean Dupont via Mon Assistant Kiné")
+ * @param {Array<{ email: string, name?: string }>} [params.cc] - Destinataires en copie
+ * @param {Array<{ name: string, url?: string, content?: string }>} [params.attachment] - Pièces jointes (url publique ou contenu base64)
  * @returns {Promise<{ messageId: string }>}
  */
 async function sendTransactionalEmail({
@@ -58,6 +60,8 @@ async function sendTransactionalEmail({
   textContent,
   replyTo,
   senderDisplayName,
+  cc,
+  attachment,
 }) {
   const { apiKey, fromEmail, fromName } = getConfig();
 
@@ -72,6 +76,10 @@ async function sendTransactionalEmail({
     htmlContent,
     ...(textContent ? { textContent } : {}),
     ...(replyTo && replyTo.email ? { replyTo: { email: replyTo.email, ...(replyTo.name ? { name: replyTo.name } : {}) } } : {}),
+    ...(Array.isArray(cc) && cc.length > 0
+      ? { cc: cc.filter(c => c && c.email).map(c => ({ email: c.email, ...(c.name ? { name: c.name } : {}) })) }
+      : {}),
+    ...(Array.isArray(attachment) && attachment.length > 0 ? { attachment } : {}),
   };
 
   const controller = new AbortController();

@@ -43,16 +43,25 @@ const sendInvitationSchema = z.object({
   channel: z.enum(['EMAIL', 'WHATSAPP', 'BOTH']),
 });
 
+const sendToOrdreSchema = z.object({
+  recipientEmail: z.string().trim().email().max(255),
+  ccEmail: z.string().trim().email().max(255).optional().or(z.literal('')),
+});
+
 // Toutes les routes nécessitent authenticate
 router.get('/', authenticate, contractsController.listContracts);
 router.get('/unread-count', authenticate, contractsController.getUnreadCount);
+router.get('/pending-ordre-count', authenticate, contractsController.getPendingOrdreCount);
+router.get('/recently-completed', authenticate, contractsController.listRecentlyCompleted);
 router.post('/mark-viewed', authenticate, contractsController.markViewed);
 router.get('/:id', authenticate, contractsController.getContract);
 router.get('/:id/preview-pdf', authenticate, contractsController.previewPdf);
+router.get('/:id/ordre-email-preview', authenticate, contractsController.getOrdreEmailPreview);
 router.post('/', authenticate, crudWriteLimiter, validate(createContractSchema), contractsController.createContract);
 router.put('/:id', authenticate, crudWriteLimiter, validate(updateContractSchema), contractsController.updateContract);
 router.post('/:id/sign-initiator', authenticate, crudWriteLimiter, validate(signInitiatorSchema), contractsController.signInitiator);
 router.post('/:id/send-invitation', authenticate, crudWriteLimiter, validate(sendInvitationSchema), contractsController.sendInvitation);
+router.post('/:id/send-to-ordre', authenticate, crudWriteLimiter, validate(sendToOrdreSchema), contractsController.sendToOrdre);
 router.post('/:id/revoke-invitation', authenticate, crudWriteLimiter, contractsController.revokeInvitation);
 router.get('/:id/final-pdf', authenticate, contractsController.getFinalPdfUrl);
 router.delete('/:id', authenticate, crudWriteLimiter, contractsController.deleteContract);
