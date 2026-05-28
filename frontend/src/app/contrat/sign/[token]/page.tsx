@@ -16,13 +16,18 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
-  Briefcase, LogIn, UserPlus, UserCheck, ArrowRight, ArrowLeft,
+  ArrowLeft, ArrowRight,
   Loader2, AlertCircle, Eye, Check, PenLine, Download, ExternalLink, Maximize2, FileText
 } from 'lucide-react';
 import DestinataireProfileWizard, { DestinataireProfileData } from './components/DestinataireProfileWizard';
+import IdentifyWelcome from './components/IdentifyWelcome';
 
-type Step = 'LOADING' | 'ERROR' | 'IDENTIFY' | 'LOGIN' | 'SIGNUP' | 'PROFILE' | 'PREVIEW' | 'SIGN' | 'DONE';
+type Step = 'LOADING' | 'ERROR' | 'IDENTIFY' | 'GUEST_TERMS' | 'LOGIN' | 'SIGNUP' | 'PROFILE' | 'PREVIEW' | 'SIGN' | 'DONE';
 type Mode = 'EXISTING_KINE' | 'NEW_KINE' | 'GUEST';
+
+// Versions légales courantes (doivent matcher backend/config/legalVersions.js)
+const CGU_VERSION = '3.1';
+const PC_VERSION = '3.2';
 
 interface PublicInfo {
   contractId: number;
@@ -93,6 +98,9 @@ export default function ContractSignPage() {
   const [sessionToken, setSessionToken] = useState<string>('');
   const [context, setContext] = useState<SessionContext | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Acceptation CGU/PC en mode invité
+  const [guestLegalAccepted, setGuestLegalAccepted] = useState(false);
 
   // Identifiants login/signup
   const [authPassword, setAuthPassword] = useState('');
@@ -339,9 +347,16 @@ export default function ContractSignPage() {
     if (!sigMatches || !sigMention || !sigHonor) return;
     setSubmitting(true);
     try {
+      const payload: Record<string, unknown> = {
+        signatureText: sigText.trim(),
+        mention: 'Lu et approuvé',
+      };
+      if (context?.mode === 'GUEST') {
+        payload.legalAcceptance = { cguVersion: CGU_VERSION, pcVersion: PC_VERSION };
+      }
       const res = await sessionFetch('/api/contract-access/me/sign', {
         method: 'POST',
-        body: JSON.stringify({ signatureText: sigText.trim(), mention: 'Lu et approuvé' }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -401,11 +416,6 @@ export default function ContractSignPage() {
   };
 
   // ============================ RENDU ============================
-  const initFullName = publicInfo ? `${publicInfo.initiator.firstName} ${publicInfo.initiator.lastName}`.trim() : '';
-  const expiresLabel = publicInfo?.expiresAt
-    ? new Date(publicInfo.expiresAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-    : '';
-
   return (
     <div className="min-h-screen bg-white dark:bg-[#141414] flex flex-col">
       {/* Header */}
@@ -447,66 +457,54 @@ export default function ContractSignPage() {
 
         {/* IDENTIFY */}
         {step === 'IDENTIFY' && publicInfo && (
-          <div className="space-y-5">
-            <div className="card-hover rounded-2xl p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-[#3899aa]/10 flex items-center justify-center">
-                  <Briefcase className="h-5 w-5 text-[#3899aa]" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-semibold">Bonjour {publicInfo.destinataireFirstName},</h1>
-                  <p className="text-sm text-muted-foreground">
-                    {initFullName} vous propose un contrat de {publicInfo.type === 'REMPLACEMENT_LIBERAL' ? 'remplacement libéral' : 'assistanat libéral'}.
-                  </p>
-                </div>
-              </div>
-              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <span>Lien valable jusqu'au {expiresLabel}</span>
-              </div>
-            </div>
+          <IdentifyWelcome
+            publicInfo={publicInfo}
+            onPrimary={() => {
+              setAuthError('');
+              setStep(publicInfo.hasExistingAccount ? 'LOGIN' : 'SIGNUP');
+            }}
+            onGuest={() => {
+              setGuestLegalAccepted(false);
+              setStep('GUEST_TERMS');
+            }}
+          />
+        )}
 
-            <div className="card-hover rounded-2xl p-6 space-y-3">
-              <h2 className="font-medium text-sm">Comment souhaitez-vous accéder au contrat ?</h2>
-
-              {publicInfo.hasExistingAccount && (
-                <button
-                  onClick={() => { setAuthError(''); setStep('LOGIN'); }}
-                  className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-[#3899aa]/40 text-left transition-all"
-                >
-                  <LogIn className="h-5 w-5 text-[#3899aa] shrink-0" />
-                  <div className="flex-1">
-                    <div className="font-medium text-sm">Se connecter à mon compte Mon Assistant Kiné</div>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                </button>
-              )}
-
-              {!publicInfo.hasExistingAccount && (
-                <button
-                  onClick={() => { setAuthError(''); setStep('SIGNUP'); }}
-                  className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-[#3899aa]/40 text-left transition-all"
-                >
-                  <UserPlus className="h-5 w-5 text-[#3899aa] shrink-0" />
-                  <div className="flex-1">
-                    <div className="font-medium text-sm">Créer un compte gratuit</div>
-                    <div className="text-xs text-muted-foreground">Vos infos sont pré-remplies, vous retrouverez ce contrat dans votre espace</div>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                </button>
-              )}
-
-              <button
-                onClick={() => completeIdentify('GUEST')}
-                disabled={submitting}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-[#3899aa]/40 text-left transition-all"
-              >
-                <UserCheck className="h-5 w-5 text-[#3899aa] shrink-0" />
-                <div className="flex-1">
-                  <div className="font-medium text-sm">Continuer en tant qu'invité</div>
-                </div>
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4 text-muted-foreground" />}
-              </button>
-            </div>
+        {/* GUEST_TERMS */}
+        {step === 'GUEST_TERMS' && publicInfo && (
+          <div className="max-w-md mx-auto w-full space-y-4 card-hover rounded-2xl p-6">
+            <Button variant="ghost" size="sm" type="button" onClick={() => setStep('IDENTIFY')}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Retour
+            </Button>
+            <h2 className="font-semibold text-base">Avant de continuer</h2>
+            <p className="text-sm text-muted-foreground">
+              Pour signer ce contrat en tant qu'invité, vous devez accepter nos conditions applicables au périmètre de la signature et de la conservation du contrat.
+            </p>
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-muted/40 transition-colors">
+              <Checkbox
+                checked={guestLegalAccepted}
+                onCheckedChange={(c) => setGuestLegalAccepted(c === true)}
+                className="mt-0.5"
+              />
+              <span className="text-sm leading-relaxed">
+                J'accepte les{' '}
+                <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer" className="text-[#3899aa] underline">
+                  Conditions Générales d'Utilisation
+                </a>{' '}
+                et la{' '}
+                <a href="/legal/politique-confidentialite.html" target="_blank" rel="noopener noreferrer" className="text-[#3899aa] underline">
+                  Politique de Confidentialité
+                </a>
+                .
+              </span>
+            </label>
+            <Button
+              onClick={() => completeIdentify('GUEST')}
+              disabled={!guestLegalAccepted || submitting}
+              className="w-full btn-teal"
+            >
+              {submitting ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Chargement...</> : 'Continuer'}
+            </Button>
           </div>
         )}
 

@@ -102,6 +102,7 @@ import { SupportModal } from './SupportModal';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import LegalAcceptanceModal from './LegalAcceptanceModal';
 import { useLegalAcceptance } from '@/hooks/useLegalAcceptance';
+import AnnouncementBanner from './AnnouncementBanner';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -1679,6 +1680,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             style={{ background: 'radial-gradient(circle, #3899aa, transparent 70%)' }}
           />
           <div className="relative z-10">
+            <AnnouncementBanner />
             {children}
           </div>
         </div>

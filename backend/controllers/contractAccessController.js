@@ -403,7 +403,23 @@ exports.sign = async (req, res) => {
       expectedFirst = contract.destinataireFirstName;
       expectedLast = contract.destinataireLastName;
       signerEmail = contract.destinataireEmail;
-      guestData = draft;
+      // Acceptation CGU/PC obligatoire en mode invité (cf. wizard front /contrat/sign)
+      const la = req.body?.legalAcceptance;
+      if (!la || typeof la.cguVersion !== 'string' || typeof la.pcVersion !== 'string') {
+        return res.status(400).json({
+          success: false,
+          error: 'Acceptation des CGU et de la Politique de Confidentialité requise',
+          code: 'LEGAL_ACCEPTANCE_MISSING'
+        });
+      }
+      guestData = {
+        ...draft,
+        legalAcceptance: {
+          cguVersion: la.cguVersion,
+          pcVersion: la.pcVersion,
+          acceptedAt: new Date().toISOString(),
+        },
+      };
     } else if (contract.kineDestinataire) {
       expectedFirst = contract.kineDestinataire.firstName;
       expectedLast = contract.kineDestinataire.lastName;
