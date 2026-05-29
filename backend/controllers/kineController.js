@@ -6,19 +6,13 @@ const prismaService = require('../services/prismaService');
 const logger = require('../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../utils/logSanitizer');
 const { uploadAvatar, deleteAvatar, generateSignedUrl, validateImageBuffer } = require('../services/gcsStorageService');
+const { normalizeFirstName, normalizeLastName } = require('../utils/nameNormalization');
+const LEGAL_VERSIONS = require('../config/legalVersions');
+const stripeService = require('../services/StripeService');
 const fs = require('fs');
 
 const createKine = async (req, res) => {
-  const {
-    uid,
-    email,
-    firstName,
-    lastName,
-    acceptedCguAt,
-    acceptedPolitiqueConfidentialiteAt,
-    cguVersion,
-    politiqueConfidentialiteVersion
-  } = req.body;
+  const { uid, email, acceptedLegalAt } = req.body;
 
   logger.warn("📥 Création kiné - UID:", sanitizeUID(req.body.uid));
 
@@ -46,21 +40,23 @@ const createKine = async (req, res) => {
                   || req.socket.remoteAddress
                   || 'unknown';
 
+    // firstName/lastName non fournis au signup — seront remplis via le wizard d'onboarding.
+    // Les versions CGU/PC sont écrites depuis LEGAL_VERSIONS (source unique de vérité),
+    // pas depuis ce qu'envoie le frontend, pour éviter toute désynchro.
+    const legalDate = acceptedLegalAt ? new Date(acceptedLegalAt) : null;
     const newKine = await prisma.kine.create({
       data: {
         uid,
         email,
-        firstName,
-        lastName,
-        acceptedCguAt: acceptedCguAt ? new Date(acceptedCguAt) : null,
-        acceptedPolitiqueConfidentialiteAt: acceptedPolitiqueConfidentialiteAt ? new Date(acceptedPolitiqueConfidentialiteAt) : null,
-        cguVersion: cguVersion || null,
-        politiqueConfidentialiteVersion: politiqueConfidentialiteVersion || null,
+        acceptedCguAt: legalDate,
+        acceptedPolitiqueConfidentialiteAt: legalDate,
+        cguVersion: legalDate ? LEGAL_VERSIONS.CGU : null,
+        politiqueConfidentialiteVersion: legalDate ? LEGAL_VERSIONS.POLITIQUE_CONFIDENTIALITE : null,
         signupIpAddress: clientIp,
       },
     });
 
-    logger.warn("✅ Kiné créé - ID:", sanitizeId(newKine.id), "Email:", sanitizeEmail(newKine.email), "CGU acceptées:", !!acceptedCguAt);
+    logger.warn("✅ Kiné créé - ID:", sanitizeId(newKine.id), "Email:", sanitizeEmail(newKine.email), "Legal accepté:", !!legalDate);
 
     return res.status(201).json(newKine);
   } catch (err) {
@@ -119,6 +115,7 @@ const getKineProfile = async (req, res) => {
 const updateKineProfile = async (req, res) => {
   const uid = req.uid; // Récupéré depuis le middleware authenticate
   const {
+    firstName, lastName,
     email, phone, adresseCabinet, rpps,
     civilite, birthDate, birthPlace, departementOrdre, numeroOrdinal, numeroUrssaf, adresseDomicile
   } = req.body;
@@ -127,7 +124,7 @@ const updateKineProfile = async (req, res) => {
 
   try {
     const prisma = prismaService.getInstance();
-    
+
     // Vérifier que le kiné existe
     const existingKine = await prisma.kine.findUnique({
       where: { uid }
@@ -142,9 +139,14 @@ const updateKineProfile = async (req, res) => {
     if (email && !email.includes('@')) {
       return res.status(400).json({ error: 'Format email invalide.' });
     }
+    // Note : firstName/lastName non-vides (y compris "   ") sont déjà rejetés par
+    // Zod via trimmedString — pas de check redondant ici.
 
     // Préparer les données à mettre à jour (seulement les champs fournis)
     const updateData = {};
+    // Nom et prénom : normalisés avant sauvegarde (source de vérité du format en DB)
+    if (firstName !== undefined) updateData.firstName = normalizeFirstName(firstName);
+    if (lastName !== undefined)  updateData.lastName  = normalizeLastName(lastName);
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
     if (adresseCabinet !== undefined) updateData.adresseCabinet = adresseCabinet;
@@ -178,9 +180,21 @@ const updateKineProfile = async (req, res) => {
         numeroOrdinal: true,
         numeroUrssaf: true,
         adresseDomicile: true,
+        stripeCustomerId: true,
         updatedAt: true
       }
     });
+
+    // Sync Stripe customer name si nom/prénom modifié et compte Stripe existant (non-bloquant)
+    if ((firstName !== undefined || lastName !== undefined) && updatedKine.stripeCustomerId) {
+      try {
+        await stripeService.stripe.customers.update(updatedKine.stripeCustomerId, {
+          name: `${updatedKine.firstName} ${updatedKine.lastName}`,
+        });
+      } catch (e) {
+        logger.warn("⚠️ Sync nom Stripe customer échoué (non-bloquant):", e.message);
+      }
+    }
 
     logger.info("✅ Profil kiné mis à jour - ID:", sanitizeId(updatedKine.id));
 

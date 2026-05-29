@@ -41,11 +41,10 @@ const profileSchema = z.object({
 const signSchema = z.object({
   signatureText: z.string().trim().min(2).max(200),
   mention: z.string().trim().min(1).max(255).optional(),
-  // Acceptation CGU/PC obligatoire uniquement en mode GUEST (vérifié dans le contrôleur)
-  legalAcceptance: z.object({
-    cguVersion: z.string().trim().min(1).max(20),
-    pcVersion: z.string().trim().min(1).max(20),
-  }).optional(),
+  // Acceptation CGU/PC obligatoire uniquement en mode GUEST (vérifié dans le contrôleur).
+  // Les versions ne sont plus envoyées par le frontend — le backend les remplit depuis
+  // legalVersions.js (source unique de vérité).
+  legalAcceptance: z.object({}).passthrough().optional(),
 });
 
 router.get('/me/context', contractSessionRequired, contractAccessController.getSessionContext);

@@ -25,10 +25,6 @@ import IdentifyWelcome from './components/IdentifyWelcome';
 type Step = 'LOADING' | 'ERROR' | 'IDENTIFY' | 'GUEST_TERMS' | 'LOGIN' | 'SIGNUP' | 'PROFILE' | 'PREVIEW' | 'SIGN' | 'DONE';
 type Mode = 'EXISTING_KINE' | 'NEW_KINE' | 'GUEST';
 
-// Versions légales courantes (doivent matcher backend/config/legalVersions.js)
-const CGU_VERSION = '3.1';
-const PC_VERSION = '3.2';
-
 interface PublicInfo {
   contractId: number;
   type: 'REMPLACEMENT_LIBERAL' | 'ASSISTANAT_LIBERAL';
@@ -352,7 +348,9 @@ export default function ContractSignPage() {
         mention: 'Lu et approuvé',
       };
       if (context?.mode === 'GUEST') {
-        payload.legalAcceptance = { cguVersion: CGU_VERSION, pcVersion: PC_VERSION };
+        // Présence de l'objet legalAcceptance = signal d'acceptation. Les versions
+        // sont remplies côté backend depuis legalVersions.js (source unique de vérité).
+        payload.legalAcceptance = {};
       }
       const res = await sessionFetch('/api/contract-access/me/sign', {
         method: 'POST',

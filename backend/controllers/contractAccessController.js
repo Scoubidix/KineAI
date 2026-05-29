@@ -16,6 +16,7 @@ const gcsStorageService = require('../services/gcsStorageService');
 const prismaService = require('../services/prismaService');
 const logger = require('../utils/logger');
 const { sanitizeId, sanitizeEmail } = require('../utils/logSanitizer');
+const LEGAL_VERSIONS = require('../config/legalVersions');
 
 const ERR_TO_STATUS = {
   [contractInviteService.ERROR_CODES.NOT_FOUND]: 404,
@@ -403,9 +404,12 @@ exports.sign = async (req, res) => {
       expectedFirst = contract.destinataireFirstName;
       expectedLast = contract.destinataireLastName;
       signerEmail = contract.destinataireEmail;
-      // Acceptation CGU/PC obligatoire en mode invité (cf. wizard front /contrat/sign)
+      // Acceptation CGU/PC obligatoire en mode invité (cf. wizard front /contrat/sign).
+      // Le frontend signale juste la présence de l'acceptation (objet legalAcceptance
+      // non-absent). Les versions sont remplies depuis LEGAL_VERSIONS — single source
+      // of truth backend, plus de risque de désynchro.
       const la = req.body?.legalAcceptance;
-      if (!la || typeof la.cguVersion !== 'string' || typeof la.pcVersion !== 'string') {
+      if (!la) {
         return res.status(400).json({
           success: false,
           error: 'Acceptation des CGU et de la Politique de Confidentialité requise',
@@ -415,8 +419,8 @@ exports.sign = async (req, res) => {
       guestData = {
         ...draft,
         legalAcceptance: {
-          cguVersion: la.cguVersion,
-          pcVersion: la.pcVersion,
+          cguVersion: LEGAL_VERSIONS.CGU,
+          pcVersion: LEGAL_VERSIONS.POLITIQUE_CONFIDENTIALITE,
           acceptedAt: new Date().toISOString(),
         },
       };

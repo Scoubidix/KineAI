@@ -12,8 +12,6 @@ import { sendEmailVerification } from "@/lib/auth-utils";
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
-    lastName: "",
-    firstName: "",
     email: "",
     password: "",
   });
@@ -24,9 +22,7 @@ export default function SignupPage() {
   const [signupComplete, setSignupComplete] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
-  const [acceptedCgu, setAcceptedCgu] = useState(false);
-  const [acceptedPolitiqueConfidentialite, setAcceptedPolitiqueConfidentialite] = useState(false);
-  const [acceptedDpa, setAcceptedDpa] = useState(false);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
 
   const router = useRouter();
   const { toast } = useToast();
@@ -75,7 +71,7 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
 
-    const { email, password, firstName, lastName } = formData;
+    const { email, password } = formData;
 
     if (!passwordValidation.isValid) {
       toast({ variant: "destructive", title: "Mot de passe invalide", description: "Le mot de passe ne respecte pas les critères de sécurité." });
@@ -89,6 +85,9 @@ export default function SignupPage() {
 
       const now = new Date().toISOString();
       const token = await user.getIdToken();
+
+      // Création du kiné : firstName/lastName seront remplis par le wizard d'onboarding.
+      // Les versions CGU/PC sont remplies côté backend depuis legalVersions.js.
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine`, {
         method: "POST",
         headers: {
@@ -97,14 +96,9 @@ export default function SignupPage() {
         },
         body: JSON.stringify({
           uid: user.uid,
-          firstName,
-          lastName,
           email,
+          acceptedLegalAt: now,
           website,
-          acceptedCguAt: acceptedCgu ? now : null,
-          acceptedPolitiqueConfidentialiteAt: acceptedPolitiqueConfidentialite ? now : null,
-          cguVersion: acceptedCgu ? "3.0" : null,
-          politiqueConfidentialiteVersion: acceptedPolitiqueConfidentialite ? "3.1" : null,
         }),
       });
 
@@ -113,7 +107,8 @@ export default function SignupPage() {
         throw new Error(errorData.error || "Erreur lors de la création du profil");
       }
 
-      // Enregistrer les acceptations dans la table legal_acceptances
+      // Enregistrer les acceptations dans legal_acceptances (audit RGPD).
+      // Pas de version envoyée : le backend remplit depuis LEGAL_VERSIONS.
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/legal-acceptances`, {
         method: "POST",
         headers: {
@@ -122,9 +117,9 @@ export default function SignupPage() {
         },
         body: JSON.stringify({
           acceptances: [
-            { documentType: "CGU", version: "3.0" },
-            { documentType: "POLITIQUE_CONFIDENTIALITE", version: "3.1" },
-            { documentType: "DPA", version: "1.0" },
+            { documentType: "CGU" },
+            { documentType: "POLITIQUE_CONFIDENTIALITE" },
+            { documentType: "DPA" },
           ],
         }),
       });
@@ -132,9 +127,9 @@ export default function SignupPage() {
       const emailResult = await sendEmailVerification(user);
       if (emailResult.success) {
         setEmailSent(true);
-        toast({ title: "Compte créé avec succès !", description: `Bienvenue ${firstName}. Un email de vérification a été envoyé.` });
+        toast({ title: "Compte créé avec succès !", description: "Un email de vérification a été envoyé." });
       } else {
-        toast({ title: "Compte créé", description: `Bienvenue ${firstName}. Problème d'envoi de l'email de vérification.`, variant: "destructive" });
+        toast({ title: "Compte créé", description: "Problème d'envoi de l'email de vérification.", variant: "destructive" });
       }
 
       if (typeof window !== "undefined" && typeof window.gtag === "function") {
@@ -173,7 +168,7 @@ export default function SignupPage() {
             </p>
             <p className="font-medium text-gray-900">{formData.email}</p>
             <p className="text-sm text-gray-500">
-              Cliquez sur le lien dans l'email pour activer votre compte.
+              Cliquez sur le lien dans l&apos;email pour activer votre compte.
               <br />
               <span className="text-sm font-semibold text-amber-600">⚠️ Pensez à vérifier vos spams / indésirables.</span>
             </p>
@@ -223,7 +218,7 @@ export default function SignupPage() {
     );
   }
 
-  // Formulaire d'inscription
+  // Formulaire d'inscription allégé
   return (
     <div className="min-h-screen bg-white flex justify-center pt-20 p-4">
       <div className="w-full max-w-sm space-y-8">
@@ -250,36 +245,6 @@ export default function SignupPage() {
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
               autoComplete="off"
-            />
-          </div>
-
-          {/* Nom */}
-          <div className="space-y-1">
-            <label htmlFor="lastName" className="text-sm font-medium text-gray-700">Nom</label>
-            <input
-              id="lastName"
-              name="lastName"
-              placeholder="Dupont"
-              value={formData.lastName}
-              onChange={handleChange}
-              className="w-full h-11 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          {/* Prénom */}
-          <div className="space-y-1">
-            <label htmlFor="firstName" className="text-sm font-medium text-gray-700">Prénom</label>
-            <input
-              id="firstName"
-              name="firstName"
-              placeholder="Jean"
-              value={formData.firstName}
-              onChange={handleChange}
-              className="w-full h-11 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              required
-              disabled={loading}
             />
           </div>
 
@@ -344,70 +309,38 @@ export default function SignupPage() {
             )}
           </div>
 
-          {/* CGU et Politique de confidentialité */}
-          <div className="space-y-3">
-            <div className="flex items-start space-x-3">
-              <input
-                type="checkbox"
-                id="acceptCgu"
-                checked={acceptedCgu}
-                onChange={(e) => setAcceptedCgu(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
-                required
-                disabled={loading}
-              />
-              <label htmlFor="acceptCgu" className="text-sm text-gray-700 cursor-pointer">
-                J'ai lu et j'accepte les{" "}
-                <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer" className="text-teal-600 underline hover:text-teal-800">
-                  Conditions Générales d'Utilisation (CGU)
-                </a>
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-            </div>
-
-            <div className="flex items-start space-x-3">
-              <input
-                type="checkbox"
-                id="acceptPolitiqueConfidentialite"
-                checked={acceptedPolitiqueConfidentialite}
-                onChange={(e) => setAcceptedPolitiqueConfidentialite(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
-                required
-                disabled={loading}
-              />
-              <label htmlFor="acceptPolitiqueConfidentialite" className="text-sm text-gray-700 cursor-pointer">
-                J'ai lu et j'accepte la{" "}
-                <a href="/legal/politique-confidentialite.html" target="_blank" rel="noopener noreferrer" className="text-teal-600 underline hover:text-teal-800">
-                  Politique de Confidentialité
-                </a>
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-            </div>
-
-            <div className="flex items-start space-x-3">
-              <input
-                type="checkbox"
-                id="acceptDpa"
-                checked={acceptedDpa}
-                onChange={(e) => setAcceptedDpa(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
-                required
-                disabled={loading}
-              />
-              <label htmlFor="acceptDpa" className="text-sm text-gray-700 cursor-pointer">
-                J'ai lu et j'accepte le{" "}
-                <a href="/legal/dpa.html" target="_blank" rel="noopener noreferrer" className="text-teal-600 underline hover:text-teal-800">
-                  Contrat de Sous-traitance (DPA)
-                </a>
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-            </div>
+          {/* Acceptation légale combinée */}
+          <div className="flex items-start space-x-3">
+            <input
+              type="checkbox"
+              id="acceptLegal"
+              checked={acceptedLegal}
+              onChange={(e) => setAcceptedLegal(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
+              required
+              disabled={loading}
+            />
+            <label htmlFor="acceptLegal" className="text-sm text-gray-700 cursor-pointer">
+              J&apos;ai lu et j&apos;accepte les{" "}
+              <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer" className="text-teal-600 underline hover:text-teal-800">
+                CGU
+              </a>
+              , la{" "}
+              <a href="/legal/politique-confidentialite.html" target="_blank" rel="noopener noreferrer" className="text-teal-600 underline hover:text-teal-800">
+                Politique de Confidentialité
+              </a>
+              {" "}et le{" "}
+              <a href="/legal/dpa.html" target="_blank" rel="noopener noreferrer" className="text-teal-600 underline hover:text-teal-800">
+                Contrat de Sous-traitance (DPA)
+              </a>
+              <span className="text-red-500 ml-1">*</span>
+            </label>
           </div>
 
           {/* Bouton Créer mon compte */}
           <button
             type="submit"
-            disabled={loading || !passwordValidation.isValid || !acceptedCgu || !acceptedPolitiqueConfidentialite || !acceptedDpa}
+            disabled={loading || !passwordValidation.isValid || !acceptedLegal}
             className="btn-teal w-full h-11 rounded-lg text-sm font-medium disabled:opacity-50"
           >
             {loading ? (

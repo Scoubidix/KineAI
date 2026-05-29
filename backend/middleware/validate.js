@@ -49,16 +49,15 @@ const updatePatientSchema = z.object({
 const createKineSchema = z.object({
   uid: trimmedString(128),
   email: z.string().email(),
-  firstName: trimmedString(100),
-  lastName: trimmedString(100),
-  acceptedCguAt: z.string().optional(),
-  acceptedPolitiqueConfidentialiteAt: z.string().optional(),
-  cguVersion: optionalTrimmedString(20),
-  politiqueConfidentialiteVersion: optionalTrimmedString(20),
-  website: z.string().optional(), // honeypot — accepte pour que le controller le detecte
+  acceptedLegalAt: z.string().optional(),   // ISO timestamp, backend remplit les versions
+  website: z.string().optional(),            // honeypot — accepte pour que le controller le détecte
 });
 
 const updateKineProfileSchema = z.object({
+  // Nom et prénom : acceptés (saisis dans l'onboarding wizard et la modal profil).
+  // trimmedString applique déjà trim() + min(1) — rejette les chaînes vides ET "   ".
+  firstName: trimmedString(100).optional(),
+  lastName:  trimmedString(100).optional(),
   email: z.string().email().optional(),
   phone: optionalTrimmedString(20),
   adresseCabinet: optionalTrimmedString(500),

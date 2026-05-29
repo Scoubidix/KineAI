@@ -17,10 +17,12 @@ const recordAcceptances = async (req, res) => {
     return res.status(400).json({ success: false, error: 'Le champ acceptances est requis (tableau non vide).', code: 'INVALID_INPUT' });
   }
 
-  // Validation des entrees
+  // Validation des entrees : documentType requis. La version est optionnelle —
+  // si absente, le service remplit depuis LEGAL_VERSIONS[documentType] (signup nouveau).
+  // Si présente (modal de ré-acceptation), elle est conservée telle quelle.
   for (const a of acceptances) {
-    if (!a.documentType || !a.version) {
-      return res.status(400).json({ success: false, error: 'Chaque acceptation doit avoir documentType et version.', code: 'INVALID_INPUT' });
+    if (!a.documentType) {
+      return res.status(400).json({ success: false, error: 'Chaque acceptation doit avoir un documentType.', code: 'INVALID_INPUT' });
     }
   }
 

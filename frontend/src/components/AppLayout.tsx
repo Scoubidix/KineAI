@@ -88,7 +88,8 @@ import {
   Camera,
   HelpCircle
 } from 'lucide-react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { normalizeFirstName, normalizeLastName } from '@/utils/nameNormalization';
 import Link from 'next/link';
 import type { RoleOrUnknown } from '@/types/user';
 import { getAuth, signOut } from 'firebase/auth';
@@ -214,6 +215,13 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
   };
 
   const handleSaveProfile = async () => {
+    // Validation Nom et Prénom : obligatoires (non vides)
+    if (!kineData.firstName.trim() || !kineData.lastName.trim()) {
+      setSaveMessage('❌ Le nom et le prénom sont obligatoires');
+      setTimeout(() => setSaveMessage(''), 3000);
+      return;
+    }
+
     // Validation RPPS : vide ou exactement 11 chiffres
     const rppsValue = kineData.rpps?.trim() || '';
     if (rppsValue && (rppsValue.length !== 11 || !/^\d{11}$/.test(rppsValue))) {
@@ -249,6 +257,8 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
+          firstName: kineData.firstName,
+          lastName: kineData.lastName,
           phone: kineData.phone,
           adresseCabinet: kineData.adresseCabinet,
           rpps: kineData.rpps?.trim() || null,
@@ -473,24 +483,34 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="firstName">Prénom</Label>
-                          <Input 
-                            id="firstName" 
+                          <Label htmlFor="firstName">Prénom *</Label>
+                          <Input
+                            id="firstName"
                             value={kineData.firstName}
-                            disabled
+                            onChange={(e) => setKineData({ ...kineData, firstName: e.target.value })}
                             className="bg-white dark:bg-zinc-900 text-foreground"
+                            required
                           />
-                          <p className="text-xs text-muted-foreground mt-1">Non modifiable</p>
+                          {kineData.firstName.trim() && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Sera enregistré : <span className="font-medium text-foreground">{normalizeFirstName(kineData.firstName)}</span>
+                            </p>
+                          )}
                         </div>
                         <div>
-                          <Label htmlFor="lastName">Nom</Label>
-                          <Input 
-                            id="lastName" 
+                          <Label htmlFor="lastName">Nom *</Label>
+                          <Input
+                            id="lastName"
                             value={kineData.lastName}
-                            disabled
+                            onChange={(e) => setKineData({ ...kineData, lastName: e.target.value })}
                             className="bg-white dark:bg-zinc-900 text-foreground"
+                            required
                           />
-                          <p className="text-xs text-muted-foreground mt-1">Non modifiable</p>
+                          {kineData.lastName.trim() && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Sera enregistré : <span className="font-medium text-foreground">{normalizeLastName(kineData.lastName)}</span>
+                            </p>
+                          )}
                         </div>
                       </div>
                       
@@ -1284,6 +1304,22 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const avatarInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Ouvrir automatiquement la modal profil si ?openProfile=true (depuis le wizard onboarding)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('openProfile') === 'true') {
+      setIsSettingsOpen(true);
+      // Nettoie le query param openProfile sans toucher au reste (autres params, hash).
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('openProfile');
+      const hash = typeof window !== 'undefined' ? window.location.hash : '';
+      const qs = params.toString();
+      router.replace(`${currentPathname}${qs ? `?${qs}` : ''}${hash}`);
+    }
+    // currentPathname/router sont stables, on ne s'intéresse qu'au changement de searchParams
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Lecture cache localStorage au montage (après hydratation)
   React.useEffect(() => {
