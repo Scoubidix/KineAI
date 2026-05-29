@@ -54,6 +54,7 @@ backend/firebase.local.*
 CLAUDE.md
 AUDIT-SECURITE.md
 .claude/
+docs/
 
 # ========== PWA (genere au build) ==========
 frontend/public/sw.js
