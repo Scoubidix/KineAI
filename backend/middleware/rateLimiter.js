@@ -522,6 +522,56 @@ const supportMessageLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter pour les routes publiques d'accès via magic link contrat
+ * 20 requêtes/minute par IP — protège contre le brute force du token JWT
+ */
+const magicLinkAccessLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20,
+  message: {
+    error: 'Trop de tentatives d\'accès au lien',
+    details: 'Veuillez patienter 1 minute avant de réessayer',
+    retryAfter: 60
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'magic_link_access'),
+  handler: (req, res) => {
+    logger.warn(`🚫 Rate limit dépassé - Magic link access - IP: ${sanitizeIP(req.ip)}`);
+    res.status(429).json({
+      error: 'Trop de tentatives d\'accès au lien',
+      details: 'Veuillez patienter 1 minute avant de réessayer',
+      retryAfter: 60
+    });
+  }
+});
+
+/**
+ * Rate limiter strict pour l'action de signature destinataire via magic link
+ * 5 tentatives/minute par IP — protection brute force du flow signature
+ */
+const magicLinkSignLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: {
+    error: 'Trop de tentatives de signature',
+    details: 'Veuillez patienter 1 minute avant de réessayer',
+    retryAfter: 60
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'magic_link_sign'),
+  handler: (req, res) => {
+    logger.warn(`🚫 Rate limit dépassé - Magic link sign - IP: ${sanitizeIP(req.ip)}`);
+    res.status(429).json({
+      error: 'Trop de tentatives de signature',
+      details: 'Veuillez patienter 1 minute avant de réessayer',
+      retryAfter: 60
+    });
+  }
+});
+
+/**
  * Middleware pour afficher les informations de rate limiting
  * Utile pour le debugging
  */
@@ -560,5 +610,7 @@ module.exports = {
   signupLimiter,
   supportTicketLimiter,
   supportMessageLimiter,
+  magicLinkAccessLimiter,
+  magicLinkSignLimiter,
   rateLimitLogger
 };

@@ -201,7 +201,7 @@ router.get('/stats', authenticate, async (req, res) => {
       },
       referrals: referrals.map(r => ({
         id: r.id,
-        refereeName: `${r.referee.firstName} ${r.referee.lastName.charAt(0)}.`, // Anonymiser
+        refereeName: `${r.referee.firstName || '?'} ${(r.referee.lastName || '?').charAt(0)}.`, // Anonymiser (firstName/lastName peuvent être null si filleul en cours d'onboarding)
         plan: r.planSubscribed,
         credit: r.creditAmount,
         status: r.status,

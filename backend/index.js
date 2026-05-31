@@ -17,6 +17,10 @@ const REQUIRED_ENV = [
   'SUPABASE_URL',
   'SUPABASE_API_KEY',
   'ADMIN_EMAILS',
+  'MAGIC_LINK_SECRET',
+  'BREVO_API_KEY',
+  'BREVO_FROM_EMAIL',
+  'BREVO_FROM_NAME',
 ];
 const missing = REQUIRED_ENV.filter(key => !process.env[key]);
 if (missing.length > 0) {
@@ -90,6 +94,11 @@ const bilanTemplatesRoutes = require('./routes/bilanTemplates');
 
 // ⚖️ LEGAL : Import des routes acceptations legales
 const legalAcceptancesRoutes = require('./routes/legalAcceptances');
+
+// 📑 CONTRATS : Import des routes contrats remplacement/assistanat
+const contactsKineRoutes = require('./routes/contactsKine');
+const contractsRoutes = require('./routes/contracts');
+const contractAccessRoutes = require('./routes/contractAccess');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -586,6 +595,12 @@ app.use('/api/referral', referralRoutes);
 
 // 📇 CONTACTS : rate limiting dans le routeur APRÈS authenticate
 app.use('/api/contacts', contactsRoutes);
+
+// 📑 CONTRATS : carnet kinés + contrats brouillon — rate limiting dans le routeur APRÈS authenticate
+app.use('/api/contacts-kine', contactsKineRoutes);
+app.use('/api/contracts', contractsRoutes);
+// 🔗 CONTRATS — Routes publiques d'accès via magic link (pas d'auth Firebase, sécurité via token)
+app.use('/api/contract-access', contractAccessRoutes);
 
 // 📧 TEMPLATES ADMIN : rate limiting dans le routeur APRÈS authenticate
 app.use('/api/templates', templatesRoutes);

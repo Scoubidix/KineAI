@@ -135,8 +135,8 @@
 <div class="header">
     <h1>Politique de Confidentialité</h1>
     <div class="version-info">
-        <strong>Mon Assistant Kiné — Version 3.1</strong><br>
-        Dernière mise à jour : 4 mai 2026<br>
+        <strong>Mon Assistant Kiné — Version 3.2</strong><br>
+        Dernière mise à jour : 28 mai 2026<br>
         Lien permanent : <a href="https://monassistantkine.vercel.app/legal/politique-confidentialite.html">https://monassistantkine.vercel.app/legal/politique-confidentialite.html</a>
     </div>
 </div>
@@ -150,7 +150,7 @@
 </div>
 
 <div class="highlight-box">
-    <strong>Périmètre de cette Politique :</strong> La présente Politique de Confidentialité concerne les données personnelles du kinésithérapeute (compte, facturation, données techniques), pour lesquelles Mon Assistant Kiné est <strong>Responsable de Traitement</strong>. Pour les données patients, Mon Assistant Kiné agit en qualité de <strong>Sous-traitant</strong> au sens de l'article 28 du RGPD. Le traitement de ces données est encadré par le <a href="dpa.html">Contrat de Sous-traitance (DPA)</a>.
+    <strong>Périmètre de cette Politique :</strong> La présente Politique de Confidentialité concerne les données personnelles du kinésithérapeute (compte, facturation, données techniques), pour lesquelles Mon Assistant Kiné est <strong>Responsable de Traitement</strong>. Pour les données patients et les données du Module Contrats, Mon Assistant Kiné agit en qualité de <strong>Sous-traitant</strong> au sens de l'article 28 du RGPD, pour le compte du kinésithérapeute qui demeure Responsable de Traitement. Le traitement des données patients est encadré par le <a href="dpa.html">Contrat de Sous-traitance (DPA)</a>.
 </div>
 
 <h2>Délégué à la Protection des Données (DPO)</h2>
@@ -189,8 +189,9 @@
         <li><strong>Professionnelles :</strong> Numéro RPPS, adresse du cabinet</li>
         <li><strong>Compte :</strong> Mot de passe chiffré, préférences</li>
         <li><strong>Abonnement :</strong> Plan choisi, historique de paiement</li>
+        <li><strong>Données complémentaires Module Contrats</strong> (collectées lors de la rédaction du premier contrat) : civilité, date et lieu de naissance, département de l'Ordre, numéro d'inscription à l'Ordre, numéro URSSAF, adresse du domicile</li>
     </ul>
-    <p><strong>Finalité :</strong> Authentification, facturation, personnalisation du service</p>
+    <p><strong>Finalité :</strong> Authentification, facturation, personnalisation du service, rédaction et signature des contrats de remplacement et d'assistanat libéral</p>
     <p><strong>Base légale :</strong> Exécution du contrat (Art. 6.1.b RGPD)</p>
 </div>
 
@@ -213,6 +214,49 @@
     <p><strong>Base légale :</strong> Intérêts légitimes (Art. 6.1.f RGPD)</p>
 </div>
 
+<h3>4. Données du Module Contrats</h3>
+<div class="highlight-box">
+    <p>Pour ces données, Mon Assistant Kiné agit en qualité de <strong>Sous-traitant</strong> au sens de l'article 28 du RGPD, pour le compte du kinésithérapeute initiateur du contrat qui demeure Responsable de Traitement.</p>
+</div>
+
+<div class="data-category">
+    <h4>Carnet d'adresses kinés</h4>
+    <ul>
+        <li>Prénom, nom, email, téléphone et notes de confrères saisis par l'utilisateur</li>
+    </ul>
+    <p><strong>Finalité :</strong> Identification des destinataires de contrats</p>
+    <p><strong>Base légale :</strong> Intérêt légitime du kinésithérapeute initiateur (Art. 6.1.f RGPD)</p>
+    <p>Le confrère concerné est informé de l'existence du traitement à l'envoi de la première invitation de signature (email mentionnant l'expéditeur). Il peut exercer son droit d'opposition ou de suppression auprès du kinésithérapeute initiateur ou directement auprès de Mon Assistant Kiné.</p>
+</div>
+
+<div class="data-category">
+    <h4>Contenu du contrat et signataire</h4>
+    <ul>
+        <li>État civil des deux signataires (civilité, date et lieu de naissance, département de l'Ordre, numéro d'inscription à l'Ordre, numéro URSSAF, adresses)</li>
+        <li>Conditions du contrat (dates, taux de rétrocession, indemnités, lieu de signature, etc.)</li>
+        <li>PDF final scellé du contrat signé</li>
+    </ul>
+    <p><strong>Finalité :</strong> Rédaction, signature, archivage et déclaration du contrat au Conseil départemental de l'Ordre</p>
+    <p><strong>Base légale :</strong> Exécution du contrat (Art. 6.1.b RGPD) et obligation légale du titulaire (Art. 6.1.c RGPD, art. R.4321-128 CSP)</p>
+</div>
+
+<div class="data-category">
+    <h4>Preuves de signature</h4>
+    <ul>
+        <li>Texte de signature et mention « Lu et approuvé »</li>
+        <li>Horodatage, adresse IP et user-agent de chaque signataire</li>
+        <li>Empreinte cryptographique (SHA-256) du PDF final, garantissant son intégrité</li>
+        <li>Journal d'audit retraçant les étapes du contrat</li>
+    </ul>
+    <p><strong>Finalité :</strong> Force probante de la signature électronique (eIDAS, art. 1366-1367 Code civil)</p>
+    <p><strong>Base légale :</strong> Exécution du contrat et intérêt légitime (constitution d'un faisceau de preuves)</p>
+</div>
+
+<div class="data-category">
+    <h4>Signataire en mode invité</h4>
+    <p>Un kinésithérapeute peut signer un contrat sans disposer d'un compte Mon Assistant Kiné. Dans ce cas, il saisit ses données d'état civil uniquement pour les besoins de la signature ; ces données sont conservées avec le contrat selon les durées indiquées plus bas. Le signataire invité peut exercer ses droits RGPD directement auprès de Mon Assistant Kiné en précisant l'identifiant du contrat concerné.</p>
+</div>
+
 <h2>Utilisation des Données</h2>
 
 <h3>Traitement par Intelligence Artificielle</h3>
@@ -232,9 +276,10 @@
 <div class="info-box">
     <ol>
         <li><strong>Service principal :</strong> Gestion de la pratique professionnelle pour les kinésithérapeutes</li>
-        <li><strong>Assistance professionnelle :</strong> 4 IA spécialisées pour accompagnement kiné</li>
+        <li><strong>Assistance professionnelle :</strong> 5 IA spécialisées pour accompagnement kiné</li>
         <li><strong>Suivi thérapeutique :</strong> Historique des séances, évaluation des progrès</li>
         <li><strong>Communication :</strong> Chat sécurisé entre kiné et patient</li>
+        <li><strong>Module Contrats :</strong> Rédaction, signature électronique, archivage et déclaration au CDO des contrats de remplacement et d'assistanat libéral</li>
         <li><strong>Facturation :</strong> Gestion des abonnements et paiements</li>
         <li><strong>Amélioration :</strong> Analyse statistique anonymisée (optionnelle)</li>
         <li><strong>Support :</strong> Assistance technique et maintenance</li>
@@ -274,7 +319,7 @@
         </tr>
         <tr>
             <td><strong>Clever Cloud</strong></td>
-            <td>Toutes données (hébergement)</td>
+            <td>Bases de données et serveurs applicatifs</td>
             <td>Infrastructure HDS (France)</td>
             <td>Contrat</td>
         </tr>
@@ -289,6 +334,24 @@
             <td>Données authentification</td>
             <td>Connexion sécurisée</td>
             <td>Contrat</td>
+        </tr>
+        <tr>
+            <td><strong>Google Cloud Storage</strong></td>
+            <td>Fichiers utilisateurs (avatars, GIFs d'exercices, PDFs de contrats signés)</td>
+            <td>Stockage privé chiffré</td>
+            <td>Contrat</td>
+        </tr>
+        <tr>
+            <td><strong>Brevo (Sib SA, France)</strong></td>
+            <td>Email, nom des signataires, PDF du contrat en pièce jointe</td>
+            <td>Envoi des invitations à signer et déclaration au CDO</td>
+            <td>Contrat</td>
+        </tr>
+        <tr>
+            <td><strong>Conseils départementaux de l'Ordre des MK</strong></td>
+            <td>Contrat signé complet (état civil, n° RPPS, n° ordinal, conditions)</td>
+            <td>Déclaration déontologique (art. R.4321-128 CSP)</td>
+            <td>Obligation légale</td>
         </tr>
     </tbody>
 </table>
@@ -369,6 +432,21 @@
             <td><strong>Cookies</strong></td>
             <td>13 mois maximum</td>
             <td>CNIL</td>
+        </tr>
+        <tr>
+            <td><strong>Contrat signé (PDF + métadonnées)</strong></td>
+            <td>10 ans après la fin du contrat</td>
+            <td>Prescription civile (art. 2224 Code civil) et obligation déontologique</td>
+        </tr>
+        <tr>
+            <td><strong>Preuves de signature (IP, user-agent, empreinte, audit log)</strong></td>
+            <td>Identique au contrat signé</td>
+            <td>Force probante (eIDAS, art. 1366-1367 Code civil)</td>
+        </tr>
+        <tr>
+            <td><strong>Carnet d'adresses kinés</strong></td>
+            <td>Durée du compte du kinésithérapeute initiateur</td>
+            <td>Intérêt légitime</td>
         </tr>
     </tbody>
 </table>
@@ -515,7 +593,7 @@
 
 <div class="warning-box">
     <p><strong>Localisation des Données</strong></p>
-    <p><strong>Principe :</strong> Données hébergées en France (Clever Cloud, certifié HDS)</p>
+    <p><strong>Principe :</strong> Données hébergées en France — bases de données et serveurs applicatifs sur Clever Cloud (certifié HDS), fichiers utilisateurs sur Google Cloud Storage (région europe-west9, Paris)</p>
     <p><strong>Exception :</strong> OpenAI (États-Unis) pour le traitement IA uniquement, avec données pseudonymisées</p>
 </div>
 
@@ -578,7 +656,7 @@
 <hr>
 
 <p style="text-align: center; font-size: 0.9em; color: #666; margin-top: 30px;">
-    <em>Politique de confidentialité mise à jour le 4 mai 2026 — Version 3.1</em><br>
+    <em>Politique de confidentialité mise à jour le 28 mai 2026 — Version 3.2</em><br>
     <strong>SAS Mon Assistant Kiné - SIRET : 38936059900017</strong>
 </p>
 

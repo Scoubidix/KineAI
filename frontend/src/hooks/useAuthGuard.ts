@@ -45,6 +45,19 @@ export function useAuthGuard(requiredRole?: 'kine' | 'patient') {
           return;
         }
 
+        // Redirect onboarding : tant que firstName ou lastName est vide en DB,
+        // le kiné doit passer par le wizard. Le test couvre null, undefined et "".
+        const onboardingPending = !userData.firstName || !userData.lastName;
+        if (onboardingPending && pathname !== '/onboarding') {
+          router.replace('/onboarding');
+          return;
+        }
+        // Inverse : si déjà onboardé et qu'on traîne sur /onboarding, retour dashboard.
+        if (!onboardingPending && pathname === '/onboarding') {
+          router.replace('/dashboard/kine/home');
+          return;
+        }
+
         setStatus('authenticated');
 
       } catch (error) {

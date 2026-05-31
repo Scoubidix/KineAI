@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import {
   SidebarProvider,
   Sidebar,
@@ -41,6 +42,7 @@ import { sendPasswordReset } from "@/lib/auth-utils";
 import { useToast } from "@/hooks/use-toast"; // Test réactivé
 import { useSubscription } from "@/hooks/useSubscription";
 import { PLANS, getPlanByType } from "@/config/plans";
+import { DEPARTEMENTS_FR } from '@/app/dashboard/kine/contrats/data/departements-fr';
 import {
   Settings,
   BarChart2,
@@ -86,7 +88,8 @@ import {
   Camera,
   HelpCircle
 } from 'lucide-react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { normalizeFirstName, normalizeLastName } from '@/utils/nameNormalization';
 import Link from 'next/link';
 import type { RoleOrUnknown } from '@/types/user';
 import { getAuth, signOut } from 'firebase/auth';
@@ -100,6 +103,7 @@ import { SupportModal } from './SupportModal';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import LegalAcceptanceModal from './LegalAcceptanceModal';
 import { useLegalAcceptance } from '@/hooks/useLegalAcceptance';
+import AnnouncementBanner from './AnnouncementBanner';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -141,7 +145,13 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
     phone: '',
     rpps: '',
     adresseCabinet: '',
-    birthDate: ''
+    birthDate: '',
+    civilite: '',
+    birthPlace: '',
+    departementOrdre: '',
+    numeroOrdinal: '',
+    numeroUrssaf: '',
+    adresseDomicile: ''
   });
 
   // 🔒 NOUVEAU : États pour les modales RGPD
@@ -186,7 +196,13 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
           phone: data.phone || '',
           rpps: data.rpps || '',
           adresseCabinet: data.adresseCabinet || '',
-          birthDate: data.birthDate || ''
+          birthDate: data.birthDate ? String(data.birthDate).slice(0, 10) : '',
+          civilite: data.civilite || '',
+          birthPlace: data.birthPlace || '',
+          departementOrdre: data.departementOrdre || '',
+          numeroOrdinal: data.numeroOrdinal || '',
+          numeroUrssaf: data.numeroUrssaf || '',
+          adresseDomicile: data.adresseDomicile || ''
         });
       } else {
         console.error('Erreur lors du chargement du profil');
@@ -199,6 +215,13 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
   };
 
   const handleSaveProfile = async () => {
+    // Validation Nom et Prénom : obligatoires (non vides)
+    if (!kineData.firstName.trim() || !kineData.lastName.trim()) {
+      setSaveMessage('❌ Le nom et le prénom sont obligatoires');
+      setTimeout(() => setSaveMessage(''), 3000);
+      return;
+    }
+
     // Validation RPPS : vide ou exactement 11 chiffres
     const rppsValue = kineData.rpps?.trim() || '';
     if (rppsValue && (rppsValue.length !== 11 || !/^\d{11}$/.test(rppsValue))) {
@@ -234,9 +257,18 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
+          firstName: kineData.firstName,
+          lastName: kineData.lastName,
           phone: kineData.phone,
           adresseCabinet: kineData.adresseCabinet,
-          rpps: kineData.rpps?.trim() || null
+          rpps: kineData.rpps?.trim() || null,
+          birthDate: kineData.birthDate || '',
+          civilite: kineData.civilite || null,
+          birthPlace: kineData.birthPlace || '',
+          departementOrdre: kineData.departementOrdre || '',
+          numeroOrdinal: kineData.numeroOrdinal || '',
+          numeroUrssaf: kineData.numeroUrssaf || '',
+          adresseDomicile: kineData.adresseDomicile || ''
         }),
       });
       
@@ -451,24 +483,34 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="firstName">Prénom</Label>
-                          <Input 
-                            id="firstName" 
+                          <Label htmlFor="firstName">Prénom *</Label>
+                          <Input
+                            id="firstName"
                             value={kineData.firstName}
-                            disabled
+                            onChange={(e) => setKineData({ ...kineData, firstName: e.target.value })}
                             className="bg-white dark:bg-zinc-900 text-foreground"
+                            required
                           />
-                          <p className="text-xs text-muted-foreground mt-1">Non modifiable</p>
+                          {kineData.firstName.trim() && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Sera enregistré : <span className="font-medium text-foreground">{normalizeFirstName(kineData.firstName)}</span>
+                            </p>
+                          )}
                         </div>
                         <div>
-                          <Label htmlFor="lastName">Nom</Label>
-                          <Input 
-                            id="lastName" 
+                          <Label htmlFor="lastName">Nom *</Label>
+                          <Input
+                            id="lastName"
                             value={kineData.lastName}
-                            disabled
+                            onChange={(e) => setKineData({ ...kineData, lastName: e.target.value })}
                             className="bg-white dark:bg-zinc-900 text-foreground"
+                            required
                           />
-                          <p className="text-xs text-muted-foreground mt-1">Non modifiable</p>
+                          {kineData.lastName.trim() && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Sera enregistré : <span className="font-medium text-foreground">{normalizeLastName(kineData.lastName)}</span>
+                            </p>
+                          )}
                         </div>
                       </div>
                       
@@ -514,40 +556,138 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                           className="bg-white dark:bg-zinc-900 text-foreground"
                         />
                       </div>
-                      
-                      <div className="flex items-center gap-4 mt-4">
-                        <Button
-                          onClick={handleSaveProfile}
-                          disabled={loading}
-                          className="btn-teal"
-                        >
-                          {loading ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Sauvegarde...
-                            </>
-                          ) : (
-                            <>
-                              <Save className="h-4 w-4 mr-2" />
-                              Sauvegarder les modifications
-                            </>
-                          )}
-                        </Button>
-                        
-                        {/* Message de confirmation */}
-                        {saveMessage && (
-                          <div className={`flex items-center gap-2 text-sm font-medium transition-all duration-300 ${
-                            saveMessage.includes('✅') 
-                              ? 'text-green-600' 
-                              : 'text-red-600'
-                          }`}>
-                            {saveMessage.includes('✅') && <CheckCircle className="h-4 w-4" />}
-                            {saveMessage}
-                          </div>
-                        )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold mb-4 text-[#3899aa]">Informations pour les contrats</h3>
+
+                  <Card className="card-hover">
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="civilite">Civilité</Label>
+                          <Select
+                            value={kineData.civilite || undefined}
+                            onValueChange={(v) => setKineData({ ...kineData, civilite: v })}
+                          >
+                            <SelectTrigger id="civilite" className="bg-white dark:bg-zinc-900 text-foreground">
+                              <SelectValue placeholder="Sélectionner..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="M.">Monsieur</SelectItem>
+                              <SelectItem value="MME">Madame</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="birthDate">Date de naissance</Label>
+                          <Input
+                            id="birthDate"
+                            type="date"
+                            value={kineData.birthDate}
+                            onChange={(e) => setKineData({ ...kineData, birthDate: e.target.value })}
+                            className="bg-white dark:bg-zinc-900 text-foreground"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="birthPlace">Lieu de naissance</Label>
+                        <Input
+                          id="birthPlace"
+                          placeholder="Ville de naissance"
+                          value={kineData.birthPlace}
+                          onChange={(e) => setKineData({ ...kineData, birthPlace: e.target.value })}
+                          className="bg-white dark:bg-zinc-900 text-foreground"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="departementOrdre">Département d'affiliation à l'Ordre</Label>
+                          <Select
+                            value={kineData.departementOrdre || undefined}
+                            onValueChange={(v) => setKineData({ ...kineData, departementOrdre: v })}
+                          >
+                            <SelectTrigger id="departementOrdre" className="bg-white dark:bg-zinc-900 text-foreground">
+                              <SelectValue placeholder="Sélectionner un département..." />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-72">
+                              {DEPARTEMENTS_FR.map((d) => (
+                                <SelectItem key={d.code} value={d.code}>
+                                  {d.code} — {d.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="numeroOrdinal">Numéro ordinal</Label>
+                          <Input
+                            id="numeroOrdinal"
+                            placeholder="Ex: 012345"
+                            value={kineData.numeroOrdinal}
+                            onChange={(e) => setKineData({ ...kineData, numeroOrdinal: e.target.value })}
+                            className="bg-white dark:bg-zinc-900 text-foreground"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="numeroUrssaf">Numéro URSSAF</Label>
+                        <Input
+                          id="numeroUrssaf"
+                          value={kineData.numeroUrssaf}
+                          onChange={(e) => setKineData({ ...kineData, numeroUrssaf: e.target.value })}
+                          className="bg-white dark:bg-zinc-900 text-foreground"
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="adresseDomicile">Adresse de domicile</Label>
+                        <Input
+                          id="adresseDomicile"
+                          placeholder="N°, rue, code postal, ville"
+                          value={kineData.adresseDomicile}
+                          onChange={(e) => setKineData({ ...kineData, adresseDomicile: e.target.value })}
+                          className="bg-white dark:bg-zinc-900 text-foreground"
+                        />
                       </div>
                     </CardContent>
                   </Card>
+                </div>
+
+                <div className="flex items-center gap-4 mt-4">
+                  <Button
+                    onClick={handleSaveProfile}
+                    disabled={loading}
+                    className="btn-teal"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Sauvegarde...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Sauvegarder les modifications
+                      </>
+                    )}
+                  </Button>
+
+                  {saveMessage && (
+                    <div className={`flex items-center gap-2 text-sm font-medium transition-all duration-300 ${
+                      saveMessage.includes('✅')
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    }`}>
+                      {saveMessage.includes('✅') && <CheckCircle className="h-4 w-4" />}
+                      {saveMessage}
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 
@@ -1100,10 +1240,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { href: '/dashboard/kine/chatbot-biblio', label: 'IA Bibliographique', icon: BookOpen, disabled: false },
         { href: '/dashboard/kine/chatbot-clinique', label: 'IA Clinique', icon: Stethoscope, disabled: false },
         { href: '/dashboard/kine/chatbot-admin', label: 'IA Administrative', icon: FileText, disabled: false },
+        { href: '/dashboard/kine/contrats', label: 'Mes Contrats', icon: Briefcase, disabled: false },
         { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, disabled: false },
         { href: '/dashboard/kine/public-programs', label: 'Programmes Publics (Bientôt)', icon: Share2, disabled: false },
         { href: '/dashboard/kine/blog', label: 'Blog Pro (Bientôt)', icon: Library, disabled: false },
-        { href: '/dashboard/kine/jobs', label: 'Annonces Emploi (Bientôt)', icon: Briefcase, disabled: false },
         { href: '/dashboard/kine/revenue', label: 'Revenus (Bientôt)', icon: DollarSign, disabled: false },
         { href: '/dashboard/kine/rewards', label: 'Mes Récompenses (Bientôt)', icon: Gift, disabled: false },
       ];
@@ -1122,6 +1262,24 @@ export default function AppLayout({ children }: AppLayoutProps) {
       { href: '/dashboard/patient/home', label: 'Accès Patient (Dev)', icon: ClipboardList, disabled: false },
     ];
   };
+
+  // Badge "nouveau" sur l'item Mes Contrats quand des contrats viennent d'être signés
+  const [contractsUnreadCount, setContractsUnreadCount] = useState(0);
+  useEffect(() => {
+    if (role !== 'kine') return;
+    let cancelled = false;
+    const fetchCount = async () => {
+      try {
+        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts/unread-count`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setContractsUnreadCount(data.count || 0);
+      } catch { /* silencieux */ }
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 2 * 60 * 1000); // toutes les 2 min
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [role]);
 
   const navigationItems = getNavigationItems();
   const displayName = role === 'kine' ? 'Dr. Kiné (Dev)' : role === 'patient' ? 'Patient (Dev)' : 'Utilisateur (Dev)';
@@ -1146,6 +1304,22 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const avatarInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Ouvrir automatiquement la modal profil si ?openProfile=true (depuis le wizard onboarding)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('openProfile') === 'true') {
+      setIsSettingsOpen(true);
+      // Nettoie le query param openProfile sans toucher au reste (autres params, hash).
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('openProfile');
+      const hash = typeof window !== 'undefined' ? window.location.hash : '';
+      const qs = params.toString();
+      router.replace(`${currentPathname}${qs ? `?${qs}` : ''}${hash}`);
+    }
+    // currentPathname/router sont stables, on ne s'intéresse qu'au changement de searchParams
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Lecture cache localStorage au montage (après hydratation)
   React.useEffect(() => {
@@ -1307,6 +1481,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   <Link href={item.href}>
                     <item.icon className="h-4 w-4 shrink-0" />
                     <span>{item.label}</span>
+                    {item.href === '/dashboard/kine/contrats' && contractsUnreadCount > 0 && (
+                      <Badge variant="destructive" className="ml-auto h-4 px-1.5 text-[9px] leading-none">
+                        {contractsUnreadCount}
+                      </Badge>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -1537,6 +1716,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             style={{ background: 'radial-gradient(circle, #3899aa, transparent 70%)' }}
           />
           <div className="relative z-10">
+            <AnnouncementBanner />
             {children}
           </div>
         </div>

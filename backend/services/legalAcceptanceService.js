@@ -14,18 +14,24 @@ async function recordAcceptance(kineId, documentType, version, ipAddress) {
     throw new Error(`Type de document invalide: ${documentType}`);
   }
 
+  // Version optionnelle : si absente, on remplit depuis LEGAL_VERSIONS (source de vérité)
+  const effectiveVersion = version || LEGAL_VERSIONS[documentType];
+  if (!effectiveVersion) {
+    throw new Error(`Version inconnue pour ${documentType}`);
+  }
+
   const prisma = prismaService.getInstance();
 
   const acceptance = await prisma.legalAcceptance.create({
     data: {
       kineId,
       documentType,
-      documentVersion: version,
+      documentVersion: effectiveVersion,
       ipAddress: ipAddress || null
     }
   });
 
-  logger.info(`Acceptation legale enregistree - Kine: ${sanitizeId(kineId)}, Doc: ${documentType} v${version}`);
+  logger.info(`Acceptation legale enregistree - Kine: ${sanitizeId(kineId)}, Doc: ${documentType} v${effectiveVersion}`);
   return acceptance;
 }
 
@@ -39,13 +45,17 @@ async function recordMultipleAcceptances(kineId, acceptances, ipAddress) {
     if (!VALID_DOCUMENT_TYPES.includes(documentType)) {
       throw new Error(`Type de document invalide: ${documentType}`);
     }
-    if (LEGAL_VERSIONS[documentType] !== version) {
-      throw new Error(`Version invalide pour ${documentType}: attendu ${LEGAL_VERSIONS[documentType]}, recu ${version}`);
+    // Version optionnelle : si absente (cas signup nouveau), on remplit depuis LEGAL_VERSIONS.
+    // Si fournie (cas modal de ré-acceptation), on l'accepte telle quelle pour préserver
+    // la rétrocompatibilité — la modal envoie ce que le backend lui a indiqué via le 451.
+    const effectiveVersion = version || LEGAL_VERSIONS[documentType];
+    if (!effectiveVersion) {
+      throw new Error(`Version inconnue pour ${documentType}`);
     }
     return {
       kineId,
       documentType,
-      documentVersion: version,
+      documentVersion: effectiveVersion,
       ipAddress: ipAddress || null
     };
   });

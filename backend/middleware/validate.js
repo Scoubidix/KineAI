@@ -49,20 +49,28 @@ const updatePatientSchema = z.object({
 const createKineSchema = z.object({
   uid: trimmedString(128),
   email: z.string().email(),
-  firstName: trimmedString(100),
-  lastName: trimmedString(100),
-  acceptedCguAt: z.string().optional(),
-  acceptedPolitiqueConfidentialiteAt: z.string().optional(),
-  cguVersion: optionalTrimmedString(20),
-  politiqueConfidentialiteVersion: optionalTrimmedString(20),
-  website: z.string().optional(), // honeypot — accepte pour que le controller le detecte
+  acceptedLegalAt: z.string().optional(),   // ISO timestamp, backend remplit les versions
+  website: z.string().optional(),            // honeypot — accepte pour que le controller le détecte
 });
 
 const updateKineProfileSchema = z.object({
+  // Nom et prénom : acceptés (saisis dans l'onboarding wizard et la modal profil).
+  // trimmedString applique déjà trim() + min(1) — rejette les chaînes vides ET "   ".
+  firstName: trimmedString(100).optional(),
+  lastName:  trimmedString(100).optional(),
   email: z.string().email().optional(),
   phone: optionalTrimmedString(20),
   adresseCabinet: optionalTrimmedString(500),
-  rpps: optionalTrimmedString(20),
+  // Nullable : le front envoie null pour effacer le RPPS (Prisma le stocke en NULL).
+  rpps: optionalTrimmedString(20).nullable(),
+  // Champs profil étendus pour la génération de contrats
+  civilite: z.enum(['M.', 'MME']).nullable().optional(),
+  birthDate: z.string().optional().or(z.literal('')),
+  birthPlace: optionalTrimmedString(200).or(z.literal('')),
+  departementOrdre: optionalTrimmedString(150).or(z.literal('')),
+  numeroOrdinal: optionalTrimmedString(50).or(z.literal('')),
+  numeroUrssaf: optionalTrimmedString(50).or(z.literal('')),
+  adresseDomicile: optionalTrimmedString(500).or(z.literal('')),
 });
 
 // ========== PROGRAMME ==========

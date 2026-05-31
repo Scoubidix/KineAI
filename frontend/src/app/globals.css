@@ -157,3 +157,16 @@ body {
   }
 
 }
+
+/* Wizard slide animations (utilisé par OnboardingWizard) */
+@keyframes slide-from-right {
+  from { transform: translateX(40px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes slide-from-left {
+  from { transform: translateX(-40px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.animate-slide-from-right { animation: slide-from-right 250ms ease-out; }
+.animate-slide-from-left  { animation: slide-from-left  250ms ease-out; }
+

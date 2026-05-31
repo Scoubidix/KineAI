@@ -19,6 +19,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { useToast } from '@/hooks/use-toast';
 
 // Interfaces pour les types de données
 interface KineData {
@@ -118,6 +119,26 @@ export default function KineHomePage() {
   const [loading, setLoading] = useState(true);
   const [loadingAdherence, setLoadingAdherence] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  // Toast de bienvenue après signature contrat via magic link
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('welcome') === 'contract') {
+      toast({
+        title: 'Bienvenue dans votre espace !',
+        description: 'Votre contrat signé est disponible dans Mes Contrats → Reçus.',
+        duration: 10000,
+      });
+      // Nettoyer l'URL pour pas re-trigger au refresh
+      const url = new URL(window.location.href);
+      url.searchParams.delete('welcome');
+      url.searchParams.delete('id');
+      window.history.replaceState({}, '', url.toString());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // URL de l'API
   const API_URL = process.env.NEXT_PUBLIC_API_URL;

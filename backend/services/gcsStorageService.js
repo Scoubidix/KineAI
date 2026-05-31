@@ -15,7 +15,9 @@ const logger = require('../utils/logger');
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'monassistantkine';
 const EXERCICES_FOLDER = 'exercices/';
 const AVATARS_FOLDER = 'avatars/';
+const CONTRACTS_FOLDER = 'contracts/';
 const DEFAULT_SIGNED_URL_EXPIRATION = 60 * 60 * 1000; // 1 heure en ms
+const CONTRACT_PDF_SIGNED_URL_EXPIRATION = 7 * 24 * 60 * 60 * 1000; // 7 jours en ms
 
 // Magic bytes pour valider le type réel des images
 const IMAGE_MAGIC_BYTES = {
@@ -323,6 +325,65 @@ async function deleteAvatar(avatarPath) {
   }
 }
 
+/**
+ * Upload du PDF final scellé d'un contrat de remplacement/assistanat
+ * @param {Buffer} fileBuffer - Buffer du PDF
+ * @param {number|string} contractId - ID du contrat
+ * @returns {Promise<string>} Path GCS du fichier
+ */
+async function uploadContractPdf(fileBuffer, contractId) {
+  try {
+    const path = `${CONTRACTS_FOLDER}${contractId}/contrat-final.pdf`;
+    const file = bucket.file(path);
+    await file.save(fileBuffer, {
+      metadata: {
+        contentType: 'application/pdf',
+        cacheControl: 'private, max-age=3600',
+        metadata: {
+          uploadedAt: new Date().toISOString(),
+          contractId: String(contractId),
+        }
+      },
+      resumable: false,
+    });
+    logger.info(`PDF contrat uploadé sur GCS (privé): ${path}`);
+    return path;
+  } catch (error) {
+    logger.error('Erreur upload PDF contrat sur GCS:', error);
+    throw new Error(`Échec upload PDF contrat: ${error.message}`);
+  }
+}
+
+/**
+ * Génère une signed URL temporaire (7j par défaut) pour télécharger un PDF de contrat.
+ */
+async function generateContractPdfSignedUrl(path, expirationMs = CONTRACT_PDF_SIGNED_URL_EXPIRATION) {
+  if (!path) return null;
+  if (!path.startsWith(CONTRACTS_FOLDER)) {
+    logger.error(`Chemin invalide pour signed URL contrat: ${path}`);
+    return null;
+  }
+  return generateSignedUrl(path, expirationMs);
+}
+
+/**
+ * Supprime un PDF de contrat (cleanup ou regénération)
+ */
+async function deleteContractPdf(path) {
+  if (!path) return;
+  if (!path.startsWith(CONTRACTS_FOLDER)) {
+    throw new Error(`Chemin non autorisé pour suppression contrat: ${path}`);
+  }
+  const file = bucket.file(path);
+  const [exists] = await file.exists();
+  if (!exists) {
+    logger.warn(`PDF contrat absent (déjà supprimé?): ${path}`);
+    return;
+  }
+  await file.delete();
+  logger.info(`PDF contrat supprimé de GCS: ${path}`);
+}
+
 module.exports = {
   uploadGif,
   generateSignedUrl,
@@ -333,7 +394,11 @@ module.exports = {
   uploadAvatar,
   deleteAvatar,
   validateImageBuffer,
+  uploadContractPdf,
+  generateContractPdfSignedUrl,
+  deleteContractPdf,
   BUCKET_NAME,
   EXERCICES_FOLDER,
   AVATARS_FOLDER,
+  CONTRACTS_FOLDER,
 };
