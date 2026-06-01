@@ -372,6 +372,7 @@ async function getPublicContractInfo(token) {
       lastName: initiator?.lastName || '',
     },
     destinataireFirstName: contract.destinataireFirstName,
+    destinataireLastName: contract.destinataireLastName,
     destinataireEmail: contract.destinataireEmail,
     hasExistingAccount: !!matchedKine,
     expiresAt: contract.accessTokenExpiresAt,

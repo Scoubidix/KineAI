@@ -12,17 +12,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
   ArrowLeft, ArrowRight,
-  Loader2, AlertCircle, Eye, Check, PenLine, Download, ExternalLink, Maximize2, FileText
+  Loader2, AlertCircle, Eye, EyeOff, Check, X, PenLine, Download, ExternalLink, Maximize2, FileText
 } from 'lucide-react';
 import DestinataireProfileWizard, { DestinataireProfileData } from './components/DestinataireProfileWizard';
 import IdentifyWelcome from './components/IdentifyWelcome';
 
-type Step = 'LOADING' | 'ERROR' | 'IDENTIFY' | 'GUEST_TERMS' | 'LOGIN' | 'SIGNUP' | 'PROFILE' | 'PREVIEW' | 'SIGN' | 'DONE';
+type Step = 'LOADING' | 'ERROR' | 'IDENTIFY' | 'GUEST_TERMS' | 'LOGIN' | 'PROFILE' | 'PREVIEW' | 'SIGN' | 'DONE';
 type Mode = 'EXISTING_KINE' | 'NEW_KINE' | 'GUEST';
 
 interface PublicInfo {
@@ -31,6 +31,7 @@ interface PublicInfo {
   destinataireRole: 'TITULAIRE' | 'REMPLACANT_OU_ASSISTANT';
   initiator: { firstName: string; lastName: string };
   destinataireFirstName: string;
+  destinataireLastName: string;
   destinataireEmail: string;
   hasExistingAccount: boolean;
   expiresAt: string;
@@ -98,11 +99,21 @@ export default function ContractSignPage() {
   // Acceptation CGU/PC en mode invité
   const [guestLegalAccepted, setGuestLegalAccepted] = useState(false);
 
-  // Identifiants login/signup
+  // Identifiants login
   const [authPassword, setAuthPassword] = useState('');
-  const [authPasswordConfirm, setAuthPasswordConfirm] = useState('');
   const [authError, setAuthError] = useState('');
   const [authSubmitting, setAuthSubmitting] = useState(false);
+
+  // Modale d'inscription NEW_KINE (multi-étapes : identifiants → nom → prénom)
+  const [signupOpen, setSignupOpen] = useState(false);
+  const [signupStep, setSignupStep] = useState<'CREDENTIALS' | 'LAST_NAME' | 'FIRST_NAME'>('CREDENTIALS');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupShowPwd, setSignupShowPwd] = useState(false);
+  const [signupLegal, setSignupLegal] = useState(false);
+  const [signupLastName, setSignupLastName] = useState('');
+  const [signupFirstName, setSignupFirstName] = useState('');
+  const [signupError, setSignupError] = useState('');
+  const [signupSubmitting, setSignupSubmitting] = useState(false);
 
   // Profile form
   const [profile, setProfile] = useState<DestProfile>({});
@@ -184,15 +195,20 @@ export default function ContractSignPage() {
     return data as SessionContext;
   }, []);
 
-  // Identification finale → ouvre une session backend, route vers PROFILE ou PREVIEW
-  const completeIdentify = useCallback(async (mode: Mode, firebaseIdToken?: string) => {
+  // Identification finale → ouvre une session backend, route vers PROFILE ou PREVIEW.
+  // extra : pour NEW_KINE, transmet l'acceptation légale et le nom/prénom confirmés.
+  const completeIdentify = useCallback(async (
+    mode: Mode,
+    firebaseIdToken?: string,
+    extra?: { legalAccepted?: boolean; firstName?: string; lastName?: string },
+  ) => {
     if (!token) return;
     setSubmitting(true);
     try {
       const res = await fetch(`${API_BASE}/api/contract-access/${encodeURIComponent(token)}/identify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode, firebaseIdToken }),
+        body: JSON.stringify({ mode, firebaseIdToken, ...(extra || {}) }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -233,27 +249,60 @@ export default function ContractSignPage() {
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError('');
-    if (authPassword.length < 8) {
-      setAuthError('Mot de passe : 8 caractères minimum');
-      return;
-    }
-    if (authPassword !== authPasswordConfirm) {
-      setAuthError('Les mots de passe ne correspondent pas');
-      return;
-    }
-    setAuthSubmitting(true);
+  // ===== Modale d'inscription NEW_KINE =====
+
+  // Critères de mot de passe (parité avec /signup)
+  const pwdChecks = useMemo(() => {
+    const p = signupPassword;
+    return {
+      minLength: p.length >= 8,
+      hasUpperCase: /[A-Z]/.test(p),
+      hasLowerCase: /[a-z]/.test(p),
+      hasNumbers: /\d/.test(p),
+      hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(p),
+    };
+  }, [signupPassword]);
+  const pwdIsValid = Object.values(pwdChecks).every(Boolean);
+
+  const openSignup = () => {
+    if (!publicInfo) return;
+    setSignupError('');
+    setSignupPassword('');
+    setSignupShowPwd(false);
+    setSignupLegal(false);
+    setSignupLastName(publicInfo.destinataireLastName || '');
+    setSignupFirstName(publicInfo.destinataireFirstName || '');
+    setSignupStep('CREDENTIALS');
+    setSignupOpen(true);
+  };
+
+  // Soumission finale : crée le compte Firebase puis enchaîne sur le flow contrat.
+  const handleSignupSubmit = async () => {
+    if (!publicInfo) return;
+    setSignupError('');
+    if (!pwdIsValid) { setSignupError('Le mot de passe ne respecte pas les critères de sécurité.'); return; }
+    if (!signupLegal) { setSignupError('Vous devez accepter les conditions pour créer un compte.'); return; }
+    if (!signupLastName.trim() || !signupFirstName.trim()) { setSignupError('Nom et prénom requis.'); return; }
+    setSignupSubmitting(true);
     try {
-      const cred = await createUserWithEmailAndPassword(auth, publicInfo?.destinataireEmail || '', authPassword);
+      const cred = await createUserWithEmailAndPassword(auth, publicInfo.destinataireEmail, signupPassword);
       const idToken = await cred.user.getIdToken();
-      await completeIdentify('NEW_KINE', idToken);
+      setSignupOpen(false);
+      await completeIdentify('NEW_KINE', idToken, {
+        legalAccepted: true,
+        firstName: signupFirstName.trim(),
+        lastName: signupLastName.trim(),
+      });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Création de compte impossible';
-      setAuthError(msg.replace('Firebase: ', ''));
+      const clean = msg.replace('Firebase: ', '');
+      setSignupError(
+        clean.includes('email-already-in-use')
+          ? 'Un compte existe déjà avec cet email. Revenez en arrière et choisissez « Se connecter ».'
+          : clean
+      );
     } finally {
-      setAuthSubmitting(false);
+      setSignupSubmitting(false);
     }
   };
 
@@ -406,29 +455,44 @@ export default function ContractSignPage() {
     await fetchFinalPdfUrl();
   };
 
-  const goToDashboard = () => {
+  const goToDashboard = async () => {
     if (!context) return;
     if (context.mode === 'EXISTING_KINE' || context.mode === 'NEW_KINE') {
+      // Le backend a marqué l'email comme vérifié (NEW_KINE) : on rafraîchit le user/token
+      // local pour qu'AppLayout voie le bon statut et n'envoie pas vers /verify-email-required.
+      try {
+        await auth.currentUser?.reload();
+        await auth.currentUser?.getIdToken(true);
+      } catch {
+        // non bloquant : au pire, fallback sur la page de vérification d'email
+      }
       router.push(`/dashboard/kine/home?welcome=contract&id=${context.contract.id}`);
     }
   };
 
   // ============================ RENDU ============================
   return (
-    <div className="min-h-screen bg-white dark:bg-[#141414] flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] shadow-md">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Image
-            src="/logo.jpg"
-            alt="Mon Assistant Kiné"
-            width={44}
-            height={44}
-            className="rounded-full shrink-0 bg-white/15 p-0.5"
-          />
-          <div>
-            <div className="font-bold text-white text-sm">Mon Assistant Kiné</div>
-          </div>
+    <div className="min-h-screen bg-[#f0f9fa] dark:bg-[#141414] flex flex-col">
+      {/* Header — façon template : fond blanc, centré, logo + nom (lien vers le site) */}
+      <header className="sticky top-0 z-50 bg-white dark:bg-[#1a1a1a] border-b border-[#d4ecea] dark:border-white/10">
+        <div className="max-w-4xl mx-auto px-6 py-3.5 flex items-center justify-center">
+          <a
+            href="https://www.monassistantkine.fr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2.5 no-underline"
+          >
+            <Image
+              src="/logo.jpg"
+              alt="Mon Assistant Kiné"
+              width={30}
+              height={30}
+              className="h-[30px] w-[30px] rounded-full shrink-0"
+            />
+            <span className="text-sm font-bold tracking-tight text-[#0f172a] dark:text-white">
+              Mon Assistant <span className="text-[#3899aa]">Kiné</span>
+            </span>
+          </a>
         </div>
       </header>
 
@@ -457,10 +521,11 @@ export default function ContractSignPage() {
         {step === 'IDENTIFY' && publicInfo && (
           <IdentifyWelcome
             publicInfo={publicInfo}
-            onPrimary={() => {
+            onLogin={() => {
               setAuthError('');
-              setStep(publicInfo.hasExistingAccount ? 'LOGIN' : 'SIGNUP');
+              setStep('LOGIN');
             }}
+            onSignup={openSignup}
             onGuest={() => {
               setGuestLegalAccepted(false);
               setStep('GUEST_TERMS');
@@ -524,33 +589,6 @@ export default function ContractSignPage() {
             {authError && <p className="text-sm text-red-600">{authError}</p>}
             <Button type="submit" disabled={authSubmitting || !authPassword} className="w-full btn-teal">
               {authSubmitting ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Connexion...</> : 'Se connecter'}
-            </Button>
-          </form>
-        )}
-
-        {/* SIGNUP */}
-        {step === 'SIGNUP' && publicInfo && (
-          <form onSubmit={handleSignup} className="max-w-md mx-auto w-full space-y-4 card-hover rounded-2xl p-6">
-            <Button variant="ghost" size="sm" type="button" onClick={() => setStep('IDENTIFY')}>
-              <ArrowLeft className="h-4 w-4 mr-1" /> Retour
-            </Button>
-            <h2 className="font-semibold text-base">Créer votre compte gratuit</h2>
-            <p className="text-xs text-muted-foreground">Votre email est vérifié automatiquement via ce lien.</p>
-            <div>
-              <Label>Email (verrouillé)</Label>
-              <Input value={publicInfo.destinataireEmail} disabled />
-            </div>
-            <div>
-              <Label htmlFor="signup-pwd">Mot de passe (8 caractères minimum)</Label>
-              <Input id="signup-pwd" type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} required />
-            </div>
-            <div>
-              <Label htmlFor="signup-pwd2">Confirmer le mot de passe</Label>
-              <Input id="signup-pwd2" type="password" value={authPasswordConfirm} onChange={(e) => setAuthPasswordConfirm(e.target.value)} required />
-            </div>
-            {authError && <p className="text-sm text-red-600">{authError}</p>}
-            <Button type="submit" disabled={authSubmitting || !authPassword || !authPasswordConfirm} className="w-full btn-teal">
-              {authSubmitting ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Création...</> : 'Créer mon compte'}
             </Button>
           </form>
         )}
@@ -785,6 +823,140 @@ export default function ContractSignPage() {
           </>
         )}
       </main>
+
+      {/* MODALE INSCRIPTION NEW_KINE — multi-étapes, sans quitter le flow contrat */}
+      <Dialog open={signupOpen} onOpenChange={(o) => { if (!signupSubmitting) setSignupOpen(o); }}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogTitle className="text-base font-semibold">Créer mon compte gratuit</DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground -mt-2">
+            Module Contrats 100% gratuit · Sans carte bancaire.
+          </DialogDescription>
+
+          {/* Mini-stepper */}
+          <div className="flex items-center gap-1.5">
+            {['CREDENTIALS', 'LAST_NAME', 'FIRST_NAME'].map((s, i) => {
+              const idx = ['CREDENTIALS', 'LAST_NAME', 'FIRST_NAME'].indexOf(signupStep);
+              return (
+                <div
+                  key={s}
+                  className={`h-1.5 flex-1 rounded-full ${i <= idx ? 'bg-[#3899aa]' : 'bg-gray-200 dark:bg-gray-700'}`}
+                />
+              );
+            })}
+          </div>
+
+          {/* Étape 1 — Identifiants */}
+          {signupStep === 'CREDENTIALS' && publicInfo && (
+            <div className="space-y-4">
+              <div>
+                <Label>Email</Label>
+                <Input value={publicInfo.destinataireEmail} disabled />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Vérifié via votre lien d&apos;invitation, non modifiable.
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="su-pwd">Mot de passe</Label>
+                <div className="relative">
+                  <Input
+                    id="su-pwd"
+                    type={signupShowPwd ? 'text' : 'password'}
+                    value={signupPassword}
+                    onChange={(e) => setSignupPassword(e.target.value)}
+                    className="pr-10"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSignupShowPwd((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {signupShowPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {signupPassword && (
+                  <div className="mt-2 p-3 bg-muted/50 rounded-lg space-y-1">
+                    {[
+                      { ok: pwdChecks.minLength, label: 'Au moins 8 caractères' },
+                      { ok: pwdChecks.hasUpperCase, label: 'Une majuscule (A-Z)' },
+                      { ok: pwdChecks.hasLowerCase, label: 'Une minuscule (a-z)' },
+                      { ok: pwdChecks.hasNumbers, label: 'Un chiffre (0-9)' },
+                      { ok: pwdChecks.hasSpecialChar, label: 'Un caractère spécial' },
+                    ].map((r) => (
+                      <div key={r.label} className={`flex items-center gap-2 text-xs ${r.ok ? 'text-green-600' : 'text-muted-foreground'}`}>
+                        {r.ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                        <span>{r.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <Checkbox checked={signupLegal} onCheckedChange={(c) => setSignupLegal(c === true)} className="mt-0.5" />
+                <span className="text-xs text-muted-foreground leading-relaxed">
+                  J&apos;ai lu et j&apos;accepte les{' '}
+                  <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer" className="text-[#3899aa] underline">CGU</a>, la{' '}
+                  <a href="/legal/politique-confidentialite.html" target="_blank" rel="noopener noreferrer" className="text-[#3899aa] underline">Politique de Confidentialité</a>{' '}
+                  et le{' '}
+                  <a href="/legal/dpa.html" target="_blank" rel="noopener noreferrer" className="text-[#3899aa] underline">Contrat de Sous-traitance (DPA)</a>.
+                </span>
+              </label>
+              {signupError && <p className="text-sm text-red-600">{signupError}</p>}
+              <div className="flex justify-end">
+                <Button
+                  className="btn-teal"
+                  disabled={!pwdIsValid || !signupLegal}
+                  onClick={() => { setSignupError(''); setSignupStep('LAST_NAME'); }}
+                >
+                  Suivant <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Étape 2 — Nom */}
+          {signupStep === 'LAST_NAME' && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="su-last">Votre nom</Label>
+                <Input id="su-last" value={signupLastName} onChange={(e) => setSignupLastName(e.target.value)} autoFocus />
+                <p className="text-[11px] text-muted-foreground mt-1">Pré-rempli depuis le contrat, corrigez si besoin.</p>
+              </div>
+              {signupError && <p className="text-sm text-red-600">{signupError}</p>}
+              <div className="flex justify-between">
+                <Button variant="ghost" onClick={() => { setSignupError(''); setSignupStep('CREDENTIALS'); }}>
+                  <ArrowLeft className="h-4 w-4 mr-1" /> Retour
+                </Button>
+                <Button className="btn-teal" disabled={!signupLastName.trim()} onClick={() => { setSignupError(''); setSignupStep('FIRST_NAME'); }}>
+                  Suivant <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Étape 3 — Prénom */}
+          {signupStep === 'FIRST_NAME' && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="su-first">Votre prénom</Label>
+                <Input id="su-first" value={signupFirstName} onChange={(e) => setSignupFirstName(e.target.value)} autoFocus />
+                <p className="text-[11px] text-muted-foreground mt-1">Pré-rempli depuis le contrat, corrigez si besoin.</p>
+              </div>
+              {signupError && <p className="text-sm text-red-600">{signupError}</p>}
+              <div className="flex justify-between">
+                <Button variant="ghost" disabled={signupSubmitting} onClick={() => { setSignupError(''); setSignupStep('LAST_NAME'); }}>
+                  <ArrowLeft className="h-4 w-4 mr-1" /> Retour
+                </Button>
+                <Button className="btn-teal" disabled={!signupFirstName.trim() || signupSubmitting} onClick={handleSignupSubmit}>
+                  {signupSubmitting
+                    ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Création...</>
+                    : <>Créer mon compte <Check className="h-4 w-4 ml-1" /></>}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={previewFullscreen} onOpenChange={setPreviewFullscreen}>
         <DialogContent className="!max-w-none !w-screen !h-screen !rounded-none p-0 flex flex-col gap-0 border-0">

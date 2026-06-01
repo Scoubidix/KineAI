@@ -12,6 +12,12 @@ const { magicLinkAccessLimiter, magicLinkSignLimiter } = require('../middleware/
 const identifySchema = z.object({
   mode: z.enum(['EXISTING_KINE', 'NEW_KINE', 'GUEST']),
   firebaseIdToken: z.string().optional(),
+  // Acceptation CGU/PC/DPA — obligatoire à la création d'un compte NEW_KINE (vérifié dans le contrôleur).
+  legalAccepted: z.boolean().optional(),
+  // Nom/prénom confirmés (ou corrigés) dans la modale d'inscription NEW_KINE. Optionnels :
+  // si absents, le backend retombe sur les noms du contrat (saisis par l'initiateur).
+  firstName: z.string().trim().max(100).optional(),
+  lastName: z.string().trim().max(100).optional(),
 });
 
 router.get('/:token', magicLinkAccessLimiter, contractAccessController.getPublicInfo);

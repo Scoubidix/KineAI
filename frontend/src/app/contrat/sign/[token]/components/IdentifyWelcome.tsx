@@ -1,10 +1,7 @@
 'use client';
 
 import React from 'react';
-import {
-  Clock, Shield, FileCheck2, LayoutGrid, BadgeCheck, Download,
-  UserPlus, LogIn, UserCheck, ArrowRight, ChevronRight, Check,
-} from 'lucide-react';
+import { Clock, Check, Users } from 'lucide-react';
 import styles from './IdentifyWelcome.module.css';
 
 interface IdentifyWelcomeProps {
@@ -15,155 +12,167 @@ interface IdentifyWelcomeProps {
     expiresAt: string;
     hasExistingAccount: boolean;
   };
-  onPrimary: () => void;
+  onLogin: () => void;
+  onSignup: () => void;
   onGuest: () => void;
 }
 
-export default function IdentifyWelcome({ publicInfo, onPrimary, onGuest }: IdentifyWelcomeProps) {
-  const initFullName = `${publicInfo.initiator.lastName} ${publicInfo.initiator.firstName}`.trim();
-  const initials = `${(publicInfo.initiator.firstName[0] || '').toUpperCase()}${(publicInfo.initiator.lastName[0] || '').toUpperCase()}`;
+const BENEFITS = [
+  {
+    label: 'Infos pré-remplies automatiquement',
+    sub: "Numéro d'ordre, adresse, coordonnées : plus jamais à ressaisir",
+  },
+  {
+    label: 'Tous tes contrats archivés',
+    sub: "Retrouve n'importe quel contrat passé en quelques secondes",
+  },
+  {
+    label: "Déclaration à l'Ordre en 1 clic",
+    sub: 'Conformité automatique, sans paperasse manuelle',
+  },
+  {
+    label: 'Export PDF en 1 clic',
+    sub: 'Contrat signé, mis en forme, prêt à envoyer ou archiver',
+  },
+];
+
+export default function IdentifyWelcome({ publicInfo, onLogin, onSignup, onGuest }: IdentifyWelcomeProps) {
+  const initFullName = `${publicInfo.initiator.firstName} ${publicInfo.initiator.lastName}`.trim();
   const expiresLabel = publicInfo.expiresAt
     ? new Date(publicInfo.expiresAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
     : '';
   const contractWord = publicInfo.type === 'REMPLACEMENT_LIBERAL' ? 'remplacement' : 'assistanat libéral';
 
-  const primaryLabel = publicInfo.hasExistingAccount
-    ? 'Me connecter et accéder au contrat'
-    : 'Créer mon compte et accéder au contrat';
-  const primarySub = publicInfo.hasExistingAccount
-    ? 'Compte déjà existant pour cet email'
-    : 'Gratuit · Sans carte bancaire · 2 minutes';
-  const PrimaryIcon = publicInfo.hasExistingAccount ? LogIn : UserPlus;
+  // Le bouton primaire s'adapte : si un compte existe déjà pour cet email, on met
+  // « Me connecter » en avant ; sinon « Créer mon compte ». Les 3 actions restent visibles.
+  const loginFirst = publicInfo.hasExistingAccount;
 
   return (
     <div className={styles.wrapper}>
-      <div className={`${styles.expiryBadge} ${styles.anim} ${styles.d1}`}>
-        <Clock size={11} />
-        Lien valable jusqu&apos;au {expiresLabel}
-      </div>
-
-      <div className={`${styles.senderCard} ${styles.anim} ${styles.d2}`}>
-        <div className={styles.senderRow}>
-          <div className={styles.senderAvatar}>{initials}</div>
-          <div>
-            <p className={styles.senderName}>{initFullName} vous invite</p>
-            <p className={styles.senderRole}>Kinésithérapeute libéral</p>
-          </div>
+      {/* STEPPER */}
+      <div className={`${styles.stepper} ${styles.anim} ${styles.d1}`}>
+        <div className={`${styles.step} ${styles.stepOn}`}>
+          <span className={styles.stepNum}>1</span>
+          <span className={styles.stepLabel}>Accès</span>
+        </div>
+        <span className={styles.stepperLine} />
+        <div className={`${styles.step} ${styles.stepOff}`}>
+          <span className={styles.stepNum}>2</span>
+          <span className={styles.stepLabel}>Signature</span>
         </div>
       </div>
 
+      {/* EXPIRATION */}
+      {expiresLabel && (
+        <div className={`${styles.expiryBadge} ${styles.anim} ${styles.d1}`}>
+          <Clock size={11} />
+          Lien valable jusqu&apos;au {expiresLabel}
+        </div>
+      )}
+
+      {/* BANNIÈRE CONTEXTE */}
+      <div className={`${styles.contextBanner} ${styles.anim} ${styles.d2}`}>
+        <div className={styles.bannerIcon}>📋</div>
+        <p>
+          <strong>{initFullName}</strong> t&apos;a invité(e) à signer un{' '}
+          <strong>contrat de {contractWord}</strong>. Il est prêt, il t&apos;attend.
+        </p>
+      </div>
+
+      {/* HERO */}
       <div className={`${styles.hero} ${styles.anim} ${styles.d3}`}>
         <p className={styles.heroTag}>👋 Bonjour {publicInfo.destinataireFirstName}</p>
         <h1 className={styles.heroTitle}>
-          Votre contrat de<br /><em>{contractWord}</em><br />vous attend.
+          Ton contrat est prêt.<br /><em>Prends 1 minute pour toi.</em>
         </h1>
         <p className={styles.heroSub}>
-          Lisez, complétez et signez votre contrat libéral en quelques minutes — depuis votre téléphone ou votre ordinateur.
+          Crée ton compte gratuit et tes infos seront pré-remplies, pour ce contrat
+          et tous les suivants. Zéro ressaisie, zéro oubli.
         </p>
       </div>
 
-      <div className={`${styles.freeBlock} ${styles.anim} ${styles.d3}`}>
-        <div className={styles.freeIcon}>
-          <Shield size={17} />
-        </div>
-        <div>
-          <p className={styles.freeTitle}>Module Contrats 100% gratuit</p>
-          <p className={styles.freeDesc}>
-            Créez votre compte et gérez <strong>tous vos contrats gratuitement</strong>, pour toujours. Aucune carte bancaire, aucune limite.
-          </p>
-        </div>
-      </div>
-
-      <div className={`${styles.anim} ${styles.d4}`}>
-        <button type="button" onClick={onPrimary} className={styles.ctaPrimary}>
-          <div className={styles.ctaLeft}>
-            <div className={styles.ctaIcon}>
-              <PrimaryIcon size={19} />
-            </div>
+      {/* AVANTAGES */}
+      <div className={`${styles.benefitsCard} ${styles.anim} ${styles.d3}`}>
+        <div className={styles.cardLabel}>Avec ton compte MAK, 100 % gratuit</div>
+        {BENEFITS.map((b) => (
+          <div key={b.label} className={styles.benefitRow}>
+            <div className={styles.checkCircle}><Check size={12} /></div>
             <div>
-              <p className={styles.ctaLabel}>{primaryLabel}</p>
-              <p className={styles.ctaSub}>{primarySub}</p>
+              <div className={styles.benefitText}>{b.label}</div>
+              <div className={styles.benefitSub}>{b.sub}</div>
             </div>
           </div>
-          <div className={styles.ctaArr}>
-            <ArrowRight size={19} />
-          </div>
+        ))}
+      </div>
+
+      {/* AVERTISSEMENT PERTE */}
+      <div className={`${styles.lossStrip} ${styles.anim} ${styles.d4}`}>
+        <span className={styles.lossIcon}>⚠️</span>
+        <p>
+          Sans compte : <strong>ressaisie manuelle à chaque contrat</strong>, aucune
+          sauvegarde, déclaration Ordre à gérer toi-même. Tu peux, mais tu reviendras.
+        </p>
+      </div>
+
+      {/* CTA — 3 boutons, sans case à cocher (acceptation gérée à l'étape suivante) */}
+      <div className={`${styles.ctaArea} ${styles.anim} ${styles.d4}`}>
+        {loginFirst ? (
+          <>
+            <button type="button" onClick={onLogin} className={styles.ctaPrimary}>
+              <span className={styles.ctaLabel}>Me connecter et accéder au contrat</span>
+              <span className={styles.ctaSub}>Compte déjà existant pour cet email</span>
+            </button>
+            <button type="button" onClick={onSignup} className={styles.ctaSecondary}>
+              <span className={styles.ctaSecLabel}>Créer un compte</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" onClick={onSignup} className={styles.ctaPrimary}>
+              <span className={styles.ctaLabel}>Créer mon compte, c&apos;est gratuit</span>
+            </button>
+            <button type="button" onClick={onLogin} className={styles.ctaSecondary}>
+              <span className={styles.ctaSecLabel}>J&apos;ai déjà un compte, me connecter</span>
+            </button>
+          </>
+        )}
+
+        <p className={styles.trustLine}>
+          Sans carte bancaire&nbsp;·&nbsp;Accès immédiat
+        </p>
+
+        <div className={styles.divider}><span>ou</span></div>
+
+        <button type="button" onClick={onGuest} className={styles.ctaGhost}>
+          <span className={styles.ctaGhostLabel}>Continuer sans compte</span>
+          <span className={styles.ctaGhostNote}>Mes infos ne seront pas sauvegardées pour la prochaine fois</span>
         </button>
-
-        <button type="button" onClick={onGuest} className={styles.ctaSecondary}>
-          <div className={styles.ctaSecLeft}>
-            <UserCheck size={15} />
-            <div>
-              <p className={styles.ctaSecLabel}>Continuer sans compte</p>
-              <p className={styles.ctaSecNote}>Accès limité — contrat non sauvegardé</p>
-            </div>
-          </div>
-          <div className={styles.ctaSecArr}>
-            <ChevronRight size={15} />
-          </div>
-        </button>
       </div>
 
-      <p className={`${styles.sectionLabel} ${styles.anim} ${styles.d5}`}>En créant votre compte</p>
-      <div className={`${styles.benefitsGrid} ${styles.anim} ${styles.d5}`}>
-        <div className={styles.benefit}>
-          <div className={styles.benefitIcon}><FileCheck2 size={15} /></div>
-          <p className={styles.benefitLabel}>Contrat sauvegardé</p>
-          <p className={styles.benefitDesc}>Retrouvez-le à tout moment dans votre espace</p>
-        </div>
-        <div className={styles.benefit}>
-          <div className={styles.benefitIcon}><LayoutGrid size={15} /></div>
-          <p className={styles.benefitLabel}>Infos pré-remplies</p>
-          <p className={styles.benefitDesc}>Adeli, RPPS — plus jamais à ressaisir</p>
-        </div>
-        <div className={styles.benefit}>
-          <div className={styles.benefitIcon}><BadgeCheck size={15} /></div>
-          <p className={styles.benefitLabel}>Déclaration Ordre en 1 clic</p>
-          <p className={styles.benefitDesc}>Déclaration pré-remplie, envoyée depuis l&apos;app</p>
-        </div>
-        <div className={styles.benefit}>
-          <div className={styles.benefitIcon}><Download size={15} /></div>
-          <p className={styles.benefitLabel}>Export PDF en un clic</p>
-          <p className={styles.benefitDesc}>Contrat signé téléchargeable à tout moment</p>
-        </div>
-      </div>
-
-      <div className={`${styles.reassurance} ${styles.anim} ${styles.d6}`}>
-        <div className={styles.reaItem}><Shield size={11} />RGPD · Données chiffrées</div>
-        <div className={styles.reaItem}><Check size={11} />Hébergement Europe</div>
-        <div className={styles.reaItem}><Check size={11} />Aucun engagement</div>
-      </div>
-
-      <div className={styles.divider}></div>
-
-      <div className={`${styles.makPromo} ${styles.anim} ${styles.d7}`}>
-        <div className={styles.makPromoHead}>
-          <div className={styles.makPromoLogo}>
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" />
-            </svg>
-          </div>
-          <div>
-            <p className={styles.makPromoName}>Mon Assistant Kiné</p>
-            <p className={styles.makPromoTag}>Conçu par des kinés, pour des kinés</p>
-          </div>
+      {/* COMMUNAUTÉ */}
+      <div className={`${styles.community} ${styles.anim} ${styles.d5}`}>
+        <div className={styles.communityBadge}>
+          <Users size={13} />
+          Créé par des kinés D.E. · Pour des kinés
         </div>
         <p>
-          Développé par <strong>deux kinésithérapeutes libéraux</strong>, MAK génère des bilans en <strong>3 minutes</strong>, détecte les drapeaux rouges et donne accès à <strong>56 000+ ressources scientifiques</strong>. Rejoignez les 200+ kinés qui l&apos;utilisent déjà.
+          Rejoins la communauté de kinésithérapeutes libéraux qui simplifient leurs
+          remplacements et récupèrent du temps pour ce qui compte vraiment.
         </p>
       </div>
 
-      <footer className={`${styles.footer} ${styles.anim} ${styles.d8}`}>
+      {/* FOOTER */}
+      <footer className={`${styles.footer} ${styles.anim} ${styles.d6}`}>
         <p>
           <a href="https://www.monassistantkine.fr" target="_blank" rel="noopener noreferrer">monassistantkine.fr</a>
           {' · '}
-          <a href="/legal/mentions-legales.html" target="_blank" rel="noopener noreferrer">Mentions légales</a>
+          <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer">CGU</a>
           {' · '}
           <a href="/legal/politique-confidentialite.html" target="_blank" rel="noopener noreferrer">Confidentialité</a>
           {' · '}
-          <a href="/legal/cgu.html" target="_blank" rel="noopener noreferrer">CGU</a>
+          <a href="/legal/mentions-legales.html" target="_blank" rel="noopener noreferrer">Mentions légales</a>
         </p>
-        <p>© {new Date().getFullYear()} Mon Assistant Kiné — Tous droits réservés</p>
+        <p>© {new Date().getFullYear()} Mon Assistant Kiné · Tous droits réservés</p>
       </footer>
     </div>
   );
