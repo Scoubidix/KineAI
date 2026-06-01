@@ -14,6 +14,7 @@ const contractService = require('../services/contractService');
 const contractPdfService = require('../services/contractPdfService');
 const gcsStorageService = require('../services/gcsStorageService');
 const prismaService = require('../services/prismaService');
+const legalAcceptanceService = require('../services/legalAcceptanceService');
 const logger = require('../utils/logger');
 const { sanitizeId, sanitizeEmail } = require('../utils/logSanitizer');
 const LEGAL_VERSIONS = require('../config/legalVersions');
@@ -67,7 +68,7 @@ exports.getPublicInfo = async (req, res) => {
 exports.identify = async (req, res) => {
   try {
     const { token } = req.params;
-    const { mode, firebaseIdToken } = req.body || {};
+    const { mode, firebaseIdToken, legalAccepted, firstName, lastName } = req.body || {};
 
     if (!['EXISTING_KINE', 'NEW_KINE', 'GUEST'].includes(mode)) {
       return res.status(400).json({ success: false, error: 'Mode invalide', code: 'INVALID_MODE' });
@@ -126,17 +127,83 @@ exports.identify = async (req, res) => {
         }
         linkedKineId = existing.id;
       } else {
-        // Création du Kine — emailVerified true car prouvé par le magic link reçu sur cet email
+        // Nouvelle création : acceptation légale obligatoire (parité avec /signup).
+        // Le frontend (modale d'inscription) envoie legalAccepted: true une fois la case cochée.
+        if (legalAccepted !== true) {
+          return res.status(400).json({
+            success: false,
+            error: 'L\'acceptation des CGU, de la Politique de Confidentialité et du DPA est requise',
+            code: 'LEGAL_REQUIRED'
+          });
+        }
+
+        // IP client pour l'audit RGPD (support proxies)
+        const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim()
+          || req.headers['x-real-ip']
+          || req.socket?.remoteAddress
+          || 'unknown';
+        const legalDate = new Date();
+
+        // Nom/prénom : on retient ceux confirmés/corrigés dans la modale s'ils sont fournis,
+        // sinon ceux du contrat (saisis par l'initiateur).
+        const effFirstName = (firstName || '').trim() || contract.destinataireFirstName;
+        const effLastName = (lastName || '').trim() || contract.destinataireLastName;
+
+        // Si le destinataire corrige son identité, on synchronise le contrat — c'est lui qui
+        // porte le nom attendu à la signature (expectedSignName côté front).
+        if (effFirstName !== contract.destinataireFirstName || effLastName !== contract.destinataireLastName) {
+          await prisma.contract.update({
+            where: { id: contract.id },
+            data: { destinataireFirstName: effFirstName, destinataireLastName: effLastName },
+          });
+          contract.destinataireFirstName = effFirstName;
+          contract.destinataireLastName = effLastName;
+        }
+
+        // Création du Kine — emailVerified true car prouvé par le magic link reçu sur cet email.
+        // Traçabilité légale écrite depuis LEGAL_VERSIONS (source unique de vérité), comme au signup.
         const newKine = await prisma.kine.create({
           data: {
             uid: decoded.uid,
             email: contract.destinataireEmail,
-            firstName: contract.destinataireFirstName,
-            lastName: contract.destinataireLastName,
+            firstName: effFirstName,
+            lastName: effLastName,
             phone: contract.destinatairePhone || null,
+            acceptedCguAt: legalDate,
+            acceptedPolitiqueConfidentialiteAt: legalDate,
+            cguVersion: LEGAL_VERSIONS.CGU,
+            politiqueConfidentialiteVersion: LEGAL_VERSIONS.POLITIQUE_CONFIDENTIALITE,
+            signupIpAddress: clientIp,
           }
         });
         linkedKineId = newKine.id;
+
+        // Email prouvé par le magic link (envoyé à destinataireEmail) → on marque le compte
+        // Firebase comme vérifié, pour un accès direct au dashboard sans email de confirmation.
+        // Réservé à NEW_KINE (inscription via contrat) ; le signup classique reste soumis à
+        // la vérification d'email. Best-effort : un échec ne bloque pas la signature.
+        try {
+          await admin.auth().updateUser(decoded.uid, { emailVerified: true });
+        } catch (e) {
+          logger.error('Echec marquage emailVerified (NEW_KINE via contrat):', e.message);
+        }
+
+        // Audit RGPD complet : CGU + PC + DPA (versions remplies backend-side).
+        // Non bloquant : un échec d'audit ne doit pas casser la signature du contrat.
+        try {
+          await legalAcceptanceService.recordMultipleAcceptances(
+            newKine.id,
+            [
+              { documentType: 'CGU' },
+              { documentType: 'POLITIQUE_CONFIDENTIALITE' },
+              { documentType: 'DPA' },
+            ],
+            clientIp
+          );
+        } catch (e) {
+          logger.error('Echec enregistrement acceptations legales (NEW_KINE via contrat):', e.message);
+        }
+
         logger.info(`Compte Kine créé via magic link : ${sanitizeId(newKine.id)} (email ${sanitizeEmail(newKine.email)})`);
       }
     }
