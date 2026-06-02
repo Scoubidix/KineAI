@@ -79,6 +79,8 @@ async function chatCompletion({ iaType, messages, stream = false, onToken }) {
   const client = provider === 'mistral' ? getMistralClient() : openaiClient;
   const cfg = resolveConfig(iaType, provider);
 
+  logger.info(`🤖 Génération LLM → provider=${provider} | model=${cfg.model} | iaType=${iaType} | stream=${stream}`);
+
   const params = {
     model: cfg.model,
     messages,
