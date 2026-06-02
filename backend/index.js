@@ -28,6 +28,12 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
+// Validation conditionnelle : MISTRAL_API_KEY requise uniquement si la génération passe par Mistral.
+if (process.env.GENERATION_PROVIDER === 'mistral' && !process.env.MISTRAL_API_KEY) {
+  console.error('FATAL: GENERATION_PROVIDER=mistral mais MISTRAL_API_KEY est manquante');
+  process.exit(1);
+}
+
 const logger = require('./utils/logger');
 const express = require('express');
 const cors = require('cors');
