@@ -9,6 +9,7 @@ const { sanitizeUID, sanitizeName } = require('../utils/logSanitizer');
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+const llmService = require('./llmService');
 
 // Fonction pour anonymiser les données patient (async pour génération URLs signées GCS)
 // options.dateFin : si fourni, génère des URLs signées v2 (longue durée) avec placeholders courts pour GPT
@@ -641,38 +642,8 @@ const prepareKineRequest = async (type, message, conversationHistory = [], kineI
     { role: 'user', content: enrichedMessage }
   ];
 
-  // 5. Config modèle selon le type d'IA
-  const modelConfig = {
-    'basique': {
-      model: 'gpt-4o-mini',
-      max_tokens: 750,
-      temperature: 0.5
-    },
-    'clinique': {
-      model: 'gpt-4.1-mini',
-      max_tokens: 2000,
-      temperature: 0.3
-    },
-    'biblio': {
-      model: 'gpt-4o-mini',
-      max_tokens: 2000,
-      temperature: 0.3
-    },
-    'admin': {
-      model: 'gpt-4o-mini',
-      max_tokens: 3000,
-      temperature: 0.2
-    },
-    'default': {
-      model: 'gpt-4o-mini',
-      max_tokens: 1000,
-      temperature: 0.7
-    }
-  };
-
-  const config = modelConfig[type] || modelConfig['default'];
-
-  return { messages, config, limitedDocuments, selectedSources, metadata, redirectDirective };
+  // Le choix du modèle/params est désormais centralisé dans llmService (par iaType + provider).
+  return { messages, limitedDocuments, selectedSources, metadata, redirectDirective };
 };
 
 /**
@@ -680,19 +651,12 @@ const prepareKineRequest = async (type, message, conversationHistory = [], kineI
  */
 const generateKineResponse = async (type, message, conversationHistory = [], kineId, options = {}) => {
   try {
-    const { messages, config, limitedDocuments, selectedSources, metadata } =
+    const { messages, limitedDocuments, selectedSources, metadata } =
       await prepareKineRequest(type, message, conversationHistory, kineId);
 
-    const completion = await openai.chat.completions.create({
-      model: config.model,
-      messages,
-      max_tokens: config.max_tokens,
-      temperature: config.temperature,
-      presence_penalty: 0.1,
-      frequency_penalty: 0.1
-    });
+    const completion = await llmService.chatCompletion({ iaType: type, messages });
 
-    const aiResponse = completion.choices[0].message.content;
+    const aiResponse = completion.content;
 
     if (!options.skipSave) {
       await saveToCorrectTable(type, kineId, message, aiResponse);
@@ -707,7 +671,7 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
       sources: type === 'admin' ? [] : knowledgeService.formatSources(selectedSources),
       confidence: overallConfidence,
       metadata: {
-        model: config.model,
+        model: completion.model,
         iaType: type,
         kineId: kineId,
         documentsFound: metadata.totalFound,
@@ -743,28 +707,17 @@ const generateKineResponse = async (type, message, conversationHistory = [], kin
  * @returns {Object} Réponse complète (même format que generateKineResponse)
  */
 const generateKineResponseStream = async (type, message, conversationHistory = [], kineId, onToken, options = {}) => {
-  const { messages, config, limitedDocuments, selectedSources, metadata } =
+  const { messages, limitedDocuments, selectedSources, metadata } =
     await prepareKineRequest(type, message, conversationHistory, kineId);
 
-  const stream = await openai.chat.completions.create({
-    model: config.model,
+  const completion = await llmService.chatCompletion({
+    iaType: type,
     messages,
-    max_tokens: config.max_tokens,
-    temperature: config.temperature,
-    presence_penalty: 0.1,
-    frequency_penalty: 0.1,
-    stream: true
+    stream: true,
+    onToken,
   });
 
-  let fullResponse = '';
-
-  for await (const chunk of stream) {
-    const delta = chunk.choices[0]?.delta?.content;
-    if (delta) {
-      fullResponse += delta;
-      onToken(delta);
-    }
-  }
+  const fullResponse = completion.content;
 
   if (!options.skipSave) {
     await saveToCorrectTable(type, kineId, message, fullResponse);
@@ -779,7 +732,7 @@ const generateKineResponseStream = async (type, message, conversationHistory = [
     sources: type === 'admin' ? [] : knowledgeService.formatSources(selectedSources),
     confidence: overallConfidence,
     metadata: {
-      model: config.model,
+      model: completion.model,
       iaType: type,
       kineId: kineId,
       documentsFound: metadata.totalFound,
@@ -1029,17 +982,10 @@ Base-toi sur le contexte de la conversation et tes connaissances générales. In
 
     logger.debug(`📝 Followup - Taille prompt système: ${systemPrompt.length} chars, RAG: ${ragDecision.rag}, docs: ${limitedDocuments.length}`);
 
-    // 5. Appel OpenAI
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages,
-      max_tokens: 750,
-      temperature: 0.5,
-      presence_penalty: 0.1,
-      frequency_penalty: 0.1
-    });
+    // 5. Appel du provider de génération (via llmService)
+    const completion = await llmService.chatCompletion({ iaType: 'followup', messages });
 
-    const aiResponse = completion.choices[0].message.content;
+    const aiResponse = completion.content;
 
     // 6. Sauvegarde dans la table de l'IA SOURCE (biblio -> chatIaBiblio, clinique -> chatIaClinique)
     if (!options.skipSave) {
@@ -1176,25 +1122,15 @@ Base-toi sur le contexte de la conversation et tes connaissances générales. In
     { role: 'user', content: message }
   ];
 
-  // 4. Appel OpenAI en streaming
-  const stream = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+  // 4. Appel du provider de génération en streaming (via llmService)
+  const completion = await llmService.chatCompletion({
+    iaType: 'followup',
     messages,
-    max_tokens: 750,
-    temperature: 0.5,
-    presence_penalty: 0.1,
-    frequency_penalty: 0.1,
-    stream: true
+    stream: true,
+    onToken,
   });
 
-  let fullResponse = '';
-  for await (const chunk of stream) {
-    const delta = chunk.choices[0]?.delta?.content;
-    if (delta) {
-      fullResponse += delta;
-      onToken(delta);
-    }
-  }
+  const fullResponse = completion.content;
 
   // 5. Sauvegarde
   if (!options.skipSave) {
@@ -1212,7 +1148,7 @@ Base-toi sur le contexte de la conversation et tes connaissances générales. In
     sources: limitedDocuments.length > 0 ? knowledgeService.formatSources(selectedSources) : [],
     confidence: overallConfidence,
     metadata: {
-      model: 'gpt-4o-mini',
+      model: completion.model,
       iaType: 'followup',
       sourceIa: sourceIa,
       ragActivated: ragDecision.rag,
