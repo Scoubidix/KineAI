@@ -92,27 +92,37 @@ async function chatCompletion({ iaType, messages, stream = false, onToken }) {
 
   if (!stream) {
     const completion = await client.chat.completions.create(params);
+    const finishReason = completion.choices[0].finish_reason ?? null;
+    if (finishReason === 'length') {
+      logger.warn(`✂️ Réponse tronquée par max_tokens (${cfg.max_tokens}) — iaType=${iaType}, model=${cfg.model}`);
+    }
     return {
       content: completion.choices[0].message.content,
       usage: completion.usage || null,
       model: cfg.model,
       provider,
+      finishReason,
     };
   }
 
   const streamResp = await client.chat.completions.create({ ...params, stream: true });
   let content = '';
   let usage = null;
+  let finishReason = null;
   for await (const chunk of streamResp) {
     const delta = chunk.choices[0]?.delta?.content;
     if (delta) {
       content += delta;
       if (onToken) onToken(delta);
     }
+    if (chunk.choices[0]?.finish_reason) finishReason = chunk.choices[0].finish_reason;
     if (chunk.usage) usage = chunk.usage; // usage parfois renvoyé sur le dernier chunk
   }
+  if (finishReason === 'length') {
+    logger.warn(`✂️ Réponse tronquée par max_tokens (${cfg.max_tokens}) — iaType=${iaType}, model=${cfg.model}`);
+  }
   logger.debug(`🤖 llmService stream terminé (provider=${provider}, model=${cfg.model})`);
-  return { content, usage, model: cfg.model, provider };
+  return { content, usage, model: cfg.model, provider, finishReason };
 }
 
 module.exports = { chatCompletion, GENERATION_CONFIG };

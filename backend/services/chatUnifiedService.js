@@ -169,6 +169,7 @@ const sendMessageStream = async ({ kineId, conversationId, message, onEvent }) =
     messageId: assistantMessage.id,
     iaType: route.type,
     ragUsed: route.rag,
+    truncated: completion.finishReason === 'length',
     sources: route.rag ? knowledgeService.formatSources(selectedSources) : [],
     confidence: route.rag && documents.length > 0
       ? knowledgeService.calculateOverallConfidence(documents)

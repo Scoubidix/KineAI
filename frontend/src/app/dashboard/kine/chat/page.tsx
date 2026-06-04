@@ -174,6 +174,9 @@ export default function UnifiedChatPage() {
         updateLastAssistantMessage((msg) => ({
           ...msg,
           iaType: payload.iaType,
+          content: payload.truncated
+            ? `${msg.content}\n\n*Réponse interrompue (limite de longueur). Demande-moi de poursuivre sur un point précis.*`
+            : msg.content,
         }));
         // Rafraîchit la sidebar (titre LLM généré en arrière-plan) + la jauge quota
         await Promise.all([loadConversations(), loadUsage()]);

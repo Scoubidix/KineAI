@@ -13,6 +13,7 @@ export interface DonePayload {
   messageId: number;
   iaType: 'basique' | 'biblio' | 'clinique';
   ragUsed: boolean;
+  truncated?: boolean;
   sources: Array<{ title?: string; [key: string]: unknown }>;
   confidence: number | null;
   usage: { total_tokens?: number } | null;
