@@ -31,6 +31,8 @@ export default function UnifiedChatPage() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isQuotaExceeded, setIsQuotaExceeded] = useState(false);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  // Type d'IA routée pour le message en cours (phrases d'attente spécifiques)
+  const [routedIaType, setRoutedIaType] = useState<'basique' | 'biblio' | 'clinique' | null>(null);
 
   const { subscription } = usePaywall();
   const {
@@ -142,6 +144,7 @@ export default function UnifiedChatPage() {
 
     const currentMessage = message.trim();
     setMessage('');
+    setRoutedIaType(null);
     streamConversationIdRef.current = activeConversationId;
 
     setChatMessages((prev) => [
@@ -158,6 +161,9 @@ export default function UnifiedChatPage() {
       onConversationCreated: (conversationId) => {
         streamConversationIdRef.current = conversationId;
         setActiveConversationId(conversationId);
+      },
+      onRouted: (iaType) => {
+        setRoutedIaType(iaType);
       },
       onToken: (delta) => {
         accumulated += delta;
@@ -256,7 +262,7 @@ export default function UnifiedChatPage() {
                   return <MessageBubble key={index} message={msg} />;
                 })}
 
-                {isSending && !isStreaming && <ThinkingIndicator />}
+                {isSending && !isStreaming && <ThinkingIndicator iaType={routedIaType} />}
               </div>
             )}
           </div>

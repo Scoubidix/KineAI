@@ -83,6 +83,9 @@ const sendMessageStream = async ({ kineId, conversationId, message, onEvent }) =
   const route = await routeQuery(message, history);
   logger.info(`🔀 Chat unifié → type=${route.type} | rag=${route.rag} | conversation=${conversation.id}`);
 
+  // Informe le frontend du type routé dès maintenant (phrases d'attente spécifiques à l'IA)
+  onEvent('routed', { iaType: route.type, rag: route.rag });
+
   // 4. Recherche documentaire si RAG
   let documents = [];
   let selectedSources = [];

@@ -24,6 +24,7 @@ interface SendMessageParams {
   message: string;
   conversationId: number | null;
   onConversationCreated: (conversationId: number) => void;
+  onRouted?: (iaType: 'basique' | 'biblio' | 'clinique') => void;
   onToken: (delta: string) => void;
   onDone: (payload: DonePayload) => void;
   onError: (error: string) => void;
@@ -39,6 +40,7 @@ export function useChatStream() {
       message,
       conversationId,
       onConversationCreated,
+      onRouted,
       onToken,
       onDone,
       onError,
@@ -97,6 +99,8 @@ export function useChatStream() {
 
                 if (eventType === 'conversation_created') {
                   onConversationCreated(payload.conversationId);
+                } else if (eventType === 'routed') {
+                  onRouted?.(payload.iaType);
                 } else if (eventType === 'token') {
                   setIsStreaming(true);
                   onToken(payload.content);
