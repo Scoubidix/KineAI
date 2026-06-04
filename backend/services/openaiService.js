@@ -479,26 +479,31 @@ RAG (recherche documentaire) :
 - true : Le kiné cherche une information spécifique qui nécessite des sources (tests, mesures, cotations, protocoles précis, données chiffrées)
 - false : Question conversationnelle, conseil général, explication vulgarisée, salutation, remerciement, organisation
 
+QUERY (réécriture pour la recherche documentaire) :
+- Reformule le message en une question autonome et complète, en résolvant les références à l'historique ("ce test", "cette étude", "et pour l'épaule ?", "le 2ème")
+- Garde le français, garde les termes médicaux précis
+- Si le message est déjà autonome, recopie-le tel quel
+
 Exemples :
-- "Bonjour" → BASIC, rag: false
-- "Comment expliquer une tendinopathie à un patient ?" → BASIC, rag: false
-- "C'est quoi le test de Lachman ?" → BASIC, rag: true
-- "Meilleur exercice pour renforcer le psoas ?" → BASIC, rag: false
-- "Quels traitements optimaux pour la lombalgie ?" → BIBLIO, rag: true
-- "Patient 45 ans douleur épaule après tennis" → CLINIC, rag: true
-- "Merci pour l'info" → BASIC, rag: false
+- "Bonjour" → {"type":"BASIC","rag":false,"query":"Bonjour"}
+- "Comment expliquer une tendinopathie à un patient ?" → {"type":"BASIC","rag":false,"query":"Comment expliquer une tendinopathie à un patient ?"}
+- "C'est quoi le test de Lachman ?" → {"type":"BASIC","rag":true,"query":"C'est quoi le test de Lachman ?"}
+- "Quels traitements optimaux pour la lombalgie ?" → {"type":"BIBLIO","rag":true,"query":"Quels traitements optimaux pour la lombalgie ?"}
+- "Patient 45 ans douleur épaule après tennis" → {"type":"CLINIC","rag":true,"query":"Patient 45 ans douleur épaule après tennis"}
+- (historique sur le test de Lachman) "Et sa sensibilité ?" → {"type":"CLINIC","rag":true,"query":"Quelle est la sensibilité du test de Lachman ?"}
+- "Merci pour l'info" → {"type":"BASIC","rag":false,"query":"Merci pour l'info"}
 
 Historique récent :
 ${recentHistory || 'Aucun'}
 
 Message : "${message}"
 
-Réponds UNIQUEMENT en JSON : {"type":"BASIC"|"BIBLIO"|"CLINIC","rag":true|false}`;
+Réponds UNIQUEMENT en JSON : {"type":"BASIC"|"BIBLIO"|"CLINIC","rag":true|false,"query":"..."}`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: routerPrompt }],
-      max_tokens: 50,
+      max_tokens: 150,
       temperature: 0,
       response_format: { type: 'json_object' }
     });
@@ -506,14 +511,38 @@ Réponds UNIQUEMENT en JSON : {"type":"BASIC"|"BIBLIO"|"CLINIC","rag":true|false
     const result = JSON.parse(response.choices[0].message.content);
     const routedType = ROUTER_TYPE_MAP[result.type] || 'basique';
     const rag = result.rag !== false;
+    const query = (typeof result.query === 'string' && result.query.trim()) ? result.query.trim() : message;
 
-    logger.debug(`🔀 Query Router: type=${result.type} (${routedType}), rag=${rag}`);
+    logger.debug(`🔀 Query Router: type=${result.type} (${routedType}), rag=${rag}, query="${query.substring(0, 120)}"`);
 
-    return { type: routedType, rag };
+    return { type: routedType, rag, query };
   } catch (error) {
     logger.error('❌ Erreur Query Router:', error.message);
-    return { type: 'basique', rag: true };
+    return { type: 'basique', rag: true, query: message };
   }
+};
+
+/**
+ * Génère un titre court de conversation (chat unifié) — appel utilitaire GPT direct,
+ * volontairement hors llmService (comme le router) : toujours gpt-4o-mini.
+ */
+const generateConversationTitle = async (userMessage, assistantResponse) => {
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [{
+      role: 'user',
+      content: `Génère un titre très court (maximum 6 mots, en français, sans guillemets ni ponctuation finale) résumant cette conversation de kinésithérapie.
+
+Question : "${userMessage.substring(0, 500)}"
+Réponse : "${(assistantResponse || '').substring(0, 500)}"
+
+Réponds UNIQUEMENT avec le titre.`
+    }],
+    max_tokens: 30,
+    temperature: 0.3
+  });
+
+  return response.choices[0].message.content.trim().replace(/^["«\s]+|["»\s]+$/g, '');
 };
 
 /**
@@ -1553,6 +1582,11 @@ module.exports = {
   generateKineResponseStream,
   generateFollowupResponse,
   generateFollowupResponseStream,
+
+  // Chat unifié (conversations)
+  routeQuery,
+  getSystemPromptByType,
+  generateConversationTitle,
 
   // Anciennes fonctions chat patients (conservées)
   generateChatResponse,
