@@ -60,6 +60,7 @@ const exerciceRoutes = require('./routes/exercices');
 const testOpenAIRoutes = require('./routes/testOpenAI');
 const patientChatRoutes = require('./routes/patientChat');
 const chatKineRoutes = require('./routes/chatKine'); // Route existante améliorée
+const conversationsRoutes = require('./routes/conversations'); // Chat unifié (conversations)
 
 
 // NOUVEAU : Import du webhook WhatsApp
@@ -646,6 +647,9 @@ app.use('/api/patient', patientChatRoutes);
 
 // IA Kinés : rate limiting dans le routeur APRÈS authenticate
 app.use('/api/chat/kine', chatKineRoutes);
+
+// Chat unifié (conversations) : rate limiting dans le routeur APRÈS authenticate
+app.use('/api/chat/kine', conversationsRoutes);
 
 // Middleware auth pour routes cron (Cloud Scheduler via OIDC)
 const { OAuth2Client } = require('google-auth-library');
