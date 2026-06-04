@@ -16,4 +16,10 @@ const TOKEN_QUOTAS = {
  */
 const getQuotaForPlan = (planType) => TOKEN_QUOTAS[planType] ?? TOKEN_QUOTAS.FREE;
 
-module.exports = { TOKEN_QUOTAS, getQuotaForPlan };
+// Coût blended estimé par million de tokens (EUR) pour les projections du dashboard admin.
+// Mistral Medium 3.5 : 1,5 $/M input + 7,5 $/M output ; le compteur stocke input+output
+// confondus, avec un ratio observé ~85% input (RAG + historique) → ~2,4 $/M ≈ 2,2 €/M.
+// À ajuster avec les données réelles de facturation Mistral.
+const BLENDED_COST_EUR_PER_MILLION = 2.2;
+
+module.exports = { TOKEN_QUOTAS, getQuotaForPlan, BLENDED_COST_EUR_PER_MILLION };

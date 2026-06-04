@@ -24,6 +24,22 @@ router.get('/stats', authenticate, requireAdmin, async (req, res) => {
 });
 
 /**
+ * GET /admin/dashboard/token-usage
+ * Consommation tokens IA du chat unifié : aujourd'hui (en cours), hier,
+ * moyenne 10 jours, détail par plan, coûts estimés (tarif blended Medium 3.5)
+ */
+router.get('/token-usage', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const tokenUsageService = require('../services/tokenUsageService');
+    const data = await tokenUsageService.getAdminUsageStats();
+    res.json({ success: true, data });
+  } catch (error) {
+    logger.error('Erreur récupération usage tokens admin', { error: error.message });
+    res.status(500).json({ success: false, error: "Erreur lors de la récupération de l'usage tokens", code: 'TOKEN_USAGE_ERROR' });
+  }
+});
+
+/**
  * GET /admin/dashboard/unverified-emails
  * Liste les kinés dont l'email n'est pas vérifié sur Firebase
  */

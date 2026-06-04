@@ -9,9 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, Layers } from 'lucide-react';
+import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, Layers, Zap } from 'lucide-react';
 import BilanFieldsTab from './components/BilanFieldsTab';
 import BilanTemplatesTab from './components/BilanTemplatesTab';
+import TokenUsageTab from './components/TokenUsageTab';
 import { Button } from '@/components/ui/button';
 
 interface LastPayout {
@@ -315,6 +316,10 @@ export default function AdminDashboardPage() {
               <TabsTrigger value="bilan-templates" className="gap-1.5">
                 <Layers className="h-3.5 w-3.5" />
                 Templates bilans
+              </TabsTrigger>
+              <TabsTrigger value="tokens" className="gap-1.5">
+                <Zap className="h-3.5 w-3.5" />
+                Tokens IA
               </TabsTrigger>
             </TabsList>
 
@@ -709,6 +714,10 @@ export default function AdminDashboardPage() {
 
             <TabsContent value="bilan-templates" className="space-y-4 mt-4">
               <BilanTemplatesTab />
+            </TabsContent>
+
+            <TabsContent value="tokens" className="space-y-4 mt-4">
+              <TokenUsageTab />
             </TabsContent>
           </Tabs>
         </div>
