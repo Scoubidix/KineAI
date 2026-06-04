@@ -130,7 +130,7 @@ const corsOptions = {
       callback(new Error('Non autorisé par CORS'));
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true, // Important pour les cookies et JWT
   optionsSuccessStatus: 200 // Pour les anciens navigateurs
@@ -436,7 +436,7 @@ app.get('/api/test-cors', (req, res) => {
         'http://localhost:3001',
         'http://localhost:3000'
       ],
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       credentials: true
     }
   });
