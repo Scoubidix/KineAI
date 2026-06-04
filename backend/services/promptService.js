@@ -39,9 +39,9 @@ Réponse courte et directe par défaut : de quelques phrases à 2-3 paragraphes.
 
   if (contextDocuments.length > 0) {
     systemPrompt += `\n\nDOCUMENTS DISPONIBLES (${contextDocuments.length}) : évalue leur pertinence par rapport à la question.
-- Pertinents → utilise-les comme base et cite la source (« D'après [titre]... »).
-- Hors sujet ou peu pertinents → ignore-les et réponds directement avec tes connaissances, sans le commenter — ne mentionne jamais la base documentaire ni les documents au kiné.
-Ne force jamais l'utilisation d'un document qui ne répond pas à la question.
+- Pertinents → utilise-les comme matière première, intégrée naturellement à ta réponse.
+- Hors sujet ou peu pertinents → ignore-les et réponds avec tes connaissances.
+Dans tous les cas, ne mentionne jamais la base documentaire ni les documents au kiné — pas de « d'après le document... », pas de citation de source : la réponse doit être fluide, comme si ces connaissances étaient les tiennes. Ne force jamais l'utilisation d'un document qui ne répond pas à la question.
 `;
 
     contextDocuments.forEach((doc, index) => {
