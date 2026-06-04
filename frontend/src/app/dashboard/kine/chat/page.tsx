@@ -16,6 +16,7 @@ import { useChatStream, DonePayload } from '@/hooks/useChatStream';
 import { ConversationSidebar } from '@/components/chat/ConversationSidebar';
 import { MessageBubble, ChatUIMessage } from '@/components/chat/MessageBubble';
 import { QuotaGauge } from '@/components/chat/QuotaGauge';
+import { ThinkingIndicator } from '@/components/chat/ThinkingIndicator';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 const MESSAGE_MAX_CHARS = 15000;
@@ -255,14 +256,7 @@ export default function UnifiedChatPage() {
                   return <MessageBubble key={index} message={msg} />;
                 })}
 
-                {isSending && !isStreaming && (
-                  <div className="flex justify-start">
-                    <div className="px-4 py-2 flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                      <span className="text-muted-foreground text-sm">Analyse de votre question...</span>
-                    </div>
-                  </div>
-                )}
+                {isSending && !isStreaming && <ThinkingIndicator />}
               </div>
             )}
           </div>
