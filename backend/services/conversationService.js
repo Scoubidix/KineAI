@@ -84,18 +84,42 @@ const softDeleteConversation = async (kineId, conversationId) => {
 };
 
 /**
- * Les N derniers messages d'une conversation, en ordre chronologique,
- * au format attendu par le LLM ({ role, content }).
+ * Historique d'une conversation pour le LLM ({ role, content }, ordre chronologique).
+ * Ancrage du premier échange : si la conversation dépasse la fenêtre, les 2 premiers
+ * messages (le cas initial + la première réponse) sont conservés en tête et remplacent
+ * les plus anciens de la fenêtre glissante — l'info la plus précieuse d'une conversation
+ * clinique est souvent posée au premier message.
  */
 const getLastMessages = async (conversationId, limit) => {
   const prisma = prismaService.getInstance();
-  const messages = await prisma.conversationMessage.findMany({
+  const recent = await prisma.conversationMessage.findMany({
     where: { conversationId },
     orderBy: { createdAt: 'desc' },
     take: limit,
-    select: { role: true, content: true }
+    select: { id: true, role: true, content: true }
   });
-  return messages.reverse();
+  const recentChrono = recent.reverse();
+
+  // Fenêtre pleine → la conversation peut être plus longue : ancrer le premier échange
+  if (recentChrono.length === limit) {
+    const firstMessages = await prisma.conversationMessage.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: 'asc' },
+      take: 2,
+      select: { id: true, role: true, content: true }
+    });
+
+    const recentIds = new Set(recentChrono.map((m) => m.id));
+    const anchors = firstMessages.filter((m) => !recentIds.has(m.id));
+
+    if (anchors.length > 0) {
+      // Les ancres remplacent les plus anciens de la fenêtre (total ≤ limit)
+      const merged = [...anchors, ...recentChrono.slice(anchors.length)];
+      return merged.map(({ role, content }) => ({ role, content }));
+    }
+  }
+
+  return recentChrono.map(({ role, content }) => ({ role, content }));
 };
 
 /**
