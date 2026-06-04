@@ -1,6 +1,5 @@
 const { OpenAI } = require('openai');
 const knowledgeService = require('./knowledgeService');
-const { lookupGlossary } = require('./embeddingService');
 const prismaService = require('./prismaService');
 const gcsStorageService = require('./gcsStorageService');
 const logger = require('../utils/logger');
@@ -456,7 +455,6 @@ const cleanChatHistory = (history, maxMessages = 20) => {
 // ========== QUERY ROUTER — DÉTECTION D'INTENTION ==========
 
 const ROUTER_TYPE_MAP = { 'BASIC': 'basique', 'BIBLIO': 'biblio', 'CLINIC': 'clinique' };
-const ROUTER_LABEL_MAP = { 'basique': 'IA Conversationnelle', 'biblio': 'IA Bibliographique', 'clinique': 'IA Clinique' };
 
 /**
  * Route la requête kiné via GPT-4o-mini (température 0, ~50 tokens)
@@ -545,29 +543,12 @@ Réponds UNIQUEMENT avec le titre.`
   return response.choices[0].message.content.trim().replace(/^["«\s]+|["»\s]+$/g, '');
 };
 
-/**
- * Génère la directive de redirection si mismatch entre page et router
- */
-const getRedirectDirective = (currentPage, routedType) => {
-  const targetLabel = ROUTER_LABEL_MAP[routedType];
-
-  if (currentPage === 'basique') {
-    return `Tu es un assistant kiné conversationnel. Donne un aperçu très court du sujet (2-3 phrases max, sans inventer de chiffres ni d'études), puis termine en suggérant d'utiliser ${targetLabel} pour une réponse complète et sourcée. Sans emoji. Maximum 50 mots.`;
-  }
-  if (currentPage === 'biblio') {
-    return `Tu es un assistant kiné bibliographique. Dis que tu es plutôt spécialisée pour la recherche bibliographique, puis suggère d'utiliser L'${targetLabel} pour une réponse adaptée. Sans emoji. Maximum 30 mots.`;
-  }
-  if (currentPage === 'clinique') {
-    return `Tu es un assistant kiné clinique. Dis que tu es plutôt spécialisée pour le raisonnement clinique, puis suggère d'utiliser L'${targetLabel} pour une réponse adaptée. Sans emoji. Maximum 30 mots.`;
-  }
-  return '';
-};
-
 // ========== NOUVELLE FONCTION PRINCIPALE POUR LES IA KINÉ ==========
 
 /**
- * Prépare la requête IA : query router, RAG, prompt, messages
- * Réutilisé par generateKineResponse (bloquant) et generateKineResponseStream (SSE)
+ * Prépare la requête IA admin/bilan : prompt système + messages.
+ * Les 3 IAs de chat (basique/biblio/clinique) passent désormais par chatUnifiedService —
+ * plus de router, de RAG ni de glossaire ici (l'admin n'en utilise pas).
  */
 const prepareKineRequest = async (type, message, conversationHistory = [], kineId) => {
   logger.debug(`🚀 IA ${type} pour kiné ID: ${sanitizeUID(kineId)}`);
@@ -576,103 +557,23 @@ const prepareKineRequest = async (type, message, conversationHistory = [], kineI
     throw new Error('Message requis');
   }
 
-  // 1. Query Router — détection d'intention (skip pour admin)
-  let routerResult = { type, rag: true };
-  let redirectDirective = '';
+  const systemPrompt = getSystemPromptByType(type, [], false);
 
-  if (type !== 'admin') {
-    routerResult = await routeQuery(message, conversationHistory);
-    const isMismatch = routerResult.type !== type;
-
-    if (isMismatch) {
-      redirectDirective = getRedirectDirective(type, routerResult.type);
-      logger.debug(`🔀 Mismatch: page=${type}, router=${routerResult.type} → redirection suggérée, RAG skippé`);
-    } else if (!routerResult.rag) {
-      logger.debug(`🔀 Match: page=${type}, rag=false → RAG skippé`);
-    } else {
-      logger.debug(`🔀 Match: page=${type}, rag=true → RAG activé`);
-    }
-  }
-
-  const shouldDoRAG = type !== 'admin' && routerResult.type === type && routerResult.rag;
-
-  // 2. Recherche documentaire (uniquement si RAG activé)
-  let allDocuments = [];
-  let selectedSources = [];
-  let metadata = { totalFound: 0, averageScore: 0, categoriesFound: [] };
-  let limitedDocuments = [];
-
-  if (shouldDoRAG) {
-    const searchResult = await knowledgeService.searchDocuments(message, {
-      filterCategory: null,
-      allowLowerThreshold: true,
-      iaType: type
-    });
-
-    allDocuments = searchResult.allDocuments;
-    selectedSources = searchResult.selectedSources;
-    metadata = searchResult.metadata;
-
-    const docLimits = {
-      'basique': 5,
-      'biblio': 6,
-      'clinique': 6,
-    };
-
-    const maxDocs = docLimits[type] || 6;
-    limitedDocuments = allDocuments.slice(0, maxDocs);
-  }
-
-  // 3. Construction du prompt système selon le type + directive de redirection si mismatch
-  let systemPrompt;
-  if (redirectDirective) {
-    systemPrompt = redirectDirective.trim();
-  } else {
-    systemPrompt = getSystemPromptByType(type, limitedDocuments, shouldDoRAG);
-  }
-
-  // 3b. Glossaire : enrichir le message user avec les équivalences terminologiques
-  let enrichedMessage = message;
-  if (shouldDoRAG && (type === 'biblio' || type === 'clinique')) {
-    const glossaryMappings = await lookupGlossary(message);
-    if (glossaryMappings.length > 0) {
-      // Enrichir le message user : ajouter l'équivalence entre parenthèses
-      glossaryMappings.forEach(m => {
-        const regex = new RegExp(`\\b${m.french_term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-        enrichedMessage = enrichedMessage.replace(regex, `${m.english_term} (${m.french_term})`);
-      });
-      logger.debug(`📖 Glossaire enrichi dans message ${type}: ${glossaryMappings.length} mapping(s)`);
-      logger.debug(`📖 Message original: "${message.substring(0, 80)}"`);
-      logger.debug(`📖 Message enrichi: "${enrichedMessage.substring(0, 120)}"`);
-    }
-  }
-
-  // 🧪 LOGS DE DEBUG POUR VÉRIFIER LA TRANSMISSION À GPT
-  logger.debug(`📤 ═══ IA ${type.toUpperCase()} - TRANSMISSION AU LLM ═══`);
-  logger.debug(`📤 RAG activé: ${shouldDoRAG} | Documents trouvés: ${allDocuments.length} → limités à: ${limitedDocuments.length}`);
-  limitedDocuments.forEach((doc, i) => {
-    const id = doc.study_id || doc.entity_id || doc.id || '?';
-    const score = Math.round((doc.finalScore || doc.relevanceScore || doc.similarity || 0) * 100);
-    const entityType = doc.entity_type || doc.metadata?.entity_type || '?';
-    const name = doc.metadata?.nom || doc.title || 'N/A';
-    const source = doc.searchSource || '?';
-    logger.debug(`📤   Doc #${i + 1}: ${id} | score=${score}% | type=${entityType} | source=${source} | content=${doc.content?.length || 0} chars | ${name.substring(0, 50)}`);
-  });
-  logger.debug(`📝 Taille prompt système: ${systemPrompt.length} caractères`);
-  logger.debug(`📤 Message user envoyé au LLM: "${enrichedMessage.substring(0, 200)}"`);
-  logger.debug(`📤 ═══════════════════════════════════════════════════════`);
-
-  // 4. Préparation des messages pour OpenAI
   const limitedHistory = conversationHistory.slice(-6);
 
   const messages = [
     { role: 'system', content: systemPrompt },
     ...limitedHistory,
-    { role: 'user', content: enrichedMessage }
+    { role: 'user', content: message }
   ];
 
-  // Le choix du modèle/params est désormais centralisé dans llmService (par iaType + provider).
-  return { messages, limitedDocuments, selectedSources, metadata, redirectDirective };
+  // Le choix du modèle/params est centralisé dans llmService (par iaType + provider).
+  return {
+    messages,
+    limitedDocuments: [],
+    selectedSources: [],
+    metadata: { totalFound: 0, averageScore: 0, categoriesFound: [] }
+  };
 };
 
 /**
@@ -822,372 +723,6 @@ const saveToCorrectTable = async (type, kineId, message, response) => {
       response: response
     }
   });
-};
-
-// ========== DÉTECTEUR RAG POUR FOLLOWUP ==========
-
-/**
- * Détermine si un message de suivi nécessite une recherche documentaire (RAG)
- * Mini LLM dédié : ~20 tokens output, température 0, ~100-200ms
- * Retourne { rag: true|false }
- */
-const shouldUseRAG = async (message, conversationHistory = []) => {
-  try {
-    const recentHistory = conversationHistory.slice(-10).map(msg =>
-      `${msg.role}: ${msg.content.substring(0, 2500)}`
-    ).join('\n');
-
-    const ragDetectorPrompt = `Tu es un query rewriter pour un assistant kiné.
-
-Un kinésithérapeute est en conversation de suivi après une recherche documentaire.
-Il a DÉJÀ reçu une réponse sourcée avec des études numérotées (1), (2), etc.
-
-ANALYSE son nouveau message et décide :
-
-rag: true + query optimisée SI :
-- Demande des détails sur une étude citée (ex: "décris l'étude 2", "détaille la réf 3") → RÉSOUS la référence dans l'historique et génère une query avec auteur + termes clés du titre
-- Demande une info factuelle ABSENTE de la conversation (nouveau sujet, autre pathologie)
-- Demande des études ou sources supplémentaires
-
-rag: false SI :
-- Reformulation, clarification ou vulgarisation de ce qui a déjà été dit
-- Remerciement, salutation, confirmation
-- Question d'opinion ou de pratique clinique générale
-
-IMPORTANT pour la query :
-- Si l'user référence une étude par numéro, RETROUVE le titre/auteur dans l'historique et construis la query avec ces termes
-- La query doit être optimisée pour une recherche vectorielle + BM25 (mots-clés pertinents, pas de mots vides)
-- Langue de la query : français (la base contient des abstracts traduits en FR)
-
-Historique récent :
-${recentHistory || 'Aucun'}
-
-Message : "${message}"
-
-Réponds UNIQUEMENT en JSON : {"rag": true|false, "query": "requête optimisée ou null si rag=false"}`;
-
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: ragDetectorPrompt }],
-      max_tokens: 100,
-      temperature: 0,
-      response_format: { type: 'json_object' }
-    });
-
-    const result = JSON.parse(response.choices[0].message.content);
-    const rag = result.rag === true;
-    const query = result.query || null;
-
-    logger.debug(`🔍 shouldUseRAG: rag=${rag}, query="${query}" pour message: "${message.substring(0, 80)}..."`);
-
-    return { rag, query };
-  } catch (error) {
-    logger.error('❌ Erreur shouldUseRAG:', error.message);
-    return { rag: false, query: null };
-  }
-};
-
-// ========== FONCTION FOLLOWUP (RAG CONDITIONNEL) ==========
-
-/**
- * Génère une réponse de suivi avec RAG conditionnel
- * Utilisée pour les questions de suivi après une recherche initiale (biblio, clinique)
- * shouldUseRAG() décide si on lance une recherche documentaire
- * Sauvegarde dans la table de l'IA source (pas dans chatIaBasique)
- */
-const generateFollowupResponse = async (message, conversationHistory = [], kineId, sourceIa, options = {}) => {
-  try {
-    const validSources = ['biblio', 'clinique'];
-    if (!validSources.includes(sourceIa)) {
-      throw new Error(`sourceIa invalide: ${sourceIa}. Valeurs acceptées: ${validSources.join(', ')}`);
-    }
-
-    logger.debug(`🔄 IA Followup (source: ${sourceIa}) pour kiné ID: ${sanitizeUID(kineId)}`);
-
-    if (!message?.trim()) {
-      throw new Error('Message requis');
-    }
-
-    // 1. Détection du besoin RAG via mini LLM
-    const ragDecision = await shouldUseRAG(message, conversationHistory);
-    const searchQuery = ragDecision.query || message;
-    logger.debug(`🔍 Followup RAG décision: rag=${ragDecision.rag}, query="${searchQuery}" (source: ${sourceIa})`);
-
-    // 2. Recherche documentaire si RAG activé (avec query optimisée)
-    let limitedDocuments = [];
-    let selectedSources = [];
-    let searchMetadata = { totalFound: 0, averageScore: 0, categoriesFound: [] };
-
-    if (ragDecision.rag) {
-      logger.debug(`📚 Followup RAG activé → recherche "${searchQuery}" dans base ${sourceIa}`);
-
-      const searchResult = await knowledgeService.searchDocuments(searchQuery, {
-        filterCategory: null,
-        allowLowerThreshold: true,
-        iaType: sourceIa
-      });
-
-      const docLimits = { 'biblio': 6, 'clinique': 6 };
-      const maxDocs = docLimits[sourceIa] || 6;
-
-      limitedDocuments = (searchResult.allDocuments || []).slice(0, maxDocs);
-      selectedSources = searchResult.selectedSources || [];
-      searchMetadata = searchResult.metadata || searchMetadata;
-
-      logger.debug(`📄 Followup RAG - Documents trouvés: ${searchMetadata.totalFound}, limités à: ${limitedDocuments.length}`);
-      logger.debug(`📄 Followup RAG - Détail documents:`, limitedDocuments.map((doc, i) => ({
-        index: i + 1,
-        title: doc.title || 'N/A',
-        score: Math.round(doc.finalScore * 100) + '%',
-        contentLength: doc.content?.length || 0
-      })));
-    } else {
-      logger.debug(`💬 Followup sans RAG → réponse conversationnelle pure`);
-    }
-
-    // 3. Construction du prompt système (adapté selon RAG on/off)
-    const contextLabel = sourceIa === 'biblio'
-      ? 'bibliographique (études, publications scientifiques)'
-      : 'clinique (tests, diagnostics, cotations)';
-
-    let systemPrompt = `Tu es un assistant IA spécialisé en kinésithérapie. Tu réponds à un kinésithérapeute diplômé.
-
-CONTEXTE : Le kiné a lancé une recherche ${contextLabel} et pose maintenant une question de suivi.
-
-RÔLE :
-- Répondre aux questions de suivi en te basant sur le contexte de la conversation
-- Approfondir, clarifier ou compléter les informations déjà fournies
-- Ton professionnel mais accessible (de kiné à kiné)
-
-TON & STYLE :
-- Format conversationnel, réponses claires et structurées
-- 200-300 mots maximum
-- Utilise le gras (**) pour les points clés
-- 2-3 emojis maximum
-
-RÈGLES :
-- PRIORITÉ À L'HISTORIQUE : quand le kiné référence un élément par numéro ("étude 2", "test 3", "réf 1"), il parle TOUJOURS d'un élément déjà cité dans la conversation. Retrouve-le dans l'historique et base ta réponse dessus.
-- Les documents complémentaires (RAG) servent uniquement à ENRICHIR ta réponse avec des détails supplémentaires, pas à remplacer l'élément référencé par le kiné.
-- Base-toi sur le contexte de la conversation précédente
-- Si la question sort du cadre de la discussion, dis-le poliment
-- Ne jamais inventer d'études, de chiffres ou de faits
-- Si tu ne sais pas, dis-le clairement
-- JAMAIS poser de diagnostic médical`;
-
-    // Injection des documents si RAG activé
-    if (ragDecision.rag && limitedDocuments.length > 0) {
-      systemPrompt += `\n\n📚 DOCUMENTS COMPLÉMENTAIRES (${limitedDocuments.length} document(s)) :
-Utilise-les pour enrichir ta réponse. Si non pertinents, ignore-les et base-toi sur l'historique.
-`;
-
-      limitedDocuments.forEach((doc, index) => {
-        const score = Math.round((doc.finalScore || doc.relevanceScore || doc.similarity || 0) * 100);
-        const source = doc.metadata?.nom || doc.metadata?.source_file || doc.title || 'Source non spécifiée';
-        const category = doc.category || doc.metadata?.entity_type || doc.metadata?.type_contenu || 'Général';
-
-        systemPrompt += `\n📄 DOCUMENT ${index + 1} (Score: ${score}%)
-SOURCE : ${source}
-CATÉGORIE : ${category}
-
-CONTENU :
-${doc.content}
-
----
-`;
-      });
-    } else if (ragDecision.rag && limitedDocuments.length === 0) {
-      systemPrompt += `\n\n📄 RECHERCHE DOCUMENTAIRE : Aucun document pertinent trouvé pour cette question de suivi.
-Base-toi sur le contexte de la conversation et tes connaissances générales. Indique clairement si tu manques d'informations sourcées.`;
-    }
-
-    // 4. Historique limité à 10 messages pour garder le contexte biblio/clinique
-    const limitedHistory = conversationHistory.slice(-10);
-
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...limitedHistory,
-      { role: 'user', content: message }
-    ];
-
-    logger.debug(`📝 Followup - Taille prompt système: ${systemPrompt.length} chars, RAG: ${ragDecision.rag}, docs: ${limitedDocuments.length}`);
-
-    // 5. Appel du provider de génération (via llmService)
-    const completion = await llmService.chatCompletion({ iaType: 'followup', messages });
-
-    const aiResponse = completion.content;
-
-    // 6. Sauvegarde dans la table de l'IA SOURCE (biblio -> chatIaBiblio, clinique -> chatIaClinique)
-    if (!options.skipSave) {
-      await saveToCorrectTable(sourceIa, kineId, message, aiResponse);
-      logger.debug(`💾 Followup sauvegardé dans table ${sourceIa}`);
-    }
-
-    // 7. Calcul de la confiance (uniquement si RAG activé)
-    const overallConfidence = limitedDocuments.length > 0
-      ? knowledgeService.calculateOverallConfidence(limitedDocuments)
-      : null;
-
-    // 8. Réponse finale
-    const response = {
-      success: true,
-      message: aiResponse,
-      sources: limitedDocuments.length > 0 ? knowledgeService.formatSources(selectedSources) : [],
-      confidence: overallConfidence,
-      metadata: {
-        model: 'gpt-4o-mini',
-        iaType: 'followup',
-        sourceIa: sourceIa,
-        ragActivated: ragDecision.rag,
-        kineId: kineId,
-        documentsFound: searchMetadata.totalFound,
-        documentsUsedForAI: limitedDocuments.length,
-        documentsDisplayed: selectedSources.length,
-        timestamp: new Date().toISOString()
-      }
-    };
-
-    logger.debug(`✅ Followup terminé - RAG: ${ragDecision.rag}, docs: ${limitedDocuments.length}, confiance: ${overallConfidence ? Math.round(overallConfidence * 100) + '%' : 'N/A'}`);
-    return response;
-
-  } catch (error) {
-    logger.error(`❌ Erreur generateFollowupResponse (source: ${sourceIa}):`, error.message);
-    throw {
-      success: false,
-      error: `Erreur lors de la génération de la réponse de suivi`,
-      details: error.message
-    };
-  }
-};
-
-/**
- * Génère une réponse de suivi en streaming (SSE)
- * Même logique que generateFollowupResponse mais avec stream: true + onToken callback
- */
-const generateFollowupResponseStream = async (message, conversationHistory = [], kineId, sourceIa, onToken, options = {}) => {
-  const validSources = ['biblio', 'clinique'];
-  if (!validSources.includes(sourceIa)) {
-    throw new Error(`sourceIa invalide: ${sourceIa}. Valeurs acceptées: ${validSources.join(', ')}`);
-  }
-
-  logger.debug(`🔄 IA Followup Stream (source: ${sourceIa}) pour kiné ID: ${sanitizeUID(kineId)}`);
-
-  if (!message?.trim()) {
-    throw new Error('Message requis');
-  }
-
-  // 1. Détection du besoin RAG + query rewriting via mini LLM
-  const ragDecision = await shouldUseRAG(message, conversationHistory);
-  const searchQuery = ragDecision.query || message;
-  logger.debug(`🔍 Followup Stream RAG décision: rag=${ragDecision.rag}, query="${searchQuery}" (source: ${sourceIa})`);
-
-  // 2. Recherche documentaire si RAG activé (avec query optimisée)
-  let limitedDocuments = [];
-  let selectedSources = [];
-  let searchMetadata = { totalFound: 0, averageScore: 0, categoriesFound: [] };
-
-  if (ragDecision.rag) {
-    const searchResult = await knowledgeService.searchDocuments(searchQuery, {
-      filterCategory: null,
-      allowLowerThreshold: true,
-      iaType: sourceIa
-    });
-
-    const docLimits = { 'biblio': 6, 'clinique': 6 };
-    const maxDocs = docLimits[sourceIa] || 6;
-
-    limitedDocuments = (searchResult.allDocuments || []).slice(0, maxDocs);
-    selectedSources = searchResult.selectedSources || [];
-    searchMetadata = searchResult.metadata || searchMetadata;
-  }
-
-  // 3. Construction du prompt système
-  const contextLabel = sourceIa === 'biblio'
-    ? 'bibliographique (études, publications scientifiques)'
-    : 'clinique (tests, diagnostics, cotations)';
-
-  let systemPrompt = `Tu es un assistant IA spécialisé en kinésithérapie. Tu réponds à un kinésithérapeute diplômé.
-
-CONTEXTE : Le kiné a lancé une recherche ${contextLabel} et pose maintenant une question de suivi.
-
-RÔLE :
-- Répondre aux questions de suivi en te basant sur le contexte de la conversation
-- Approfondir, clarifier ou compléter les informations déjà fournies
-- Ton professionnel mais accessible (de kiné à kiné)
-
-TON & STYLE :
-- Format conversationnel, réponses claires et structurées
-- 200-300 mots maximum
-- Utilise le gras (**) pour les points clés
-- 2-3 emojis maximum
-
-RÈGLES :
-- PRIORITÉ À L'HISTORIQUE : quand le kiné référence un élément par numéro ("étude 2", "test 3", "réf 1"), il parle TOUJOURS d'un élément déjà cité dans la conversation. Retrouve-le dans l'historique et base ta réponse dessus.
-- Les documents complémentaires (RAG) servent uniquement à ENRICHIR ta réponse avec des détails supplémentaires, pas à remplacer l'élément référencé par le kiné.
-- Base-toi sur le contexte de la conversation précédente
-- Si la question sort du cadre de la discussion, dis-le poliment
-- Ne jamais inventer d'études, de chiffres ou de faits
-- Si tu ne sais pas, dis-le clairement
-- JAMAIS poser de diagnostic médical`;
-
-  if (ragDecision.rag && limitedDocuments.length > 0) {
-    systemPrompt += `\n\n📚 DOCUMENTS COMPLÉMENTAIRES (${limitedDocuments.length} document(s)) :
-Utilise-les pour enrichir ta réponse. Si non pertinents, ignore-les et base-toi sur l'historique.
-`;
-    limitedDocuments.forEach((doc, index) => {
-      const score = Math.round((doc.finalScore || doc.relevanceScore || doc.similarity || 0) * 100);
-      const source = doc.metadata?.nom || doc.metadata?.source_file || doc.title || 'Source non spécifiée';
-      const category = doc.category || doc.metadata?.entity_type || doc.metadata?.type_contenu || 'Général';
-      systemPrompt += `\n📄 DOCUMENT ${index + 1} (Score: ${score}%)\nSOURCE : ${source}\nCATÉGORIE : ${category}\n\nCONTENU :\n${doc.content}\n\n---\n`;
-    });
-  } else if (ragDecision.rag && limitedDocuments.length === 0) {
-    systemPrompt += `\n\n📄 RECHERCHE DOCUMENTAIRE : Aucun document pertinent trouvé pour cette question de suivi.
-Base-toi sur le contexte de la conversation et tes connaissances générales. Indique clairement si tu manques d'informations sourcées.`;
-  }
-
-  const limitedHistory = conversationHistory.slice(-10);
-  const messages = [
-    { role: 'system', content: systemPrompt },
-    ...limitedHistory,
-    { role: 'user', content: message }
-  ];
-
-  // 4. Appel du provider de génération en streaming (via llmService)
-  const completion = await llmService.chatCompletion({
-    iaType: 'followup',
-    messages,
-    stream: true,
-    onToken,
-  });
-
-  const fullResponse = completion.content;
-
-  // 5. Sauvegarde
-  if (!options.skipSave) {
-    await saveToCorrectTable(sourceIa, kineId, message, fullResponse);
-    logger.debug(`💾 Followup (stream) sauvegardé dans table ${sourceIa}`);
-  }
-
-  const overallConfidence = limitedDocuments.length > 0
-    ? knowledgeService.calculateOverallConfidence(limitedDocuments)
-    : null;
-
-  return {
-    success: true,
-    message: fullResponse,
-    sources: limitedDocuments.length > 0 ? knowledgeService.formatSources(selectedSources) : [],
-    confidence: overallConfidence,
-    metadata: {
-      model: completion.model,
-      iaType: 'followup',
-      sourceIa: sourceIa,
-      ragActivated: ragDecision.rag,
-      kineId: kineId,
-      documentsFound: searchMetadata.totalFound,
-      documentsUsedForAI: limitedDocuments.length,
-      documentsDisplayed: selectedSources.length,
-      timestamp: new Date().toISOString()
-    }
-  };
 };
 
 // ========== PROMPTS SYSTÈME SPÉCIALISÉS ==========
@@ -1577,11 +1112,9 @@ ANTI-HALLUCINATION :
 }
 
 module.exports = {
-  // Nouvelles fonctions IA Kiné
+  // IA admin/bilan
   generateKineResponse,
   generateKineResponseStream,
-  generateFollowupResponse,
-  generateFollowupResponseStream,
 
   // Chat unifié (conversations)
   routeQuery,
