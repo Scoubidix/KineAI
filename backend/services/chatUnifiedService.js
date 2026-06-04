@@ -6,6 +6,7 @@ const logger = require('../utils/logger');
 const llmService = require('./llmService');
 const conversationService = require('./conversationService');
 const knowledgeService = require('./knowledgeService');
+const tokenUsageService = require('./tokenUsageService');
 const { routeQuery, getSystemPromptByType, generateConversationTitle } = require('./openaiService');
 
 // Budget input (spec §8) — couche 2 et 3. La couche 1 (message ≤ 15 000 chars) est au contrôleur.
@@ -131,6 +132,9 @@ const sendMessageStream = async ({ kineId, conversationId, message, onEvent }) =
     model: completion.model,
     tokensUsed: completion.usage?.total_tokens ?? null
   });
+
+  // 9bis. Incrément du quota quotidien (APRÈS génération — jamais de coupure en cours de message)
+  await tokenUsageService.incrementDailyUsage(kineId, completion.usage?.total_tokens ?? 0);
 
   // 10. Titre en arrière-plan si la conversation n'en a pas encore
   if (!conversation.title) {

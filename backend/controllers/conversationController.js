@@ -10,8 +10,10 @@ const MESSAGE_MAX_CHARS = 15000;
 
 /**
  * Récupère le kiné depuis le token Firebase. Répond et retourne null si introuvable.
+ * Réutilise req.kine si un middleware amont (checkTokenQuota) l'a déjà chargé.
  */
 const getKine = async (req, res) => {
+  if (req.kine) return req.kine;
   if (!req.uid) {
     res.status(401).json({ success: false, error: 'Authentification échouée - UID manquant', code: 'UNAUTHORIZED' });
     return null;
@@ -176,11 +178,43 @@ const deleteConversation = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/chat/kine/usage — consommation tokens du jour pour la jauge UI
+ */
+const getUsage = async (req, res) => {
+  try {
+    const kine = await getKine(req, res);
+    if (!kine) return;
+
+    const tokenUsageService = require('../services/tokenUsageService');
+    const { getQuotaForPlan } = require('../config/tokenQuotas');
+
+    const planType = kine.planType || 'FREE';
+    const limit = getQuotaForPlan(planType);
+    const tokensUsed = await tokenUsageService.getDailyUsage(kine.id);
+
+    res.json({
+      success: true,
+      usage: {
+        date: tokenUsageService.getParisDate().toISOString().substring(0, 10),
+        tokensUsed,
+        limit,
+        remaining: Math.max(0, limit - tokensUsed),
+        planType
+      }
+    });
+  } catch (error) {
+    logger.error('❌ Erreur getUsage:', error);
+    res.status(500).json({ success: false, error: 'Erreur serveur', code: 'INTERNAL_ERROR' });
+  }
+};
+
 module.exports = {
   sendChat,
   listConversations,
   getConversation,
   renameConversation,
   deleteConversation,
+  getUsage,
   MESSAGE_MAX_CHARS
 };
