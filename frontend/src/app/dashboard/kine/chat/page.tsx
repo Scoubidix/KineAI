@@ -167,7 +167,6 @@ export default function UnifiedChatPage() {
         updateLastAssistantMessage((msg) => ({
           ...msg,
           iaType: payload.iaType,
-          sources: payload.sources?.length ? payload.sources : undefined,
         }));
         // Rafraîchit la sidebar (titre LLM généré en arrière-plan) + la jauge quota
         await Promise.all([loadConversations(), loadUsage()]);

@@ -1,8 +1,8 @@
 'use client';
 
-// Bulle de message du chat unifié : rendu markdown léger sanitizé (même pipeline que
-// les anciennes pages) + badge du type d'IA sur les réponses + sources dépliables
-// (uniquement sur le message live — les sources ne sont pas persistées en base).
+// Bulle de message du chat unifié : rendu markdown léger sanitizé + badge du type d'IA.
+// Les URLs du texte sont cliquables (références biblio dans la réponse), comme sur
+// l'ancienne page biblio. Les références/sources vivent dans le texte de la réponse.
 import React from 'react';
 import DOMPurify from 'dompurify';
 import { BookOpen, Stethoscope } from 'lucide-react';
@@ -11,7 +11,6 @@ export interface ChatUIMessage {
   role: 'user' | 'assistant';
   content: string;
   iaType?: 'basique' | 'biblio' | 'clinique' | null;
-  sources?: Array<{ title?: string; [key: string]: unknown }>;
 }
 
 const IA_BADGES: Record<string, { label: string; Icon: typeof BookOpen }> = {
@@ -29,7 +28,9 @@ const renderMarkdown = (content: string) =>
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/^- (.*$)/gim, '• $1')
       .replace(/^\d+\.\s+(.*$)/gim, '<strong>$1</strong>')
-      .replace(/\n/g, '<br>')
+      .replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-teal-600 underline hover:text-teal-800">$1</a>')
+      .replace(/\n/g, '<br>'),
+    { ADD_ATTR: ['target'] }
   );
 
 export function MessageBubble({ message }: { message: ChatUIMessage }) {
@@ -57,21 +58,6 @@ export function MessageBubble({ message }: { message: ChatUIMessage }) {
             dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }}
           />
         </div>
-
-        {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
-          <details className="mt-2 text-xs text-muted-foreground">
-            <summary className="cursor-pointer select-none hover:text-foreground">
-              Sources ({message.sources.length})
-            </summary>
-            <ul className="mt-1.5 space-y-1 pl-4">
-              {message.sources.map((source, index) => (
-                <li key={index} className="list-disc">
-                  {String(source.title || source.nom || source.source || `Source ${index + 1}`)}
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
       </div>
     </div>
   );
