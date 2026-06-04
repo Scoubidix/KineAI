@@ -7,6 +7,7 @@ const llmService = require('./llmService');
 const conversationService = require('./conversationService');
 const knowledgeService = require('./knowledgeService');
 const tokenUsageService = require('./tokenUsageService');
+const { lookupGlossary } = require('./embeddingService');
 const { routeQuery, getSystemPromptByType, generateConversationTitle } = require('./openaiService');
 
 // Budget input (spec §8) — couche 2 et 3. La couche 1 (message ≤ 15 000 chars) est au contrôleur.
@@ -105,15 +106,33 @@ const sendMessageStream = async ({ kineId, conversationId, message, onEvent }) =
     selectedSources = searchResult.selectedSources || [];
   }
 
-  // 5. Message user sauvegardé AVANT génération (survit à un échec)
+  // 5. Message user sauvegardé AVANT génération (survit à un échec) — version originale
   await conversationService.saveUserMessage(conversation.id, message);
+
+  // 5bis. Glossaire FR→EN : enrichit le message envoyé au LLM (les docs RAG sont en anglais).
+  // Repris de l'ancien prepareKineRequest ; la sauvegarde garde le message original.
+  let llmMessage = message;
+  if (route.rag && (route.type === 'biblio' || route.type === 'clinique')) {
+    try {
+      const glossaryMappings = await lookupGlossary(message);
+      glossaryMappings.forEach((m) => {
+        const regex = new RegExp(`\\b${m.french_term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+        llmMessage = llmMessage.replace(regex, `${m.english_term} (${m.french_term})`);
+      });
+      if (glossaryMappings.length > 0) {
+        logger.debug(`📖 Glossaire : ${glossaryMappings.length} mapping(s) appliqué(s) au message LLM`);
+      }
+    } catch (error) {
+      logger.warn('⚠️ Glossaire indisponible, message non enrichi:', error.message);
+    }
+  }
 
   // 6. Messages pour le LLM (prompt système du type routé + historique + user)
   const systemPrompt = getSystemPromptByType(route.type, documents, route.rag);
   let messages = [
     { role: 'system', content: systemPrompt },
     ...history,
-    { role: 'user', content: message }
+    { role: 'user', content: llmMessage }
   ];
 
   // 7. Garde-fou budget input (élagage silencieux de l'historique)
