@@ -473,7 +473,7 @@ const routeQuery = async (message, conversationHistory = []) => {
 TYPES :
 - BASIC : Question conversationnelle, conseil pratique, explication pour un patient, organisation cabinet, salutation, remerciement
 - BIBLIO : Recherche bibliographique, études scientifiques, preuves, "que dit la littérature", "quels traitements optimaux", "quel est l'intérêt de"
-- CLINIC : Cas clinique complexe, diagnostic différentiel, tests diagnostiques spécifiques, cotations musculaires, "test de Lachman", "diagnostic épaule"
+- CLINIC : Cas clinique complexe, diagnostic différentiel, tests diagnostiques spécifiques (réalisation, fiabilité, sensibilité/spécificité, interprétation), cotations musculaires, "test de Lachman", "diagnostic épaule"
 
 RAG (recherche documentaire) :
 - true : Le kiné cherche une information spécifique qui nécessite des sources (tests, mesures, cotations, protocoles précis, données chiffrées)
@@ -493,6 +493,7 @@ Exemples :
 - "C'est quoi le test de Lachman ?" → {"type":"BASIC","rag":true,"query":"C'est quoi le test de Lachman ?"}
 - "Quels traitements optimaux pour la lombalgie ?" → {"type":"BIBLIO","rag":true,"query":"Quels traitements optimaux pour la lombalgie ?"}
 - "Patient 45 ans douleur épaule après tennis" → {"type":"CLINIC","rag":true,"query":"Patient 45 ans douleur épaule après tennis"}
+- "Quelle est la fiabilité du test de Thessaly ?" → {"type":"CLINIC","rag":true,"query":"Fiabilité du test de Thessaly pour les lésions méniscales"}
 - (historique sur le test de Lachman) "Et sa sensibilité ?" → {"type":"CLINIC","rag":true,"query":"Quelle est la sensibilité du test de Lachman ?"}
 - (historique : cas clinique épaule en cours) "ok et niveau prise en charge ?" → {"type":"CLINIC","rag":true,"query":"Prise en charge kinésithérapique d'un conflit sous-acromial de l'épaule"}
 - (historique : cas clinique épaule en cours) "comment je l'explique simplement à mon patient ?" → {"type":"BASIC","rag":false,"query":"Comment expliquer un conflit sous-acromial à un patient"}
