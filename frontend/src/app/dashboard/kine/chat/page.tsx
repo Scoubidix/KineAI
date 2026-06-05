@@ -28,7 +28,8 @@ export default function UnifiedChatPage() {
   const [chatMessages, setChatMessages] = useState<ChatUIMessage[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // Panneau de conversations fermé par défaut (gain de place, surtout mobile)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [isQuotaExceeded, setIsQuotaExceeded] = useState(false);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   // Type d'IA routée pour le message en cours (phrases d'attente spécifiques)
@@ -208,13 +209,10 @@ export default function UnifiedChatPage() {
       <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/40">
         <Wand2 className="text-[#3899aa] h-4 w-4 shrink-0" />
         <h2 className="text-sm font-medium text-[#3899aa]">Assistant IA</h2>
-        <span className="text-[10px] text-muted-foreground hidden sm:inline">
-          conversationnel · bibliographique · clinique
-        </span>
         <QuotaGauge usage={usage} />
       </div>
 
-      <div className="flex h-[calc(100vh-130px)]">
+      <div className="flex h-[calc(100dvh-130px)]">
         {/* Sidebar interne de conversations (en plus de la sidebar AppLayout) */}
         <ConversationSidebar
           conversations={conversations}
@@ -250,10 +248,6 @@ export default function UnifiedChatPage() {
                   <h3 className="text-lg font-medium text-muted-foreground mb-2">
                     Posez votre question
                   </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Conversationnel, recherche bibliographique ou raisonnement clinique :
-                    l&apos;assistant s&apos;adapte automatiquement à votre question.
-                  </p>
                 </div>
               </div>
             ) : (
