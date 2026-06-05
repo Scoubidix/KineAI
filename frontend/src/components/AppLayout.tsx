@@ -1234,7 +1234,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { href: '/dashboard/kine/create-exercise', label: 'Mes Exercices', icon: Dumbbell, disabled: false },
         { href: '/dashboard/kine/programmes', label: 'Programmes', icon: Calendar, disabled: false },
         { href: '/dashboard/kine/bilan-kine', label: 'Bilan Kiné', icon: ClipboardCheck, disabled: false },
-        { href: '/dashboard/kine/chat', label: 'Assistant IA', icon: Wand2, disabled: false },
+        { href: '/dashboard/kine/chat', label: 'Assistant IA', icon: Wand2, disabled: false, highlight: true },
         { href: '/dashboard/kine/chatbot-admin', label: 'IA Administrative', icon: FileText, disabled: false },
         { href: '/dashboard/kine/contrats', label: 'Mes Contrats', icon: Briefcase, disabled: false },
         { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, disabled: false },
@@ -1472,7 +1472,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   }
                   disabled={item.disabled && item.label.includes('(Bientôt)')}
                   aria-disabled={item.disabled && !item.label.includes('(Bientôt)')}
-                  className={item.disabled && !item.label.includes('(Bientôt)') ? "text-foreground/40 cursor-not-allowed opacity-60" : "text-foreground hover:border hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-transparent data-[active=true]:border data-[active=true]:border-[#3899aa]/50 data-[active=true]:shadow-[0_0_12px_rgba(56,153,170,0.3)] data-[active=true]:bg-transparent"}
+                  className={
+                    item.disabled && !item.label.includes('(Bientôt)')
+                      ? "text-foreground/40 cursor-not-allowed opacity-60"
+                      : ('highlight' in item && item.highlight)
+                        // Onglet mis en avant (Assistant IA) : style « actif » en permanence
+                        ? "text-foreground border border-[#3899aa]/50 shadow-[0_0_12px_rgba(56,153,170,0.3)] bg-transparent hover:bg-transparent data-[active=true]:bg-transparent"
+                        : "text-foreground hover:border hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-transparent data-[active=true]:border data-[active=true]:border-[#3899aa]/50 data-[active=true]:shadow-[0_0_12px_rgba(56,153,170,0.3)] data-[active=true]:bg-transparent"
+                  }
                 >
                   <Link href={item.href}>
                     <item.icon className="h-4 w-4 shrink-0" />
