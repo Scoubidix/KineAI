@@ -15,7 +15,6 @@ import { useConversations } from '@/hooks/useConversations';
 import { useChatStream, DonePayload } from '@/hooks/useChatStream';
 import { ConversationSidebar } from '@/components/chat/ConversationSidebar';
 import { MessageBubble, ChatUIMessage } from '@/components/chat/MessageBubble';
-import { QuotaGauge } from '@/components/chat/QuotaGauge';
 import { ThinkingIndicator } from '@/components/chat/ThinkingIndicator';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
@@ -23,21 +22,6 @@ const MESSAGE_MAX_CHARS = 15000;
 // Plans sans CTA upgrade (pas de plan supérieur à vendre)
 const TOP_PLANS = ['PIONNIER', 'EXPERT'];
 
-// Suggestions cliquables de l'état vide (une par registre — remplissent l'input)
-const SUGGESTIONS = [
-  {
-    label: 'Question pratique',
-    text: 'Comment expliquer une tendinopathie à un patient ?',
-  },
-  {
-    label: "Recherche d'études",
-    text: "Que dit la littérature sur les exercices excentriques dans la tendinopathie d'Achille ?",
-  },
-  {
-    label: 'Cas clinique',
-    text: "Patient de 45 ans, douleur latérale de l'épaule apparue progressivement depuis 3 semaines, douleur à l'abduction active. Quelles hypothèses et quels tests ?",
-  },
-];
 
 export default function UnifiedChatPage() {
   const [message, setMessage] = useState('');
@@ -55,6 +39,7 @@ export default function UnifiedChatPage() {
   }, []);
   const [isQuotaExceeded, setIsQuotaExceeded] = useState(false);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  const [firstName, setFirstName] = useState('');
   // Type d'IA routée pour le message en cours (phrases d'attente spécifiques)
   const [routedIaType, setRoutedIaType] = useState<'basique' | 'biblio' | 'clinique' | null>(null);
 
@@ -75,12 +60,25 @@ export default function UnifiedChatPage() {
   // L'id de conversation peut être créé en cours de stream (event conversation_created)
   const streamConversationIdRef = useRef<number | null>(null);
 
-  // Chargement initial : conversations + quota
+  // Chargement initial : conversations + quota + prénom (pour le message d'accueil)
   useEffect(() => {
     const auth = getAuth(app);
+    const loadProfile = async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch(`${API_BASE}/kine/profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data?.firstName) setFirstName(data.firstName);
+      } catch {
+        // Pas bloquant : le message d'accueil s'affiche sans prénom
+      }
+    };
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        await Promise.all([loadConversations(), loadUsage()]);
+        await Promise.all([loadConversations(), loadUsage(), loadProfile()]);
       }
     });
     return () => unsubscribe();
@@ -232,7 +230,6 @@ export default function UnifiedChatPage() {
       <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/40">
         <Wand2 className="text-[#3899aa] h-4 w-4 shrink-0" />
         <h2 className="text-sm font-medium text-[#3899aa]">Assistant IA</h2>
-        <QuotaGauge usage={usage} />
       </div>
 
       <div className="flex h-[calc(100dvh-130px)]">
@@ -267,26 +264,11 @@ export default function UnifiedChatPage() {
             ) : chatMessages.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center max-w-2xl px-4">
-                  <Wand2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-muted-foreground mb-6">
-                    Posez votre question
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {SUGGESTIONS.map((suggestion) => (
-                      <button
-                        key={suggestion.label}
-                        onClick={() => setMessage(suggestion.text)}
-                        className="text-left border border-border rounded-xl p-3.5 hover:border-[#3899aa]/60 hover:shadow-[0_0_12px_rgba(56,153,170,0.15)] transition-all bg-white dark:bg-card"
-                      >
-                        <span className="block text-xs font-medium text-[#3899aa] mb-1.5">
-                          {suggestion.label}
-                        </span>
-                        <span className="block text-xs text-muted-foreground line-clamp-3">
-                          {suggestion.text}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                  <Wand2 className="w-10 h-10 text-[#3899aa] mx-auto mb-6" />
+                  {/* Même style que le « Bienvenue {firstName} » de la page d'accueil, sans le gras */}
+                  <h2 className="text-2xl md:text-3xl text-primary">
+                    Bonjour{firstName ? ` ${firstName}` : ''}, comment puis-je vous aider ?
+                  </h2>
                 </div>
               </div>
             ) : (
@@ -305,8 +287,8 @@ export default function UnifiedChatPage() {
 
           {/* Bandeau quota épuisé */}
           {isQuotaExceeded && (
-            <div className="mx-2 sm:mx-6 mb-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2">
-              <p className="text-sm text-amber-800 dark:text-amber-200 flex-1">
+            <div className="mx-2 sm:mx-6 mb-2 rounded-lg border border-[#3899aa]/40 bg-[#3899aa]/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2">
+              <p className="text-sm text-foreground/90 flex-1">
                 {isTopPlan
                   ? 'Quota quotidien atteint. Votre quota se réinitialise à minuit — revenez demain !'
                   : 'Quota quotidien atteint. Passez au plan supérieur pour continuer dès maintenant, ou revenez demain.'}
