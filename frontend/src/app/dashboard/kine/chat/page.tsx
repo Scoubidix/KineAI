@@ -23,13 +23,36 @@ const MESSAGE_MAX_CHARS = 15000;
 // Plans sans CTA upgrade (pas de plan supérieur à vendre)
 const TOP_PLANS = ['PIONNIER', 'EXPERT'];
 
+// Suggestions cliquables de l'état vide (une par registre — remplissent l'input)
+const SUGGESTIONS = [
+  {
+    label: 'Question pratique',
+    text: 'Comment expliquer une tendinopathie à un patient ?',
+  },
+  {
+    label: "Recherche d'études",
+    text: "Que dit la littérature sur les exercices excentriques dans la tendinopathie d'Achille ?",
+  },
+  {
+    label: 'Cas clinique',
+    text: "Patient de 45 ans, douleur latérale de l'épaule apparue progressivement depuis 3 semaines, douleur à l'abduction active. Quelles hypothèses et quels tests ?",
+  },
+];
+
 export default function UnifiedChatPage() {
   const [message, setMessage] = useState('');
   const [chatMessages, setChatMessages] = useState<ChatUIMessage[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  // Panneau de conversations fermé par défaut (gain de place, surtout mobile)
+  // Panneau de conversations : ouvert par défaut sur desktop, fermé sur mobile
+  // (mesuré une fois au montage — la transition de largeur rend l'ouverture fluide)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+
+  useEffect(() => {
+    if (window.innerWidth >= 768) {
+      setIsSidebarCollapsed(false);
+    }
+  }, []);
   const [isQuotaExceeded, setIsQuotaExceeded] = useState(false);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   // Type d'IA routée pour le message en cours (phrases d'attente spécifiques)
@@ -243,11 +266,27 @@ export default function UnifiedChatPage() {
               </div>
             ) : chatMessages.length === 0 ? (
               <div className="flex items-center justify-center h-full">
-                <div className="text-center max-w-md px-4">
+                <div className="text-center max-w-2xl px-4">
                   <Wand2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                  <h3 className="text-lg font-medium text-muted-foreground mb-6">
                     Posez votre question
                   </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {SUGGESTIONS.map((suggestion) => (
+                      <button
+                        key={suggestion.label}
+                        onClick={() => setMessage(suggestion.text)}
+                        className="text-left border border-border rounded-xl p-3.5 hover:border-[#3899aa]/60 hover:shadow-[0_0_12px_rgba(56,153,170,0.15)] transition-all bg-white dark:bg-card"
+                      >
+                        <span className="block text-xs font-medium text-[#3899aa] mb-1.5">
+                          {suggestion.label}
+                        </span>
+                        <span className="block text-xs text-muted-foreground line-clamp-3">
+                          {suggestion.text}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : (
