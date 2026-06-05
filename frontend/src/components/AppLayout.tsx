@@ -56,7 +56,8 @@ import {
   Dumbbell, 
   Briefcase, 
   Share2, 
-  Wand2, 
+  Wand2,
+  Sparkles,
   Gift, 
   Newspaper, 
   ClipboardCheck, 
@@ -1472,18 +1473,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   }
                   disabled={item.disabled && item.label.includes('(Bientôt)')}
                   aria-disabled={item.disabled && !item.label.includes('(Bientôt)')}
-                  className={
-                    item.disabled && !item.label.includes('(Bientôt)')
-                      ? "text-foreground/40 cursor-not-allowed opacity-60"
-                      : ('highlight' in item && item.highlight)
-                        // Onglet mis en avant (Assistant IA) : style « actif » en permanence
-                        ? "text-foreground border border-[#3899aa]/50 shadow-[0_0_12px_rgba(56,153,170,0.3)] bg-transparent hover:bg-transparent data-[active=true]:bg-transparent"
-                        : "text-foreground hover:border hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-transparent data-[active=true]:border data-[active=true]:border-[#3899aa]/50 data-[active=true]:shadow-[0_0_12px_rgba(56,153,170,0.3)] data-[active=true]:bg-transparent"
-                  }
+                  className={item.disabled && !item.label.includes('(Bientôt)') ? "text-foreground/40 cursor-not-allowed opacity-60" : "text-foreground hover:border hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-transparent data-[active=true]:border data-[active=true]:border-[#3899aa]/50 data-[active=true]:shadow-[0_0_12px_rgba(56,153,170,0.3)] data-[active=true]:bg-transparent"}
                 >
                   <Link href={item.href}>
                     <item.icon className="h-4 w-4 shrink-0" />
                     <span>{item.label}</span>
+                    {'highlight' in item && item.highlight && (
+                      // Poussière d'étoile teal : signale l'onglet sans casser l'harmonie
+                      <Sparkles className="ml-auto h-3.5 w-3.5 shrink-0 text-[#3899aa] animate-pulse" />
+                    )}
                     {item.href === '/dashboard/kine/contrats' && contractsUnreadCount > 0 && (
                       <Badge variant="destructive" className="ml-auto h-4 px-1.5 text-[9px] leading-none">
                         {contractsUnreadCount}
