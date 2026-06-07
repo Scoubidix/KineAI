@@ -41,7 +41,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { sendPasswordReset } from "@/lib/auth-utils";
 import { useToast } from "@/hooks/use-toast"; // Test réactivé
 import { useSubscription } from "@/hooks/useSubscription";
-import { PLANS, getPlanByType } from "@/config/plans";
+import { PLANS, getPlanByType, getChatQuotaLabel } from "@/config/plans";
 import { DEPARTEMENTS_FR } from '@/app/dashboard/kine/contrats/data/departements-fr';
 import {
   Settings,
@@ -1570,34 +1570,20 @@ export default function AppLayout({ children }: AppLayoutProps) {
                             <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                             {currentPlan.features.maxProgrammes === Infinity ? 'Programmes illimités' : `${currentPlan.features.maxProgrammes} programme${currentPlan.features.maxProgrammes > 1 ? 's' : ''} patient`}
                           </li>
-                          {currentPlan.features.assistants.includes('CONVERSATIONNEL') && (
+                          <li className="flex items-center gap-2 text-xs text-foreground">
+                            <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                            Assistant IA — {getChatQuotaLabel(headerSubscription.planType)}
+                          </li>
+                          {currentPlan.features.iaBilans && (
                             <li className="flex items-center gap-2 text-xs text-foreground">
                               <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                              Assistant conversationnel
+                              Génération de bilans
                             </li>
                           )}
-                          {currentPlan.features.assistants.includes('BIBLIOTHEQUE') && (
+                          {currentPlan.features.moduleAdmin && (
                             <li className="flex items-center gap-2 text-xs text-foreground">
                               <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                              Assistant bibliographique
-                            </li>
-                          )}
-                          {currentPlan.features.assistants.includes('CLINIQUE') && (
-                            <li className="flex items-center gap-2 text-xs text-foreground">
-                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                              Assistant clinique
-                            </li>
-                          )}
-                          {currentPlan.features.assistants.includes('ADMINISTRATIF') && (
-                            <li className="flex items-center gap-2 text-xs text-foreground">
-                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                              Assistant administratif
-                            </li>
-                          )}
-                          {currentPlan.features.bilanKine && (
-                            <li className="flex items-center gap-2 text-xs text-foreground">
-                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                              Bilan kiné
+                              Module administratif
                             </li>
                           )}
                         </ul>

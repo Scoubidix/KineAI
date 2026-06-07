@@ -17,14 +17,6 @@ const PLAN_TYPES = {
   EXPERT: 'EXPERT'
 };
 
-// Liste des assistants IA disponibles
-const AI_ASSISTANTS = {
-  CONVERSATIONNEL: 'CONVERSATIONNEL',   // Chat avec les patients
-  BIBLIOTHEQUE: 'BIBLIOTHEQUE',         // Recherche bibliographique
-  CLINIQUE: 'CLINIQUE',                 // Analyse clinique
-  ADMINISTRATIF: 'ADMINISTRATIF'        // Tâches administratives
-};
-
 const PLANS = {
   [PLAN_TYPES.DECLIC]: {
     id: 'DECLIC',
@@ -38,9 +30,11 @@ const PLANS = {
       // Limites principales
       maxProgrammes: 1,            // 1 programme patient avec IA maximum
       unlimitedPatients: true,     // Patients illimités (gestion uniquement)
-      
-      // Assistants IA disponibles
-      assistants: [AI_ASSISTANTS.CONVERSATIONNEL]
+
+      // Chat IA unifié : quota quotidien relatif (1 = usage standard)
+      chatMultiplier: 1,
+      iaBilans: false,             // Génération de bilans par IA
+      moduleAdmin: false           // Module administratif (courriers, templates)
     },
     limits: {
       programmes: 1
@@ -49,7 +43,7 @@ const PLANS = {
     highlights: [
       '1 programme patient avec IA',
       'Patients illimités',
-      'Assistant IA conversationnel',
+      'Assistant IA inclus',
       'Support par email'
     ]
   },
@@ -66,14 +60,11 @@ const PLANS = {
       // Limites principales
       maxProgrammes: 5,            // 5 programmes patients avec IA maximum
       unlimitedPatients: true,     // Patients illimités
-      
-      // Assistants IA disponibles
-      assistants: [
-        AI_ASSISTANTS.CONVERSATIONNEL,
-        AI_ASSISTANTS.BIBLIOTHEQUE,
-        AI_ASSISTANTS.CLINIQUE
-      ],
-      bilanKine: true
+
+      // Chat IA unifié : quota quotidien relatif (1 = usage standard)
+      chatMultiplier: 3,
+      iaBilans: true,              // Génération de bilans par IA
+      moduleAdmin: false           // Module administratif (courriers, templates)
     },
     limits: {
       programmes: 5
@@ -81,10 +72,9 @@ const PLANS = {
     description: 'Pour un suivi professionnel de plusieurs patients',
     highlights: [
       '5 programmes patients avec IA',
-      'Patients illimités', 
-      'Assistant IA conversationnel',
-      'Assistant IA bibliographique',
-      'Assistant IA clinique',
+      'Patients illimités',
+      'Assistant IA : 3× le plan Déclic',
+      'Génération de bilans',
       'Support prioritaire'
     ]
   },
@@ -103,15 +93,11 @@ const PLANS = {
       // Limites principales
       maxProgrammes: Infinity,     // Programmes illimités
       unlimitedPatients: true,     // Patients illimités
-      
-      // Assistants IA disponibles (tous)
-      assistants: [
-        AI_ASSISTANTS.CONVERSATIONNEL,
-        AI_ASSISTANTS.BIBLIOTHEQUE,
-        AI_ASSISTANTS.CLINIQUE,
-        AI_ASSISTANTS.ADMINISTRATIF
-      ],
-      bilanKine: true
+
+      // Chat IA unifié : quota quotidien relatif (1 = usage standard)
+      chatMultiplier: 10,
+      iaBilans: true,              // Génération de bilans par IA
+      moduleAdmin: true            // Module administratif (courriers, templates)
     },
     limits: {
       programmes: -1 // illimité
@@ -121,8 +107,9 @@ const PLANS = {
       '🚀 Prix pionnier exceptionnel',
       'Programmes patients illimités',
       'Patients illimités',
-      'Tous les assistants IA',
-      'Assistant IA administratif',
+      'Assistant IA : 10× le plan Déclic',
+      'Génération de bilans',
+      'Module administratif (courriers et templates)',
       'Support téléphone prioritaire',
       'Rapports avancés',
       '⚡ Limité à 100 places seulement'
@@ -139,18 +126,14 @@ const PLANS = {
     interval: 'month',
     stripePriceId: 'price_1TAXd7EHFuBHSJxkiRnFSDfi',
     features: {
-      // Limites principales  
+      // Limites principales
       maxProgrammes: Infinity,     // Programmes illimités
       unlimitedPatients: true,     // Patients illimités
-      
-      // Assistants IA disponibles (tous)
-      assistants: [
-        AI_ASSISTANTS.CONVERSATIONNEL,
-        AI_ASSISTANTS.BIBLIOTHEQUE,
-        AI_ASSISTANTS.CLINIQUE,
-        AI_ASSISTANTS.ADMINISTRATIF
-      ],
-      bilanKine: true
+
+      // Chat IA unifié : quota quotidien relatif (1 = usage standard)
+      chatMultiplier: 10,
+      iaBilans: true,              // Génération de bilans par IA
+      moduleAdmin: true            // Module administratif (courriers, templates)
     },
     limits: {
       programmes: -1 // illimité
@@ -159,8 +142,9 @@ const PLANS = {
     highlights: [
       'Programmes patients illimités',
       'Patients illimités',
-      'Tous les assistants IA',
-      'Assistant IA administratif',
+      'Assistant IA : 10× le plan Déclic',
+      'Génération de bilans',
+      'Module administratif (courriers et templates)',
       'Support téléphone prioritaire',
       'Rapports avancés'
     ]
@@ -176,18 +160,22 @@ const FREE_PLAN = {
   features: {
     maxProgrammes: 0,            // Aucun programme avec IA autorisé
     unlimitedPatients: true,     // Patients illimités (gestion uniquement)
-    assistants: []               // Aucun assistant IA
+
+    // Chat IA unifié : quota quotidien relatif (0 = usage limité)
+    chatMultiplier: 0,
+    iaBilans: false,             // Génération de bilans par IA
+    moduleAdmin: false           // Module administratif (courriers, templates)
   },
   limits: {
     programmes: 0
   },
-  description: 'Accès limité - Abonnement requis pour les fonctionnalités IA',
+  description: 'Accès découverte - Abonnement requis pour les programmes avec IA',
   highlights: [
     'Gestion des patients illimitée',
     'Création de programmes de base',
+    'Assistant IA : usage découverte',
     'Tableaux de bord de base',
-    'Pas d\'accès aux programmes avec IA',
-    'Pas d\'assistants IA'
+    'Pas d\'accès aux programmes avec IA'
   ]
 };
 
@@ -197,10 +185,13 @@ const getPlanByType = (planType) => {
   return PLANS[planType] || FREE_PLAN;
 };
 
-// Helper pour vérifier si un assistant IA est disponible
-const hasAssistant = (planType, assistantType) => {
+// Helper pour le libellé du quota chat IA selon le plan
+const getChatQuotaLabel = (planType) => {
   const plan = getPlanByType(planType);
-  return plan.features.assistants.includes(assistantType);
+  const multiplier = plan.features.chatMultiplier;
+  if (!multiplier) return 'usage découverte';
+  if (multiplier === 1) return 'usage inclus';
+  return `${multiplier}× le plan Déclic`;
 };
 
 // Helper pour récupérer la limite de programmes
@@ -214,39 +205,6 @@ const canCreateProgramme = (planType, currentProgrammes) => {
   const limit = getProgrammeLimit(planType);
   if (limit === Infinity || limit === -1) return true;
   return currentProgrammes < limit;
-};
-
-// Liste des features disponibles (pour les composants FeatureGate)
-const FEATURES = {
-  CREATE_PROGRAMME: 'CREATE_PROGRAMME',           // Créer un programme avec IA
-  AI_CONVERSATIONNEL: 'AI_CONVERSATIONNEL',     // Assistant conversationnel
-  AI_BIBLIOTHEQUE: 'AI_BIBLIOTHEQUE',           // Assistant bibliographique
-  AI_CLINIQUE: 'AI_CLINIQUE',                   // Assistant clinique
-  AI_ADMINISTRATIF: 'AI_ADMINISTRATIF',         // Assistant administratif
-};
-
-// Messages d'erreur contextuels
-const PAYWALL_MESSAGES = {
-  [FEATURES.CREATE_PROGRAMME]: {
-    title: 'Limite de programmes atteinte',
-    message: 'Vous avez atteint la limite de programmes avec IA de votre plan. Passez à un plan supérieur pour créer plus de programmes.',
-  },
-  [FEATURES.AI_CONVERSATIONNEL]: {
-    title: 'Assistant IA non disponible',
-    message: 'L\'assistant IA conversationnel nécessite un abonnement actif.',
-  },
-  [FEATURES.AI_BIBLIOTHEQUE]: {
-    title: 'Assistant bibliographique indisponible', 
-    message: 'Cette fonctionnalité est disponible à partir du plan Pratique.',
-  },
-  [FEATURES.AI_CLINIQUE]: {
-    title: 'Assistant clinique indisponible',
-    message: 'Cette fonctionnalité est disponible à partir du plan Pratique.',
-  },
-  [FEATURES.AI_ADMINISTRATIF]: {
-    title: 'Assistant administratif indisponible',
-    message: 'Cette fonctionnalité est disponible uniquement avec les plans Pionnier et Expert.',
-  },
 };
 
 // Helper pour vérifier si un plan est encore disponible
@@ -288,16 +246,13 @@ const plans = PLANS;
 module.exports = {
   STRIPE_CONFIG,
   PLAN_TYPES,
-  AI_ASSISTANTS,
   PLANS,
   plans,
   FREE_PLAN,
   getPlanByType,
-  hasAssistant,
+  getChatQuotaLabel,
   getProgrammeLimit,
   canCreateProgramme,
-  FEATURES,
-  PAYWALL_MESSAGES,
   isPlanAvailable,
   getRemainingSlots
 };
