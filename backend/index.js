@@ -362,7 +362,6 @@ app.get('/api/test-paywall', (req, res) => {
       endpoints: [
         'GET /api/kine/subscription',
         'GET /api/kine/usage',
-        'GET /api/kine/limits',
         'POST /api/kine/usage/refresh',
         'GET /api/plans/PIONNIER/availability',
         'GET /api/plans/PIONNIER/remaining-slots',
@@ -377,46 +376,6 @@ app.get('/api/test-paywall', (req, res) => {
         'Plan Pionnier limitation (100 slots)',
         'Feature gates by plan',
         'Stripe checkout integration'
-      ]
-    }
-  });
-});
-
-// 🤖 NOUVEAU : Test des 4 IA Spécialisées
-app.get('/api/test-ia', (req, res) => {
-  res.json({
-    message: '4 IA Spécialisées system check',
-    timestamp: new Date().toISOString(),
-    iaSystem: {
-      configured: !!process.env.OPENAI_API_KEY,
-      tables: [
-        'chat_ia_basique',
-        'chat_ia_biblio', 
-        'chat_ia_clinique',
-        'chat_ia_administrative'
-      ],
-      endpoints: {
-        iaBasique: 'POST /api/chat/kine/ia-basique',
-        iaBiblio: 'POST /api/chat/kine/ia-biblio',
-        iaClinique: 'POST /api/chat/kine/ia-clinique',
-        iaAdministrative: 'POST /api/chat/kine/ia-administrative',
-        iaStatus: 'GET /api/chat/kine/ia-status',
-        historyBasique: 'GET /api/chat/kine/history-basique',
-        historyBiblio: 'GET /api/chat/kine/history-biblio',
-        historyClinique: 'GET /api/chat/kine/history-clinique',
-        historyAdministrative: 'GET /api/chat/kine/history-administrative',
-        allHistory: 'GET /api/chat/kine/all-history',
-        clearHistoryBasique: 'DELETE /api/chat/kine/history-basique',
-        clearAllHistory: 'DELETE /api/chat/kine/all-history'
-      },
-      features: [
-        'IA Basique - Assistant conversationnel général',
-        'IA Bibliographique - Références scientifiques',
-        'IA Clinique - Aide diagnostic et traitement',
-        'IA Administrative - Gestion cabinet et réglementation',
-        'Historiques séparés par IA',
-        'Recherche vectorielle intégrée',
-        'Prompts spécialisés par domaine'
       ]
     }
   });
@@ -722,12 +681,10 @@ app.listen(PORT, '0.0.0.0', () => {
   logger.info(`🚀 KineAI Backend running on port ${PORT}`);
   logger.info(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`🔗 Health check: http://localhost:${PORT}/health`);
-  logger.info(`🤖 IA Basique: /api/chat/kine/ia-basique`);
-  logger.info(`🤖 IA Bibliographique: /api/chat/kine/ia-biblio`);
-  logger.info(`🤖 IA Clinique: /api/chat/kine/ia-clinique`);
-  logger.info(`🤖 IA Administrative: /api/chat/kine/ia-administrative`);
-  logger.info(`🤖 Statut 4 IA: /api/chat/kine/ia-status`);
-  logger.info(`🤖 Test 4 IA: /api/test-ia`);
+  logger.info(`🤖 Chat unifié (SSE): /api/chat/kine/chat`);
+  logger.info(`🤖 Conversations: /api/chat/kine/conversations`);
+  logger.info(`🤖 Quota tokens: /api/chat/kine/usage`);
+  logger.info(`🤖 IA Administrative (bilans): /api/chat/kine/ia-administrative`);
   logger.info(`📊 Vector Test: /api/test-vector`);
   logger.info(`📱 WhatsApp Test: /api/test-whatsapp`);
   logger.info(`📱 WhatsApp Webhook: /webhook/whatsapp`);
