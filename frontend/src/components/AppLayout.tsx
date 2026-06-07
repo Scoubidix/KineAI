@@ -41,7 +41,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { sendPasswordReset } from "@/lib/auth-utils";
 import { useToast } from "@/hooks/use-toast"; // Test réactivé
 import { useSubscription } from "@/hooks/useSubscription";
-import { PLANS, getPlanByType } from "@/config/plans";
+import { PLANS, getPlanByType, getChatQuotaLabel } from "@/config/plans";
 import { DEPARTEMENTS_FR } from '@/app/dashboard/kine/contrats/data/departements-fr';
 import {
   Settings,
@@ -56,7 +56,8 @@ import {
   Dumbbell, 
   Briefcase, 
   Share2, 
-  Wand2, 
+  Wand2,
+  Sparkles,
   Gift, 
   Newspaper, 
   ClipboardCheck, 
@@ -78,8 +79,6 @@ import {
   Globe,
   Database,
   CheckCircle,
-  BookOpen,
-  Stethoscope,
   CreditCard,
   Trophy,
   AlertCircle,
@@ -1236,9 +1235,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { href: '/dashboard/kine/create-exercise', label: 'Mes Exercices', icon: Dumbbell, disabled: false },
         { href: '/dashboard/kine/programmes', label: 'Programmes', icon: Calendar, disabled: false },
         { href: '/dashboard/kine/bilan-kine', label: 'Bilan Kiné', icon: ClipboardCheck, disabled: false },
-        { href: '/dashboard/kine/chatbot', label: 'IA Conversationnelle', icon: Wand2, disabled: false },
-        { href: '/dashboard/kine/chatbot-biblio', label: 'IA Bibliographique', icon: BookOpen, disabled: false },
-        { href: '/dashboard/kine/chatbot-clinique', label: 'IA Clinique', icon: Stethoscope, disabled: false },
+        { href: '/dashboard/kine/chat', label: 'Assistant IA', icon: Wand2, disabled: false, highlight: true },
         { href: '/dashboard/kine/chatbot-admin', label: 'IA Administrative', icon: FileText, disabled: false },
         { href: '/dashboard/kine/contrats', label: 'Mes Contrats', icon: Briefcase, disabled: false },
         { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, disabled: false },
@@ -1481,6 +1478,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   <Link href={item.href}>
                     <item.icon className="h-4 w-4 shrink-0" />
                     <span>{item.label}</span>
+                    {'highlight' in item && item.highlight && (
+                      // Poussière d'étoile teal : signale l'onglet sans casser l'harmonie
+                      <Sparkles className="ml-auto h-3.5 w-3.5 shrink-0 text-[#3899aa] animate-pulse" />
+                    )}
                     {item.href === '/dashboard/kine/contrats' && contractsUnreadCount > 0 && (
                       <Badge variant="destructive" className="ml-auto h-4 px-1.5 text-[9px] leading-none">
                         {contractsUnreadCount}
@@ -1569,34 +1570,20 @@ export default function AppLayout({ children }: AppLayoutProps) {
                             <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                             {currentPlan.features.maxProgrammes === Infinity ? 'Programmes illimités' : `${currentPlan.features.maxProgrammes} programme${currentPlan.features.maxProgrammes > 1 ? 's' : ''} patient`}
                           </li>
-                          {currentPlan.features.assistants.includes('CONVERSATIONNEL') && (
+                          <li className="flex items-center gap-2 text-xs text-foreground">
+                            <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                            Assistant IA — {getChatQuotaLabel(headerSubscription.planType)}
+                          </li>
+                          {currentPlan.features.iaBilans && (
                             <li className="flex items-center gap-2 text-xs text-foreground">
                               <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                              Assistant conversationnel
+                              Génération de bilans
                             </li>
                           )}
-                          {currentPlan.features.assistants.includes('BIBLIOTHEQUE') && (
+                          {currentPlan.features.moduleAdmin && (
                             <li className="flex items-center gap-2 text-xs text-foreground">
                               <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                              Assistant bibliographique
-                            </li>
-                          )}
-                          {currentPlan.features.assistants.includes('CLINIQUE') && (
-                            <li className="flex items-center gap-2 text-xs text-foreground">
-                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                              Assistant clinique
-                            </li>
-                          )}
-                          {currentPlan.features.assistants.includes('ADMINISTRATIF') && (
-                            <li className="flex items-center gap-2 text-xs text-foreground">
-                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                              Assistant administratif
-                            </li>
-                          )}
-                          {currentPlan.features.bilanKine && (
-                            <li className="flex items-center gap-2 text-xs text-foreground">
-                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                              Bilan kiné
+                              Module administratif
                             </li>
                           )}
                         </ul>

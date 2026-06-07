@@ -4,6 +4,23 @@ const { sanitizeEmail } = require('../utils/logSanitizer');
 const prismaService = require('../services/prismaService');
 // Middleware pour vérifier les autorisations selon le plan d'abonnement
 
+// Matrice des features IA gatées par plan — source unique pour requireAssistant
+// et requireAssistantOrPreview. Le chat unifié n'y figure pas : il est ouvert à
+// tous les plans et régulé par le quota quotidien de tokens (checkTokenQuota).
+const ASSISTANTS_BY_PLAN = {
+  'FREE': [],
+  'DECLIC': [],
+  'PRATIQUE': ['ADMINISTRATIF'],
+  'PIONNIER': ['ADMINISTRATIF', 'TEMPLATES_ADMIN'],
+  'EXPERT': ['ADMINISTRATIF', 'TEMPLATES_ADMIN']
+};
+
+// Plan recommandé à afficher quand l'accès est refusé
+const RECOMMENDED_PLAN_BY_ASSISTANT = {
+  'ADMINISTRATIF': 'PRATIQUE',
+  'TEMPLATES_ADMIN': 'PIONNIER'
+};
+
 /**
  * Middleware pour vérifier si le kiné peut créer un nouveau programme
  */
@@ -107,27 +124,12 @@ const requireAssistant = (assistantType) => {
 
       const planType = kine.planType || 'FREE';
 
-      // Définir les assistants par plan
-      const assistantsByPlan = {
-        'FREE': [],
-        'DECLIC': ['CONVERSATIONNEL'],
-        'PRATIQUE': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF'],
-        'PIONNIER': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF', 'TEMPLATES_ADMIN'],
-        'EXPERT': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF', 'TEMPLATES_ADMIN']
-      };
-
-      const availableAssistants = assistantsByPlan[planType] || [];
+      const availableAssistants = ASSISTANTS_BY_PLAN[planType] || [];
 
       if (!availableAssistants.includes(assistantType)) {
-        // Déterminer le plan recommandé
-        let recommendedPlan = 'DECLIC';
-        if (['BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF'].includes(assistantType)) {
-          recommendedPlan = 'PRATIQUE';
-        } else if (assistantType === 'TEMPLATES_ADMIN') {
-          recommendedPlan = 'PIONNIER';
-        }
+        const recommendedPlan = RECOMMENDED_PLAN_BY_ASSISTANT[assistantType] || 'PRATIQUE';
 
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: 'Assistant IA non autorisé',
           code: 'ASSISTANT_NOT_ALLOWED',
           message: `L'assistant ${assistantType} n'est pas disponible avec votre plan ${planType}`,
@@ -172,15 +174,7 @@ const requireAssistantOrPreview = (assistantType) => {
 
       const planType = kine.planType || 'FREE';
 
-      const assistantsByPlan = {
-        'FREE': [],
-        'DECLIC': ['CONVERSATIONNEL'],
-        'PRATIQUE': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF'],
-        'PIONNIER': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF', 'TEMPLATES_ADMIN'],
-        'EXPERT': ['CONVERSATIONNEL', 'BIBLIOTHEQUE', 'CLINIQUE', 'ADMINISTRATIF', 'TEMPLATES_ADMIN']
-      };
-
-      const availableAssistants = assistantsByPlan[planType] || [];
+      const availableAssistants = ASSISTANTS_BY_PLAN[planType] || [];
       const hasAccess = availableAssistants.includes(assistantType);
 
       req.kineId = kine.id;
@@ -191,60 +185,6 @@ const requireAssistantOrPreview = (assistantType) => {
 
     } catch (error) {
       logger.error('Erreur vérification assistant IA (preview):', error);
-      res.status(500).json({ error: 'Erreur interne du serveur' });
-    }
-  };
-};
-
-/**
- * Middleware pour vérifier l'accès à une fonctionnalité générale
- * @param {string} feature - Nom de la fonctionnalité
- */
-const requireFeature = (feature) => {
-  return async (req, res, next) => {
-    try {
-      const prisma = prismaService.getInstance();
-      const kine = await prisma.kine.findUnique({
-        where: { uid: req.uid },
-        select: { id: true, planType: true }
-      });
-
-      if (!kine) {
-        return res.status(404).json({ error: 'Kinésithérapeute non trouvé' });
-      }
-
-      const planType = kine.planType || 'FREE';
-
-      // Vérifier selon la fonctionnalité
-      switch (feature) {
-        case 'CREATE_PROGRAMME':
-          // Rediriger vers canCreateProgramme
-          return canCreateProgramme(req, res, next);
-
-        case 'AI_CONVERSATIONNEL':
-          return requireAssistant('CONVERSATIONNEL')(req, res, next);
-
-        case 'AI_BIBLIOTHEQUE':
-          return requireAssistant('BIBLIOTHEQUE')(req, res, next);
-
-        case 'AI_CLINIQUE':
-          return requireAssistant('CLINIQUE')(req, res, next);
-
-        case 'AI_ADMINISTRATIF':
-          return requireAssistant('ADMINISTRATIF')(req, res, next);
-
-        case 'TEMPLATES_ADMIN':
-          return requireAssistant('TEMPLATES_ADMIN')(req, res, next);
-
-        default:
-          return res.status(400).json({ 
-            error: 'Fonctionnalité inconnue',
-            feature 
-          });
-      }
-
-    } catch (error) {
-      logger.error('Erreur vérification fonctionnalité:', error);
       res.status(500).json({ error: 'Erreur interne du serveur' });
     }
   };
@@ -333,7 +273,6 @@ module.exports = {
   canCreateProgramme,
   requireAssistant,
   requireAssistantOrPreview,
-  requireFeature,
   getPlanInfo,
   requireAdmin
 };

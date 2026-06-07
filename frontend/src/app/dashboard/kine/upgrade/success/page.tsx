@@ -25,7 +25,7 @@ import {
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { getAuth } from 'firebase/auth';
-import { plans } from '@/config/plans';
+import { plans, getChatQuotaLabel } from '@/config/plans';
 
 interface SubscriptionData {
   planType: string | null;
@@ -81,35 +81,19 @@ function UpgradeSuccessContent() {
     setTimeout(() => setRefreshing(false), 1000);
   };
 
-  // Obtenir les fonctionnalités par plan
+  // Obtenir les fonctionnalités par plan (source unique : config/plans.js)
   const getPlanFeatures = (planType: string) => {
-    const features = {
-      'DECLIC': [
-        '1 programme simultané avec IA',
-        'Assistant IA conversationnel'
-      ],
-      'PRATIQUE': [
-        '3 programmes simultanés avec IA',
-        'Assistant IA conversationnel',
-        'Assistant IA bibliographique',
-        'Assistant IA clinique'
-      ],
-      'PIONNIER': [
-        'Programmes illimités avec IA',
-        'Assistant IA conversationnel',
-        'Assistant IA bibliographique',
-        'Assistant IA clinique',
-        'Assistant IA administratif'
-      ],
-      'EXPERT': [
-        'Programmes illimités avec IA',
-        'Assistant IA conversationnel',
-        'Assistant IA bibliographique',
-        'Assistant IA clinique',
-        'Assistant IA administratif'
-      ]
-    };
-    return features[planType as keyof typeof features] || [];
+    const plan = Object.values(plans).find(p => p.type === planType);
+    if (!plan) return [];
+    const items = [
+      plan.features.maxProgrammes === Infinity
+        ? 'Programmes illimités avec IA'
+        : `${plan.features.maxProgrammes} programme${plan.features.maxProgrammes > 1 ? 's' : ''} avec IA`,
+      `Assistant IA — ${getChatQuotaLabel(planType)}`
+    ];
+    if (plan.features.iaBilans) items.push('Génération de bilans');
+    if (plan.features.moduleAdmin) items.push('Module administratif (courriers et templates)');
+    return items;
   };
 
   // Obtenir les détails du plan

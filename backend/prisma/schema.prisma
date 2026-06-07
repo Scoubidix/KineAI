@@ -66,6 +66,11 @@ model Kine {
   chatIaAdministrative ChatIaAdministrative[]
   // =============================================
 
+  // ========== CHAT UNIFIÉ (conversations + quota) ==========
+  conversations    Conversation[]
+  dailyTokenUsages DailyTokenUsage[]
+  // ==========================================================
+
   // ========== RELATION RGPD ==========
   rgpdExports RgpdExport[]
   // ===================================
@@ -892,3 +897,50 @@ model ContractSignature {
 }
 
 // ===========================================================
+
+// ========== CHAT UNIFIÉ : CONVERSATIONS + QUOTA TOKENS ==========
+
+model Conversation {
+  id        Int       @id @default(autoincrement())
+  title     String? // null tant que non généré par le LLM
+  isActive  Boolean   @default(true) // soft delete (convention projet)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  kineId   Int
+  kine     Kine                  @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  messages ConversationMessage[]
+
+  @@index([kineId, updatedAt])
+  @@map("conversation")
+}
+
+model ConversationMessage {
+  id         Int      @id @default(autoincrement())
+  role       String // 'user' | 'assistant'
+  content    String
+  iaType     String? // basique|biblio|clinique — messages assistant uniquement
+  ragUsed    Boolean? // assistant uniquement
+  model      String? // modèle réellement utilisé (traçabilité Mistral/GPT)
+  tokensUsed Int? // usage.total_tokens de l'appel — assistant uniquement
+  createdAt  DateTime @default(now())
+
+  conversationId Int
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("conversation_message")
+}
+
+model DailyTokenUsage {
+  id         Int      @id @default(autoincrement())
+  date       DateTime @db.Date // jour calendaire Europe/Paris
+  tokensUsed Int      @default(0)
+
+  kineId Int
+  kine   Kine @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
+  @@unique([kineId, date])
+  @@map("daily_token_usage")
+}

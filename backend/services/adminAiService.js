@@ -1,7 +1,5 @@
-const { OpenAI } = require('openai');
 const logger = require('../utils/logger');
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const llmService = require('./llmService');
 
 const SYSTEM_PROMPT = `Tu es un assistant administratif spécialisé en kinésithérapie.
 Tu rédiges des messages professionnels pour des kinésithérapeutes.
@@ -18,17 +16,15 @@ RÈGLES STRICTES :
 
 async function generateMessage(prompt) {
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const response = await llmService.chatCompletion({
+      iaType: 'admin_message',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: prompt }
       ],
-      max_tokens: 500,
-      temperature: 0.7
     });
 
-    return response.choices[0].message.content;
+    return response.content;
   } catch (error) {
     logger.error('Erreur génération message IA admin:', error.message);
     throw new Error('Erreur lors de la génération du message');

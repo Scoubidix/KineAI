@@ -31,7 +31,7 @@ import {
   Gift
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { plans } from '../config/plans';
+import { plans, getChatQuotaLabel } from '../config/plans';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -321,40 +321,25 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                             <span>Gestion patients</span>
                           </div>
                           
-                          {plan.features.assistants.includes('CONVERSATIONNEL') && (
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
+                            <span>Assistant IA — {getChatQuotaLabel(plan.type)}</span>
+                          </div>
+
+                          {plan.features.iaBilans && (
                             <div className="flex items-center gap-2">
                               <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
-                              <span>IA Conversationnelle</span>
-                            </div>
-                          )}
-                          
-                          {plan.features.assistants.includes('BIBLIOTHEQUE') && (
-                            <div className="flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
-                              <span>IA Bibliographique</span>
-                            </div>
-                          )}
-                          
-                          {plan.features.assistants.includes('CLINIQUE') && (
-                            <div className="flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
-                              <span>IA Clinique</span>
+                              <span>Génération de bilans</span>
                             </div>
                           )}
 
-                          {plan.features.assistants.includes('ADMINISTRATIF') && (
+                          {plan.features.moduleAdmin && (
                             <div className="flex items-center gap-2">
                               <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
-                              <span>IA Administrative</span>
+                              <span>Module administratif</span>
                             </div>
                           )}
 
-                          {plan.features.bilanKine && (
-                            <div className="flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
-                              <span>Bilan kiné</span>
-                            </div>
-                          )}
                         </div>
 
                         {/* Bouton d'action - poussé vers le bas */}
