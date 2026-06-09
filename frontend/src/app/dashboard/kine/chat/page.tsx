@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Wand2, Send, Loader2, Lock } from 'lucide-react';
+import { Wand2, Send, Loader2, Lock, Stethoscope, BookOpen, Activity } from 'lucide-react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 import { PaywallModal } from '@/components/PaywallModal';
@@ -21,6 +21,13 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 const MESSAGE_MAX_CHARS = 15000;
 // Plans sans CTA upgrade (pas de plan supérieur à vendre)
 const TOP_PLANS = ['PIONNIER', 'EXPERT'];
+
+// Domaines d'expertise mobilisés automatiquement par le routeur (écran d'accueil)
+const EXPERTISE_CHIPS = [
+  { label: 'Clinique', icon: Stethoscope, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+  { label: 'Recherche scientifique', icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+  { label: 'Exercices & rééducation', icon: Activity, color: 'text-pink-500', bg: 'bg-pink-500/10' },
+];
 
 
 export default function UnifiedChatPage() {
@@ -186,6 +193,9 @@ export default function UnifiedChatPage() {
       },
       onRouted: (iaType) => {
         setRoutedIaType(iaType);
+        // Pose l'iaType sur le message en cours dès le routage (avant les tokens),
+        // pour que le repli des références biblio s'applique pendant le streaming.
+        updateLastAssistantMessage((msg) => ({ ...msg, iaType }));
       },
       onToken: (delta) => {
         accumulated += delta;
@@ -264,11 +274,38 @@ export default function UnifiedChatPage() {
             ) : chatMessages.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center max-w-2xl px-4">
-                  <Wand2 className="w-10 h-10 text-[#3899aa] mx-auto mb-6" />
-                  {/* Même style que le « Bienvenue {firstName} » de la page d'accueil, sans le gras */}
-                  <h2 className="text-2xl md:text-3xl text-primary">
-                    Bonjour{firstName ? ` ${firstName}` : ''}, comment puis-je vous aider ?
+                  <Wand2 className="w-10 h-10 text-[#3899aa] mx-auto mb-5" />
+                  {firstName && (
+                    <p className="text-2xl md:text-3xl font-semibold text-primary mb-1">Bonjour {firstName},</p>
+                  )}
+                  <h2 className="text-2xl md:text-3xl font-semibold text-primary">
+                    Votre copilote IA kiné
                   </h2>
+                  <p className="mt-3 text-base text-muted-foreground">
+                    Posez votre question comme vous le feriez à un confrère.
+                  </p>
+                  <p className="text-base text-muted-foreground">
+                    L&apos;IA identifie votre besoin et mobilise les bonnes expertises.
+                  </p>
+
+                  {/* Domaines couverts — chips colorés à la manière d'un copilote */}
+                  <div className="mt-7 flex flex-wrap items-center justify-center gap-2">
+                    {EXPERTISE_CHIPS.map(({ label, icon: Icon, color, bg }) => (
+                      <span
+                        key={label}
+                        className="flex items-center gap-1.5 rounded-full border border-border/60 bg-card px-3 py-1.5 text-xs font-medium text-foreground/80"
+                      >
+                        <span className={`flex h-5 w-5 items-center justify-center rounded-md ${bg}`}>
+                          <Icon className={`h-3.5 w-3.5 ${color}`} />
+                        </span>
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+
+                  <p className="mt-7 text-[11px] text-muted-foreground/80">
+                    Outil d&apos;aide informatif uniquement — ne constitue en aucun cas un diagnostic médical ni un avis thérapeutique.
+                  </p>
                 </div>
               </div>
             ) : (
@@ -277,7 +314,13 @@ export default function UnifiedChatPage() {
                   const isLastAssistant = msg.role === 'assistant' && index === chatMessages.length - 1;
                   // Masque le placeholder vide avant le 1er token
                   if (isLastAssistant && !msg.content && isSending && !isStreaming) return null;
-                  return <MessageBubble key={index} message={msg} />;
+                  return (
+                    <MessageBubble
+                      key={index}
+                      message={msg}
+                      isStreaming={isLastAssistant && isStreaming}
+                    />
+                  );
                 })}
 
                 {isSending && !isStreaming && <ThinkingIndicator iaType={routedIaType} />}

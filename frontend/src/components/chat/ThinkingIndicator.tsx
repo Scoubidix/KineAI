@@ -9,6 +9,12 @@ type IaType = 'basique' | 'biblio' | 'clinique';
 
 const GENERIC_PHRASE = 'Analyse de votre question…';
 
+// Phrase « type détecté » insérée après la phrase générique, uniquement pour biblio/clinique
+const DETECTED_PHRASE: Partial<Record<IaType, string>> = {
+  biblio: 'Type de demande détectée : Bibliographique',
+  clinique: 'Type de demande détectée : Clinique',
+};
+
 const PHRASES_BY_IA: Record<IaType, string[]> = {
   basique: [
     'Consultation de la base de connaissances…',
@@ -40,10 +46,15 @@ export function ThinkingIndicator({ iaType }: { iaType: IaType | null }) {
 
   // Tant que le router n'a pas répondu : phrase générique seule (tenue).
   // Dès que l'IA est connue : la séquence spécifique s'enchaîne.
-  const phrases = useMemo(
-    () => (iaType ? [GENERIC_PHRASE, ...PHRASES_BY_IA[iaType]] : [GENERIC_PHRASE]),
-    [iaType]
-  );
+  const phrases = useMemo(() => {
+    if (!iaType) return [GENERIC_PHRASE];
+    const detected = DETECTED_PHRASE[iaType];
+    return [
+      GENERIC_PHRASE,
+      ...(detected ? [detected] : []),
+      ...PHRASES_BY_IA[iaType],
+    ];
+  }, [iaType]);
 
   useEffect(() => {
     // Tient la dernière phrase une fois la séquence terminée

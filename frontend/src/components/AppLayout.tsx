@@ -1236,7 +1236,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { href: '/dashboard/kine/programmes', label: 'Programmes', icon: Calendar, disabled: false },
         { href: '/dashboard/kine/bilan-kine', label: 'Bilan Kiné', icon: ClipboardCheck, disabled: false },
         { href: '/dashboard/kine/chat', label: 'Assistant IA', icon: Wand2, disabled: false, highlight: true },
-        { href: '/dashboard/kine/chatbot-admin', label: 'IA Administrative', icon: FileText, disabled: false },
+        { href: '/dashboard/kine/chatbot-admin', label: 'Module administratif', icon: FileText, disabled: false },
         { href: '/dashboard/kine/contrats', label: 'Mes Contrats', icon: Briefcase, disabled: false },
         { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, disabled: false },
         { href: '/dashboard/kine/public-programs', label: 'Programmes Publics (Bientôt)', icon: Share2, disabled: false },

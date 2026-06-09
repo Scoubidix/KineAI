@@ -160,7 +160,7 @@ export default function KineChatbotAdminPage() {
             <div className="flex items-center gap-3">
               <FileText className="text-[#3899aa] h-7 w-7 shrink-0" />
               <div>
-                <h2 className="text-xl font-semibold text-[#3899aa]">IA Administrative</h2>
+                <h2 className="text-xl font-semibold text-[#3899aa]">Module administratif</h2>
                 <p className="text-foreground text-sm">Gérez vos templates, contacts et envoyez vos courriers</p>
               </div>
             </div>
