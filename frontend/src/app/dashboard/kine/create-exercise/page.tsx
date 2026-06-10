@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Dumbbell, Trash2, Pencil, Plus, Loader2, Eye, Lock, Globe, Search, Filter, X, Tag } from 'lucide-react';
+import { Dumbbell, Trash2, Pencil, Plus, Loader2, Lock, Globe, Search, Filter, X, Tag } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
@@ -855,7 +855,11 @@ export default function KineCreateExercisePage() {
                       const exerciceTags = parseTagsFromString(ex.tags);
                       
                       return (
-                        <Card key={ex.id} className="card-hover relative">
+                        <Card
+                          key={ex.id}
+                          className={`card-hover relative ${hasExpandableContent ? 'cursor-pointer' : ''}`}
+                          onClick={hasExpandableContent ? () => toggleCardExpansion(cardKey) : undefined}
+                        >
                           <CardHeader className="pb-3">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
@@ -883,13 +887,13 @@ export default function KineCreateExercisePage() {
                               </div>
                               {!ex.isPublic && (
                                 <div className="flex gap-1 ml-2">
-                                  <Button size="icon" variant="ghost" onClick={() => handleEdit(ex)} className="h-8 w-8">
+                                  <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(ex); }} className="h-8 w-8">
                                     <Pencil className="w-3 h-3" />
                                   </Button>
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    onClick={() => { setExerciceToDelete(ex); setDeleteDialogOpen(true); }}
+                                    onClick={(e) => { e.stopPropagation(); setExerciceToDelete(ex); setDeleteDialogOpen(true); }}
                                     className="h-8 w-8 hover:bg-red-100 hover:text-red-600"
                                   >
                                     <Trash2 className="w-3 h-3" />
@@ -899,17 +903,6 @@ export default function KineCreateExercisePage() {
                             </div>
                           </CardHeader>
                           <CardContent className="pt-0">
-                            {hasExpandableContent && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="p-0 h-auto text-blue-600 hover:text-blue-800 transition-colors mb-2"
-                                onClick={() => toggleCardExpansion(cardKey)}
-                              >
-                                <Eye className="w-3 h-3 mr-1" />
-                                {isExpanded ? 'Voir moins' : 'Voir plus'}
-                              </Button>
-                            )}
                             <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line break-words">
                               {isExpanded || !shouldTruncate
                                 ? ex.description
