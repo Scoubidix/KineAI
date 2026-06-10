@@ -92,7 +92,7 @@ export function RGPDDeleteModal({
     if (!rgpdService.validateConfirmationText(confirmationText)) {
       toast({
         title: "Confirmation incorrecte",
-        description: "Vous devez saisir exactement 'SUPPRIMER' pour confirmer",
+        description: "Tu dois saisir exactement 'SUPPRIMER' pour confirmer",
         variant: "destructive",
       });
       return;
@@ -101,7 +101,7 @@ export function RGPDDeleteModal({
     if (!understands7DaysDelay || !agreesToDataLoss) {
       toast({
         title: "Conditions non acceptées",
-        description: "Vous devez accepter toutes les conditions pour continuer",
+        description: "Tu dois accepter toutes les conditions pour continuer",
         variant: "destructive",
       });
       return;
@@ -120,7 +120,7 @@ export function RGPDDeleteModal({
         // Succès - afficher les détails et déconnecter
         toast({
           title: "Compte supprimé",
-          description: "Votre compte a été supprimé définitivement",
+          description: "Ton compte a été supprimé définitivement",
           className: "bg-green-50 border-green-200 text-green-800",
         });
 
@@ -142,9 +142,9 @@ export function RGPDDeleteModal({
         let errorMessage = result.error;
         
         if (result.code === 'SUBSCRIPTION_ACTIVE') {
-          errorMessage = `Vous devez d'abord annuler votre abonnement ${result.planType}`;
+          errorMessage = `Tu dois d'abord annuler ton abonnement ${result.planType}`;
         } else if (result.code === 'EXPORT_REQUIRED') {
-          errorMessage = 'Vous devez d\'abord exporter vos données (export récent requis)';
+          errorMessage = 'Tu dois d\'abord exporter tes données (export récent requis)';
         }
 
         toast({
@@ -189,14 +189,14 @@ export function RGPDDeleteModal({
           Suppression définitive de compte
         </h3>
         <p className="text-red-700">
-          Cette action est irréversible et supprimera toutes vos données
+          Cette action est irréversible et supprimera toutes tes données
         </p>
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="ml-2">Vérification de votre éligibilité...</span>
+          <span className="ml-2">Vérification de ton éligibilité...</span>
         </div>
       ) : eligibility ? (
         <>
@@ -281,7 +281,7 @@ export function RGPDDeleteModal({
             <CardContent>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>• Profil professionnel</div>
-                <div>• Tous vos patients</div>
+                <div>• Tous tes patients</div>
                 <div>• Programmes d'exercices</div>
                 <div>• Exercices personnalisés</div>
                 <div>• Historique des IA</div>
@@ -402,7 +402,7 @@ export function RGPDDeleteModal({
           </h4>
           
           <div className="space-y-1 text-sm text-blue-700">
-            <div>1. Votre compte sera marqué pour suppression</div>
+            <div>1. Ton compte sera marqué pour suppression</div>
             <div>2. Délai de grâce de 7 jours avant suppression effective</div>
             <div>3. Email de confirmation et possibilité d'annulation</div>
             <div>4. Suppression définitive de toutes les données après 7 jours</div>
@@ -449,7 +449,7 @@ export function RGPDDeleteModal({
           <DialogDescription>
             {step === 1 
               ? "Vérification des prérequis et informations sur la suppression"
-              : "Confirmation finale pour la suppression définitive de votre compte"
+              : "Confirmation finale pour la suppression définitive de ton compte"
             }
           </DialogDescription>
         </DialogHeader>
@@ -459,7 +459,7 @@ export function RGPDDeleteModal({
         {/* Note légale */}
         <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded border-t">
           <strong>Information légale :</strong> Cette suppression est conforme à l'Article 17 du RGPD 
-          (droit à l'effacement). Un délai de grâce de 7 jours est appliqué pour votre sécurité.
+          (droit à l'effacement). Un délai de grâce de 7 jours est appliqué pour ta sécurité.
         </div>
       </DialogContent>
     </Dialog>

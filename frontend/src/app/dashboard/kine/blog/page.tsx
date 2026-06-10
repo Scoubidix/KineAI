@@ -19,7 +19,7 @@ export default function KineBlogPage() {
           </CardHeader>
           <CardContent>
             <p className="text-foreground">
-              Accédez bientôt ici à des résumés d'articles scientifiques pertinents, des actualités métier et des ressources pour votre pratique professionnelle.
+              Accédez bientôt ici à des résumés d'articles scientifiques pertinents, des actualités métier et des ressources pour ta pratique professionnelle.
             </p>
           </CardContent>
         </Card>

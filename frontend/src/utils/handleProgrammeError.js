@@ -13,7 +13,7 @@ export const handleProgrammeCreationError = async (error, toast) => {
         // Plan FREE - Abonnement requis
         toast({
           title: "🚫 Abonnement requis",
-          description: "Un abonnement est requis pour créer un programme. Cliquez sur 'Upgrade' en haut à droite pour découvrir nos plans.",
+          description: "Un abonnement est requis pour créer un programme. Clique sur 'Upgrade' en haut à droite pour découvrir nos plans.",
           className: "bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] text-white border-0",
           duration: 8000, // Plus long pour laisser le temps de lire
         });
@@ -22,10 +22,10 @@ export const handleProgrammeCreationError = async (error, toast) => {
       
       if (errorData?.code === 'PROGRAMME_LIMIT_REACHED') {
         // Limite de programmes atteinte
-        const message = errorData.message || "Vous avez atteint la limite de programmes de votre plan actuel";
+        const message = errorData.message || "Tu as atteint la limite de programmes de ton plan actuel";
         toast({
           title: "⚠️ Limite atteinte",
-          description: `${message} Cliquez sur 'Upgrade' en haut à droite pour augmenter votre limite.`,
+          description: `${message} Clique sur 'Upgrade' en haut à droite pour augmenter ta limite.`,
           className: "bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] text-white border-0",
           duration: 8000,
         });
@@ -35,7 +35,7 @@ export const handleProgrammeCreationError = async (error, toast) => {
       // Autres erreurs 403
       toast({
         title: "❌ Accès refusé",
-        description: errorData.message || "Vous n'avez pas les droits pour effectuer cette action",
+        description: errorData.message || "Tu n'as pas les droits pour effectuer cette action",
         variant: "destructive",
         duration: 4000
       });
@@ -46,7 +46,7 @@ export const handleProgrammeCreationError = async (error, toast) => {
     if (error.status && !error.ok) {
       toast({
         title: "❌ Erreur serveur",
-        description: "Une erreur est survenue côté serveur. Veuillez réessayer.",
+        description: "Une erreur est survenue côté serveur. Réessaye.",
         variant: "destructive", 
         duration: 4000
       });
@@ -56,7 +56,7 @@ export const handleProgrammeCreationError = async (error, toast) => {
     // Erreurs réseau ou autres
     toast({
       title: "❌ Erreur réseau",
-      description: "Impossible de contacter le serveur. Vérifiez votre connexion.",
+      description: "Impossible de contacter le serveur. Vérifie ta connexion.",
       variant: "destructive",
       duration: 4000
     });
@@ -66,7 +66,7 @@ export const handleProgrammeCreationError = async (error, toast) => {
     console.error('Erreur parsing error response:', parseError);
     toast({
       title: "❌ Erreur inattendue", 
-      description: "Une erreur technique est survenue. Veuillez réessayer.",
+      description: "Une erreur technique est survenue. Réessaye.",
       variant: "destructive",
       duration: 4000
     });

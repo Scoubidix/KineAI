@@ -375,7 +375,7 @@ export default function BilanKinePage() {
     if (!rawNotes.trim()) {
       toast({
         title: "Notes vides",
-        description: "Veuillez entrer vos notes cliniques avant de générer le bilan",
+        description: "Entre tes notes cliniques avant de générer le bilan",
         variant: "destructive",
       });
       return;
@@ -539,7 +539,7 @@ export default function BilanKinePage() {
     if (!savedPatient) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      toast({ title: 'Erreur', description: 'Veuillez autoriser les fenêtres pop-up', variant: 'destructive' });
+      toast({ title: 'Erreur', description: 'Autorise les fenêtres pop-up', variant: 'destructive' });
       return;
     }
 
@@ -690,7 +690,7 @@ export default function BilanKinePage() {
       if (!printWindow) {
         toast({
           title: "Erreur",
-          description: 'Veuillez autoriser les fenêtres pop-up pour télécharger le PDF',
+          description: 'Autorise les fenêtres pop-up pour télécharger le PDF',
           variant: "destructive",
         });
         return;
@@ -839,7 +839,7 @@ export default function BilanKinePage() {
     }
   };
 
-  const placeholderText = `Notez vos observations en vrac...
+  const placeholderText = `Note tes observations en vrac...
 
 Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. ATCD : hernie discale L4-L5 opérée 2018. Douleur bas du dos irradiant fesse droite, EVA 5/10 repos 7/10 effort. Flexion lombaire limitée 40°, Lasègue négatif, paravertébraux contracturés...`;
 
@@ -872,16 +872,16 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
           <div className="absolute left-0 top-full mt-2 w-72 bg-popover border border-border rounded-lg shadow-lg p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
             <div className="text-xs text-foreground space-y-3">
               <div>
-                <p className="font-medium text-foreground mb-2">Transformez vos notes en bilan structuré :</p>
+                <p className="font-medium text-foreground mb-2">Transforme tes notes en bilan structuré :</p>
                 <ul className="space-y-1 pl-2">
-                  <li>&bull; Notez vos observations sans vous soucier de la structure</li>
-                  <li>&bull; Incluez : anamnèse, tests, mesures, observations</li>
-                  <li>&bull; Plus vos notes sont détaillées, meilleur sera le bilan</li>
+                  <li>&bull; Note tes observations sans te soucier de la structure</li>
+                  <li>&bull; Inclus : anamnèse, tests, mesures, observations</li>
+                  <li>&bull; Plus tes notes sont détaillées, meilleur sera le bilan</li>
                 </ul>
               </div>
               <div>
                 <p className="font-medium text-foreground mb-2">Envoi :</p>
-                <p className="text-xs">Utilisez votre messagerie cryptée pour transmettre votre bilan au médecin</p>
+                <p className="text-xs">Utilise ta messagerie cryptée pour transmettre ton bilan au médecin</p>
               </div>
             </div>
           </div>
@@ -1031,7 +1031,7 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
                 )}
               </Button>
             </div>
-            <p className="text-[11px] text-red-400">L&apos;IA peut faire des erreurs. Vérifiez les informations importantes.</p>
+            <p className="text-[11px] text-red-400">L&apos;IA peut faire des erreurs. Vérifie les informations importantes.</p>
           </div>
         </div>
 
@@ -1118,7 +1118,7 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
 
           {!isPreviewResult && (
             <p className="text-[11px] text-muted-foreground mt-2 text-right">
-              Vous pouvez modifier le bilan directement avant export
+              Tu peux modifier le bilan directement avant export
             </p>
           )}
         </div>

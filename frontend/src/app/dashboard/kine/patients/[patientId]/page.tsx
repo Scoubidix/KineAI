@@ -408,7 +408,7 @@ export default function PatientDetailPage() {
     if (!patient) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      toast({ title: 'Erreur', description: 'Veuillez autoriser les fenêtres pop-up', variant: 'destructive' });
+      toast({ title: 'Erreur', description: 'Autorise les fenêtres pop-up', variant: 'destructive' });
       return;
     }
 
@@ -879,7 +879,7 @@ export default function PatientDetailPage() {
                 </Label>
                 <Input 
                   id="programme-title"
-                  placeholder="Entrez le titre du programme"
+                  placeholder="Entre le titre du programme"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -893,7 +893,7 @@ export default function PatientDetailPage() {
                 </Label>
                 <Textarea
                   id="programme-description"
-                  placeholder="Décrivez les objectifs et le contenu du programme..."
+                  placeholder="Décris les objectifs et le contenu du programme..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
@@ -1367,7 +1367,7 @@ export default function PatientDetailPage() {
                 Programmes d'exercices
               </CardTitle>
               <p className="text-sm text-foreground">
-                Gérez les programmes de rééducation de votre patient
+                Gère les programmes de rééducation de ton patient
               </p>
             </div>
             {programmesData.length === 0 && (
@@ -1394,7 +1394,7 @@ export default function PatientDetailPage() {
                   Aucun programme créé
                 </h3>
                 <p className="text-foreground mb-6">
-                  Commencez par créer un programme d'exercices personnalisé pour ce patient
+                  Commence par créer un programme d'exercices personnalisé pour ce patient
                 </p>
               </div>
             ) : (
@@ -1469,7 +1469,7 @@ export default function PatientDetailPage() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Êtes-vous sûr de vouloir supprimer le programme <strong>"{programme.titre}"</strong> ?
+                                  Es-tu sûr de vouloir supprimer le programme <strong>"{programme.titre}"</strong> ?
                                   Cette action est irréversible et supprimera également l'accès chat du patient.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
@@ -1577,7 +1577,7 @@ export default function PatientDetailPage() {
                   <div className="text-center py-8 text-muted-foreground">
                     <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
                     <p className="text-sm">Aucun bilan associé à ce patient</p>
-                    <p className="text-xs mt-1">Générez un bilan depuis l'outil "Bilan Kiné" et associez-le à ce patient</p>
+                    <p className="text-xs mt-1">Génère un bilan depuis l'outil "Bilan Kiné" et associe-le à ce patient</p>
                   </div>
                 ) : (
                   <div className="max-h-[60vh] overflow-y-auto space-y-2">
@@ -1706,7 +1706,7 @@ export default function PatientDetailPage() {
                   ✅ Lien sécurisé généré avec succès !
                 </p>
                 <p className="text-xs text-green-700 dark:text-green-400">
-                  Votre patient pourra accéder à son programme personnalisé et poser ses questions via ce lien.
+                  Ton patient pourra accéder à son programme personnalisé et poser ses questions via ce lien.
                 </p>
               </div>
               
@@ -1763,7 +1763,7 @@ export default function PatientDetailPage() {
                       </p>
                     </div>
                     <p className="text-xs text-green-700 dark:text-green-400">
-                      Votre patient va recevoir le lien sur WhatsApp dans quelques instants.
+                      Ton patient va recevoir le lien sur WhatsApp dans quelques instants.
                     </p>
                   </div>
                 )}

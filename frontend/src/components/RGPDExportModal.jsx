@@ -45,7 +45,7 @@ export function RGPDExportModal({ isOpen, onClose, kineData }) {
         setExportData(result);
         toast({
           title: "Export généré",
-          description: "Votre export de données est prêt à télécharger.",
+          description: "Ton export de données est prêt à télécharger.",
           className: "bg-green-50 border-green-200 text-green-800",
         });
       } else {
@@ -84,7 +84,7 @@ export function RGPDExportModal({ isOpen, onClose, kineData }) {
       if (result.success) {
         toast({
           title: "Téléchargement lancé",
-          description: "Votre export ZIP a été téléchargé.",
+          description: "Ton export ZIP a été téléchargé.",
           className: "bg-blue-50 border-blue-200 text-blue-800",
         });
       }
@@ -117,10 +117,10 @@ export function RGPDExportModal({ isOpen, onClose, kineData }) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Database className="h-5 w-5 text-blue-600" />
-            Export de vos données RGPD
+            Export de tes données RGPD
           </DialogTitle>
           <DialogDescription>
-            Téléchargez une copie complète de toutes vos données personnelles et professionnelles
+            Télécharge une copie complète de toutes tes données personnelles et professionnelles
             stockées dans notre système, conformément à l'Article 20 du RGPD.
           </DialogDescription>
         </DialogHeader>
@@ -178,7 +178,7 @@ export function RGPDExportModal({ isOpen, onClose, kineData }) {
                 </div>
                 <div className="flex items-start gap-2">
                   <Shield className="h-4 w-4 mt-0.5 text-green-600" />
-                  <span>Vos données sont chiffrées et sécurisées pendant le transfert</span>
+                  <span>Tes données sont chiffrées et sécurisées pendant le transfert</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <FileText className="h-4 w-4 mt-0.5 text-blue-600" />
@@ -284,9 +284,9 @@ export function RGPDExportModal({ isOpen, onClose, kineData }) {
 
           {/* Note légale */}
           <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded">
-            <strong>Note :</strong> Cet export contient toutes vos données personnelles. 
-            Veillez à le stocker en sécurité et à ne le partager qu'avec des tiers de confiance. 
-            Vous pouvez générer un nouvel export à tout moment.
+            <strong>Note :</strong> Cet export contient toutes tes données personnelles.
+            Veille à le stocker en sécurité et à ne le partager qu'avec des tiers de confiance.
+            Tu peux générer un nouvel export à tout moment.
           </div>
         </div>
       </DialogContent>

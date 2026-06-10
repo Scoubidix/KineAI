@@ -71,7 +71,7 @@ export default function ParrainagePage() {
       const auth = getAuth(app);
       const user = auth.currentUser;
       if (!user) {
-        setError('Vous devez être connecté');
+        setError('Tu dois être connecté');
         return;
       }
 
@@ -106,7 +106,7 @@ export default function ParrainagePage() {
       if (!user) {
         toast({
           title: "Erreur",
-          description: "Vous devez être connecté",
+          description: "Tu dois être connecté",
           variant: "destructive"
         });
         return;
@@ -125,7 +125,7 @@ export default function ParrainagePage() {
       if (response.ok) {
         toast({
           title: data.isNew ? "Code généré !" : "Code existant",
-          description: `Votre code de parrainage : ${data.code}`,
+          description: `Ton code de parrainage : ${data.code}`,
           className: "bg-green-50 border-green-200 text-green-800"
         });
         // Recharger les stats
@@ -154,7 +154,7 @@ export default function ParrainagePage() {
     setCopied(true);
     toast({
       title: "Copié !",
-      description: "Le code a été copié dans votre presse-papier",
+      description: "Le code a été copié dans ton presse-papier",
       className: "bg-green-50 border-green-200 text-green-800"
     });
     setTimeout(() => setCopied(false), 2000);
@@ -207,7 +207,7 @@ export default function ParrainagePage() {
             Parrainage
           </h1>
           <p className="text-foreground mt-1">
-            Parrainez vos confrères et gagnez tous les deux 1 mois gratuit !
+            Parraine tes confrères et gagnez tous les deux 1 mois gratuit !
           </p>
         </div>
 
@@ -220,7 +220,7 @@ export default function ParrainagePage() {
                 <div>
                   <p className="font-medium text-orange-900 dark:text-orange-300">Abonnement requis</p>
                   <p className="text-sm text-orange-700 dark:text-orange-400 mt-1">
-                    Vous devez avoir un abonnement actif pour pouvoir parrainer des confrères.
+                    Tu dois avoir un abonnement actif pour pouvoir parrainer des confrères.
                   </p>
                 </div>
               </div>
@@ -236,7 +236,7 @@ export default function ParrainagePage() {
               Mon code de parrainage
             </CardTitle>
             <CardDescription className="text-foreground">
-              Partagez ce code avec vos confrères kinésithérapeutes
+              Partage ce code avec tes confrères kinésithérapeutes
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -281,7 +281,7 @@ export default function ParrainagePage() {
               <div className="text-center py-6">
                 <Gift className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground mb-4">
-                  Vous n'avez pas encore de code de parrainage
+                  Tu n'as pas encore de code de parrainage
                 </p>
                 <Button onClick={generateCode} disabled={generating || !!error} className="btn-teal">
                   {generating ? (
@@ -315,9 +315,9 @@ export default function ParrainagePage() {
                 <div className="h-10 w-10 rounded-full bg-[#3899aa]/10 flex items-center justify-center mx-auto mb-3">
                   <span className="text-[#3899aa] font-bold">1</span>
                 </div>
-                <p className="font-medium text-foreground">Partagez votre code</p>
+                <p className="font-medium text-foreground">Partage ton code</p>
                 <p className="text-sm text-foreground mt-1">
-                  Envoyez votre code à un confrère kiné
+                  Envoie ton code à un confrère kiné
                 </p>
               </div>
               <div className="p-4 border rounded-lg text-center">
@@ -326,7 +326,7 @@ export default function ParrainagePage() {
                 </div>
                 <p className="font-medium text-foreground">Il s'abonne</p>
                 <p className="text-sm text-foreground mt-1">
-                  Il entre votre code lors de son paiement
+                  Il entre ton code lors de son paiement
                 </p>
               </div>
               <div className="p-4 border rounded-lg text-center">
@@ -436,7 +436,7 @@ export default function ParrainagePage() {
             <CardContent className="pt-6 text-center">
               <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-foreground">
-                Vous n'avez pas encore de filleuls. Partagez votre code !
+                Tu n'as pas encore de filleuls. Partage ton code !
               </p>
             </CardContent>
           </Card>

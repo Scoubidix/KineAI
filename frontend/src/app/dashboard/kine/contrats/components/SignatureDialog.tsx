@@ -62,9 +62,9 @@ export default function SignatureDialog({
 
         <div className="space-y-4 mt-2">
           <div>
-            <Label htmlFor="sig-text">Signez en écrivant votre nom complet</Label>
+            <Label htmlFor="sig-text">Signe en écrivant ton nom complet</Label>
             <div className="text-xs text-muted-foreground mb-2">
-              Saisissez exactement : <strong className="text-foreground">{expectedName}</strong>
+              Saisis exactement : <strong className="text-foreground">{expectedName}</strong>
             </div>
             <Input
               id="sig-text"
@@ -82,7 +82,7 @@ export default function SignatureDialog({
               className={text.length > 0 && !matches ? 'border-red-400 focus-visible:ring-red-200' : matches ? 'border-green-500 focus-visible:ring-green-200' : ''}
             />
             {text.length > 0 && !matches && (
-              <p className="text-xs text-red-600 mt-1">Le texte saisi ne correspond pas à votre nom complet.</p>
+              <p className="text-xs text-red-600 mt-1">Le texte saisi ne correspond pas à ton nom complet.</p>
             )}
             {matches && (
               <p className="text-xs text-green-700 mt-1 flex items-center gap-1"><Check className="h-3 w-3" /> Signature valide</p>

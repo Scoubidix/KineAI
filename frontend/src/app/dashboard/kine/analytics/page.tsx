@@ -18,7 +18,7 @@ export default function KineAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              Analysez ici les tendances des feedbacks patients, l'adhésion aux programmes et d'autres métriques clés.
+              Analyse ici les tendances des feedbacks patients, l'adhésion aux programmes et d'autres métriques clés.
             </p>
              {/* TODO: Implement actual charts and data display here */}
              <div className="mt-6 p-6 border rounded-md bg-muted/50">

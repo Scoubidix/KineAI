@@ -74,7 +74,7 @@ export default function AnnoncesEmploiHubPage() {
   const cards = [
     {
       title: 'Nouveau contrat',
-      description: 'Créer votre contrat de remplacement ou d\'assistanat',
+      description: 'Créer ton contrat de remplacement ou d\'assistanat',
       icon: FileSearch,
       onClick: () => setNouveauxOpen(true),
       comingSoon: false,
@@ -82,7 +82,7 @@ export default function AnnoncesEmploiHubPage() {
     },
     {
       title: 'Mes contrats',
-      description: 'Retrouvez tous vos anciens contrats',
+      description: 'Retrouve tous tes anciens contrats',
       icon: FolderOpen,
       onClick: () => setMesContratsOpen(true),
       comingSoon: false,
@@ -90,7 +90,7 @@ export default function AnnoncesEmploiHubPage() {
     },
     {
       title: 'Proposer une annonce',
-      description: 'Publiez une annonce pour trouver la personne idéale',
+      description: 'Publie une annonce pour trouver la personne idéale',
       icon: UserPlus,
       onClick: () => setProposerOpen(true),
       comingSoon: true,
@@ -98,7 +98,7 @@ export default function AnnoncesEmploiHubPage() {
     },
     {
       title: 'Je cherche un Remplacement/Assistanat',
-      description: 'Publiez votre profil pour être contacté pour des postes adaptés à vos envies',
+      description: 'Publie ton profil pour être contacté pour des postes adaptés à tes envies',
       icon: Search,
       onClick: () => setChercherOpen(true),
       comingSoon: true,
@@ -116,7 +116,7 @@ export default function AnnoncesEmploiHubPage() {
               <Briefcase className="text-[#3899aa] h-7 w-7 shrink-0" />
               <div>
                 <h2 className="text-xl font-semibold text-[#3899aa]">Mes Contrats</h2>
-                <p className="text-foreground text-sm">Gérez vos remplacements et assistanats en toute simplicité</p>
+                <p className="text-foreground text-sm">Gère tes remplacements et assistanats en toute simplicité</p>
               </div>
             </div>
             <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1 self-start sm:self-auto">

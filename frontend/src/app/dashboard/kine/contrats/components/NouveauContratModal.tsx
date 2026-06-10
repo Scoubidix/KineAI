@@ -639,12 +639,12 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
       });
       const data = await res.json();
       if (!res.ok) {
-        setInvitationError(data?.error || 'Envoi impossible. Veuillez réessayer.');
+        setInvitationError(data?.error || 'Envoi impossible. Réessaye.');
         return;
       }
       setInvitationSent(true);
     } catch {
-      setInvitationError('Erreur réseau. Veuillez réessayer.');
+      setInvitationError('Erreur réseau. Réessaye.');
     } finally {
       setSendingInvitation(false);
     }
@@ -652,7 +652,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
 
   const handleFinish = () => {
     if (signed && !invitationSent) {
-      toast({ title: 'Contrat enregistré', description: 'Vous pouvez l\'envoyer plus tard depuis "Mes contrats".' });
+      toast({ title: 'Contrat enregistré', description: 'Tu peux l\'envoyer plus tard depuis "Mes contrats".' });
     } else if (!signed) {
       toast({ title: 'Brouillon enregistré', description: 'Le contrat est disponible dans "Mes contrats".' });
     }
@@ -691,7 +691,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
             {/* ===================== CONTRACT_TYPE ===================== */}
             {current === 'CONTRACT_TYPE' && (
               <div className="space-y-6 max-w-lg mx-auto">
-                <h2 className="text-xl font-semibold text-center">Quel type de contrat souhaitez-vous créer ?</h2>
+                <h2 className="text-xl font-semibold text-center">Quel type de contrat souhaites-tu créer ?</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -722,7 +722,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
             {/* ===================== ROLE ===================== */}
             {current === 'ROLE' && (
               <div className="space-y-6 max-w-lg mx-auto">
-                <h2 className="text-xl font-semibold text-center">Quel est votre rôle dans ce contrat ?</h2>
+                <h2 className="text-xl font-semibold text-center">Quel est ton rôle dans ce contrat ?</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -749,7 +749,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
             {/* ===================== DESTINATAIRE_PICK ===================== */}
             {current === 'DESTINATAIRE_PICK' && (
               <div className="space-y-5 max-w-lg mx-auto">
-                <h2 className="text-xl font-semibold text-center">Avec quel kiné établissez-vous ce contrat ?</h2>
+                <h2 className="text-xl font-semibold text-center">Avec quel kiné établis-tu ce contrat ?</h2>
                 {loadingContacts ? (
                   <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
                 ) : (
@@ -818,11 +818,11 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
             {current === 'DESTINATAIRE_NEW' && (
               <div className="space-y-5 max-w-md mx-auto">
                 <h2 className="text-xl font-semibold text-center">
-                  {editingContactId !== null ? 'Modifier le contact' : 'Qui est votre destinataire ?'}
+                  {editingContactId !== null ? 'Modifier le contact' : 'Qui est ton destinataire ?'}
                 </h2>
                 <p className="text-sm text-muted-foreground text-center">
                   {editingContactId !== null
-                    ? 'Mettez à jour les informations de votre contact.'
+                    ? 'Mets à jour les informations de ton contact.'
                     : 'Il complètera lui-même ses informations à la signature.'}
                 </p>
                 {editingContactId !== null && (
@@ -867,7 +867,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
             {/* ===================== PROFILE_CIVILITE ===================== */}
             {current === 'PROFILE_CIVILITE' && (
               <div className="space-y-6 max-w-md mx-auto">
-                <h2 className="text-xl font-semibold text-center">Quelle est votre civilité ?</h2>
+                <h2 className="text-xl font-semibold text-center">Quelle est ta civilité ?</h2>
                 <div className="grid grid-cols-2 gap-3">
                   {(['M.', 'MME'] as Civilite[]).map(c => (
                     <button
@@ -886,7 +886,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
             {/* ===================== PROFILE_BIRTH_DATE ===================== */}
             {current === 'PROFILE_BIRTH_DATE' && (
               <div className="space-y-5 max-w-md mx-auto">
-                <h2 className="text-xl font-semibold text-center">Quelle est votre date de naissance ?</h2>
+                <h2 className="text-xl font-semibold text-center">Quelle est ta date de naissance ?</h2>
                 <Input
                   ref={inputRef}
                   type="date"
@@ -900,7 +900,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
             {/* ===================== PROFILE_BIRTH_PLACE ===================== */}
             {current === 'PROFILE_BIRTH_PLACE' && (
               <div className="space-y-5 max-w-md mx-auto">
-                <h2 className="text-xl font-semibold text-center">Où êtes-vous né(e) ?</h2>
+                <h2 className="text-xl font-semibold text-center">Où es-tu né(e) ?</h2>
                 <Input
                   ref={inputRef}
                   placeholder="Ville de naissance"
@@ -914,7 +914,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
             {/* ===================== PROFILE_DEPT_ORDRE ===================== */}
             {current === 'PROFILE_DEPT_ORDRE' && (
               <div className="space-y-5 max-w-md mx-auto">
-                <h2 className="text-xl font-semibold text-center">Quel est votre département d'affiliation à l'Ordre ?</h2>
+                <h2 className="text-xl font-semibold text-center">Quel est ton département d'affiliation à l'Ordre ?</h2>
                 <Select value={profileForm.departementOrdre || ''} onValueChange={pickDeptOrdre}>
                   <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Sélectionner un département..." /></SelectTrigger>
                   <SelectContent className="max-h-72">
@@ -929,7 +929,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
             {/* ===================== PROFILE_NUM_ORDINAL ===================== */}
             {current === 'PROFILE_NUM_ORDINAL' && (
               <div className="space-y-5 max-w-md mx-auto">
-                <h2 className="text-xl font-semibold text-center">Quel est votre numéro ordinal ?</h2>
+                <h2 className="text-xl font-semibold text-center">Quel est ton numéro ordinal ?</h2>
                 <Input
                   ref={inputRef}
                   placeholder="Ex: 012345"
@@ -944,7 +944,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
             {current === 'PROFILE_ADRESSE' && (
               <div className="space-y-5 max-w-md mx-auto">
                 <h2 className="text-xl font-semibold text-center">
-                  {roleInitiateur === 'TITULAIRE' ? 'Quelle est l\'adresse de votre cabinet ?' : 'Quelle est votre adresse de domicile ?'}
+                  {roleInitiateur === 'TITULAIRE' ? 'Quelle est l\'adresse de ton cabinet ?' : 'Quelle est ton adresse de domicile ?'}
                 </h2>
                 <Input
                   ref={inputRef}
@@ -1028,7 +1028,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
             {/* ===================== M_BALNEO_TOGGLE ===================== */}
             {current === 'M_BALNEO_TOGGLE' && (
               <div className="space-y-6 max-w-md mx-auto">
-                <h2 className="text-xl font-semibold text-center">Avez-vous une balnéothérapie ?</h2>
+                <h2 className="text-xl font-semibold text-center">As-tu une balnéothérapie ?</h2>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -1123,7 +1123,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
                     )}
                     {signed && (
                       <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300">
-                        Signé par vous
+                        Signé par toi
                       </Badge>
                     )}
                   </div>
@@ -1131,7 +1131,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
                 {signed && (
                   <div className="rounded-lg border border-green-300 bg-green-50 dark:bg-green-950/20 p-3 flex items-start gap-2 text-xs text-green-900 dark:text-green-100">
                     <Check className="h-4 w-4 mt-0.5 shrink-0" />
-                    <div>Signature enregistrée. Envoyez le contrat au destinataire depuis <strong>Mes contrats</strong>.</div>
+                    <div>Signature enregistrée. Envoie le contrat au destinataire depuis <strong>Mes contrats</strong>.</div>
                   </div>
                 )}
                 {previewLoading && (
@@ -1150,7 +1150,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
                   isMobile ? (
                     <div className="flex-1 flex flex-col items-center justify-center gap-3 border-2 border-dashed border-[#3899aa]/30 rounded-lg p-6 text-center">
                       <FileText className="h-10 w-10 text-[#3899aa]" />
-                      <p className="text-sm text-muted-foreground">Ouvrez l'aperçu PDF en plein écran pour le relire.</p>
+                      <p className="text-sm text-muted-foreground">Ouvre l'aperçu PDF en plein écran pour le relire.</p>
                       <Button type="button" onClick={() => setPreviewFullscreen(true)} className="btn-teal">
                         <Maximize2 className="h-4 w-4 mr-1" /> Ouvrir l'aperçu PDF
                       </Button>
@@ -1175,8 +1175,8 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
                 {!invitationSent ? (
                   <>
                     <p className="text-sm text-muted-foreground">
-                      Voulez-vous l'envoyer dès maintenant à{' '}
-                      <strong className="text-foreground">{destinataireFullName || 'votre destinataire'}</strong>
+                      Veux-tu l'envoyer dès maintenant à{' '}
+                      <strong className="text-foreground">{destinataireFullName || 'ton destinataire'}</strong>
                       {destinataireEmail && <> (<span className="text-foreground">{destinataireEmail}</span>)</>} ?
                     </p>
                     {invitationError && (
@@ -1236,7 +1236,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
               )
             ) : (
               <>
-                <span className="text-xs text-muted-foreground hidden sm:inline">Appuyez sur ↵</span>
+                <span className="text-xs text-muted-foreground hidden sm:inline">Appuie sur ↵</span>
                 <Button onClick={advance} disabled={!canAdvance || isPersisting} className="btn-teal">
                   {isPersisting
                     ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> ...</>
@@ -1257,7 +1257,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
         onOpenChange={setSignOpen}
         expectedName={initiatorFullName}
         title="Signer le contrat"
-        description="Vous signez en tant qu'initiateur. Le contrat passera en statut 'Signé par vous' et pourra être envoyé au destinataire."
+        description="Tu signes en tant qu'initiateur. Le contrat passera en statut 'Signé par toi' et pourra être envoyé au destinataire."
         onConfirm={handleSignConfirm}
         submitting={signing}
       />

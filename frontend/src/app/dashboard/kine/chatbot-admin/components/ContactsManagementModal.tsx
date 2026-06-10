@@ -220,7 +220,7 @@ export default function ContactsManagementModal({
                 </div>
               ) : filteredContacts.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center h-full flex items-center justify-center">
-                  {contacts.length === 0 ? 'Aucun contact. Créez votre premier contact !' : 'Aucun contact trouvé'}
+                  {contacts.length === 0 ? 'Aucun contact. Crée ton premier contact !' : 'Aucun contact trouvé'}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -274,7 +274,7 @@ export default function ContactsManagementModal({
             <DialogTitle>Confirmer la suppression</DialogTitle>
           </DialogHeader>
           <p className="py-4 text-sm sm:text-base">
-            Êtes-vous sûr de vouloir supprimer ce contact ? Cette action est irréversible.
+            Es-tu sûr de vouloir supprimer ce contact ? Cette action est irréversible.
           </p>
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-4 mt-4">
             <Button variant="ghost" onClick={() => setConfirmDeleteId(null)}>Annuler</Button>

@@ -143,7 +143,7 @@ export default function KineChatbotAdminPage() {
     },
     {
       title: 'Historique',
-      description: 'Tous vos envois passés',
+      description: 'Tous tes envois passés',
       icon: Clock,
       onClick: () => setHistoryOpen(true),
       color: 'text-orange-500',
@@ -160,8 +160,8 @@ export default function KineChatbotAdminPage() {
             <div className="flex items-center gap-3">
               <FileText className="text-[#3899aa] h-7 w-7 shrink-0" />
               <div>
-                <h2 className="text-xl font-semibold text-[#3899aa]">IA Administrative</h2>
-                <p className="text-foreground text-sm">Gérez vos templates, contacts et envoyez vos courriers</p>
+                <h2 className="text-xl font-semibold text-[#3899aa]">Module administratif</h2>
+                <p className="text-foreground text-sm">Gère tes templates, contacts et envoie tes courriers</p>
               </div>
             </div>
             <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1 self-start sm:self-auto">
@@ -184,7 +184,7 @@ export default function KineChatbotAdminPage() {
               <div className="flex-1">
                 <h3 className="font-semibold text-lg text-[#3899aa]">Nouveau courrier</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Sélectionnez un destinataire, choisissez un template, personnalisez et envoyez par email ou WhatsApp
+                  Sélectionne un destinataire, choisis un template, personnalise et envoie par email ou WhatsApp
                 </p>
               </div>
               {waitingForPaywall
@@ -273,10 +273,10 @@ export default function KineChatbotAdminPage() {
                   <div>
                     <p className="text-sm font-medium text-foreground">Pour bien démarrer</p>
                     <ul className="text-sm text-muted-foreground mt-2 space-y-1.5">
-                      <li>Consultez les <button onClick={() => setTemplatesOpen(true)} className="text-[#3899aa] hover:underline font-medium">templates disponibles</button> pour vos relances et communications</li>
-                      <li>Ajoutez vos <button onClick={() => setContactsOpen(true)} className="text-[#3899aa] hover:underline font-medium">contacts externes</button> (médecins, mutuelles...) pour les retrouver facilement</li>
-                      <li>Créez vos propres templates personnalisés pour gagner du temps</li>
-                      <li>Utilisez l&apos;IA pour générer un brouillon de message en décrivant votre besoin</li>
+                      <li>Consulte les <button onClick={() => setTemplatesOpen(true)} className="text-[#3899aa] hover:underline font-medium">templates disponibles</button> pour tes relances et communications</li>
+                      <li>Ajoute tes <button onClick={() => setContactsOpen(true)} className="text-[#3899aa] hover:underline font-medium">contacts externes</button> (médecins, mutuelles...) pour les retrouver facilement</li>
+                      <li>Crée tes propres templates personnalisés pour gagner du temps</li>
+                      <li>Utilise l&apos;IA pour générer un brouillon de message en décrivant ton besoin</li>
                     </ul>
                   </div>
                 </div>

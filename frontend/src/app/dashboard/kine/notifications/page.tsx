@@ -121,7 +121,7 @@ export default function KineNotificationsPage() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error('Session expirée. Veuillez vous reconnecter.');
+          throw new Error('Session expirée. Reconnecte-toi.');
         }
         throw new Error('Erreur lors du chargement des notifications');
       }
@@ -409,7 +409,7 @@ export default function KineNotificationsPage() {
                     <DialogTitle>Confirmer la suppression</DialogTitle>
                   </DialogHeader>
                   <p className="py-4">
-                    Êtes-vous sûr de vouloir supprimer <strong>toutes vos notifications</strong> ({notifications.length}) ?
+                    Es-tu sûr de vouloir supprimer <strong>toutes tes notifications</strong> ({notifications.length}) ?
                     Cette action est irréversible.
                   </p>
                   <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-4 mt-4">
@@ -481,7 +481,7 @@ export default function KineNotificationsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-primary">
               <Bell className="text-accent" /> 
-              Vos Notifications
+              Tes Notifications
               {stats && stats.unread > 0 && (
                 <span className="bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded-full">
                   {stats.unread}
@@ -489,7 +489,7 @@ export default function KineNotificationsPage() {
               )}
             </CardTitle>
             <CardDescription>
-              Consultez ici les alertes et messages importants de vos patients.
+              Consulte ici les alertes et messages importants de tes patients.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -547,7 +547,7 @@ export default function KineNotificationsPage() {
                     <div className="text-sm text-muted-foreground space-y-2">
                       {notification.type === 'PATIENT_REQUEST' && notification.patient?.name ? (
                         <>
-                          <p><span className="font-semibold text-foreground">{notification.patient.name}</span> souhaite vous contacter : &quot;{notification.metadata?.motif}&quot;</p>
+                          <p><span className="font-semibold text-foreground">{notification.patient.name}</span> souhaite te contacter : &quot;{notification.metadata?.motif}&quot;</p>
                           <div className="flex gap-2 mt-2">
                             <Button
                               size="sm"
@@ -635,11 +635,11 @@ export default function KineNotificationsPage() {
                 <p className="text-muted-foreground text-lg font-medium">
                   {showOnlyUnread || selectedType !== 'all' 
                     ? 'Aucune notification correspondant aux filtres'
-                    : 'Vous n\'avez aucune notification pour le moment'
+                    : 'Tu n\'as aucune notification pour le moment'
                   }
                 </p>
                 <p className="text-muted-foreground text-sm mt-2">
-                  Les notifications apparaîtront ici lorsque vos patients valideront leurs séances.
+                  Les notifications apparaîtront ici lorsque tes patients valideront leurs séances.
                 </p>
               </div>
             )}

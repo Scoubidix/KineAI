@@ -196,7 +196,7 @@ export default function VideoUpload({ gifUrl, gifPath, onGifChange }: VideoUploa
                     {uploadProgress}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Veuillez patienter...
+                    Patiente...
                   </p>
                 </div>
               </>
@@ -207,8 +207,8 @@ export default function VideoUpload({ gifUrl, gifPath, onGifChange }: VideoUploa
                 </div>
                 <div className="text-center">
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    Glissez une vidéo ou{' '}
-                    <span className="text-blue-600">parcourez</span>
+                    Glisse une vidéo ou{' '}
+                    <span className="text-blue-600">parcours</span>
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     MP4, MOV, AVI • Max {MAX_SIZE_MB}MB

@@ -238,7 +238,7 @@ export default function PatientsPage() {
                         name="firstName" 
                         value={form.firstName} 
                         onChange={handleInputChange}
-                        placeholder="Entrez le prénom"
+                        placeholder="Nicolas"
                         className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
@@ -253,7 +253,7 @@ export default function PatientsPage() {
                         name="lastName" 
                         value={form.lastName} 
                         onChange={handleInputChange}
-                        placeholder="Entrez le nom de famille"
+                        placeholder="Dupont"
                         className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
@@ -323,7 +323,7 @@ export default function PatientsPage() {
                       name="goals"
                       value={form.goals}
                       onChange={(e) => setForm({ ...form, goals: e.target.value })}
-                      placeholder="Décrivez les objectifs thérapeutiques, pathologies, zones à traiter..."
+                      placeholder="Décris les objectifs thérapeutiques, pathologies, zones à traiter..."
                       className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-all duration-200 resize-none"
                       rows={3}
                     />
@@ -506,7 +506,7 @@ export default function PatientsPage() {
               <DialogTitle>Confirmer la suppression</DialogTitle>
             </DialogHeader>
             <p className="py-4 text-sm sm:text-base">
-              Êtes-vous sûr de vouloir supprimer le patient{' '}
+              Es-tu sûr de vouloir supprimer le patient{' '}
               <strong>{patientToDelete?.firstName} {patientToDelete?.lastName?.toUpperCase()}</strong> ?
               Cette action est irréversible.
             </p>

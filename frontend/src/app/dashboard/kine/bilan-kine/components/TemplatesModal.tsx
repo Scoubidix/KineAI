@@ -372,7 +372,7 @@ export default function TemplatesModal({ open, onOpenChange }: TemplatesModalPro
         ) : filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-12">
             {templates.length === 0
-              ? 'Aucun template pour l\'instant. Créez votre premier template pour réutiliser une composition de mesures.'
+              ? 'Aucun template pour l\'instant. Crée ton premier template pour réutiliser une composition de mesures.'
               : 'Aucun résultat'}
           </p>
         ) : (

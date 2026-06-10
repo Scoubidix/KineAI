@@ -28,6 +28,12 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
+// Validation conditionnelle : MISTRAL_API_KEY requise uniquement si la génération passe par Mistral.
+if (process.env.GENERATION_PROVIDER === 'mistral' && !process.env.MISTRAL_API_KEY) {
+  console.error('FATAL: GENERATION_PROVIDER=mistral mais MISTRAL_API_KEY est manquante');
+  process.exit(1);
+}
+
 const logger = require('./utils/logger');
 const express = require('express');
 const cors = require('cors');
@@ -54,6 +60,7 @@ const exerciceRoutes = require('./routes/exercices');
 const testOpenAIRoutes = require('./routes/testOpenAI');
 const patientChatRoutes = require('./routes/patientChat');
 const chatKineRoutes = require('./routes/chatKine'); // Route existante améliorée
+const conversationsRoutes = require('./routes/conversations'); // Chat unifié (conversations)
 
 
 // NOUVEAU : Import du webhook WhatsApp
@@ -123,7 +130,7 @@ const corsOptions = {
       callback(new Error('Non autorisé par CORS'));
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true, // Important pour les cookies et JWT
   optionsSuccessStatus: 200 // Pour les anciens navigateurs
@@ -355,7 +362,6 @@ app.get('/api/test-paywall', (req, res) => {
       endpoints: [
         'GET /api/kine/subscription',
         'GET /api/kine/usage',
-        'GET /api/kine/limits',
         'POST /api/kine/usage/refresh',
         'GET /api/plans/PIONNIER/availability',
         'GET /api/plans/PIONNIER/remaining-slots',
@@ -375,46 +381,6 @@ app.get('/api/test-paywall', (req, res) => {
   });
 });
 
-// 🤖 NOUVEAU : Test des 4 IA Spécialisées
-app.get('/api/test-ia', (req, res) => {
-  res.json({
-    message: '4 IA Spécialisées system check',
-    timestamp: new Date().toISOString(),
-    iaSystem: {
-      configured: !!process.env.OPENAI_API_KEY,
-      tables: [
-        'chat_ia_basique',
-        'chat_ia_biblio', 
-        'chat_ia_clinique',
-        'chat_ia_administrative'
-      ],
-      endpoints: {
-        iaBasique: 'POST /api/chat/kine/ia-basique',
-        iaBiblio: 'POST /api/chat/kine/ia-biblio',
-        iaClinique: 'POST /api/chat/kine/ia-clinique',
-        iaAdministrative: 'POST /api/chat/kine/ia-administrative',
-        iaStatus: 'GET /api/chat/kine/ia-status',
-        historyBasique: 'GET /api/chat/kine/history-basique',
-        historyBiblio: 'GET /api/chat/kine/history-biblio',
-        historyClinique: 'GET /api/chat/kine/history-clinique',
-        historyAdministrative: 'GET /api/chat/kine/history-administrative',
-        allHistory: 'GET /api/chat/kine/all-history',
-        clearHistoryBasique: 'DELETE /api/chat/kine/history-basique',
-        clearAllHistory: 'DELETE /api/chat/kine/all-history'
-      },
-      features: [
-        'IA Basique - Assistant conversationnel général',
-        'IA Bibliographique - Références scientifiques',
-        'IA Clinique - Aide diagnostic et traitement',
-        'IA Administrative - Gestion cabinet et réglementation',
-        'Historiques séparés par IA',
-        'Recherche vectorielle intégrée',
-        'Prompts spécialisés par domaine'
-      ]
-    }
-  });
-});
-
 // NOUVEAU : Test CORS
 app.get('/api/test-cors', (req, res) => {
   res.json({
@@ -429,7 +395,7 @@ app.get('/api/test-cors', (req, res) => {
         'http://localhost:3001',
         'http://localhost:3000'
       ],
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       credentials: true
     }
   });
@@ -641,6 +607,9 @@ app.use('/api/patient', patientChatRoutes);
 // IA Kinés : rate limiting dans le routeur APRÈS authenticate
 app.use('/api/chat/kine', chatKineRoutes);
 
+// Chat unifié (conversations) : rate limiting dans le routeur APRÈS authenticate
+app.use('/api/chat/kine', conversationsRoutes);
+
 // Middleware auth pour routes cron (Cloud Scheduler via OIDC)
 const { OAuth2Client } = require('google-auth-library');
 const oauthClient = new OAuth2Client();
@@ -712,12 +681,10 @@ app.listen(PORT, '0.0.0.0', () => {
   logger.info(`🚀 KineAI Backend running on port ${PORT}`);
   logger.info(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`🔗 Health check: http://localhost:${PORT}/health`);
-  logger.info(`🤖 IA Basique: /api/chat/kine/ia-basique`);
-  logger.info(`🤖 IA Bibliographique: /api/chat/kine/ia-biblio`);
-  logger.info(`🤖 IA Clinique: /api/chat/kine/ia-clinique`);
-  logger.info(`🤖 IA Administrative: /api/chat/kine/ia-administrative`);
-  logger.info(`🤖 Statut 4 IA: /api/chat/kine/ia-status`);
-  logger.info(`🤖 Test 4 IA: /api/test-ia`);
+  logger.info(`🤖 Chat unifié (SSE): /api/chat/kine/chat`);
+  logger.info(`🤖 Conversations: /api/chat/kine/conversations`);
+  logger.info(`🤖 Quota tokens: /api/chat/kine/usage`);
+  logger.info(`🤖 IA Administrative (bilans): /api/chat/kine/ia-administrative`);
   logger.info(`📊 Vector Test: /api/test-vector`);
   logger.info(`📱 WhatsApp Test: /api/test-whatsapp`);
   logger.info(`📱 WhatsApp Webhook: /webhook/whatsapp`);

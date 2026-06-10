@@ -129,7 +129,7 @@ export default function EnvoiOrdreDialog({ open, onOpenChange, contractId, onSen
                   {preview.previousSentAt
                     ? new Date(preview.previousSentAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
                     : ''}
-                  {preview.previousRecipient && <> à <strong>{preview.previousRecipient}</strong></>}. Vous pouvez le renvoyer si besoin.
+                  {preview.previousRecipient && <> à <strong>{preview.previousRecipient}</strong></>}. Tu peux le renvoyer si besoin.
                 </div>
               )}
 

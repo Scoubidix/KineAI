@@ -127,8 +127,8 @@ export default function KineHomePage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('welcome') === 'contract') {
       toast({
-        title: 'Bienvenue dans votre espace !',
-        description: 'Votre contrat signé est disponible dans Mes Contrats → Reçus.',
+        title: 'Bienvenue dans ton espace !',
+        description: 'Ton contrat signé est disponible dans Mes Contrats → Reçus.',
         duration: 10000,
       });
       // Nettoyer l'URL pour pas re-trigger au refresh
@@ -312,7 +312,7 @@ export default function KineHomePage() {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Chargement de votre tableau de bord...</p>
+            <p className="text-muted-foreground">Chargement de ton tableau de bord...</p>
           </div>
         </div>
       </AppLayout>
@@ -328,7 +328,7 @@ export default function KineHomePage() {
           <div className="text-center">
             <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Erreur de chargement</h2>
-            <p className="text-muted-foreground mb-4">Impossible de charger vos informations.</p>
+            <p className="text-muted-foreground mb-4">Impossible de charger tes informations.</p>
             <Button onClick={() => window.location.reload()}>Réessayer</Button>
           </div>
         </div>
@@ -506,7 +506,7 @@ export default function KineHomePage() {
                   ) : (
                     <p className="text-muted-foreground text-center py-4 italic">
                       {error 
-                        ? "Erreur lors du chargement des données. Veuillez réessayer."
+                        ? "Erreur lors du chargement des données. Réessaye."
                         : `Aucun patient avec séance prévue pour le ${format(selectedDate, 'dd/MM/yyyy')}.`
                       }
                     </p>
@@ -530,10 +530,10 @@ export default function KineHomePage() {
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-center sm:text-left">
                   <h3 className="text-lg font-semibold text-primary mb-1">
-                    Votre avis compte !
+                    Ton avis compte !
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Partagez vos remarques ou idées pour améliorer l'application.
+                    Partage tes remarques ou idées pour améliorer l'application.
                   </p>
                 </div>
                 <Button

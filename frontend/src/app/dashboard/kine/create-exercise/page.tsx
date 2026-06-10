@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Dumbbell, Trash2, Pencil, Plus, Loader2, Eye, Lock, Globe, Search, Filter, X, Tag } from 'lucide-react';
+import { Dumbbell, Trash2, Pencil, Plus, Loader2, Lock, Globe, Search, Filter, X, Tag } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
@@ -421,7 +421,7 @@ export default function KineCreateExercisePage() {
         loadAllTags();
       } else if (res.status === 400) {
         // Exercice utilisé dans des programmes
-        alert("Votre exercice est utilisé dans un programme, impossible de supprimer");
+        alert("Ton exercice est utilisé dans un programme, impossible de supprimer");
         setDeleteDialogOpen(false);
         setExerciceToDelete(null);
       } else {
@@ -638,7 +638,7 @@ export default function KineCreateExercisePage() {
                             name="nom" 
                             value={form.nom} 
                             onChange={handleInputChange}
-                            placeholder="Entrez le nom de l'exercice"
+                            placeholder="Entre le nom de l'exercice"
                             className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             required
                           />
@@ -653,7 +653,7 @@ export default function KineCreateExercisePage() {
                             name="description"
                             value={form.description}
                             onChange={handleInputChange}
-                            placeholder="Décrivez l'exercice en détail : position de départ, mouvement, répétitions recommandées, points d'attention..."
+                            placeholder="Décris l'exercice en détail : position de départ, mouvement, répétitions recommandées, points d'attention..."
                             className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-all duration-200 resize-none"
                             rows={6}
                             required
@@ -696,7 +696,7 @@ export default function KineCreateExercisePage() {
                             </div>
                           )}
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Sélectionnez les catégories qui correspondent à cet exercice
+                            Sélectionne les catégories qui correspondent à cet exercice
                           </p>
                         </div>
 
@@ -825,10 +825,10 @@ export default function KineCreateExercisePage() {
                     </h3>
                     <p className="text-gray-500 dark:text-gray-400">
                       {search || selectedTags.length > 0
-                        ? 'Essayez de modifier vos filtres ou votre recherche' 
-                        : showPublic 
+                        ? 'Essaie de modifier tes filtres ou ta recherche'
+                        : showPublic
                           ? 'Aucun exercice public n\'est disponible pour le moment'
-                          : 'Commencez par créer votre premier exercice'
+                          : 'Commence par créer ton premier exercice'
                       }
                     </p>
                   </div>
@@ -855,7 +855,11 @@ export default function KineCreateExercisePage() {
                       const exerciceTags = parseTagsFromString(ex.tags);
                       
                       return (
-                        <Card key={ex.id} className="card-hover relative">
+                        <Card
+                          key={ex.id}
+                          className={`card-hover relative ${hasExpandableContent ? 'cursor-pointer' : ''}`}
+                          onClick={hasExpandableContent ? () => toggleCardExpansion(cardKey) : undefined}
+                        >
                           <CardHeader className="pb-3">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
@@ -883,13 +887,13 @@ export default function KineCreateExercisePage() {
                               </div>
                               {!ex.isPublic && (
                                 <div className="flex gap-1 ml-2">
-                                  <Button size="icon" variant="ghost" onClick={() => handleEdit(ex)} className="h-8 w-8">
+                                  <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(ex); }} className="h-8 w-8">
                                     <Pencil className="w-3 h-3" />
                                   </Button>
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    onClick={() => { setExerciceToDelete(ex); setDeleteDialogOpen(true); }}
+                                    onClick={(e) => { e.stopPropagation(); setExerciceToDelete(ex); setDeleteDialogOpen(true); }}
                                     className="h-8 w-8 hover:bg-red-100 hover:text-red-600"
                                   >
                                     <Trash2 className="w-3 h-3" />
@@ -899,17 +903,6 @@ export default function KineCreateExercisePage() {
                             </div>
                           </CardHeader>
                           <CardContent className="pt-0">
-                            {hasExpandableContent && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="p-0 h-auto text-blue-600 hover:text-blue-800 transition-colors mb-2"
-                                onClick={() => toggleCardExpansion(cardKey)}
-                              >
-                                <Eye className="w-3 h-3 mr-1" />
-                                {isExpanded ? 'Voir moins' : 'Voir plus'}
-                              </Button>
-                            )}
                             <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line break-words">
                               {isExpanded || !shouldTruncate
                                 ? ex.description
@@ -959,7 +952,7 @@ export default function KineCreateExercisePage() {
                         <p className="text-gray-500 dark:text-gray-400">
                           {showPublic
                             ? 'Aucun template public n\'est disponible pour le moment'
-                            : 'Créez votre premier template pour gagner du temps lors de la création de programmes'
+                            : 'Crée ton premier template pour gagner du temps lors de la création de programmes'
                           }
                         </p>
                       </div>
@@ -1064,7 +1057,7 @@ export default function KineCreateExercisePage() {
                   <Input
                     value={templateForm.description}
                     onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
-                    placeholder="Décrivez l'objectif de ce template..."
+                    placeholder="Décris l'objectif de ce template..."
                   />
                 </div>
               </div>
@@ -1333,7 +1326,7 @@ export default function KineCreateExercisePage() {
               <DialogTitle>Confirmer la suppression</DialogTitle>
             </DialogHeader>
             <p className="py-4 text-sm sm:text-base">
-              Êtes-vous sûr de vouloir supprimer l'exercice{' '}
+              Es-tu sûr de vouloir supprimer l'exercice{' '}
               <strong>"{exerciceToDelete?.nom}"</strong> ?
               Cette action est irréversible.
             </p>
@@ -1351,7 +1344,7 @@ export default function KineCreateExercisePage() {
               <DialogTitle>Confirmer la suppression</DialogTitle>
             </DialogHeader>
             <p className="py-4 text-sm sm:text-base">
-              Êtes-vous sûr de vouloir supprimer le template{' '}
+              Es-tu sûr de vouloir supprimer le template{' '}
               <strong>"{templateToDelete?.nom}"</strong> ?
               Cette action est irréversible.
             </p>

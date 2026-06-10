@@ -183,7 +183,7 @@ class RGPDService {
         canDelete: false,
         planType: 'UNKNOWN',
         hasRecentExport: false,
-        reason: error.message || 'Impossible de vérifier votre éligibilité'
+        reason: error.message || 'Impossible de vérifier ton éligibilité'
       };
     }
   }

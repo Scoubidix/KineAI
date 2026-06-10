@@ -92,7 +92,7 @@ export default function ApplyTemplateModal({ open, onOpenChange, onApply }: Appl
           ) : filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-12">
               {templates.length === 0
-                ? 'Aucun template disponible. Créez-en un depuis la page Bilans.'
+                ? 'Aucun template disponible. Crées-en un depuis la page Bilans.'
                 : 'Aucun résultat'}
             </p>
           ) : (
