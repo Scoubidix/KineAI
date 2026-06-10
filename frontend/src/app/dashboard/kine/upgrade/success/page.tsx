@@ -119,7 +119,7 @@ function UpgradeSuccessContent() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Vérification de votre abonnement...</p>
+          <p className="text-muted-foreground">Vérification de ton abonnement...</p>
         </div>
       </div>
     );
@@ -135,7 +135,7 @@ function UpgradeSuccessContent() {
             </div>
             <CardTitle className="text-red-900 dark:text-red-300">Erreur de vérification</CardTitle>
             <CardDescription className="text-red-700 dark:text-red-400">
-              Une erreur s'est produite lors de la vérification de votre paiement.
+              Une erreur s'est produite lors de la vérification de ton paiement.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -180,17 +180,17 @@ function UpgradeSuccessContent() {
               <div className="mx-auto mb-4 p-3 bg-[#3899aa]/10 rounded-full w-fit">
                 <RefreshCw className="h-8 w-8 text-[#3899aa]" />
               </div>
-              <CardTitle className="text-[#3899aa]">Activation de votre abonnement</CardTitle>
+              <CardTitle className="text-[#3899aa]">Activation de ton abonnement</CardTitle>
               <CardDescription className="text-muted-foreground text-base sm:text-lg">
-                Votre paiement a été traité avec succès ! Nous finalisons l'activation de votre compte.
+                Ton paiement a été traité avec succès ! Nous finalisons l'activation de ton compte.
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center space-y-6">
               <div className="bg-muted/50 rounded-lg p-4">
                 <p className="text-muted-foreground">
                   {currentPlan === 'FREE' 
-                    ? 'Si vous venez d\'effectuer un paiement, l\'activation peut prendre quelques instants.'
-                    : 'L\'activation de votre abonnement est en cours. Cela ne devrait prendre que quelques secondes.'
+                    ? 'Si tu viens d\'effectuer un paiement, l\'activation peut prendre quelques instants.'
+                    : 'L\'activation de ton abonnement est en cours. Cela ne devrait prendre que quelques secondes.'
                   }
                 </p>
               </div>
@@ -237,7 +237,7 @@ function UpgradeSuccessContent() {
                 <Badge className="bg-accent text-accent-foreground">Actif</Badge>
               </CardTitle>
               <CardDescription className="text-base sm:text-lg">
-                Vous avez maintenant accès à toutes les fonctionnalités du plan {planDetails.name}
+                Tu as maintenant accès à toutes les fonctionnalités du plan {planDetails.name}
               </CardDescription>
             </CardHeader>
             
@@ -315,7 +315,7 @@ function UpgradeSuccessContent() {
               </div>
               <CardTitle className="text-amber-900 dark:text-amber-300">Activation en cours</CardTitle>
               <CardDescription className="text-amber-700 dark:text-amber-400">
-                Votre abonnement est en cours d'activation. Cela peut prendre quelques secondes.
+                Ton abonnement est en cours d'activation. Cela peut prendre quelques secondes.
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center">

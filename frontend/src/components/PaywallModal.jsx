@@ -75,7 +75,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
     if (!user) {
       toast({
         title: "Erreur",
-        description: "Vous devez être connecté",
+        description: "Tu dois être connecté",
         variant: "destructive"
       });
       return;
@@ -236,7 +236,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                 Mon Assistant Kiné
               </DialogTitle>
               <DialogDescription className="text-muted-foreground text-sm sm:text-base">
-                Choisissez votre plan d'abonnement professionnel
+                Choisis ton plan d'abonnement professionnel
               </DialogDescription>
             </DialogHeader>
 
@@ -413,7 +413,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                       />
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Vous avez un code de parrainage ? Entrez-le pour recevoir 1 mois offert après votre premier renouvellement.
+                      Tu as un code de parrainage ? Entre-le pour recevoir 1 mois offert après ton premier renouvellement.
                     </p>
                   </CardContent>
                 </Card>
@@ -484,7 +484,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                       </div>
                       <div className="flex items-center gap-2">
                         <CreditCard className="h-4 w-4 text-accent flex-shrink-0" />
-                        <span className="text-foreground">Proratisation automatique sur votre prochaine facture</span>
+                        <span className="text-foreground">Proratisation automatique sur ta prochaine facture</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-accent flex-shrink-0" />

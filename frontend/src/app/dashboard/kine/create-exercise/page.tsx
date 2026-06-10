@@ -421,7 +421,7 @@ export default function KineCreateExercisePage() {
         loadAllTags();
       } else if (res.status === 400) {
         // Exercice utilisé dans des programmes
-        alert("Votre exercice est utilisé dans un programme, impossible de supprimer");
+        alert("Ton exercice est utilisé dans un programme, impossible de supprimer");
         setDeleteDialogOpen(false);
         setExerciceToDelete(null);
       } else {
@@ -638,7 +638,7 @@ export default function KineCreateExercisePage() {
                             name="nom" 
                             value={form.nom} 
                             onChange={handleInputChange}
-                            placeholder="Entrez le nom de l'exercice"
+                            placeholder="Entre le nom de l'exercice"
                             className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             required
                           />
@@ -653,7 +653,7 @@ export default function KineCreateExercisePage() {
                             name="description"
                             value={form.description}
                             onChange={handleInputChange}
-                            placeholder="Décrivez l'exercice en détail : position de départ, mouvement, répétitions recommandées, points d'attention..."
+                            placeholder="Décris l'exercice en détail : position de départ, mouvement, répétitions recommandées, points d'attention..."
                             className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-all duration-200 resize-none"
                             rows={6}
                             required
@@ -696,7 +696,7 @@ export default function KineCreateExercisePage() {
                             </div>
                           )}
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Sélectionnez les catégories qui correspondent à cet exercice
+                            Sélectionne les catégories qui correspondent à cet exercice
                           </p>
                         </div>
 
@@ -825,10 +825,10 @@ export default function KineCreateExercisePage() {
                     </h3>
                     <p className="text-gray-500 dark:text-gray-400">
                       {search || selectedTags.length > 0
-                        ? 'Essayez de modifier vos filtres ou votre recherche' 
-                        : showPublic 
+                        ? 'Essaie de modifier tes filtres ou ta recherche'
+                        : showPublic
                           ? 'Aucun exercice public n\'est disponible pour le moment'
-                          : 'Commencez par créer votre premier exercice'
+                          : 'Commence par créer ton premier exercice'
                       }
                     </p>
                   </div>
@@ -959,7 +959,7 @@ export default function KineCreateExercisePage() {
                         <p className="text-gray-500 dark:text-gray-400">
                           {showPublic
                             ? 'Aucun template public n\'est disponible pour le moment'
-                            : 'Créez votre premier template pour gagner du temps lors de la création de programmes'
+                            : 'Crée ton premier template pour gagner du temps lors de la création de programmes'
                           }
                         </p>
                       </div>
@@ -1064,7 +1064,7 @@ export default function KineCreateExercisePage() {
                   <Input
                     value={templateForm.description}
                     onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
-                    placeholder="Décrivez l'objectif de ce template..."
+                    placeholder="Décris l'objectif de ce template..."
                   />
                 </div>
               </div>
@@ -1333,7 +1333,7 @@ export default function KineCreateExercisePage() {
               <DialogTitle>Confirmer la suppression</DialogTitle>
             </DialogHeader>
             <p className="py-4 text-sm sm:text-base">
-              Êtes-vous sûr de vouloir supprimer l'exercice{' '}
+              Es-tu sûr de vouloir supprimer l'exercice{' '}
               <strong>"{exerciceToDelete?.nom}"</strong> ?
               Cette action est irréversible.
             </p>
@@ -1351,7 +1351,7 @@ export default function KineCreateExercisePage() {
               <DialogTitle>Confirmer la suppression</DialogTitle>
             </DialogHeader>
             <p className="py-4 text-sm sm:text-base">
-              Êtes-vous sûr de vouloir supprimer le template{' '}
+              Es-tu sûr de vouloir supprimer le template{' '}
               <strong>"{templateToDelete?.nom}"</strong> ?
               Cette action est irréversible.
             </p>

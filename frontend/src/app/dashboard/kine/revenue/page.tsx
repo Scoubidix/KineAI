@@ -19,7 +19,7 @@ export default function KineRevenuePage() {
           </CardHeader>
           <CardContent>
             <p className="text-foreground">
-              Gérez bientôt ici vos invitations de patients, votre programme d'affiliation et suivez vos revenus récurrents.
+              Gère bientôt ici tes invitations de patients, ton programme d'affiliation et suis tes revenus récurrents.
             </p>
           </CardContent>
         </Card>

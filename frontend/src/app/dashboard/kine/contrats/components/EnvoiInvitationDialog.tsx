@@ -55,7 +55,7 @@ export default function EnvoiInvitationDialog({
       });
       const data = await res.json();
       if (!res.ok) {
-        setErrorMessage(data?.error || 'Envoi impossible. Veuillez réessayer.');
+        setErrorMessage(data?.error || 'Envoi impossible. Réessaye.');
         setStage('ERROR');
         return;
       }
@@ -64,7 +64,7 @@ export default function EnvoiInvitationDialog({
       toast({ title: 'Email envoyé', description: `Invitation envoyée à ${destinataireEmail}.` });
       onSent?.();
     } catch {
-      setErrorMessage('Erreur réseau. Veuillez réessayer.');
+      setErrorMessage('Erreur réseau. Réessaye.');
       setStage('ERROR');
     } finally {
       setSubmitting(false);
@@ -91,7 +91,7 @@ export default function EnvoiInvitationDialog({
             <div className="rounded-lg border border-[#3899aa]/30 bg-[#3899aa]/5 p-3 text-sm">
               <p>
                 Nous envoyons l'email directement depuis Mon Assistant Kiné. Le destinataire reçoit un lien sécurisé,
-                valable 7 jours, pour consulter et signer le contrat. Toutes les réponses arriveront sur votre adresse email.
+                valable 7 jours, pour consulter et signer le contrat. Toutes les réponses arriveront sur ton adresse email.
               </p>
             </div>
             <Button onClick={handleSend} disabled={submitting} className="w-full btn-teal">

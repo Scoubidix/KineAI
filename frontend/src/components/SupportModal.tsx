@@ -98,7 +98,7 @@ export function SupportModal({ open, onOpenChange, initialTicketId }: SupportMod
     setSuccess('');
 
     if (!subject.trim() || !body.trim()) {
-      setError('Veuillez remplir tous les champs.');
+      setError('Remplis tous les champs.');
       return;
     }
 
@@ -110,7 +110,7 @@ export function SupportModal({ open, onOpenChange, initialTicketId }: SupportMod
       });
 
       if (res.ok) {
-        setSuccess('Votre requete a bien ete envoyee !');
+        setSuccess('Ta requete a bien ete envoyee !');
         setSubject('');
         setBody('');
         fetchTickets();
@@ -227,7 +227,7 @@ export function SupportModal({ open, onOpenChange, initialTicketId }: SupportMod
                   }`}>
                     <p className="whitespace-pre-wrap break-words">{msg.body}</p>
                     <p className={`text-[10px] mt-1 ${msg.isAdmin ? 'text-muted-foreground' : 'text-primary-foreground/70'}`}>
-                      {msg.isAdmin ? 'Support' : 'Vous'} - {formatDate(msg.createdAt)}
+                      {msg.isAdmin ? 'Support' : 'Toi'} - {formatDate(msg.createdAt)}
                     </p>
                   </div>
                 </div>
@@ -241,7 +241,7 @@ export function SupportModal({ open, onOpenChange, initialTicketId }: SupportMod
                 <Textarea
                   value={replyBody}
                   onChange={(e) => setReplyBody(e.target.value)}
-                  placeholder="Votre message..."
+                  placeholder="Ton message..."
                   className="min-h-[50px] max-h-[80px] resize-none text-sm"
                   maxLength={5000}
                 />
@@ -293,7 +293,7 @@ export function SupportModal({ open, onOpenChange, initialTicketId }: SupportMod
                     id="support-body"
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
-                    placeholder="Decrivez votre probleme ou votre question..."
+                    placeholder="Decris ton probleme ou ta question..."
                     className="min-h-[100px] sm:min-h-[120px] resize-none"
                     maxLength={5000}
                   />

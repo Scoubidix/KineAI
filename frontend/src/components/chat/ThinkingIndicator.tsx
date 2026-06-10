@@ -7,7 +7,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 type IaType = 'basique' | 'biblio' | 'clinique';
 
-const GENERIC_PHRASE = 'Analyse de votre question…';
+const GENERIC_PHRASE = 'Analyse de ta question…';
 
 // Phrase « type détecté » insérée après la phrase générique, uniquement pour biblio/clinique
 const DETECTED_PHRASE: Partial<Record<IaType, string>> = {

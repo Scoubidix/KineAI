@@ -185,7 +185,7 @@ export default function CompareWithPreviousModal({
             </DialogHeader>
 
             <p className="text-sm text-muted-foreground -mt-2">
-              Cochez un ou plusieurs bilans à inclure dans la comparaison. Les valeurs du bilan le plus récent sélectionné pré-rempliront vos mesures.
+              Coche un ou plusieurs bilans à inclure dans la comparaison. Les valeurs du bilan le plus récent sélectionné pré-rempliront tes mesures.
             </p>
 
             <div className="max-h-80 overflow-y-auto space-y-1.5 mt-2">

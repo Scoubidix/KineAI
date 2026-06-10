@@ -243,7 +243,7 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
       const user = auth.currentUser;
       if (!user) {
         console.error('Utilisateur non connecté');
-        setSaveMessage('❌ Erreur : Vous devez être connecté');
+        setSaveMessage('❌ Erreur : Tu dois être connecté');
         setTimeout(() => setSaveMessage(''), 3000);
         return;
       }
@@ -287,7 +287,7 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
         // Version toast à réactiver une fois le Toaster configuré
         toast({
           title: "Profil mis à jour",
-          description: "Vos informations ont été sauvegardées avec succès.",
+          description: "Tes informations ont été sauvegardées avec succès.",
           duration: 3000,
           className: "bg-green-50 border-green-200 text-green-800",
         });
@@ -700,7 +700,7 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                       <CardHeader>
                         <CardTitle className="text-base text-foreground">Mot de passe</CardTitle>
                         <CardDescription className="text-foreground">
-                          Modifiez votre mot de passe de connexion via un email sécurisé
+                          Modifie ton mot de passe de connexion via un email sécurisé
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
@@ -712,7 +712,7 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                                 Sécurité renforcée
                               </p>
                               <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                                Pour votre sécurité, la modification du mot de passe se fait via un email de réinitialisation sécurisé envoyé à votre adresse : <span className="font-medium">{kineData.email}</span>
+                                Pour ta sécurité, la modification du mot de passe se fait via un email de réinitialisation sécurisé envoyé à ton adresse : <span className="font-medium">{kineData.email}</span>
                               </p>
                             </div>
                           </div>
@@ -751,9 +751,9 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                         </div>
                         
                         <div className="text-xs text-muted-foreground">
-                          <p>• L'email sera envoyé à votre adresse de connexion</p>
+                          <p>• L'email sera envoyé à ton adresse de connexion</p>
                           <p>• Le lien de réinitialisation expire dans 1 heure</p>
-                          <p>• Vérifiez vos spams si vous ne recevez pas l'email</p>
+                          <p>• Vérifie tes spams si tu ne reçois pas l'email</p>
                         </div>
                       </CardContent>
                     </Card>
@@ -771,7 +771,7 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                       <CardHeader>
                         <CardTitle className="text-base text-foreground">Apparence</CardTitle>
                         <CardDescription className="text-foreground">
-                          Personnalisez l'apparence de l'application
+                          Personnalise l'apparence de l'application
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
@@ -813,7 +813,7 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                       <CardHeader>
                         <CardTitle className="text-base text-foreground">Notifications</CardTitle>
                         <CardDescription className="text-foreground">
-                          Configurez vos préférences de notifications
+                          Configure tes préférences de notifications
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -839,7 +839,7 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                   {subscriptionLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin" />
-                      <span className="ml-2">Chargement de votre abonnement...</span>
+                      <span className="ml-2">Chargement de ton abonnement...</span>
                     </div>
                   ) : (
                     <Card className="card-hover">
@@ -887,7 +887,7 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
 
                         <div className="p-4 bg-muted/30 rounded-lg border">
                           <p className="text-sm text-muted-foreground mb-3">
-                            Consultez vos factures, modifiez votre moyen de paiement ou résiliez votre abonnement.
+                            Consulte tes factures, modifie ton moyen de paiement ou résilie ton abonnement.
                           </p>
                           <Button
                             onClick={handleOpenPortal}
@@ -921,9 +921,9 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                   <div className="space-y-4">
                     <Card className="card-hover">
                       <CardHeader>
-                        <CardTitle className="text-base text-foreground">Vos données</CardTitle>
+                        <CardTitle className="text-base text-foreground">Tes données</CardTitle>
                         <CardDescription className="text-foreground">
-                          Gérez et contrôlez vos données personnelles
+                          Gère et contrôle tes données personnelles
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
@@ -931,7 +931,7 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                           <div>
                             <p className="font-medium">Télécharger mes données</p>
                             <p className="text-sm text-muted-foreground">
-                              Exportez toutes vos données personnelles (ZIP, 24h de validité)
+                              Exporte toutes tes données personnelles (ZIP, 24h de validité)
                             </p>
                           </div>
                           <Button 
@@ -967,7 +967,7 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                       <CardHeader>
                         <CardTitle className="text-base text-foreground">Conservation des données</CardTitle>
                         <CardDescription className="text-foreground">
-                          Durée de conservation de vos données
+                          Durée de conservation de tes données
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -1230,12 +1230,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const getNavigationItems = () => {
     if (role === 'kine') {
       return [
+        { href: '/dashboard/kine/chat', label: 'Assistant IA', icon: Wand2, disabled: false, highlight: true },
         { href: '/dashboard/kine/home', label: 'Accueil Kiné', icon: Home, disabled: false },
         { href: '/dashboard/kine/patients', label: 'Patients', icon: Users, disabled: false },
         { href: '/dashboard/kine/create-exercise', label: 'Mes Exercices', icon: Dumbbell, disabled: false },
         { href: '/dashboard/kine/programmes', label: 'Programmes', icon: Calendar, disabled: false },
         { href: '/dashboard/kine/bilan-kine', label: 'Bilan Kiné', icon: ClipboardCheck, disabled: false },
-        { href: '/dashboard/kine/chat', label: 'Assistant IA', icon: Wand2, disabled: false, highlight: true },
         { href: '/dashboard/kine/chatbot-admin', label: 'Module administratif', icon: FileText, disabled: false },
         { href: '/dashboard/kine/contrats', label: 'Mes Contrats', icon: Briefcase, disabled: false },
         { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, disabled: false },
@@ -1383,7 +1383,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Format non supporté. Utilisez JPEG, PNG ou WebP.');
+      alert('Format non supporté. Utilise JPEG, PNG ou WebP.');
       return;
     }
 
@@ -1564,7 +1564,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                         <p className="text-xs text-muted-foreground">{currentPlan.price}€/mois</p>
                       </div>
                       <div className="p-3">
-                        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Inclus dans votre plan</p>
+                        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Inclus dans ton plan</p>
                         <ul className="space-y-1.5">
                           <li className="flex items-center gap-2 text-xs text-foreground">
                             <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />

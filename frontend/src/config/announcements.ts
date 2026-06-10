@@ -17,7 +17,7 @@ export const ANNOUNCEMENTS: Announcement[] = [
     id: 'contracts-module-2026-05-v2',
     title: 'Nouveau : Module Contrats',
     description:
-      "Rédigez, signez électroniquement et déclarez vos contrats au Conseil de l'Ordre.",
+      "Rédige, signe électroniquement et déclare tes contrats au Conseil de l'Ordre.",
     icon: 'sparkles',
     cta: { label: 'Découvrir le module', href: '/dashboard/kine/contrats' },
     publishedAt: '2026-05-28',

@@ -122,7 +122,7 @@ export function ConversationSidebar({
           </div>
         ) : conversations.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-6 px-2">
-            Aucune conversation. Posez votre première question !
+            Aucune conversation. Pose ta première question !
           </p>
         ) : (
           conversations.map((conversation) => (

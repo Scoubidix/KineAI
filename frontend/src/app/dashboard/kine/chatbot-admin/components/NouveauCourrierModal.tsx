@@ -329,7 +329,7 @@ export default function NouveauCourrierModal({
       });
 
       if (res.status === 429) {
-        toast({ title: 'Limite atteinte', description: 'Veuillez patienter avant de réessayer.', variant: 'destructive', duration: 8000 });
+        toast({ title: 'Limite atteinte', description: 'Patiente avant de réessayer.', variant: 'destructive', duration: 8000 });
         return;
       }
 
@@ -433,7 +433,7 @@ export default function NouveauCourrierModal({
 
       if (res.status === 429) {
         const data = await res.json();
-        toast({ title: 'Limite atteinte', description: data.details || 'Veuillez patienter avant de réessayer.', variant: 'destructive', duration: 8000 });
+        toast({ title: 'Limite atteinte', description: data.details || 'Patiente avant de réessayer.', variant: 'destructive', duration: 8000 });
         return;
       }
 
@@ -583,7 +583,7 @@ export default function NouveauCourrierModal({
                 onClick={() => handleSelectTemplate(null)}
               >
                 <p className="font-medium text-sm">Message libre</p>
-                <p className="text-xs text-muted-foreground">Rédigez votre message de zéro</p>
+                <p className="text-xs text-muted-foreground">Rédige ton message de zéro</p>
               </div>
 
               {/* AI generation option */}
@@ -601,7 +601,7 @@ export default function NouveauCourrierModal({
                 {showAiInput && (
                   <div className="mt-3 space-y-2" onClick={e => e.stopPropagation()}>
                     <p className="text-xs text-muted-foreground italic">
-                      L&apos;IA génère un brouillon. Vérifiez et adaptez le message avant envoi.
+                      L&apos;IA génère un brouillon. Vérifie et adapte le message avant envoi.
                     </p>
                     <Textarea
                       value={aiPrompt}
@@ -692,7 +692,7 @@ export default function NouveauCourrierModal({
                 <div className="space-y-1">
                   <label className="text-sm font-medium">Message</label>
                   {useFreetextMode ? (
-                    <Textarea value={editedBody} onChange={e => setEditedBody(e.target.value)} className="min-h-[200px] font-mono text-sm" placeholder="Rédigez votre message..." />
+                    <Textarea value={editedBody} onChange={e => setEditedBody(e.target.value)} className="min-h-[200px] font-mono text-sm" placeholder="Rédige ton message..." />
                   ) : (
                     <div className="relative" ref={bodyRef}>
                       <div

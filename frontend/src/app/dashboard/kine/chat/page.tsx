@@ -279,13 +279,13 @@ export default function UnifiedChatPage() {
                     <p className="text-2xl md:text-3xl font-semibold text-primary mb-1">Bonjour {firstName},</p>
                   )}
                   <h2 className="text-2xl md:text-3xl font-semibold text-primary">
-                    Votre copilote IA kiné
+                    Ton copilote IA kiné
                   </h2>
                   <p className="mt-3 text-base text-muted-foreground">
-                    Posez votre question comme vous le feriez à un confrère.
+                    Pose ta question comme tu le ferais à un confrère.
                   </p>
                   <p className="text-base text-muted-foreground">
-                    L&apos;IA identifie votre besoin et mobilise les bonnes expertises.
+                    L&apos;IA identifie ton besoin et mobilise les bonnes expertises.
                   </p>
 
                   {/* Domaines couverts — chips colorés à la manière d'un copilote */}
@@ -333,8 +333,8 @@ export default function UnifiedChatPage() {
             <div className="mx-2 sm:mx-6 mb-2 rounded-lg border border-[#3899aa]/40 bg-[#3899aa]/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2">
               <p className="text-sm text-foreground/90 flex-1">
                 {isTopPlan
-                  ? 'Quota quotidien atteint. Votre quota se réinitialise à minuit — revenez demain !'
-                  : 'Quota quotidien atteint. Passez au plan supérieur pour continuer dès maintenant, ou revenez demain.'}
+                  ? 'Quota quotidien atteint. Ton quota se réinitialise à minuit — reviens demain !'
+                  : 'Quota quotidien atteint. Passe au plan supérieur pour continuer dès maintenant, ou reviens demain.'}
               </p>
               {!isTopPlan && (
                 <Button onClick={() => setIsPaywallOpen(true)} className="btn-teal rounded-full text-sm h-9 px-4 shrink-0">
@@ -349,7 +349,7 @@ export default function UnifiedChatPage() {
           <div className="px-2 sm:px-6 pb-2">
             <div className="relative flex items-center bg-white dark:bg-card border-2 border-border rounded-full px-4 py-1 shadow-sm focus-within:border-[#3899aa]/60 focus-within:shadow-md transition-all">
               <Input
-                placeholder={isQuotaExceeded ? 'Quota quotidien atteint' : 'Posez votre question ici...'}
+                placeholder={isQuotaExceeded ? 'Quota quotidien atteint' : 'Pose ta question ici...'}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}

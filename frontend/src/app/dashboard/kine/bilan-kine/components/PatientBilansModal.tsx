@@ -488,7 +488,7 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
               )}
               {editing && (
                 <p className="text-[11px] text-muted-foreground mt-2 text-right">
-                  Vous pouvez modifier directement le contenu ci-dessus
+                  Tu peux modifier directement le contenu ci-dessus
                 </p>
               )}
             </div>

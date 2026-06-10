@@ -286,7 +286,7 @@ export default function TemplatesManagementModal({
             <DialogTitle>Confirmer la suppression</DialogTitle>
           </DialogHeader>
           <p className="py-4 text-sm sm:text-base">
-            Êtes-vous sûr de vouloir supprimer ce template ? Cette action est irréversible.
+            Es-tu sûr de vouloir supprimer ce template ? Cette action est irréversible.
           </p>
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-4 mt-4">
             <Button variant="ghost" onClick={() => setConfirmDeleteId(null)}>Annuler</Button>

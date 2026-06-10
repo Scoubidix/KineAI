@@ -23,7 +23,7 @@ export default function BilanHubPage() {
               <FileText className="text-[#3899aa] h-7 w-7 shrink-0" />
               <div>
                 <h2 className="text-xl font-semibold text-[#3899aa]">Bilans</h2>
-                <p className="text-foreground text-sm">Rédigez, suivez et exportez vos bilans kinésithérapiques</p>
+                <p className="text-foreground text-sm">Rédige, suis et exporte tes bilans kinésithérapiques</p>
               </div>
             </div>
             <div className="flex items-center gap-2 bg-[#3899aa]/10 rounded-full px-3 py-1 self-start sm:self-auto">
@@ -46,7 +46,7 @@ export default function BilanHubPage() {
               <div className="flex-1">
                 <h3 className="font-semibold text-lg text-[#3899aa]">Nouveau bilan</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Choisissez un patient, le type de bilan (initial, intermédiaire, final), puis remplissez vos notes et mesures
+                  Choisis un patient, le type de bilan (initial, intermédiaire, final), puis remplis tes notes et mesures
                 </p>
               </div>
               <ArrowRight className="h-5 w-5 text-[#3899aa] hidden sm:block" />
@@ -69,7 +69,7 @@ export default function BilanHubPage() {
                 <ArrowRight className="h-4 w-4 text-[#3899aa]/40" />
               </div>
               <p className="text-sm text-muted-foreground mt-2">
-                Retrouvez les bilans déjà réalisés en cherchant un patient
+                Retrouve les bilans déjà réalisés en cherchant un patient
               </p>
             </CardContent>
           </Card>

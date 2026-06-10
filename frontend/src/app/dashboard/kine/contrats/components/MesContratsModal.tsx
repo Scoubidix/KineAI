@@ -49,7 +49,7 @@ interface MesContratsModalProps {
 
 const STATUS_LABELS: Record<ContractRow['status'], { label: string; color: string }> = {
   BROUILLON: { label: 'Brouillon', color: 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' },
-  SIGNE_INITIATEUR: { label: 'Signé par vous', color: 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300' },
+  SIGNE_INITIATEUR: { label: 'Signé par toi', color: 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300' },
   ENVOYE: { label: 'Envoyé', color: 'bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300' },
   COMPLETE: { label: 'Complet', color: 'bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300' },
   ARCHIVE: { label: 'Archivé', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' },
@@ -200,7 +200,7 @@ export default function MesContratsModal({ open, onOpenChange, refreshKey }: Mes
         toast({ title: 'Erreur', description: data.error || 'Signature impossible', variant: 'destructive' });
         return;
       }
-      toast({ title: 'Contrat signé', description: 'Vous pouvez maintenant l\'envoyer au destinataire.' });
+      toast({ title: 'Contrat signé', description: 'Tu peux maintenant l\'envoyer au destinataire.' });
       setSigningContractId(null);
       // Refresh la liste pour voir le nouveau statut
       fetchContracts();
@@ -210,7 +210,7 @@ export default function MesContratsModal({ open, onOpenChange, refreshKey }: Mes
   };
 
   const handleRevoke = async (contractId: number) => {
-    if (!confirm('Révoquer le lien envoyé au destinataire ? Le contrat redeviendra "Signé par vous" et vous pourrez le renvoyer.')) return;
+    if (!confirm('Révoquer le lien envoyé au destinataire ? Le contrat redeviendra "Signé par toi" et tu pourras le renvoyer.')) return;
     setRevokingId(contractId);
     try {
       const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts/${contractId}/revoke-invitation`, {
@@ -221,7 +221,7 @@ export default function MesContratsModal({ open, onOpenChange, refreshKey }: Mes
         toast({ title: 'Erreur', description: data.error || 'Révocation impossible', variant: 'destructive' });
         return;
       }
-      toast({ title: 'Lien révoqué', description: 'Vous pouvez renvoyer un nouveau lien.' });
+      toast({ title: 'Lien révoqué', description: 'Tu peux renvoyer un nouveau lien.' });
       fetchContracts();
     } finally {
       setRevokingId(null);
@@ -279,7 +279,7 @@ export default function MesContratsModal({ open, onOpenChange, refreshKey }: Mes
                 <div className="text-center py-12">
                   <FileSearch className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground">Aucun contrat pour le moment.</p>
-                  <p className="text-xs text-muted-foreground mt-1">Créez votre premier contrat depuis la card "Nouveau contrat".</p>
+                  <p className="text-xs text-muted-foreground mt-1">Crée ton premier contrat depuis la card "Nouveau contrat".</p>
                 </div>
               )}
               {!loading && contracts.length > 0 && (
@@ -499,7 +499,7 @@ export default function MesContratsModal({ open, onOpenChange, refreshKey }: Mes
         onOpenChange={(o) => { if (!o) setSigningContractId(null); }}
         expectedName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim()}
         title="Signer le brouillon"
-        description="Vous signez ce contrat en tant qu'initiateur."
+        description="Tu signes ce contrat en tant qu'initiateur."
         onConfirm={handleSignConfirm}
         submitting={signing}
       />

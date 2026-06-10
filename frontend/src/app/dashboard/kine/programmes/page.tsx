@@ -640,7 +640,7 @@ export default function ProgrammesPage() {
             <h1 className="text-2xl md:text-3xl font-bold text-[#3899aa]">Gestion des Programmes</h1>
             <p className="flex items-center gap-2 text-md md:text-lg text-muted-foreground mt-1">
               <Calendar className="h-5 w-5 text-accent" />
-              Vue d'ensemble de tous vos programmes de rééducation
+              Vue d'ensemble de tous tes programmes de rééducation
             </p>
           </div>
           <Button onClick={handleOpenPatientSelector} className="btn-teal flex items-center gap-2 w-full sm:w-auto">
@@ -702,8 +702,8 @@ export default function ProgrammesPage() {
               <h3 className="text-lg font-semibold mb-2 text-foreground">Aucun programme trouvé</h3>
               <p className="text-muted-foreground mb-4">
                 {searchQuery || statusFilter !== 'all' 
-                  ? 'Aucun programme ne correspond à vos critères de recherche.'
-                  : 'Vous n\'avez pas encore créé de programmes.'
+                  ? 'Aucun programme ne correspond à tes critères de recherche.'
+                  : 'Tu n\'as pas encore créé de programmes.'
                 }
               </p>
             </CardContent>
@@ -953,7 +953,7 @@ export default function ProgrammesPage() {
                   </Label>
                   <Input 
                     id="programme-title"
-                    placeholder="Entrez le titre du programme"
+                    placeholder="Entre le titre du programme"
                     value={createTitle}
                     onChange={(e) => setCreateTitle(e.target.value)}
                     className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -967,7 +967,7 @@ export default function ProgrammesPage() {
                   </Label>
                   <Textarea
                     id="programme-description"
-                    placeholder="Décrivez les objectifs et le contenu du programme..."
+                    placeholder="Décris les objectifs et le contenu du programme..."
                     value={createDescription}
                     onChange={(e) => setCreateDescription(e.target.value)}
                     className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"

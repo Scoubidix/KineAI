@@ -124,7 +124,7 @@ export default function AdminDashboardPage() {
       const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/admin/dashboard/stats`);
       if (!res.ok) {
         if (res.status === 403) {
-          setError('Acces refuse. Vous n\'etes pas administrateur.');
+          setError('Acces refuse. Tu n\'es pas administrateur.');
           return;
         }
         throw new Error('Erreur serveur');

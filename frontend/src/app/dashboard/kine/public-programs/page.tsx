@@ -19,7 +19,7 @@ export default function KinePublicProgramsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-foreground">
-              Créez et gérez bientôt ici des programmes d'exercices standards que vous pourrez partager ou vendre à un public plus large, en dehors de vos patients directs.
+              Crée et gère bientôt ici des programmes d'exercices standards que tu pourras partager ou vendre à un public plus large, en dehors de tes patients directs.
             </p>
           </CardContent>
         </Card>

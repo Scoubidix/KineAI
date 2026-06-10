@@ -19,11 +19,11 @@ export default function KineRewardsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-foreground">
-              Gagnez bientôt ici des récompenses et des avantages exclusifs en participant activement à la plateforme Mon Assistant Kiné : ajoutez des exercices, partagez des programmes, publiez des articles, et plus encore !
+              Gagnez bientôt ici des récompenses et des avantages exclusifs en participant activement à la plateforme Mon Assistant Kiné : ajoute des exercices, partage des programmes, publie des articles, et plus encore !
             </p>
              {/* Placeholder for future rewards display */}
              <div className="mt-6 p-6 border rounded-md bg-muted/50">
-                 <p className="text-foreground italic">Vos récompenses et badges apparaîtront bientôt ici.</p>
+                 <p className="text-foreground italic">Tes récompenses et badges apparaîtront bientôt ici.</p>
              </div>
           </CardContent>
         </Card>
