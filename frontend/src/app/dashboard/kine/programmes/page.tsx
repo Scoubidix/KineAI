@@ -67,7 +67,7 @@ interface Patient {
   id: number;
   firstName: string;
   lastName: string;
-  email: string;
+  email: string | null;
   phone: string;
   hasActiveProgram?: boolean;
 }
@@ -383,7 +383,7 @@ export default function ProgrammesPage() {
 
   // Filtrage des patients pour la sélection
   const filteredPatients = patients.filter(patient =>
-    matchesAllTokens(`${patient.lastName} ${patient.firstName} ${patient.email}`, patientSearchQuery)
+    matchesAllTokens(`${patient.lastName} ${patient.firstName} ${patient.email ?? ''}`, patientSearchQuery)
   );
 
   // Fonctions de gestion des filtres
@@ -912,9 +912,6 @@ export default function ProgrammesPage() {
                               </Badge>
                             )}
                           </div>
-                          <p className={`text-xs text-muted-foreground ${hasActiveProgram ? 'text-gray-400 dark:text-gray-500' : ''}`}>
-                            {patient.email}
-                          </p>
                         </div>
                       </div>
                     </Card>

@@ -25,7 +25,7 @@ interface PatientData {
   firstName: string;
   lastName: string;
   birthDate: string;
-  email: string;
+  email: string | null;
   phone: string;
   goals?: string;
 }
@@ -1308,10 +1308,12 @@ export default function PatientDetailPage() {
                             {patient.firstName} {patient.lastName.toUpperCase()}
                           </h1>
                           <div className="flex items-center gap-3 text-sm text-muted-foreground min-w-0">
-                            <span className="flex items-center gap-1 truncate">
-                              <Mail className="w-3 h-3 text-[#3899aa] shrink-0" />
-                              <span className="truncate">{patient.email}</span>
-                            </span>
+                            {patient.email && (
+                              <span className="flex items-center gap-1 truncate">
+                                <Mail className="w-3 h-3 text-[#3899aa] shrink-0" />
+                                <span className="truncate">{patient.email}</span>
+                              </span>
+                            )}
                             <span className="flex items-center gap-1 shrink-0">
                               <Phone className="w-3 h-3 text-[#3899aa]" />
                               {patient.phone}

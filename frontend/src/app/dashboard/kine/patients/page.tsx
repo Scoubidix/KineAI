@@ -159,7 +159,8 @@ export default function PatientsPage() {
   };
 
   const handleEditPatient = (patient: UserProfileData) => {
-    setForm(patient);
+    // email peut être null en base : on coerce en '' pour l'input contrôlé
+    setForm({ ...patient, email: patient.email ?? '' });
     setDialogOpen(true);
   };
 
@@ -182,7 +183,7 @@ export default function PatientsPage() {
     const value = e.target.value;
     setSearch(value);
     const filtered = patients.filter(p =>
-      matchesAllTokens(`${p.firstName} ${p.lastName} ${p.email} ${p.phone}`, value)
+      matchesAllTokens(`${p.firstName} ${p.lastName} ${p.email ?? ''} ${p.phone}`, value)
     );
     setFilteredPatients(sortPatients(filtered));
   };
@@ -292,17 +293,16 @@ export default function PatientsPage() {
                   
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Adresse email *
+                      Adresse email <span className="text-gray-400 font-normal">(optionnel)</span>
                     </Label>
-                    <Input 
+                    <Input
                       id="email"
                       type="email"
-                      name="email" 
-                      value={form.email} 
+                      name="email"
+                      value={form.email}
                       onChange={handleInputChange}
                       placeholder="exemple@email.com"
                       className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
                     />
                   </div>
                 </div>
@@ -376,7 +376,7 @@ export default function PatientsPage() {
                     <Button
                       onClick={handleAddOrUpdatePatient}
                       className="btn-teal flex-1 text-sm sm:text-base"
-                      disabled={!form.firstName || !form.lastName || !form.birthDate || !form.phone || !form.email || (!form.id && !consentChecked)}
+                      disabled={!form.firstName || !form.lastName || !form.birthDate || !form.phone || (!form.id && !consentChecked)}
                     >
                       {form.id ? 'Mettre à jour' : 'Créer le patient'}
                     </Button>
@@ -454,7 +454,7 @@ export default function PatientsPage() {
                               {p.lastName.toUpperCase()}
                             </span>
                             <div className="lg:hidden text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              {p.email} · {p.phone}
+                              {p.email ? `${p.email} · ` : ''}{p.phone}
                             </div>
                           </div>
                         </TableCell>

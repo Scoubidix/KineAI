@@ -95,7 +95,7 @@ exports.createPatient = async (req, res) => {
         firstName,
         lastName,
         birthDate: new Date(birthDate),
-        email,
+        email: email || null, // Email optionnel : '' ou undefined → null
         phone,
         goals,
         kineId: kine.id,
@@ -156,7 +156,7 @@ exports.updatePatient = async (req, res) => {
         firstName,
         lastName,
         birthDate: new Date(birthDate),
-        email,
+        email: email || null, // Email optionnel : '' ou undefined → null
         phone,
         goals,
       },
@@ -166,6 +166,49 @@ exports.updatePatient = async (req, res) => {
   } catch (err) {
     logger.error("Erreur update patient :", err);
     res.status(500).json({ error: "Erreur modification patient" });
+  }
+};
+
+// PATCH /patients/:id/email — Mise à jour ciblée de l'email seul (modal rapide du module Courrier)
+exports.updatePatientEmail = async (req, res) => {
+  const { id } = req.params;
+  const firebaseUid = req.uid;
+  const { email } = req.body;
+
+  try {
+    const prisma = prismaService.getInstance();
+
+    const kine = await prisma.kine.findUnique({
+      where: { uid: firebaseUid },
+    });
+
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    // Vérifier ownership avant modification
+    const patient = await prisma.patient.findFirst({
+      where: {
+        id: parseInt(id),
+        kineId: kine.id,
+        isActive: true
+      }
+    });
+
+    if (!patient) {
+      return res.status(404).json({ error: "Patient non trouvé ou accès refusé" });
+    }
+
+    const updatedPatient = await prisma.patient.update({
+      where: { id: parseInt(id) },
+      data: { email },
+    });
+
+    logger.info(`✅ Email patient mis à jour (ID: ${sanitizeId(updatedPatient.id)})`);
+    res.json(updatedPatient);
+  } catch (err) {
+    logger.error("Erreur update email patient :", err);
+    res.status(500).json({ error: "Erreur modification email patient" });
   }
 };
 
