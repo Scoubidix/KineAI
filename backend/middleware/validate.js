@@ -30,7 +30,7 @@ const createPatientSchema = z.object({
   firstName: trimmedString(100),
   lastName: trimmedString(100),
   birthDate: z.string().min(1),
-  email: z.string().email(),
+  email: z.string().email().optional().or(z.literal('')), // Optionnel : vide ou email valide
   phone: z.string().max(20),
   goals: z.string().max(2000),
 });
@@ -39,9 +39,14 @@ const updatePatientSchema = z.object({
   firstName: trimmedString(100),
   lastName: trimmedString(100),
   birthDate: z.string().min(1),
-  email: z.string().email(),
+  email: z.string().email().optional().or(z.literal('')), // Optionnel : vide ou email valide
   phone: z.string().max(20),
   goals: z.string().max(2000),
+});
+
+// Mise à jour ciblée de l'email seul (modal rapide du module Courrier) : email requis et valide
+const updatePatientEmailSchema = z.object({
+  email: z.string().email(),
 });
 
 // ========== KINE ==========
@@ -164,6 +169,7 @@ module.exports = {
   validate,
   createPatientSchema,
   updatePatientSchema,
+  updatePatientEmailSchema,
   createKineSchema,
   updateKineProfileSchema,
   createProgrammeSchema,

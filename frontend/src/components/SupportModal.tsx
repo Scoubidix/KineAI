@@ -14,11 +14,15 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { Send, Loader2, MessageSquare, Plus, ArrowLeft, CheckCircle2, CircleCheck } from 'lucide-react';
+import { Send, Loader2, MessageSquare, Plus, ArrowLeft, CheckCircle2, CircleCheck, ImagePlus, X } from 'lucide-react';
+
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2 Mo
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 interface TicketMessage {
   id: number;
   body: string;
+  imageUrl?: string | null;
   isAdmin: boolean;
   createdAt: string;
 }
@@ -47,9 +51,23 @@ export function SupportModal({ open, onOpenChange, initialTicketId }: SupportMod
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [replyBody, setReplyBody] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [replyImageFile, setReplyImageFile] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const newImageInputRef = useRef<HTMLInputElement>(null);
+  const replyImageInputRef = useRef<HTMLInputElement>(null);
+
+  const validateImage = (file: File): string | null => {
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      return 'Format non supporte (JPEG, PNG ou WebP uniquement).';
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      return 'Image trop lourde (2 Mo max).';
+    }
+    return null;
+  };
 
   useEffect(() => {
     if (open) {
@@ -57,6 +75,9 @@ export function SupportModal({ open, onOpenChange, initialTicketId }: SupportMod
     } else {
       // Reset a la fermeture
       setSelectedTicket(null);
+      setImageFile(null);
+      setReplyImageFile(null);
+      setError('');
     }
   }, [open]);
 
@@ -104,15 +125,22 @@ export function SupportModal({ open, onOpenChange, initialTicketId }: SupportMod
 
     setSubmitting(true);
     try {
+      const formData = new FormData();
+      formData.append('subject', subject.trim());
+      formData.append('body', body.trim());
+      if (imageFile) formData.append('image', imageFile);
+
       const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/support/tickets`, {
         method: 'POST',
-        body: JSON.stringify({ subject: subject.trim(), body: body.trim() }),
+        body: formData,
       });
 
       if (res.ok) {
         setSuccess('Ta requete a bien ete envoyee !');
         setSubject('');
         setBody('');
+        setImageFile(null);
+        if (newImageInputRef.current) newImageInputRef.current.value = '';
         fetchTickets();
         setTimeout(() => {
           setSuccess('');
@@ -130,17 +158,23 @@ export function SupportModal({ open, onOpenChange, initialTicketId }: SupportMod
   };
 
   const handleReply = async () => {
-    if (!replyBody.trim() || !selectedTicket) return;
+    if ((!replyBody.trim() && !replyImageFile) || !selectedTicket) return;
 
     setSubmitting(true);
     try {
+      const formData = new FormData();
+      formData.append('body', replyBody.trim());
+      if (replyImageFile) formData.append('image', replyImageFile);
+
       const res = await fetchWithAuth(
         `${process.env.NEXT_PUBLIC_API_URL}/api/support/tickets/${selectedTicket.id}/messages`,
-        { method: 'POST', body: JSON.stringify({ body: replyBody.trim() }) }
+        { method: 'POST', body: formData }
       );
 
       if (res.ok) {
         setReplyBody('');
+        setReplyImageFile(null);
+        if (replyImageInputRef.current) replyImageInputRef.current.value = '';
         // Rafraichir le ticket
         const ticketRes = await fetchWithAuth(
           `${process.env.NEXT_PUBLIC_API_URL}/api/support/tickets/${selectedTicket.id}`
@@ -225,7 +259,16 @@ export function SupportModal({ open, onOpenChange, initialTicketId }: SupportMod
                       ? 'bg-muted text-foreground'
                       : 'bg-primary text-primary-foreground'
                   }`}>
-                    <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+                    {msg.body && <p className="whitespace-pre-wrap break-words">{msg.body}</p>}
+                    {msg.imageUrl && (
+                      <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block">
+                        <img
+                          src={msg.imageUrl}
+                          alt="Piece jointe"
+                          className={`rounded-md max-h-48 w-auto object-contain cursor-zoom-in ${msg.body ? 'mt-2' : ''}`}
+                        />
+                      </a>
+                    )}
                     <p className={`text-[10px] mt-1 ${msg.isAdmin ? 'text-muted-foreground' : 'text-primary-foreground/70'}`}>
                       {msg.isAdmin ? 'Support' : 'Toi'} - {formatDate(msg.createdAt)}
                     </p>
@@ -237,22 +280,68 @@ export function SupportModal({ open, onOpenChange, initialTicketId }: SupportMod
 
             {/* Repondre */}
             {selectedTicket.status === 'OPEN' && (
-              <div className="flex gap-2 mt-3 pt-3 border-t shrink-0">
-                <Textarea
-                  value={replyBody}
-                  onChange={(e) => setReplyBody(e.target.value)}
-                  placeholder="Ton message..."
-                  className="min-h-[50px] max-h-[80px] resize-none text-sm"
-                  maxLength={5000}
-                />
-                <Button
-                  size="sm"
-                  onClick={handleReply}
-                  disabled={submitting || !replyBody.trim()}
-                  className="self-end h-9 w-9 p-0 shrink-0"
-                >
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
+              <div className="mt-3 pt-3 border-t shrink-0">
+                {replyImageFile && (
+                  <div className="relative inline-block mb-2">
+                    <img
+                      src={URL.createObjectURL(replyImageFile)}
+                      alt="Apercu"
+                      className="h-16 w-auto rounded-md border object-contain"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReplyImageFile(null);
+                        if (replyImageInputRef.current) replyImageInputRef.current.value = '';
+                      }}
+                      className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    ref={replyImageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const err = validateImage(file);
+                      if (err) { setError(err); e.target.value = ''; return; }
+                      setError('');
+                      setReplyImageFile(file);
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => replyImageInputRef.current?.click()}
+                    className="self-end h-9 w-9 p-0 shrink-0"
+                    title="Joindre une image"
+                  >
+                    <ImagePlus className="h-4 w-4" />
+                  </Button>
+                  <Textarea
+                    value={replyBody}
+                    onChange={(e) => setReplyBody(e.target.value)}
+                    placeholder="Ton message..."
+                    className="min-h-[50px] max-h-[80px] resize-none text-sm"
+                    maxLength={5000}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleReply}
+                    disabled={submitting || (!replyBody.trim() && !replyImageFile)}
+                    className="self-end h-9 w-9 p-0 shrink-0"
+                  >
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {error && <p className="text-xs text-destructive mt-1">{error}</p>}
               </div>
             )}
           </div>
@@ -275,9 +364,9 @@ export function SupportModal({ open, onOpenChange, initialTicketId }: SupportMod
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="new" className="mt-4 flex-1 overflow-y-auto">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
+            <TabsContent value="new" className="mt-3 flex-1 overflow-y-auto">
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <div className="space-y-1.5">
                   <Label htmlFor="support-subject">Objet de la demande</Label>
                   <Input
                     id="support-subject"
@@ -287,17 +376,66 @@ export function SupportModal({ open, onOpenChange, initialTicketId }: SupportMod
                     maxLength={255}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="support-body">Message</Label>
                   <Textarea
                     id="support-body"
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
                     placeholder="Decris ton probleme ou ta question..."
-                    className="min-h-[100px] sm:min-h-[120px] resize-none"
+                    className="min-h-[70px] sm:min-h-[80px] resize-none"
                     maxLength={5000}
                   />
-                  <p className="text-xs text-muted-foreground text-right">{body.length}/5000</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <input
+                    ref={newImageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const err = validateImage(file);
+                      if (err) { setError(err); e.target.value = ''; return; }
+                      setError('');
+                      setImageFile(file);
+                    }}
+                  />
+                  {imageFile ? (
+                    <div className="relative inline-block">
+                      <img
+                        src={URL.createObjectURL(imageFile)}
+                        alt="Apercu"
+                        className="h-16 w-auto rounded-md border object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImageFile(null);
+                          if (newImageInputRef.current) newImageInputRef.current.value = '';
+                        }}
+                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => newImageInputRef.current?.click()}
+                        className="gap-2"
+                      >
+                        <ImagePlus className="h-4 w-4" />
+                        Joindre une image
+                      </Button>
+                      <span className="text-xs text-muted-foreground">JPEG, PNG, WebP - 2 Mo max (optionnel)</span>
+                    </div>
+                  )}
                 </div>
 
                 {error && <p className="text-sm text-destructive">{error}</p>}

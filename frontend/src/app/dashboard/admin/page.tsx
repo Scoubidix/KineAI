@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, Layers, Zap } from 'lucide-react';
+import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, Layers, Zap, ImagePlus, X, Pencil, Trash2 } from 'lucide-react';
 import BilanFieldsTab from './components/BilanFieldsTab';
 import BilanTemplatesTab from './components/BilanTemplatesTab';
 import TokenUsageTab from './components/TokenUsageTab';
@@ -62,9 +62,13 @@ interface UnverifiedKine {
 interface TicketMessage {
   id: number;
   body: string;
+  imageUrl?: string | null;
   isAdmin: boolean;
   createdAt: string;
 }
+
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2 Mo
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 interface SupportTicket {
   id: number;
@@ -114,8 +118,23 @@ export default function AdminDashboardPage() {
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [expandedTicket, setExpandedTicket] = useState<number | null>(null);
   const [replyBodies, setReplyBodies] = useState<Record<number, string>>({});
+  const [replyImages, setReplyImages] = useState<Record<number, File | null>>({});
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const messagesEndRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const replyImageInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const [ticketError, setTicketError] = useState<string | null>(null);
+  // Edition / suppression des messages admin
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editingBody, setEditingBody] = useState('');
+  const [editRemoveImage, setEditRemoveImage] = useState(false);
+  const [savingMessage, setSavingMessage] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null);
+
+  const validateImage = (file: File): string | null => {
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) return 'Format non supporte (JPEG, PNG ou WebP).';
+    if (file.size > MAX_IMAGE_SIZE) return 'Image trop lourde (2 Mo max).';
+    return null;
+  };
 
   const fetchStats = async () => {
     setLoading(true);
@@ -186,23 +205,95 @@ export default function AdminDashboardPage() {
   };
 
   const handleReply = async (ticketId: number) => {
-    const body = replyBodies[ticketId]?.trim();
-    if (!body) return;
+    const body = replyBodies[ticketId]?.trim() || '';
+    const image = replyImages[ticketId];
+    if (!body && !image) return;
 
     setReplyingTo(ticketId);
+    setTicketError(null);
     try {
+      const formData = new FormData();
+      formData.append('body', body);
+      if (image) formData.append('image', image);
+
       const res = await fetchWithAuth(
         `${process.env.NEXT_PUBLIC_API_URL}/api/support/admin/tickets/${ticketId}/reply`,
-        { method: 'POST', body: JSON.stringify({ body }) }
+        { method: 'POST', body: formData }
       );
       if (res.ok) {
         setReplyBodies(prev => ({ ...prev, [ticketId]: '' }));
+        setReplyImages(prev => ({ ...prev, [ticketId]: null }));
+        if (replyImageInputRefs.current[ticketId]) replyImageInputRefs.current[ticketId]!.value = '';
         fetchTickets();
       }
     } catch {
       // Silencieux
     } finally {
       setReplyingTo(null);
+    }
+  };
+
+  const startEditMessage = (msg: TicketMessage) => {
+    setEditingMessageId(msg.id);
+    setEditingBody(msg.body);
+    setEditRemoveImage(false);
+  };
+
+  const cancelEditMessage = () => {
+    setEditingMessageId(null);
+    setEditingBody('');
+    setEditRemoveImage(false);
+  };
+
+  const handleSaveMessage = async (messageId: number) => {
+    const body = editingBody.trim();
+    if (!body) return;
+
+    setSavingMessage(true);
+    setTicketError(null);
+    try {
+      const formData = new FormData();
+      formData.append('body', body);
+      if (editRemoveImage) formData.append('removeImage', 'true');
+
+      const res = await fetchWithAuth(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/support/admin/messages/${messageId}`,
+        { method: 'PUT', body: formData }
+      );
+      if (res.ok) {
+        cancelEditMessage();
+        fetchTickets();
+      } else {
+        const json = await res.json().catch(() => ({}));
+        setTicketError(json.error || 'Erreur lors de la modification.');
+      }
+    } catch {
+      setTicketError('Erreur de connexion.');
+    } finally {
+      setSavingMessage(false);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: number) => {
+    if (!window.confirm('Supprimer definitivement ce message ?')) return;
+
+    setDeletingMessageId(messageId);
+    setTicketError(null);
+    try {
+      const res = await fetchWithAuth(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/support/admin/messages/${messageId}`,
+        { method: 'DELETE' }
+      );
+      if (res.ok) {
+        fetchTickets();
+      } else {
+        const json = await res.json().catch(() => ({}));
+        setTicketError(json.error || 'Erreur lors de la suppression.');
+      }
+    } catch {
+      setTicketError('Erreur de connexion.');
+    } finally {
+      setDeletingMessageId(null);
     }
   };
 
@@ -651,15 +742,87 @@ export default function AdminDashboardPage() {
                             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1 mb-4">
                               {ticket.messages.map((msg) => (
                                 <div key={msg.id} className={`flex ${msg.isAdmin ? 'justify-end' : 'justify-start'}`}>
-                                  <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                                    msg.isAdmin
-                                      ? 'bg-primary text-primary-foreground'
-                                      : 'bg-muted text-foreground'
-                                  }`}>
-                                    <p className="whitespace-pre-wrap break-words">{msg.body}</p>
-                                    <p className={`text-[10px] mt-1 ${msg.isAdmin ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                                      {msg.isAdmin ? 'Admin' : `${ticket.kine.firstName}`} - {formatDateShort(msg.createdAt)}
-                                    </p>
+                                  <div className="group flex items-end gap-1.5 max-w-[80%]">
+                                    {/* Boutons edition/suppression (messages admin uniquement, a gauche de la bulle) */}
+                                    {msg.isAdmin && editingMessageId !== msg.id && (
+                                      <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                        <button
+                                          onClick={() => startEditMessage(msg)}
+                                          className="text-muted-foreground hover:text-foreground"
+                                          title="Modifier"
+                                        >
+                                          <Pencil className="h-3.5 w-3.5" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteMessage(msg.id)}
+                                          disabled={deletingMessageId === msg.id}
+                                          className="text-muted-foreground hover:text-destructive"
+                                          title="Supprimer"
+                                        >
+                                          {deletingMessageId === msg.id
+                                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            : <Trash2 className="h-3.5 w-3.5" />}
+                                        </button>
+                                      </div>
+                                    )}
+                                    <div className={`rounded-lg px-3 py-2 text-sm ${
+                                      msg.isAdmin
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-muted text-foreground'
+                                    }`}>
+                                      {editingMessageId === msg.id ? (
+                                        // Mode edition
+                                        <div className="space-y-2 min-w-[220px]">
+                                          <Textarea
+                                            value={editingBody}
+                                            onChange={(e) => setEditingBody(e.target.value)}
+                                            className="min-h-[60px] resize-none text-sm text-foreground bg-background"
+                                            maxLength={5000}
+                                          />
+                                          {msg.imageUrl && !editRemoveImage && (
+                                            <div className="flex items-center gap-2">
+                                              <img src={msg.imageUrl} alt="Piece jointe" className="h-12 w-auto rounded border object-contain" />
+                                              <button
+                                                onClick={() => setEditRemoveImage(true)}
+                                                className="text-[11px] text-destructive-foreground/90 underline"
+                                              >
+                                                Retirer l'image
+                                              </button>
+                                            </div>
+                                          )}
+                                          {msg.imageUrl && editRemoveImage && (
+                                            <p className="text-[11px] italic text-primary-foreground/80">
+                                              Image retiree.{' '}
+                                              <button onClick={() => setEditRemoveImage(false)} className="underline">Annuler</button>
+                                            </p>
+                                          )}
+                                          <div className="flex gap-2">
+                                            <Button size="sm" className="h-7 text-xs" onClick={() => handleSaveMessage(msg.id)} disabled={savingMessage || !editingBody.trim()}>
+                                              {savingMessage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Enregistrer'}
+                                            </Button>
+                                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={cancelEditMessage} disabled={savingMessage}>
+                                              Annuler
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          {msg.body && <p className="whitespace-pre-wrap break-words">{msg.body}</p>}
+                                          {msg.imageUrl && (
+                                            <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block">
+                                              <img
+                                                src={msg.imageUrl}
+                                                alt="Piece jointe"
+                                                className={`rounded-md max-h-48 w-auto object-contain cursor-zoom-in ${msg.body ? 'mt-2' : ''}`}
+                                              />
+                                            </a>
+                                          )}
+                                          <p className={`text-[10px] mt-1 ${msg.isAdmin ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                                            {msg.isAdmin ? 'Admin' : `${ticket.kine.firstName}`} - {formatDateShort(msg.createdAt)}
+                                          </p>
+                                        </>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               ))}
@@ -667,7 +830,40 @@ export default function AdminDashboardPage() {
                             </div>
 
                             {/* Zone de reponse */}
+                            {replyImages[ticket.id] && (
+                              <div className="relative inline-block mb-2">
+                                <img
+                                  src={URL.createObjectURL(replyImages[ticket.id]!)}
+                                  alt="Apercu"
+                                  className="h-16 w-auto rounded-md border object-contain"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setReplyImages(prev => ({ ...prev, [ticket.id]: null }));
+                                    if (replyImageInputRefs.current[ticket.id]) replyImageInputRefs.current[ticket.id]!.value = '';
+                                  }}
+                                  className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
                             <div className="flex gap-2">
+                              <input
+                                ref={(el) => { replyImageInputRefs.current[ticket.id] = el; }}
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const err = validateImage(file);
+                                  if (err) { setTicketError(err); e.target.value = ''; return; }
+                                  setTicketError(null);
+                                  setReplyImages(prev => ({ ...prev, [ticket.id]: file }));
+                                }}
+                              />
                               <Textarea
                                 value={replyBodies[ticket.id] || ''}
                                 onChange={(e) => setReplyBodies(prev => ({ ...prev, [ticket.id]: e.target.value }))}
@@ -678,8 +874,16 @@ export default function AdminDashboardPage() {
                               <div className="flex flex-col gap-1.5">
                                 <Button
                                   size="sm"
+                                  variant="outline"
+                                  onClick={() => replyImageInputRefs.current[ticket.id]?.click()}
+                                  title="Joindre une image"
+                                >
+                                  <ImagePlus className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
                                   onClick={() => handleReply(ticket.id)}
-                                  disabled={replyingTo === ticket.id || !replyBodies[ticket.id]?.trim()}
+                                  disabled={replyingTo === ticket.id || (!replyBodies[ticket.id]?.trim() && !replyImages[ticket.id])}
                                 >
                                   {replyingTo === ticket.id ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -698,6 +902,7 @@ export default function AdminDashboardPage() {
                                 </Button>
                               </div>
                             </div>
+                            {ticketError && <p className="text-xs text-destructive mt-2">{ticketError}</p>}
                           </div>
                         )}
                       </CardContent>

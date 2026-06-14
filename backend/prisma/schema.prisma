@@ -112,7 +112,7 @@ model Patient {
   lastName  String
   birthDate DateTime
   phone     String
-  email     String
+  email     String?  // Optionnel : le kiné peut créer un patient sans email
   goals     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -610,6 +610,7 @@ model SupportTicket {
 model TicketMessage {
   id        Int      @id @default(autoincrement())
   body      String   @db.Text
+  imagePath String?  // Chemin GCS de la piece jointe (dossier support/), supprime a la resolution du ticket
   isAdmin   Boolean  @default(false)
   createdAt DateTime @default(now())
 
