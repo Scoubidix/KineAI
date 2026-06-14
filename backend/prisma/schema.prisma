@@ -610,6 +610,7 @@ model SupportTicket {
 model TicketMessage {
   id        Int      @id @default(autoincrement())
   body      String   @db.Text
+  imagePath String?  // Chemin GCS de la piece jointe (dossier support/), supprime a la resolution du ticket
   isAdmin   Boolean  @default(false)
   createdAt DateTime @default(now())
 

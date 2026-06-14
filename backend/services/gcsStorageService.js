@@ -16,6 +16,7 @@ const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'monassistantkine';
 const EXERCICES_FOLDER = 'exercices/';
 const AVATARS_FOLDER = 'avatars/';
 const CONTRACTS_FOLDER = 'contracts/';
+const SUPPORT_FOLDER = 'support/';
 const DEFAULT_SIGNED_URL_EXPIRATION = 60 * 60 * 1000; // 1 heure en ms
 const CONTRACT_PDF_SIGNED_URL_EXPIRATION = 7 * 24 * 60 * 60 * 1000; // 7 jours en ms
 
@@ -326,6 +327,77 @@ async function deleteAvatar(avatarPath) {
 }
 
 /**
+ * Upload une piece jointe de ticket support vers GCS (fichier PRIVE par defaut)
+ * @param {Buffer} fileBuffer - Buffer de l'image
+ * @param {string} fileName - Nom du fichier
+ * @param {string} contentType - MIME type de l'image
+ * @returns {Promise<string>} Le chemin du fichier (imagePath)
+ */
+async function uploadSupportImage(fileBuffer, fileName, contentType) {
+  try {
+    const timestamp = Date.now();
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const uniqueFileName = `${timestamp}_${sanitizedFileName}`;
+    const imagePath = `${SUPPORT_FOLDER}${uniqueFileName}`;
+
+    const file = bucket.file(imagePath);
+
+    await file.save(fileBuffer, {
+      metadata: {
+        contentType,
+        cacheControl: 'private, max-age=3600',
+        metadata: {
+          uploadedAt: new Date().toISOString(),
+        }
+      },
+      resumable: false,
+    });
+
+    logger.info(`Image support uploadee sur GCS (privee): ${imagePath}`);
+    return imagePath;
+
+  } catch (error) {
+    logger.error('Erreur lors de l\'upload de l\'image support sur GCS:', error);
+    throw new Error(`Echec de l'upload de l'image support: ${error.message}`);
+  }
+}
+
+/**
+ * Supprimer une piece jointe de ticket support de GCS
+ * @param {string} imagePath - Chemin du fichier (ex: "support/123_bug.png")
+ * @returns {Promise<void>}
+ */
+async function deleteSupportImage(imagePath) {
+  try {
+    if (!imagePath) {
+      logger.warn('Tentative de suppression d\'une image support avec chemin vide');
+      return;
+    }
+
+    // Verification de securite : uniquement dossier support/
+    if (!imagePath.startsWith(SUPPORT_FOLDER)) {
+      logger.error('Tentative de suppression hors du dossier support:', imagePath);
+      throw new Error('Chemin de fichier non autorise');
+    }
+
+    const file = bucket.file(imagePath);
+
+    const [exists] = await file.exists();
+    if (!exists) {
+      logger.warn(`L'image support n'existe pas sur GCS (deja supprimee?): ${imagePath}`);
+      return;
+    }
+
+    await file.delete();
+    logger.info(`Image support supprimee de GCS: ${imagePath}`);
+
+  } catch (error) {
+    logger.error('Erreur lors de la suppression de l\'image support sur GCS:', error);
+    throw new Error(`Echec de la suppression de l'image support: ${error.message}`);
+  }
+}
+
+/**
  * Upload du PDF final scellé d'un contrat de remplacement/assistanat
  * @param {Buffer} fileBuffer - Buffer du PDF
  * @param {number|string} contractId - ID du contrat
@@ -394,6 +466,8 @@ module.exports = {
   uploadAvatar,
   deleteAvatar,
   validateImageBuffer,
+  uploadSupportImage,
+  deleteSupportImage,
   uploadContractPdf,
   generateContractPdfSignedUrl,
   deleteContractPdf,
@@ -401,4 +475,5 @@ module.exports = {
   EXERCICES_FOLDER,
   AVATARS_FOLDER,
   CONTRACTS_FOLDER,
+  SUPPORT_FOLDER,
 };
