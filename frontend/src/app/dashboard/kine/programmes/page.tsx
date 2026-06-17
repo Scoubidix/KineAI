@@ -29,13 +29,15 @@ import {
   Filter,
   Plus,
   X,
-  Tag
+  Tag,
+  Eye
 } from 'lucide-react';
 import { format, differenceInDays, isAfter, isBefore, addDays, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 
 interface Programme {
   id: number;
@@ -77,6 +79,65 @@ interface ExerciseOption {
   nom: string;
   isPublic: boolean;
   tags?: string;
+  description?: string;   // déjà renvoyé par l'API, exposé pour l'aperçu
+  gifUrl?: string;        // URL signée GCS, déjà renvoyée par l'API
+  gifPath?: string;       // chemin GCS, déjà renvoyé par l'API
+}
+
+// Bouton "Aperçu" + popover affichant le GIF et la description d'un exercice.
+// Données déjà chargées en mémoire (gifUrl/description) → ouverture instantanée, aucun appel API.
+function ExercisePreviewPopover({ exercise }: { exercise: ExerciseOption }) {
+  const tags = parseTagsFromString(exercise.tags);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          // stopPropagation : ouvrir l'aperçu ne doit PAS cocher/décocher l'exercice
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Aperçu de ${exercise.nom}`}
+          className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-gray-500 hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+        >
+          <Eye className="h-4 w-4" />
+          <span>Aperçu</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="w-auto max-w-[min(92vw,40rem)]"
+        // Le contenu est rendu via Portal mais React propage les events à travers
+        // l'arbre React → sans ce stopPropagation, un clic dans le popover cocherait la ligne.
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="space-y-2 min-w-0">
+          <p className="font-medium text-sm text-foreground break-words">{exercise.nom}</p>
+
+          {exercise.gifUrl ? (
+            <img
+              src={exercise.gifUrl}
+              alt={`Démonstration : ${exercise.nom}`}
+              className="max-w-full max-h-[70vh] mx-auto rounded-md border bg-muted object-contain"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-24 rounded-md border bg-muted text-xs text-gray-500">
+              Pas d'illustration
+            </div>
+          )}
+
+          {tags.length > 0 && (
+            <div className="flex gap-1 flex-wrap pt-1">
+              {tags.map((tag) => (
+                <Badge key={tag} variant="outline" className="text-xs">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 interface ProgrammeExercise {
@@ -1203,7 +1264,7 @@ export default function ProgrammesPage() {
                                 <p className="font-medium text-sm text-foreground">
                                   {exercise.nom}
                                 </p>
-                                <div className="flex gap-1 mt-1 flex-wrap">
+                                <div className="flex gap-1 mt-1 flex-wrap items-center">
                                   <Badge variant={exercise.isPublic ? "default" : "secondary"} className="text-xs">
                                     {exercise.isPublic ? 'Public' : 'Privé'}
                                   </Badge>
@@ -1212,6 +1273,7 @@ export default function ProgrammesPage() {
                                       {tag}
                                     </Badge>
                                   ))}
+                                  <ExercisePreviewPopover exercise={exercise} />
                                 </div>
                               </div>
                             </div>
