@@ -142,15 +142,16 @@ router.post('/clock/delete', async (req, res) => {
   if (!clockId) {
     return res.status(400).json({ success: false, error: 'clockId requis', code: 'BAD_REQUEST' });
   }
+  if (!email) {
+    return res.status(400).json({ success: false, error: 'email requis', code: 'BAD_REQUEST' });
+  }
   // Détacher EN BASE avant la suppression : la suppression du clock supprime l'abo et émet
   // customer.subscription.deleted ; en détachant d'abord, le webhook ne matche plus le kiné
   // et ne rabaisse pas son plan (même garde que set-plan).
-  if (email) {
-    try {
-      await prisma.kine.update({ where: { email }, data: { subscriptionId: null, subscriptionStatus: null } });
-    } catch (err) {
-      logger.warn('[test/clock/delete] détachement base ignoré:', err.message);
-    }
+  try {
+    await prisma.kine.update({ where: { email }, data: { subscriptionId: null, subscriptionStatus: null } });
+  } catch (err) {
+    logger.warn('[test/clock/delete] détachement base ignoré:', err.message);
   }
   try {
     await StripeService.stripe.testHelpers.testClocks.del(clockId);
