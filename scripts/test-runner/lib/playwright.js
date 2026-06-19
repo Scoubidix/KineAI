@@ -1,4 +1,8 @@
-const { stripAnsi } = require('./util');
+const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const { stripAnsi, streamLines } = require('./util');
+const { FRONTEND_DIR, TMP_DIR } = require('./paths');
 
 function basename(p) {
   return String(p || '').split(/[\\/]/).pop();
@@ -41,4 +45,33 @@ function parsePlaywrightResults(report) {
   return out;
 }
 
-module.exports = { parsePlaywrightResults };
+// Lance Playwright dans frontend/ : reporter list (logs live) + json (fichier).
+// NE PAS définir CI → navigateur visible (cf. playwright.config.ts).
+function runPlaywright({ onLog } = {}) {
+  return new Promise((resolve, reject) => {
+    const outFile = path.join(TMP_DIR, 'kineai-playwright-results.json');
+    try { fs.rmSync(outFile, { force: true }); } catch (_) {}
+    if (onLog) onLog('> npx playwright test (frontend, navigateur visible)');
+    const child = spawn('npx', ['playwright', 'test', '--reporter=list,json'], {
+      cwd: FRONTEND_DIR,
+      shell: true,
+      env: { ...process.env, CI: '', PLAYWRIGHT_JSON_OUTPUT_NAME: outFile },
+    });
+    streamLines(child.stdout, onLog);
+    streamLines(child.stderr, onLog);
+    child.on('error', reject);
+    child.on('close', () => {
+      if (!fs.existsSync(outFile)) {
+        return reject(new Error('Playwright n\'a pas produit de résultats (échec de lancement ?)'));
+      }
+      try {
+        const report = JSON.parse(fs.readFileSync(outFile, 'utf8'));
+        resolve(parsePlaywrightResults(report));
+      } catch (e) {
+        reject(new Error('Résultats Playwright illisibles : ' + e.message));
+      }
+    });
+  });
+}
+
+module.exports = { parsePlaywrightResults, runPlaywright };

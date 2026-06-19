@@ -6,4 +6,16 @@ function stripAnsi(str) {
   return String(str).replace(/\x1b\[[0-9;]*m/g, '');
 }
 
-module.exports = { stripAnsi };
+// Découpe un buffer stdout/stderr en lignes et les transmet à onLog.
+function streamLines(stream, onLog) {
+  let buf = '';
+  stream.on('data', (chunk) => {
+    buf += chunk.toString();
+    const lines = buf.split(/\r?\n/);
+    buf = lines.pop();
+    for (const line of lines) if (onLog) onLog(line);
+  });
+  stream.on('end', () => { if (buf && onLog) onLog(buf); });
+}
+
+module.exports = { stripAnsi, streamLines };
