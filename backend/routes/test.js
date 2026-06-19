@@ -35,19 +35,27 @@ router.post('/set-plan', async (req, res) => {
     return res.status(404).json({ success: false, error: 'Kiné non trouvé', code: 'NOT_FOUND' });
   }
 
-  if (cancelStripeSub && kine.subscriptionId) {
+  // Quand on annule l'abonnement, on détache subscriptionId/subscriptionStatus EN BASE
+  // AVANT l'annulation Stripe. Sinon le webhook customer.subscription.deleted qui suit
+  // retrouve le kiné par subscriptionId (handleSubscriptionDeleted) et écrase planType
+  // vers FREE — ce qui annulerait le restore EXPERT du afterAll. En détachant d'abord,
+  // le webhook ne matche plus aucun kiné et le planType cible (EXPERT/FREE) tient.
+  const subToCancel = cancelStripeSub ? kine.subscriptionId : null;
+
+  const data = cancelStripeSub
+    ? { planType, subscriptionId: null, subscriptionStatus: null }
+    : { planType };
+
+  const updated = await prisma.kine.update({ where: { email }, data });
+
+  if (subToCancel) {
     try {
-      await StripeService.stripe.subscriptions.cancel(kine.subscriptionId);
+      await StripeService.stripe.subscriptions.cancel(subToCancel);
     } catch (err) {
       logger.warn('[test/set-plan] annulation Stripe ignorée:', err.message);
     }
   }
 
-  const data = planType === null
-    ? { planType: null, subscriptionId: null, subscriptionStatus: null }
-    : { planType };
-
-  const updated = await prisma.kine.update({ where: { email }, data });
   return res.json({ success: true, planType: updated.planType });
 });
 
