@@ -83,10 +83,7 @@ backend/data/*.csv
 kines-*.csv
 kines-*.json
 ps-libreacces-*.txt
-scripts/*
-# Outillage de tests versionné (UI runner) — réinclus malgré l'ignore global de scripts/
-!scripts/test-runner/
-!scripts/run-tests-ui.ps1
+scripts/
 
 # Artefacts Playwright e2e (runs locaux)
 test-results/
