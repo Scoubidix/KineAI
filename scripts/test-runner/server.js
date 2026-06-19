@@ -14,7 +14,8 @@ const clients = new Set(); // réponses SSE ouvertes
 // Diffuse un event SSE à tous les clients connectés.
 function broadcast(event, data) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const res of clients) res.write(payload);
+  // Ne pas écrire sur un client déjà déconnecté (fenêtre étroite entre 'close' et le nettoyage du Set).
+  for (const res of clients) if (!res.writableEnded) res.write(payload);
 }
 
 const log = (line) => broadcast('log', line);
@@ -52,10 +53,11 @@ async function runTarget(target) {
 }
 
 function readBody(req) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let b = '';
     req.on('data', (c) => { b += c; });
     req.on('end', () => resolve(b));
+    req.on('error', reject); // évite un handler bloqué si le client coupe en cours d'envoi
   });
 }
 
