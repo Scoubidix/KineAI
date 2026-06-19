@@ -20,7 +20,15 @@ test.describe('Reconduction abonnement (Test Clock)', () => {
 
   // Supprime le clock (cascade) puis restaure EXPERT, quoi qu'il arrive.
   test.afterAll(async () => {
-    if (clockId) await deleteClock(clockId, EMAIL);
+    // Restaure EXPERT quoi qu'il arrive : un échec de suppression du clock ne doit pas
+    // empêcher la restauration du compte de test.
+    if (clockId) {
+      try {
+        await deleteClock(clockId, EMAIL);
+      } catch {
+        // suppression best-effort ; le test clock s'auto-supprime sous ~30j
+      }
+    }
     await setPlan('EXPERT', true);
   });
 
