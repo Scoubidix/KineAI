@@ -59,4 +59,44 @@ router.post('/set-plan', async (req, res) => {
   return res.json({ success: true, planType: updated.planType });
 });
 
+// POST /api/test/clock/create-subscription — crée un abo sur un Test Clock et le lie au kiné.
+router.post('/clock/create-subscription', async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) {
+    return res.status(400).json({ success: false, error: 'email requis', code: 'BAD_REQUEST' });
+  }
+
+  const kine = await prisma.kine.findUnique({ where: { email } });
+  if (!kine) {
+    return res.status(404).json({ success: false, error: 'Kiné non trouvé', code: 'NOT_FOUND' });
+  }
+
+  const stripe = StripeService.stripe;
+  const now = Math.floor(Date.now() / 1000);
+
+  const clock = await stripe.testHelpers.testClocks.create({ frozen_time: now });
+  const customer = await stripe.customers.create({
+    test_clock: clock.id,
+    email,
+    metadata: { kineId: String(kine.id) },
+  });
+  await stripe.paymentMethods.attach('pm_card_visa', { customer: customer.id });
+  await stripe.customers.update(customer.id, {
+    invoice_settings: { default_payment_method: 'pm_card_visa' },
+  });
+  const subscription = await stripe.subscriptions.create({
+    customer: customer.id,
+    items: [{ price: process.env.STRIPE_PRICE_PRATIQUE }],
+    default_payment_method: 'pm_card_visa',
+  });
+
+  await prisma.kine.update({
+    where: { email },
+    data: { subscriptionId: subscription.id, subscriptionStatus: 'active' },
+  });
+
+  const periodEnd = subscription.items.data[0].current_period_end;
+  return res.json({ clockId: clock.id, subscriptionId: subscription.id, periodEnd });
+});
+
 module.exports = router;
