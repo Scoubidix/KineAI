@@ -80,14 +80,14 @@ router.post('/clock/create-subscription', async (req, res) => {
     email,
     metadata: { kineId: String(kine.id) },
   });
-  await stripe.paymentMethods.attach('pm_card_visa', { customer: customer.id });
+  const paymentMethod = await stripe.paymentMethods.attach('pm_card_visa', { customer: customer.id });
   await stripe.customers.update(customer.id, {
-    invoice_settings: { default_payment_method: 'pm_card_visa' },
+    invoice_settings: { default_payment_method: paymentMethod.id },
   });
   const subscription = await stripe.subscriptions.create({
     customer: customer.id,
     items: [{ price: process.env.STRIPE_PRICE_PRATIQUE }],
-    default_payment_method: 'pm_card_visa',
+    default_payment_method: paymentMethod.id,
   });
 
   await prisma.kine.update({
