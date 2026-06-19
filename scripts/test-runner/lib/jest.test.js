@@ -9,7 +9,7 @@ const SAMPLE = {
       name: 'C:\\Users\\x\\backend\\tests\\subscription.test.js',
       assertionResults: [
         { title: 'passe si plan actif', status: 'passed', duration: 12, failureMessages: [] },
-        { title: 'refuse si FREE', status: 'failed', duration: 8, failureMessages: ['[31mExpected 200 received 403[39m\n  at x'] },
+        { title: 'refuse si FREE', status: 'failed', duration: 8, failureMessages: ['\x1b[31mExpected 200 received 403\x1b[39m\n  at x'] },
       ],
     },
     {
