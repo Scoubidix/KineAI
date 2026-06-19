@@ -92,7 +92,7 @@ router.post('/clock/create-subscription', async (req, res) => {
 
   await prisma.kine.update({
     where: { email },
-    data: { subscriptionId: subscription.id, subscriptionStatus: 'active' },
+    data: { subscriptionId: subscription.id, subscriptionStatus: 'ACTIVE' },
   });
 
   const periodEnd = subscription.items.data[0].current_period_end;

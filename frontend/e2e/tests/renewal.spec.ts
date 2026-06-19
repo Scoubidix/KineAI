@@ -50,7 +50,7 @@ test.describe('Reconduction abonnement (Test Clock)', () => {
 
     // 4. Assertions.
     expect(new Date(after.subscriptionEndDate!).getTime()).toBeGreaterThan(endBefore.getTime());
-    expect(after.subscriptionStatus).toBe('active');
+    expect(after.subscriptionStatus).toBe('ACTIVE');
     expect(after.planType).toBe('PRATIQUE');
   });
 });
