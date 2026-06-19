@@ -99,4 +99,65 @@ router.post('/clock/create-subscription', async (req, res) => {
   return res.json({ clockId: clock.id, subscriptionId: subscription.id, periodEnd });
 });
 
+// POST /api/test/clock/advance — avance le Test Clock et attend qu'il repasse 'ready'.
+router.post('/clock/advance', async (req, res) => {
+  const { clockId, toTimestamp } = req.body || {};
+  if (!clockId || !toTimestamp) {
+    return res.status(400).json({ success: false, error: 'clockId et toTimestamp requis', code: 'BAD_REQUEST' });
+  }
+  const stripe = StripeService.stripe;
+  await stripe.testHelpers.testClocks.advance(clockId, { frozen_time: toTimestamp });
+  const deadline = Date.now() + 30000;
+  let clock = null;
+  while (Date.now() < deadline) {
+    clock = await stripe.testHelpers.testClocks.retrieve(clockId);
+    if (clock.status === 'ready') {
+      return res.json({ status: 'ready' });
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return res.status(504).json({ success: false, error: 'Test clock pas prêt avant timeout', code: 'CLOCK_TIMEOUT' });
+});
+
+// GET /api/test/kine-subscription — lit l'état d'abonnement d'un kiné (cible de polling e2e).
+router.get('/kine-subscription', async (req, res) => {
+  const email = req.query.email;
+  if (!email) {
+    return res.status(400).json({ success: false, error: 'email requis', code: 'BAD_REQUEST' });
+  }
+  const kine = await prisma.kine.findUnique({ where: { email } });
+  if (!kine) {
+    return res.status(404).json({ success: false, error: 'Kiné non trouvé', code: 'NOT_FOUND' });
+  }
+  return res.json({
+    planType: kine.planType,
+    subscriptionStatus: kine.subscriptionStatus,
+    subscriptionEndDate: kine.subscriptionEndDate,
+  });
+});
+
+// POST /api/test/clock/delete — détache l'abo en base puis supprime le Test Clock (cascade).
+router.post('/clock/delete', async (req, res) => {
+  const { clockId, email } = req.body || {};
+  if (!clockId) {
+    return res.status(400).json({ success: false, error: 'clockId requis', code: 'BAD_REQUEST' });
+  }
+  // Détacher EN BASE avant la suppression : la suppression du clock supprime l'abo et émet
+  // customer.subscription.deleted ; en détachant d'abord, le webhook ne matche plus le kiné
+  // et ne rabaisse pas son plan (même garde que set-plan).
+  if (email) {
+    try {
+      await prisma.kine.update({ where: { email }, data: { subscriptionId: null, subscriptionStatus: null } });
+    } catch (err) {
+      logger.warn('[test/clock/delete] détachement base ignoré:', err.message);
+    }
+  }
+  try {
+    await StripeService.stripe.testHelpers.testClocks.del(clockId);
+  } catch (err) {
+    logger.warn('[test/clock/delete] suppression clock ignorée:', err.message);
+  }
+  return res.json({ success: true });
+});
+
 module.exports = router;
