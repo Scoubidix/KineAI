@@ -84,3 +84,7 @@ kines-*.csv
 kines-*.json
 ps-libreacces-*.txt
 scripts/
+
+# Artefacts Playwright e2e (runs locaux)
+test-results/
+playwright-report/
