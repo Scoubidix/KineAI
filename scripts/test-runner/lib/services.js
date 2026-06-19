@@ -4,6 +4,12 @@ const { spawn } = require('child_process');
 const path = require('path');
 const { ROOT, BACKEND_DIR, FRONTEND_DIR } = require('./paths');
 
+// Outils système Windows par chemin complet : indépendant du PATH du shell qui lance le serveur
+// (le PATH peut ne pas contenir powershell/tasklist selon le contexte de lancement).
+const SYS = process.env.SystemRoot || process.env.windir || 'C:\\Windows';
+const POWERSHELL = path.join(SYS, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+const TASKLIST = path.join(SYS, 'System32', 'tasklist.exe');
+
 // Teste si un port TCP accepte une connexion.
 function isPortOpen(port, host = '127.0.0.1', timeoutMs = 1000) {
   return new Promise((resolve) => {
@@ -95,7 +101,7 @@ async function ensureServices({ onLog } = {}) {
 // Détecte un process stripe via tasklist (Windows).
 function isStripeRunning() {
   return new Promise((resolve) => {
-    const child = spawn('tasklist', ['/FI', 'IMAGENAME eq stripe.exe', '/NH'], { shell: true });
+    const child = spawn(TASKLIST, ['/FI', 'IMAGENAME eq stripe.exe', '/NH']);
     let out = '';
     child.stdout.on('data', (c) => { out += c.toString(); });
     child.on('error', () => resolve(false));
@@ -107,8 +113,8 @@ function isStripeRunning() {
 function startStripeListen(onLog) {
   return new Promise((resolve, reject) => {
     const script = path.join(ROOT, 'scripts', 'e2e-stripe-listen.ps1');
-    const child = spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', script], {
-      cwd: ROOT, shell: true, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
+    const child = spawn(POWERSHELL, ['-ExecutionPolicy', 'Bypass', '-File', script], {
+      cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
     });
     let settled = false;
     const finish = (fn, arg) => { if (!settled) { settled = true; child.unref(); fn(arg); } };
