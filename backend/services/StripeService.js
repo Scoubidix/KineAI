@@ -7,7 +7,11 @@ const prismaService = require('./prismaService');
 
 class StripeService {
   constructor() {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    // apiVersion pinnée explicitement : découple la version npm du SDK du comportement
+    // de l'API. Garde le comportement Basil actuel même après une montée de version du SDK.
+    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-08-27.basil',
+    });
     this.endpointSecret = process.env.STRIPE_ENDPOINT_SECRET;
 
     // Price IDs Stripe configurés via variables d'environnement
