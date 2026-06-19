@@ -6,6 +6,22 @@ export class SuccessPage {
 
   async waitForLanding() {
     await this.page.waitForURL(/\/dashboard\/kine\/upgrade\/success/, { timeout: 60_000 });
+
+    // Désenregistre les service workers sur localhost pour éviter qu'un SW stale
+    // (mis en cache lors d'une session précédente) serve des JS avec des erreurs de parse
+    // et empêche React de s'hydrater. Reload minimal pour repartir sur des JS frais.
+    const hasStaleSwIssue = await this.page.evaluate(async () => {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) await reg.unregister();
+        return regs.length > 0;
+      }
+      return false;
+    });
+    if (hasStaleSwIssue) {
+      await this.page.reload({ waitUntil: 'domcontentloaded' });
+    }
+
     await expect(
       this.page.getByRole('heading', { name: /Paiement réussi/ })
     ).toBeVisible({ timeout: 30_000 });
@@ -18,8 +34,11 @@ export class SuccessPage {
       if (await refresh.isVisible().catch(() => false)) {
         await refresh.click();
       }
-      await expect(this.page.getByText(`Plan ${planName}`)).toBeVisible({ timeout: 3000 });
-      await expect(this.page.getByText('Actif', { exact: true })).toBeVisible({ timeout: 3000 });
+      // Cible le titre exact "Plan <Nom> Actif" (le badge "Actif" fait partie du heading).
+      // Évite le strict mode violation : getByText('Plan Pratique') matcherait aussi le paragraphe descriptif.
+      await expect(
+        this.page.getByRole('heading', { name: `Plan ${planName} Actif` })
+      ).toBeVisible({ timeout: 3000 });
     }).toPass({ timeout: 45_000, intervals: [2000, 3000, 5000] });
   }
 }
