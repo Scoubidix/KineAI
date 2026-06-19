@@ -120,7 +120,17 @@ function startStripeListen(onLog) {
     child.stdout.on('data', handle);
     child.stderr.on('data', handle);
     child.on('error', (e) => finish(reject, e));
-    setTimeout(() => finish(resolve), 15000); // fallback : stripe listen affiche "Ready" très vite
+    // Fallback : stripe listen affiche "Ready" très vite. Si on ne l'a pas vu après 15s,
+    // on continue quand même mais on prévient — c'est le symptôme classique d'un mauvais
+    // STRIPE_SECRET_KEY ou whsec (cf. pièges connus). Mieux vaut un test e2e qui échoue avec
+    // un indice qu'un blocage silencieux.
+    setTimeout(() => {
+      if (!settled && onLog) {
+        onLog('[avertissement] stripe listen : "Ready" non détecté après 15s — je continue. ' +
+          'Si le webhook échoue, vérifier STRIPE_SECRET_KEY (sk_test_) et STRIPE_ENDPOINT_SECRET (whsec) dans backend/.env.');
+      }
+      finish(resolve);
+    }, 15000);
   });
 }
 
