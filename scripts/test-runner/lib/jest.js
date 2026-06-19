@@ -49,8 +49,11 @@ function runJest({ onLog } = {}) {
     });
     streamLines(child.stdout, onLog);
     streamLines(child.stderr, onLog);
-    child.on('error', reject);
+    // Mémorise une erreur de spawn (ex: npx introuvable) pour la remonter telle quelle, sans la masquer.
+    let spawnError = null;
+    child.on('error', (e) => { spawnError = e; });
     child.on('close', () => {
+      if (spawnError) return reject(spawnError);
       // Jest sort en code 1 si des tests échouent : c'est NORMAL, on lit quand même le fichier.
       if (!fs.existsSync(outFile)) {
         return reject(new Error('Jest n\'a pas produit de résultats (crash au démarrage ?)'));
