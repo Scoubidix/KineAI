@@ -467,13 +467,17 @@ async function handleSubscriptionCreated(subscription, eventId) {
       trialEndDate: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
     };
     
+    // Depuis l'API Basil, current_period_start/end vivent sur les items, plus au top level
+    const periodStart = subscription.items?.data?.[0]?.current_period_start;
+    const periodEnd = subscription.items?.data?.[0]?.current_period_end;
+
     // Ajouter les dates seulement si elles sont valides
-    if (subscription.current_period_start && !isNaN(subscription.current_period_start)) {
-      updateData.subscriptionStartDate = new Date(subscription.current_period_start * 1000);
+    if (periodStart && !isNaN(periodStart)) {
+      updateData.subscriptionStartDate = new Date(periodStart * 1000);
     }
-    
-    if (subscription.current_period_end && !isNaN(subscription.current_period_end)) {
-      updateData.subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+
+    if (periodEnd && !isNaN(periodEnd)) {
+      updateData.subscriptionEndDate = new Date(periodEnd * 1000);
     }
     
     await prisma.kine.update({
@@ -483,9 +487,9 @@ async function handleSubscriptionCreated(subscription, eventId) {
     
     // Message adaptatif selon la disponibilité des dates
     let message = `Abonnement ${planType} créé pour kiné ${kine.id}`;
-    if (subscription.current_period_start && subscription.current_period_end) {
-      const startDate = new Date(subscription.current_period_start * 1000).toLocaleDateString();
-      const endDate = new Date(subscription.current_period_end * 1000).toLocaleDateString();
+    if (periodStart && periodEnd) {
+      const startDate = new Date(periodStart * 1000).toLocaleDateString();
+      const endDate = new Date(periodEnd * 1000).toLocaleDateString();
       message += ` - Période: ${startDate} au ${endDate}`;
     } else {
       message += ' - Dates de période seront mises à jour via subscription.updated';

@@ -401,6 +401,9 @@ app.get('/api/test-cors', (req, res) => {
   });
 });
 
+  // Outils e2e (set-plan) — montés uniquement hors production
+  app.use('/api/test', require('./routes/test'));
+
 // Debug base de données
 app.get('/api/debug-db', async (req, res) => {
   try {

@@ -301,8 +301,11 @@ router.get('/subscription/:subscriptionId', authenticate, async (req, res) => {
         subscription: {
           id: subscription.id,
           status: subscription.status,
-          currentPeriodStart: new Date(subscription.current_period_start * 1000),
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+          // Depuis l'API Basil, current_period_start/end vivent sur les items, plus au top level
+          currentPeriodStart: subscription.items?.data?.[0]?.current_period_start
+            ? new Date(subscription.items.data[0].current_period_start * 1000) : null,
+          currentPeriodEnd: subscription.items?.data?.[0]?.current_period_end
+            ? new Date(subscription.items.data[0].current_period_end * 1000) : null,
           cancelAtPeriodEnd: subscription.cancel_at_period_end,
           cancelAt: subscription.cancel_at ? new Date(subscription.cancel_at * 1000) : null,
           items: subscription.items.data.map(item => ({
@@ -492,13 +495,17 @@ router.post('/refresh-subscription-dates', authenticate, stripePaymentLimiter, a
       
       // Mettre à jour en base avec les vraies dates
       const updateData = {};
-      
-      if (subscription.current_period_start) {
-        updateData.subscriptionStartDate = new Date(subscription.current_period_start * 1000);
+
+      // Depuis l'API Basil, current_period_start/end vivent sur les items, plus au top level
+      const periodStart = subscription.items?.data?.[0]?.current_period_start;
+      const periodEnd = subscription.items?.data?.[0]?.current_period_end;
+
+      if (periodStart) {
+        updateData.subscriptionStartDate = new Date(periodStart * 1000);
       }
-      
-      if (subscription.current_period_end) {
-        updateData.subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+
+      if (periodEnd) {
+        updateData.subscriptionEndDate = new Date(periodEnd * 1000);
       }
 
       if (Object.keys(updateData).length > 0) {
