@@ -3,6 +3,7 @@
 // et le followup ont été remplacés par le chat unifié (conversationController + chatUnifiedService).
 const prismaService = require('../services/prismaService');
 const { generateKineResponse } = require('../services/openaiService');
+const activityService = require('../services/activityService');
 const logger = require('../utils/logger');
 
 // Limite de caractères pour le mode preview (aperçu tronqué)
@@ -71,6 +72,9 @@ const handleKineRequest = async (req, res, iaType) => {
 
 // ========== IA ADMINISTRATIVE (BILAN) ==========
 const sendIaAdministrative = async (req, res) => {
+  // Temps gagné : 1 bilan généré = 10 min. Incrémenté au clic « Générer »,
+  // indépendamment de l'association/sauvegarde patient (non-bloquant).
+  activityService.logActivity(req.uid, 'BILAN_GENERATED');
   await handleKineRequest(req, res, 'admin');
 };
 

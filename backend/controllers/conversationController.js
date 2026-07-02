@@ -3,6 +3,7 @@
 const prismaService = require('../services/prismaService');
 const conversationService = require('../services/conversationService');
 const chatUnifiedService = require('../services/chatUnifiedService');
+const activityService = require('../services/activityService');
 const logger = require('../utils/logger');
 
 // Couche 1 du budget input (spec §8)
@@ -35,6 +36,9 @@ const sendChat = async (req, res) => {
   try {
     const kine = await getKine(req, res);
     if (!kine) return;
+
+    // Temps gagné : 1 recherche IA = 5 min (non-bloquant)
+    activityService.logActivity(req.uid, 'IA_SEARCH');
 
     const { message, conversationId } = req.body;
 

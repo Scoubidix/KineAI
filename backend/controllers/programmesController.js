@@ -1,6 +1,7 @@
 const prismaService = require('../services/prismaService');
 const { generateChatUrl } = require('../services/patientTokenService');
 const gcsStorageService = require('../services/gcsStorageService');
+const activityService = require('../services/activityService');
 const logger = require('../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../utils/logSanitizer');
 
@@ -219,6 +220,9 @@ exports.createProgramme = async (req, res) => {
         }
       }
     });
+
+    // Temps gagné : 1 programme créé = 10 min (non-bloquant)
+    activityService.logActivity(req.uid, 'PROGRAMME_CREATED');
 
     res.json(newProgramme);
   } catch (error) {
