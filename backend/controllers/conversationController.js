@@ -37,9 +37,6 @@ const sendChat = async (req, res) => {
     const kine = await getKine(req, res);
     if (!kine) return;
 
-    // Temps gagné : 1 recherche IA = 5 min (non-bloquant)
-    activityService.logActivity(req.uid, 'IA_SEARCH');
-
     const { message, conversationId } = req.body;
 
     if (!message?.trim()) {
@@ -60,6 +57,10 @@ const sendChat = async (req, res) => {
         return res.status(404).json({ success: false, error: 'Conversation non trouvée', code: 'NOT_FOUND' });
       }
     }
+
+    // Temps gagné : 1 recherche IA = 5 min. Loggé APRÈS validation + ownership
+    // (message non vide/valide, conversation possédée), non-bloquant.
+    activityService.logActivity(req.uid, 'IA_SEARCH');
 
     // Ouverture du flux SSE (mêmes headers que les streams existants)
     res.writeHead(200, {

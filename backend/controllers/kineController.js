@@ -13,11 +13,12 @@ const { MINUTES_BY_TYPE } = require('../config/timeSaved');
 const fs = require('fs');
 
 // Bornes [lundi 00:00, dimanche 23:59:59.999] de la semaine (Europe/Paris) contenant `ref`.
+// Normalisées en UTC (comme le reste du contrôleur) pour être indépendantes du fuseau serveur.
 function getParisWeekBounds(ref = new Date()) {
   const paris = new Date(ref.toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
   const day = (paris.getDay() + 6) % 7; // lundi = 0
-  const monday = new Date(paris.getFullYear(), paris.getMonth(), paris.getDate() - day, 0, 0, 0, 0);
-  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59, 999);
+  const monday = new Date(Date.UTC(paris.getFullYear(), paris.getMonth(), paris.getDate() - day, 0, 0, 0, 0));
+  const sunday = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 6, 23, 59, 59, 999));
   return { start: monday, end: sunday };
 }
 
@@ -509,10 +510,13 @@ const getPatientSessionsByDate = async (req, res) => {
     const patients = patientsWithSessions.map(programme => {
       const validation = programme.sessionValidations[0]; // Il ne peut y en avoir qu'une par date
 
-      // Séance X/N : N = durée (jours), X = jour courant du programme (clampé)
+      // Séance X/N : N = durée (jours), X = jour courant du programme (clampé).
+      // Normalisation UTC pour rester aligné avec targetDate (minuit UTC).
       const total = programme.duree || 0;
       const msPerDay = 24 * 60 * 60 * 1000;
-      const elapsed = Math.floor((targetDate.getTime() - new Date(programme.dateDebut).setHours(0, 0, 0, 0)) / msPerDay);
+      const dd = new Date(programme.dateDebut);
+      const progStartUTC = Date.UTC(dd.getUTCFullYear(), dd.getUTCMonth(), dd.getUTCDate());
+      const elapsed = Math.floor((targetDate.getTime() - progStartUTC) / msPerDay);
       const index = total > 0 ? Math.min(Math.max(elapsed + 1, 1), total) : 0;
 
       return {
@@ -713,8 +717,13 @@ const getDashboardStats = async (req, res) => {
 
     const now = new Date();
     const thisWeek = getParisWeekBounds(now);
-    const lastWeekRef = new Date(thisWeek.start.getFullYear(), thisWeek.start.getMonth(), thisWeek.start.getDate() - 7);
+    const lastWeekRef = new Date(Date.UTC(thisWeek.start.getUTCFullYear(), thisWeek.start.getUTCMonth(), thisWeek.start.getUTCDate() - 7));
     const lastWeek = getParisWeekBounds(lastWeekRef);
+
+    // Bornes du jour (Europe/Paris → UTC) pour « programmes en cours aujourd'hui »
+    const nowParis = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
+    const todayStart = new Date(Date.UTC(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate(), 0, 0, 0, 0));
+    const todayEnd = new Date(Date.UTC(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate(), 23, 59, 59, 999));
 
     const [thisWeekGrouped, lastWeekGrouped, bilansGeneratedTotal, programmesActiveToday] = await Promise.all([
       prisma.kineActivityEvent.groupBy({
@@ -728,7 +737,16 @@ const getDashboardStats = async (req, res) => {
         _count: { _all: true },
       }),
       prisma.kineActivityEvent.count({ where: { kineId: kine.id, type: 'BILAN_GENERATED' } }),
-      prisma.programme.count({ where: { isArchived: false, patient: { kineId: kine.id, isActive: true } } }),
+      // « En cours aujourd'hui » : actif, non archivé, et couvrant la date du jour
+      prisma.programme.count({
+        where: {
+          isActive: true,
+          isArchived: false,
+          dateDebut: { lte: todayEnd },
+          dateFin: { gte: todayStart },
+          patient: { kineId: kine.id, isActive: true },
+        },
+      }),
     ]);
 
     const thisWeekMinutes = sumMinutes(thisWeekGrouped);
@@ -770,17 +788,19 @@ async function computeWeekAdherence(prisma, kineId, weekStart, weekEnd, todayPar
   let missed = 0;
   let plannedToday = 0;
 
+  const todayTime = todayParisMidnight.getTime();
   for (const prog of programmes) {
-    // Bornes du programme en JOUR seulement (on ignore l'heure de création,
-    // sinon le jour de création est exclu car minuit < dateDebut à 14h).
-    const progStart = new Date(prog.dateDebut);
-    progStart.setHours(0, 0, 0, 0);
-    const progEnd = new Date(prog.dateFin);
-    progEnd.setHours(0, 0, 0, 0);
+    // Bornes du programme en JOUR seulement (UTC) — on ignore l'heure de création,
+    // sinon le jour de création est exclu car minuit < dateDebut à 14h.
+    const dd = new Date(prog.dateDebut);
+    const progStart = Date.UTC(dd.getUTCFullYear(), dd.getUTCMonth(), dd.getUTCDate());
+    const df = new Date(prog.dateFin);
+    const progEnd = Date.UTC(df.getUTCFullYear(), df.getUTCMonth(), df.getUTCDate());
 
     for (let i = 0; i < 7; i++) {
-      const day = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i);
-      if (day < progStart || day > progEnd) continue; // pas prévu ce jour
+      const day = new Date(Date.UTC(weekStart.getUTCFullYear(), weekStart.getUTCMonth(), weekStart.getUTCDate() + i));
+      const dayTime = day.getTime();
+      if (dayTime < progStart || dayTime > progEnd) continue; // pas prévu ce jour
       total += 1;
       const validated = prog.sessionValidations.some(
         (v) => v.isValidated && new Date(v.date).toDateString() === day.toDateString()
@@ -788,9 +808,9 @@ async function computeWeekAdherence(prisma, kineId, weekStart, weekEnd, todayPar
       // Partition sans chevauchement : réalisée | manquée (passée) | prévue aujourd'hui (en attente)
       if (validated) {
         done += 1;
-      } else if (day < todayParisMidnight) {
+      } else if (dayTime < todayTime) {
         missed += 1;
-      } else if (day.toDateString() === todayParisMidnight.toDateString()) {
+      } else if (dayTime === todayTime) {
         plannedToday += 1;
       }
       // jours futurs non validés : comptés dans `total` seulement
@@ -823,7 +843,7 @@ const getAdherenceWeek = async (req, res) => {
     const prevWeek = getParisWeekBounds(prevRef);
 
     const nowParis = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
-    const todayParisMidnight = new Date(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate());
+    const todayParisMidnight = new Date(Date.UTC(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate()));
 
     const [current, previous] = await Promise.all([
       computeWeekAdherence(prisma, kine.id, week.start, week.end, todayParisMidnight),

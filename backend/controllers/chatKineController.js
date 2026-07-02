@@ -45,6 +45,13 @@ const handleKineRequest = async (req, res, iaType) => {
     // 4. Appel du service
     const response = await generateKineResponse(iaType, message, conversationHistory, kine.id, { skipSave: isPreview });
 
+    // Temps gagné : 1 bilan généré = 10 min. Loggé seulement après une génération
+    // réussie et hors mode preview (non-bloquant). Incrémente au clic « Générer »,
+    // indépendamment de l'association/sauvegarde patient.
+    if (iaType === 'admin' && !isPreview) {
+      activityService.logActivity(firebaseUid, 'BILAN_GENERATED');
+    }
+
     // 5. Ajout du firebaseUid dans les métadonnées
     response.metadata.firebaseUid = firebaseUid;
 
@@ -72,9 +79,6 @@ const handleKineRequest = async (req, res, iaType) => {
 
 // ========== IA ADMINISTRATIVE (BILAN) ==========
 const sendIaAdministrative = async (req, res) => {
-  // Temps gagné : 1 bilan généré = 10 min. Incrémenté au clic « Générer »,
-  // indépendamment de l'association/sauvegarde patient (non-bloquant).
-  activityService.logActivity(req.uid, 'BILAN_GENERATED');
   await handleKineRequest(req, res, 'admin');
 };
 
