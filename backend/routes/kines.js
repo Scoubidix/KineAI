@@ -17,7 +17,9 @@ const {
   uploadKineAvatar,
   deleteKineAvatar,
   getAdherenceByDate,
-  getPatientSessionsByDate
+  getPatientSessionsByDate,
+  getDashboardStats,
+  getAdherenceWeek
 } = require('../controllers/kineController');
 
 // Configuration multer pour l'upload d'avatars
@@ -57,6 +59,9 @@ router.post('/', signupLimiter, validate(createKineSchema), createKine);
 // GET /kine/profile - Récupérer le profil du kiné connecté (nécessite auth)
 router.get('/profile', authenticate, getKineProfile);
 
+// GET /kine/dashboard-stats - Stats du hero (temps gagné, bilans, programmes)
+router.get('/dashboard-stats', authenticate, getDashboardStats);
+
 // PUT /kine/profile - Modifier le profil du kiné connecté (nécessite auth)
 router.put('/profile', authenticate, validate(updateKineProfileSchema), updateKineProfile);
 
@@ -73,6 +78,9 @@ router.delete('/profile/avatar', authenticate, avatarUploadLimiter, deleteKineAv
 // GET /kine/adherence/:date - Calculer l'adhérence globale pour une date donnée
 // Exemple: GET /kine/adherence/2025-07-02
 router.get('/adherence/:date', authenticate, getAdherenceByDate);
+
+// GET /kine/adherence-week/:date - Adhérence agrégée sur la semaine contenant :date
+router.get('/adherence-week/:date', authenticate, getAdherenceWeek);
 
 // GET /kine/patients-sessions/:date - Liste détaillée des patients et leur statut de validation
 // Exemple: GET /kine/patients-sessions/2025-07-02

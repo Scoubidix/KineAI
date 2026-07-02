@@ -3,6 +3,7 @@
 const prismaService = require('../services/prismaService');
 const conversationService = require('../services/conversationService');
 const chatUnifiedService = require('../services/chatUnifiedService');
+const activityService = require('../services/activityService');
 const logger = require('../utils/logger');
 
 // Couche 1 du budget input (spec §8)
@@ -56,6 +57,10 @@ const sendChat = async (req, res) => {
         return res.status(404).json({ success: false, error: 'Conversation non trouvée', code: 'NOT_FOUND' });
       }
     }
+
+    // Temps gagné : 1 recherche IA = 5 min. Loggé APRÈS validation + ownership
+    // (message non vide/valide, conversation possédée), non-bloquant.
+    activityService.logActivity(req.uid, 'IA_SEARCH');
 
     // Ouverture du flux SSE (mêmes headers que les streams existants)
     res.writeHead(200, {

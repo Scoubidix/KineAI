@@ -3,6 +3,7 @@
 // et le followup ont été remplacés par le chat unifié (conversationController + chatUnifiedService).
 const prismaService = require('../services/prismaService');
 const { generateKineResponse } = require('../services/openaiService');
+const activityService = require('../services/activityService');
 const logger = require('../utils/logger');
 
 // Limite de caractères pour le mode preview (aperçu tronqué)
@@ -43,6 +44,13 @@ const handleKineRequest = async (req, res, iaType) => {
 
     // 4. Appel du service
     const response = await generateKineResponse(iaType, message, conversationHistory, kine.id, { skipSave: isPreview });
+
+    // Temps gagné : 1 bilan généré = 10 min. Loggé seulement après une génération
+    // réussie et hors mode preview (non-bloquant). Incrémente au clic « Générer »,
+    // indépendamment de l'association/sauvegarde patient.
+    if (iaType === 'admin' && !isPreview) {
+      activityService.logActivity(firebaseUid, 'BILAN_GENERATED');
+    }
 
     // 5. Ajout du firebaseUid dans les métadonnées
     response.metadata.firebaseUid = firebaseUid;

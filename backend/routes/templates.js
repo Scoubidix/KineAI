@@ -9,6 +9,7 @@ const { sendMessageTemplate } = require('./webhook/whatsapp');
 const prismaService = require('../services/prismaService');
 const { gptLimiter, whatsappTemplatesPatientLimiter, whatsappTemplatesKineLimiter } = require('../middleware/rateLimiter');
 const adminAiService = require('../services/adminAiService');
+const activityService = require('../services/activityService');
 const { validate, createTemplateSchema, updateTemplateSchema, personalizeTemplateSchema, templateHistorySchema, sendWhatsappSchema } = require('../middleware/validate');
 
 // Helper: get kineId from Firebase UID
@@ -127,6 +128,9 @@ router.post('/generate', authenticate, gptLimiter, requireAssistant('TEMPLATES_A
     logger.info(`POST /api/templates/generate - Kiné ID: ${sanitizeId(kine.id)}`);
 
     const generatedMessage = await adminAiService.generateMessage(prompt.trim());
+
+    // Temps gagné : 1 courrier admin généré = 10 min (non-bloquant)
+    activityService.logActivity(req.uid, 'ADMIN_LETTER');
 
     res.json({ success: true, generatedMessage });
   } catch (error) {

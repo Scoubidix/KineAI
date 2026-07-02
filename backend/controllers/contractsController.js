@@ -4,6 +4,7 @@ const contractInviteService = require('../services/contractInviteService');
 const contractOrdreService = require('../services/contractOrdreService');
 const gcsStorageService = require('../services/gcsStorageService');
 const prismaService = require('../services/prismaService');
+const activityService = require('../services/activityService');
 const logger = require('../utils/logger');
 const { sanitizeId } = require('../utils/logSanitizer');
 
@@ -51,6 +52,10 @@ exports.createContract = async (req, res) => {
       kineInitiateurId: kineId,
       payload: req.body,
     });
+
+    // Temps gagné : 1 contrat créé = 30 min (non-bloquant)
+    activityService.logActivity(req.uid, 'CONTRACT_CREATED');
+
     res.status(201).json({ success: true, contract });
   } catch (err) {
     return handleServiceError(err, res, 'Erreur création contrat');

@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { handleProgrammeCreationError } from '@/utils/handleProgrammeError';
 import { matchesAllTokens } from '@/utils/textSearch';
 import { 
@@ -581,6 +581,18 @@ export default function ProgrammesPage() {
     setShowPatientSelector(true);
     fetchPatients();
   };
+
+  // Ouverture auto du sélecteur si redirigé depuis l'accueil (?new=1)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      handleOpenPatientSelector();
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('new');
+      router.replace(`/dashboard/kine/programmes${params.toString() ? `?${params.toString()}` : ''}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Sélectionner un patient et ouvrir le modal de création
   const handleSelectPatient = (patient: Patient) => {

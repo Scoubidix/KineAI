@@ -9,7 +9,23 @@ const { uploadAvatar, deleteAvatar, generateSignedUrl, validateImageBuffer } = r
 const { normalizeFirstName, normalizeLastName } = require('../utils/nameNormalization');
 const LEGAL_VERSIONS = require('../config/legalVersions');
 const stripeService = require('../services/StripeService');
+const { MINUTES_BY_TYPE } = require('../config/timeSaved');
 const fs = require('fs');
+
+// Bornes [lundi 00:00, dimanche 23:59:59.999] de la semaine (Europe/Paris) contenant `ref`.
+// Normalisées en UTC (comme le reste du contrôleur) pour être indépendantes du fuseau serveur.
+function getParisWeekBounds(ref = new Date()) {
+  const paris = new Date(ref.toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
+  const day = (paris.getDay() + 6) % 7; // lundi = 0
+  const monday = new Date(Date.UTC(paris.getFullYear(), paris.getMonth(), paris.getDate() - day, 0, 0, 0, 0));
+  const sunday = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 6, 23, 59, 59, 999));
+  return { start: monday, end: sunday };
+}
+
+// Somme des minutes gagnées à partir d'un groupBy Prisma [{ type, _count:{_all} }]
+function sumMinutes(grouped) {
+  return grouped.reduce((total, row) => total + (MINUTES_BY_TYPE[row.type] || 0) * row._count._all, 0);
+}
 
 const createKine = async (req, res) => {
   const { uid, email, acceptedLegalAt } = req.body;
@@ -493,7 +509,16 @@ const getPatientSessionsByDate = async (req, res) => {
     // 4. Formatter les données pour la réponse
     const patients = patientsWithSessions.map(programme => {
       const validation = programme.sessionValidations[0]; // Il ne peut y en avoir qu'une par date
-      
+
+      // Séance X/N : N = durée (jours), X = jour courant du programme (clampé).
+      // Normalisation UTC pour rester aligné avec targetDate (minuit UTC).
+      const total = programme.duree || 0;
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const dd = new Date(programme.dateDebut);
+      const progStartUTC = Date.UTC(dd.getUTCFullYear(), dd.getUTCMonth(), dd.getUTCDate());
+      const elapsed = Math.floor((targetDate.getTime() - progStartUTC) / msPerDay);
+      const index = total > 0 ? Math.min(Math.max(elapsed + 1, 1), total) : 0;
+
       return {
         patient: {
           id: programme.patient.id,
@@ -509,6 +534,7 @@ const getPatientSessionsByDate = async (req, res) => {
           dateFin: programme.dateFin,
           isArchived: programme.isArchived  // 🆕 Info archivage
         },
+        seance: { index, total },
         session: {
           isValidated: !!validation?.isValidated,
           painLevel: validation?.painLevel || null,
@@ -676,6 +702,173 @@ const deleteKineAvatar = async (req, res) => {
   }
 };
 
+/**
+ * GET /kine/dashboard-stats
+ * Stats du hero : temps gagné (semaine + delta), bilans générés (total), programmes actifs.
+ */
+const getDashboardStats = async (req, res) => {
+  const uid = req.uid;
+  try {
+    const prisma = prismaService.getInstance();
+    const kine = await prisma.kine.findUnique({ where: { uid }, select: { id: true } });
+    if (!kine) {
+      return res.status(404).json({ success: false, error: 'Kiné non trouvé.' });
+    }
+
+    const now = new Date();
+    const thisWeek = getParisWeekBounds(now);
+    const lastWeekRef = new Date(Date.UTC(thisWeek.start.getUTCFullYear(), thisWeek.start.getUTCMonth(), thisWeek.start.getUTCDate() - 7));
+    const lastWeek = getParisWeekBounds(lastWeekRef);
+
+    // Bornes du jour (Europe/Paris → UTC) pour « programmes en cours aujourd'hui »
+    const nowParis = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
+    const todayStart = new Date(Date.UTC(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate(), 0, 0, 0, 0));
+    const todayEnd = new Date(Date.UTC(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate(), 23, 59, 59, 999));
+
+    const [thisWeekGrouped, lastWeekGrouped, bilansGeneratedTotal, programmesActiveToday] = await Promise.all([
+      prisma.kineActivityEvent.groupBy({
+        by: ['type'],
+        where: { kineId: kine.id, createdAt: { gte: thisWeek.start, lte: thisWeek.end } },
+        _count: { _all: true },
+      }),
+      prisma.kineActivityEvent.groupBy({
+        by: ['type'],
+        where: { kineId: kine.id, createdAt: { gte: lastWeek.start, lte: lastWeek.end } },
+        _count: { _all: true },
+      }),
+      prisma.kineActivityEvent.count({ where: { kineId: kine.id, type: 'BILAN_GENERATED' } }),
+      // « En cours aujourd'hui » : actif, non archivé, et couvrant la date du jour
+      prisma.programme.count({
+        where: {
+          isActive: true,
+          isArchived: false,
+          dateDebut: { lte: todayEnd },
+          dateFin: { gte: todayStart },
+          patient: { kineId: kine.id, isActive: true },
+        },
+      }),
+    ]);
+
+    const thisWeekMinutes = sumMinutes(thisWeekGrouped);
+    const lastWeekMinutes = sumMinutes(lastWeekGrouped);
+
+    res.json({
+      success: true,
+      timeSaved: {
+        thisWeekMinutes,
+        lastWeekMinutes,
+        deltaMinutes: thisWeekMinutes - lastWeekMinutes,
+        formatted: { hours: Math.floor(thisWeekMinutes / 60), minutes: thisWeekMinutes % 60 },
+      },
+      bilansGeneratedTotal,
+      programmesActiveToday,
+    });
+  } catch (err) {
+    logger.error('❌ Erreur dashboard-stats:', err.message);
+    res.status(500).json({ success: false, error: 'Erreur serveur.' });
+  }
+};
+
+// Compte les séances prévues/réalisées d'une semaine donnée pour un kiné.
+async function computeWeekAdherence(prisma, kineId, weekStart, weekEnd, todayParisMidnight) {
+  const programmes = await prisma.programme.findMany({
+    where: {
+      isActive: true,
+      patient: { kineId, isActive: true },
+      dateDebut: { lte: weekEnd },
+      dateFin: { gte: weekStart },
+    },
+    include: {
+      sessionValidations: { where: { date: { gte: weekStart, lte: weekEnd } } },
+    },
+  });
+
+  let total = 0;
+  let done = 0;
+  let missed = 0;
+  let plannedToday = 0;
+
+  const todayTime = todayParisMidnight.getTime();
+  for (const prog of programmes) {
+    // Bornes du programme en JOUR seulement (UTC) — on ignore l'heure de création,
+    // sinon le jour de création est exclu car minuit < dateDebut à 14h.
+    const dd = new Date(prog.dateDebut);
+    const progStart = Date.UTC(dd.getUTCFullYear(), dd.getUTCMonth(), dd.getUTCDate());
+    const df = new Date(prog.dateFin);
+    const progEnd = Date.UTC(df.getUTCFullYear(), df.getUTCMonth(), df.getUTCDate());
+
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(Date.UTC(weekStart.getUTCFullYear(), weekStart.getUTCMonth(), weekStart.getUTCDate() + i));
+      const dayTime = day.getTime();
+      if (dayTime < progStart || dayTime > progEnd) continue; // pas prévu ce jour
+      total += 1;
+      const validated = prog.sessionValidations.some(
+        (v) => v.isValidated && new Date(v.date).toDateString() === day.toDateString()
+      );
+      // Partition sans chevauchement : réalisée | manquée (passée) | prévue aujourd'hui (en attente)
+      if (validated) {
+        done += 1;
+      } else if (dayTime < todayTime) {
+        missed += 1;
+      } else if (dayTime === todayTime) {
+        plannedToday += 1;
+      }
+      // jours futurs non validés : comptés dans `total` seulement
+    }
+  }
+
+  // Adhérence = réalisées / (séances arrivées à échéance) — exclut le futur et l'attente du jour.
+  const measured = done + missed;
+  const percentage = measured > 0 ? Math.round((done / measured) * 100) : 0;
+  return { total, done, missed, plannedToday, percentage };
+}
+
+/**
+ * GET /kine/adherence-week/:date
+ * Adhérence agrégée sur les 7 jours de la semaine (Europe/Paris) contenant :date.
+ */
+const getAdherenceWeek = async (req, res) => {
+  const uid = req.uid;
+  const { date } = req.params;
+  try {
+    const prisma = prismaService.getInstance();
+    const kine = await prisma.kine.findUnique({ where: { uid }, select: { id: true } });
+    if (!kine) {
+      return res.status(404).json({ success: false, error: 'Kiné non trouvé.' });
+    }
+
+    const ref = new Date(date + 'T12:00:00');
+    const week = getParisWeekBounds(ref);
+    const prevRef = new Date(week.start.getFullYear(), week.start.getMonth(), week.start.getDate() - 7);
+    const prevWeek = getParisWeekBounds(prevRef);
+
+    const nowParis = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
+    const todayParisMidnight = new Date(Date.UTC(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate()));
+
+    const [current, previous] = await Promise.all([
+      computeWeekAdherence(prisma, kine.id, week.start, week.end, todayParisMidnight),
+      computeWeekAdherence(prisma, kine.id, prevWeek.start, prevWeek.end, todayParisMidnight),
+    ]);
+
+    res.json({
+      success: true,
+      week: {
+        start: week.start.toISOString().split('T')[0],
+        end: week.end.toISOString().split('T')[0],
+      },
+      totalSessions: current.total,
+      doneSessions: current.done,
+      missedSessions: current.missed,
+      plannedToday: current.plannedToday,
+      percentage: current.percentage,
+      deltaVsLastWeek: current.percentage - previous.percentage,
+    });
+  } catch (err) {
+    logger.error('❌ Erreur adherence-week:', err.message);
+    res.status(500).json({ success: false, error: 'Erreur serveur.' });
+  }
+};
+
 module.exports = {
   createKine,
   getKineProfile,
@@ -683,5 +876,7 @@ module.exports = {
   uploadKineAvatar,
   deleteKineAvatar,
   getAdherenceByDate,
-  getPatientSessionsByDate
+  getPatientSessionsByDate,
+  getDashboardStats,
+  getAdherenceWeek
 };
