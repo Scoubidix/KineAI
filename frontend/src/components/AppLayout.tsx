@@ -7,6 +7,9 @@ import {
   Sidebar,
   SidebarHeader,
   SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -1136,8 +1139,8 @@ function NotificationsDropdown() {
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <button className="relative p-2 rounded-full hover:bg-white/20 transition-colors" title="Notifications">
-          <Bell className="h-5 w-5 text-white" />
+        <button className="relative p-2 rounded-full hover:bg-[#3899aa]/10 transition-colors" title="Notifications">
+          <Bell className="h-5 w-5 text-foreground" />
           {unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] flex items-center justify-center px-1">
               {unreadCount > 99 ? '99+' : unreadCount}
@@ -1279,6 +1282,36 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }, [role]);
 
   const navigationItems = getNavigationItems();
+
+  // Regroupement en sous-catégories pour la sidebar kiné (fond teal)
+  const kineSections = [
+    {
+      label: 'Principal',
+      items: [
+        { href: '/dashboard/kine/home', label: 'Accueil Kiné', icon: Home, emoji: '🏠', highlight: false },
+        { href: '/dashboard/kine/chat', label: 'Assistant IA', icon: Wand2, emoji: '🤖', highlight: true },
+      ],
+    },
+    {
+      label: 'Mon activité',
+      items: [
+        { href: '/dashboard/kine/patients', label: 'Patients', icon: Users, emoji: '👥', highlight: false },
+        { href: '/dashboard/kine/create-exercise', label: 'Mes Exercices', icon: Dumbbell, emoji: '🏋️', highlight: false },
+        { href: '/dashboard/kine/programmes', label: 'Programmes', icon: Calendar, emoji: '📋', highlight: false },
+        { href: '/dashboard/kine/bilan-kine', label: 'Bilan Kiné', icon: ClipboardCheck, emoji: '📝', highlight: false },
+        { href: '/dashboard/kine/chatbot-admin', label: 'Module administratif', icon: FileText, emoji: '📁', highlight: false },
+        { href: '/dashboard/kine/contrats', label: 'Mes Contrats', icon: Briefcase, emoji: '📄', highlight: false },
+      ],
+    },
+    {
+      label: 'Communauté',
+      items: [
+        { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, emoji: '🎁', highlight: false },
+      ],
+    },
+  ];
+  const sidebarSections = role === 'kine' ? kineSections : [{ label: '', items: navigationItems }];
+
   const displayName = role === 'kine' ? 'Dr. Kiné (Dev)' : role === 'patient' ? 'Patient (Dev)' : 'Utilisateur (Dev)';
   const displayInitials = role === 'kine' ? 'DK' : role === 'patient' ? 'PA' : 'U';
 
@@ -1450,48 +1483,62 @@ export default function AppLayout({ children }: AppLayoutProps) {
     <SidebarProvider defaultOpen={true}>
       {/* Fond uni */}
       <div className="fixed inset-0 z-0 bg-white dark:bg-[#141414]" />
-      <Sidebar collapsible="icon" side="left" variant="sidebar" className="text-sm text-foreground border-r border-primary/20 bg-[#eef7f6] dark:bg-[#0f1c1b]">
-        <SidebarHeader className="h-14 flex-row items-center gap-3 px-3 border-b border-primary/20 bg-[#4db3c5]">
+      <Sidebar collapsible="icon" side="left" variant="sidebar" className="text-sm text-foreground border-r border-[#3899aa]/15 bg-[#eef7f6] dark:bg-[#0f1c1b]">
+        <SidebarHeader className="h-14 flex-row items-center gap-3 px-3 border-b border-[#3899aa]/15 bg-[#eef7f6] dark:bg-[#0f1c1b]">
           <img
             src="/logo.jpg"
             alt="Mon Assistant Kiné"
             className="h-9 w-9 rounded-md object-contain flex-shrink-0 bg-white/15 p-0.5"
           />
-          <span className="font-semibold text-white text-base truncate group-data-[state=collapsed]:hidden">Mon Assistant Kiné</span>
+          <span className="font-semibold text-foreground text-base truncate group-data-[state=collapsed]:hidden">
+            <span className="text-[#3899aa]">M</span>on <span className="text-[#3899aa]">A</span>ssistant <span className="text-[#3899aa]">K</span>iné
+          </span>
         </SidebarHeader>
         <SidebarContent className="p-2">
-          <SidebarMenu>
-            {navigationItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton
-                  asChild
-                  tooltip={item.label}
-                  isActive={
-                    currentPathname === item.href ||
-                    (item.href !== '/' && !item.href.endsWith('/home') && currentPathname.startsWith(item.href + '/')) ||
-                    (item.href.endsWith('/home') && currentPathname === item.href)
-                  }
-                  disabled={item.disabled && item.label.includes('(Bientôt)')}
-                  aria-disabled={item.disabled && !item.label.includes('(Bientôt)')}
-                  className={item.disabled && !item.label.includes('(Bientôt)') ? "text-foreground/40 cursor-not-allowed opacity-60" : "text-foreground hover:border hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-transparent data-[active=true]:border data-[active=true]:border-[#3899aa]/50 data-[active=true]:shadow-[0_0_12px_rgba(56,153,170,0.3)] data-[active=true]:bg-transparent"}
-                >
-                  <Link href={item.href}>
-                    <item.icon className="h-4 w-4 shrink-0" />
-                    <span>{item.label}</span>
-                    {'highlight' in item && item.highlight && (
-                      // Poussière d'étoile teal : signale l'onglet sans casser l'harmonie
-                      <Sparkles className="ml-auto h-3.5 w-3.5 shrink-0 text-[#3899aa] animate-pulse" />
-                    )}
-                    {item.href === '/dashboard/kine/contrats' && contractsUnreadCount > 0 && (
-                      <Badge variant="destructive" className="ml-auto h-4 px-1.5 text-[9px] leading-none">
-                        {contractsUnreadCount}
-                      </Badge>
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
+          {sidebarSections.map((section) => (
+            <SidebarGroup key={section.label || 'default'}>
+              {section.label && (
+                <SidebarGroupLabel className="text-muted-foreground uppercase text-[10px] tracking-wider px-2">
+                  {section.label}
+                </SidebarGroupLabel>
+              )}
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {section.items.map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        tooltip={item.label}
+                        isActive={
+                          currentPathname === item.href ||
+                          (item.href !== '/' && !item.href.endsWith('/home') && currentPathname.startsWith(item.href + '/')) ||
+                          (item.href.endsWith('/home') && currentPathname === item.href)
+                        }
+                        className="text-foreground/80 hover:bg-[#3899aa]/10 hover:text-foreground data-[active=true]:bg-[#3899aa] data-[active=true]:text-white"
+                      >
+                        <Link href={item.href}>
+                          {'emoji' in item && item.emoji ? (
+                            <span className="flex h-4 w-4 items-center justify-center text-[13px] leading-none shrink-0">{item.emoji}</span>
+                          ) : (
+                            <item.icon className="h-4 w-4 shrink-0" />
+                          )}
+                          <span>{item.label}</span>
+                          {'highlight' in item && item.highlight && (
+                            <Sparkles className="ml-auto h-3.5 w-3.5 shrink-0 text-[#3899aa] animate-pulse" />
+                          )}
+                          {item.href === '/dashboard/kine/contrats' && contractsUnreadCount > 0 && (
+                            <Badge variant="destructive" className="ml-auto h-4 px-1.5 text-[9px] leading-none">
+                              {contractsUnreadCount}
+                            </Badge>
+                          )}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
         </SidebarContent>
         {canInstall && (
           <SidebarFooter className="p-2 border-t border-primary/20">
@@ -1508,10 +1555,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       <SidebarInset className="min-w-0">
         {/* Header principal - toutes tailles */}
-        <header className="sticky top-0 z-50 bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] shadow-md">
+        <header className="sticky top-0 z-50 bg-[#eef7f6] dark:bg-[#0f1c1b] border-b border-[#3899aa]/15 shadow-sm">
           <div className="flex h-14 items-center px-4 gap-3">
-            <SidebarTrigger className="text-white hover:bg-white/20" />
-            <span className="hidden sm:flex items-center text-white/90 text-sm font-medium ml-2 capitalize">
+            <SidebarTrigger className="text-foreground hover:bg-[#3899aa]/10" />
+            <span className="hidden sm:flex items-center text-muted-foreground text-sm font-medium ml-2 capitalize">
               {format(new Date(), 'EEEE d MMMM yyyy', { locale: fr })}
             </span>
             <div className="flex-1" />
@@ -1617,10 +1664,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
               {role === 'kine' && <NotificationsDropdown />}
               <Popover>
                 <PopoverTrigger asChild>
-                  <button className="rounded-full hover:ring-2 hover:ring-white/40 transition-all">
-                    <Avatar className="h-8 w-8 border-2 border-white/30 cursor-pointer">
+                  <button className="rounded-full hover:ring-2 hover:ring-[#3899aa]/40 transition-all">
+                    <Avatar className="h-8 w-8 border-2 border-[#3899aa]/30 cursor-pointer">
                       {headerAvatarUrl && <AvatarImage src={headerAvatarUrl} alt="Avatar" />}
-                      <AvatarFallback className="bg-white/20 text-white text-xs font-semibold">
+                      <AvatarFallback className="bg-[#3899aa]/15 text-foreground text-xs font-semibold">
                         {headerInitials || displayInitials}
                       </AvatarFallback>
                     </Avatar>
