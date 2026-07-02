@@ -771,21 +771,35 @@ async function computeWeekAdherence(prisma, kineId, weekStart, weekEnd, todayPar
   let plannedToday = 0;
 
   for (const prog of programmes) {
+    // Bornes du programme en JOUR seulement (on ignore l'heure de création,
+    // sinon le jour de création est exclu car minuit < dateDebut à 14h).
+    const progStart = new Date(prog.dateDebut);
+    progStart.setHours(0, 0, 0, 0);
+    const progEnd = new Date(prog.dateFin);
+    progEnd.setHours(0, 0, 0, 0);
+
     for (let i = 0; i < 7; i++) {
       const day = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i);
-      if (day < prog.dateDebut || day > prog.dateFin) continue; // pas prévu ce jour
+      if (day < progStart || day > progEnd) continue; // pas prévu ce jour
       total += 1;
       const validated = prog.sessionValidations.some(
         (v) => v.isValidated && new Date(v.date).toDateString() === day.toDateString()
       );
-      if (validated) done += 1;
-      const isToday = day.toDateString() === todayParisMidnight.toDateString();
-      if (isToday) plannedToday += 1;
-      if (!validated && day < todayParisMidnight) missed += 1;
+      // Partition sans chevauchement : réalisée | manquée (passée) | prévue aujourd'hui (en attente)
+      if (validated) {
+        done += 1;
+      } else if (day < todayParisMidnight) {
+        missed += 1;
+      } else if (day.toDateString() === todayParisMidnight.toDateString()) {
+        plannedToday += 1;
+      }
+      // jours futurs non validés : comptés dans `total` seulement
     }
   }
 
-  const percentage = total > 0 ? Math.round((done / total) * 100) : 0;
+  // Adhérence = réalisées / (séances arrivées à échéance) — exclut le futur et l'attente du jour.
+  const measured = done + missed;
+  const percentage = measured > 0 ? Math.round((done / measured) * 100) : 0;
   return { total, done, missed, plannedToday, percentage };
 }
 
