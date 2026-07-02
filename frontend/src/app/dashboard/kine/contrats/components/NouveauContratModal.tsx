@@ -14,7 +14,7 @@ import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
-  ArrowLeft, Loader2, UserPlus, User, Check, Eye, AlertCircle, PenLine, FileText, Building2, MapPin, Search, Pencil, Trash2, Maximize2, Mail, Send
+  ArrowLeft, Loader2, UserPlus, User, Check, Eye, AlertCircle, PenLine, FileText, Building2, MapPin, Search, Pencil, Trash2, Maximize2, Mail, Send, Download
 } from 'lucide-react';
 import { DEPARTEMENTS_FR } from '../data/departements-fr';
 import SignatureDialog from './SignatureDialog';
@@ -124,6 +124,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
   const [signing, setSigning] = useState(false);
   const [signed, setSigned] = useState(false);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
+  const [previewDownloaded, setPreviewDownloaded] = useState(false); // mobile : aperçu téléchargé au moins une fois
   const [sendingInvitation, setSendingInvitation] = useState(false);
   const [invitationSent, setInvitationSent] = useState(false);
   const [invitationError, setInvitationError] = useState<string | null>(null);
@@ -196,6 +197,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
     setSigned(false);
     setSignOpen(false);
     setPreviewFullscreen(false);
+    setPreviewDownloaded(false);
     setSendingInvitation(false);
     setInvitationSent(false);
     setInvitationError(null);
@@ -447,6 +449,7 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
     setPreviewError(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
+    setPreviewDownloaded(false);
     try {
       const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts/${cid}/preview-pdf`);
       if (!res.ok) {
@@ -607,6 +610,20 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
   const destinataireContact = useMemo(() => contacts.find(c => c.id === selectedContactId) || null, [contacts, selectedContactId]);
   const destinataireFullName = destinataireContact ? `${destinataireContact.firstName} ${destinataireContact.lastName}`.trim() : '';
   const destinataireEmail = destinataireContact?.email || '';
+
+  // Mobile : Android n'affiche pas de PDF inline dans une iframe (surtout depuis un blob:).
+  // On télécharge donc le blob déjà fetché, puis on ouvre directement la signature.
+  const handleDownloadPreview = () => {
+    if (!previewUrl) return;
+    const a = document.createElement('a');
+    a.href = previewUrl;
+    a.download = `apercu-contrat${contractId ? `-${contractId}` : ''}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setPreviewDownloaded(true);
+    setSignOpen(true); // passer directement à la signature
+  };
 
   const handleSignConfirm = async (signatureText: string, mention: string) => {
     if (!contractId) return;
@@ -1150,10 +1167,17 @@ export default function NouveauContratModal({ open, onOpenChange, onCreated }: N
                   isMobile ? (
                     <div className="flex-1 flex flex-col items-center justify-center gap-3 border-2 border-dashed border-[#3899aa]/30 rounded-lg p-6 text-center">
                       <FileText className="h-10 w-10 text-[#3899aa]" />
-                      <p className="text-sm text-muted-foreground">Ouvre l'aperçu PDF en plein écran pour le relire.</p>
-                      <Button type="button" onClick={() => setPreviewFullscreen(true)} className="btn-teal">
-                        <Maximize2 className="h-4 w-4 mr-1" /> Ouvrir l'aperçu PDF
+                      <p className="text-sm text-muted-foreground">
+                        Sur mobile, télécharge le PDF pour le relire, puis passe à la signature.
+                      </p>
+                      <Button type="button" onClick={handleDownloadPreview} className="btn-teal">
+                        <Download className="h-4 w-4 mr-1" /> Télécharger l'aperçu (PDF)
                       </Button>
+                      {previewDownloaded && (
+                        <p className="text-xs text-muted-foreground">
+                          Aperçu téléchargé — retrouve-le dans tes téléchargements. Tu peux signer ci-dessous.
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <iframe src={previewUrl} title="Aperçu PDF contrat" className="w-full flex-1 min-h-[300px] border rounded-lg" />
