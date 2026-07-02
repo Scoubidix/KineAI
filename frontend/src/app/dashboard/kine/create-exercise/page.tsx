@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import AppLayout from '@/components/AppLayout';
+
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -518,7 +518,7 @@ export default function KineCreateExercisePage() {
   }, [exercices, selectedTags]);
 
   return (
-    <AppLayout>
+    <>
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
           <div className="space-y-2">
@@ -1355,6 +1355,6 @@ export default function KineCreateExercisePage() {
           </DialogContent>
         </Dialog>
       </div>
-    </AppLayout>
+    </>
   );
 }

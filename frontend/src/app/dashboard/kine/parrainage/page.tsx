@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import AppLayout from '@/components/AppLayout';
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -189,16 +189,16 @@ export default function ParrainagePage() {
 
   if (loading) {
     return (
-      <AppLayout>
+      <>
         <div className="flex items-center justify-center min-h-[60vh]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="max-w-4xl mx-auto space-y-6">
         {/* En-tête */}
         <div>
@@ -442,6 +442,6 @@ export default function ParrainagePage() {
           </Card>
         )}
       </div>
-    </AppLayout>
+    </>
   );
 }

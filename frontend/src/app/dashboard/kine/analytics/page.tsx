@@ -1,13 +1,13 @@
 'use client';
 
 import React from 'react';
-import AppLayout from '@/components/AppLayout';
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { BarChart2 } from 'lucide-react';
 
 export default function KineAnalyticsPage() {
   return (
-    <AppLayout>
+    <>
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <Card className="w-full max-w-lg text-center shadow-md">
           <CardHeader>
@@ -27,6 +27,6 @@ export default function KineAnalyticsPage() {
           </CardContent>
         </Card>
       </div>
-    </AppLayout>
+    </>
   );
 }

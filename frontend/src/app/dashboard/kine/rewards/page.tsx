@@ -2,13 +2,13 @@
 'use client';
 
 import React from 'react';
-import AppLayout from '@/components/AppLayout';
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Gift } from 'lucide-react';
 
 export default function KineRewardsPage() {
   return (
-    <AppLayout>
+    <>
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <Card className="w-full max-w-lg text-center card-hover">
           <CardHeader>
@@ -28,6 +28,6 @@ export default function KineRewardsPage() {
           </CardContent>
         </Card>
       </div>
-    </AppLayout>
+    </>
   );
 }

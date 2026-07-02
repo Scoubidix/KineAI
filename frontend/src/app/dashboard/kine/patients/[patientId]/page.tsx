@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import AppLayout from '@/components/AppLayout';
+
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1276,7 +1276,7 @@ export default function PatientDetailPage() {
   };
 
   return (
-    <AppLayout>
+    <>
       <div className="p-4 sm:p-6 space-y-6 overflow-x-hidden">
         {/* Section profil patient NOUVELLE VERSION */}
         <div className="card-hover rounded-lg overflow-hidden">
@@ -2019,6 +2019,6 @@ export default function PatientDetailPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </AppLayout>
+    </>
   );
 }

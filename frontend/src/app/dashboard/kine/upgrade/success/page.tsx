@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import AppLayout from '@/components/AppLayout';
+
 import { AuthGuard } from '@/components/AuthGuard';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -354,7 +354,7 @@ function UpgradeSuccessContent() {
 // Page principale avec Suspense
 export default function UpgradeSuccessPage() {
   return (
-    <AppLayout>
+    <>
       <AuthGuard role="kine" />
       <Suspense fallback={
         <div className="flex items-center justify-center min-h-[400px]">
@@ -366,6 +366,6 @@ export default function UpgradeSuccessPage() {
       }>
         <UpgradeSuccessContent />
       </Suspense>
-    </AppLayout>
+    </>
   );
 }

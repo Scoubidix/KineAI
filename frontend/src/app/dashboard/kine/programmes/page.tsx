@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useRef } from 'react';
-import AppLayout from '@/components/AppLayout';
+
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -675,7 +675,7 @@ export default function ProgrammesPage() {
 
   if (loading) {
     return (
-      <AppLayout>
+      <>
         <AuthGuard role="kine" />
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
@@ -683,13 +683,13 @@ export default function ProgrammesPage() {
             <p className="text-muted-foreground">Chargement des programmes...</p>
           </div>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   if (error) {
     return (
-      <AppLayout>
+      <>
         <AuthGuard role="kine" />
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
@@ -699,12 +699,12 @@ export default function ProgrammesPage() {
             <Button onClick={() => window.location.reload()}>Réessayer</Button>
           </div>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <AuthGuard role="kine" />
       <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
         {/* En-tête */}
@@ -1416,6 +1416,6 @@ export default function ProgrammesPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+    </>
   );
 }

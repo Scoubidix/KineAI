@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import DOMPurify from 'dompurify';
-import AppLayout from '@/components/AppLayout';
+
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { FileText, FilePlus2, Loader2, Copy, Sparkles, Mail, Download, Lock, Lightbulb, ArrowLeft, Search, UserPlus, Check, History, ArrowRight, Save } from 'lucide-react';
@@ -859,7 +859,7 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
   };
 
   return (
-    <AppLayout>
+    <>
       {/* Header compact */}
       <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/40">
         <FileText className="text-[#3899aa] h-4 w-4 shrink-0" />
@@ -1312,6 +1312,6 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
           </div>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+    </>
   );
 }

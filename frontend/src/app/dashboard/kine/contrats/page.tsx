@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import AppLayout from '@/components/AppLayout';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Briefcase, FileSearch, FolderOpen, UserPlus, Search, ArrowRight, CheckCircle } from 'lucide-react';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
@@ -107,7 +107,7 @@ export default function AnnoncesEmploiHubPage() {
   ];
 
   return (
-    <AppLayout>
+    <>
       <div className="max-w-4xl mx-auto p-4">
         {/* Header */}
         <div className="card-hover rounded-lg p-4 sm:p-6 mb-6">
@@ -196,6 +196,6 @@ export default function AnnoncesEmploiHubPage() {
           fetchPendingOrdreCount();
         }}
       />
-    </AppLayout>
+    </>
   );
 }

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import AppLayout from '@/components/AppLayout';
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import {
   Bell,
@@ -350,7 +350,7 @@ export default function KineNotificationsPage() {
   // Interface de chargement
   if (loading) {
     return (
-      <AppLayout>
+      <>
         <div className="space-y-6">
           <h1 className="text-2xl md:text-3xl font-bold text-primary">Notifications</h1>
           <Card className="card-hover w-full max-w-4xl mx-auto">
@@ -362,14 +362,14 @@ export default function KineNotificationsPage() {
             </CardContent>
           </Card>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   const unreadNotifications = notifications.filter(n => !n.isRead);
 
   return (
-    <AppLayout>
+    <>
       <div className="space-y-6">
         {/* Header avec stats */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -655,6 +655,6 @@ export default function KineNotificationsPage() {
         }}
         initialTicketId={supportTicketId}
       />
-    </AppLayout>
+    </>
   );
 }

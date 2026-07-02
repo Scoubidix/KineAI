@@ -3,7 +3,7 @@
 // Page du chat unifié : sidebar interne de conversations (en plus de la sidebar AppLayout)
 // + zone de chat. Le router backend décide du type d'IA à chaque message.
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import AppLayout from '@/components/AppLayout';
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Wand2, Send, Loader2, Lock, Stethoscope, BookOpen, Activity } from 'lucide-react';
@@ -235,7 +235,7 @@ export default function UnifiedChatPage() {
   const isTopPlan = usage ? TOP_PLANS.includes(usage.planType) : false;
 
   return (
-    <AppLayout>
+    <>
       {/* Header compact */}
       <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/40">
         <Wand2 className="text-[#3899aa] h-4 w-4 shrink-0" />
@@ -375,6 +375,6 @@ export default function UnifiedChatPage() {
       </div>
 
       <PaywallModal isOpen={isPaywallOpen} onClose={() => setIsPaywallOpen(false)} subscription={subscription} />
-    </AppLayout>
+    </>
   );
 }

@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect } from 'react';
-import AppLayout from '@/components/AppLayout';
+
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -79,6 +79,7 @@ interface DashboardStats {
     formatted: { hours: number; minutes: number };
   };
   bilansGeneratedTotal: number;
+  iaSearchesTotal: number;
   programmesActiveToday: number;
 }
 
@@ -260,7 +261,7 @@ export default function KineHomePage() {
   // Chargement en cours
   if (loading) {
     return (
-      <AppLayout>
+      <>
         <AuthGuard role="kine" />
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
@@ -268,13 +269,13 @@ export default function KineHomePage() {
             <p className="text-muted-foreground">Chargement de ton tableau de bord...</p>
           </div>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   if (!kine) {
     return (
-      <AppLayout>
+      <>
         <AuthGuard role="kine" />
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
@@ -284,14 +285,14 @@ export default function KineHomePage() {
             <Button onClick={() => window.location.reload()}>Réessayer</Button>
           </div>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   const RING_CIRCUMFERENCE = 2 * Math.PI * 38;
 
   return (
-    <AppLayout>
+    <>
       <AuthGuard role="kine" />
       <div className="space-y-6">
         {/* Hero */}
@@ -319,6 +320,10 @@ export default function KineHomePage() {
             <div>
               <div className="text-2xl md:text-3xl font-bold leading-none">{dashboardStats?.bilansGeneratedTotal ?? '—'}</div>
               <div className="text-xs opacity-70 mt-1">bilans générés par l'IA</div>
+            </div>
+            <div>
+              <div className="text-2xl md:text-3xl font-bold leading-none">{dashboardStats?.iaSearchesTotal ?? '—'}</div>
+              <div className="text-xs opacity-70 mt-1">recherches au Copilote IA</div>
             </div>
             <div>
               <div className="text-2xl md:text-3xl font-bold leading-none">{dashboardStats?.programmesActiveToday ?? '—'}</div>
@@ -485,6 +490,6 @@ export default function KineHomePage() {
 
       <NouveauBilanModal open={bilanModalOpen} onOpenChange={setBilanModalOpen} />
       <NouveauContratModal open={contratModalOpen} onOpenChange={setContratModalOpen} />
-    </AppLayout>
+    </>
   );
 }

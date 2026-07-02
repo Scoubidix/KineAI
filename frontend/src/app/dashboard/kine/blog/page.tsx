@@ -2,13 +2,13 @@
 'use client';
 
 import React from 'react';
-import AppLayout from '@/components/AppLayout';
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Library } from 'lucide-react'; // Icon for library/blog
 
 export default function KineBlogPage() {
   return (
-    <AppLayout>
+    <>
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <Card className="w-full max-w-lg text-center card-hover">
           <CardHeader>
@@ -24,6 +24,6 @@ export default function KineBlogPage() {
           </CardContent>
         </Card>
       </div>
-    </AppLayout>
+    </>
   );
 }

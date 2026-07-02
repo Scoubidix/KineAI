@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import AppLayout from '@/components/AppLayout';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
@@ -201,7 +201,7 @@ export default function PatientsPage() {
   };
 
   return (
-    <AppLayout>
+    <>
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-x-hidden">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div className="space-y-2">
@@ -529,6 +529,6 @@ export default function PatientsPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </AppLayout>
+    </>
   );
 }
