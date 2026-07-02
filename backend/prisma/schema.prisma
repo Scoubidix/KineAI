@@ -104,6 +104,10 @@ model Kine {
   contractSignatures    ContractSignature[]
   lastContractsViewedAt DateTime? // Pour badge "nouveau" sur contrats signés depuis dernière visite
   // ========================================
+
+  // ========== RELATION ACTIVITÉ (temps gagné) ==========
+  activityEvents KineActivityEvent[]
+  // =====================================================
 }
 
 model Patient {
@@ -944,4 +948,26 @@ model DailyTokenUsage {
 
   @@unique([kineId, date])
   @@map("daily_token_usage")
+}
+
+// ========== ACTIVITÉ KINÉ (temps gagné) ==========
+
+enum KineActivityType {
+  IA_SEARCH
+  BILAN_GENERATED
+  PROGRAMME_CREATED
+  ADMIN_LETTER
+  CONTRACT_CREATED
+}
+
+model KineActivityEvent {
+  id        Int              @id @default(autoincrement())
+  kineId    Int
+  kine      Kine             @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  type      KineActivityType
+  createdAt DateTime         @default(now())
+
+  @@index([kineId, createdAt])
+  @@index([kineId, type])
+  @@map("kine_activity_events")
 }
