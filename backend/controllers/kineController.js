@@ -9,7 +9,22 @@ const { uploadAvatar, deleteAvatar, generateSignedUrl, validateImageBuffer } = r
 const { normalizeFirstName, normalizeLastName } = require('../utils/nameNormalization');
 const LEGAL_VERSIONS = require('../config/legalVersions');
 const stripeService = require('../services/StripeService');
+const { MINUTES_BY_TYPE } = require('../config/timeSaved');
 const fs = require('fs');
+
+// Bornes [lundi 00:00, dimanche 23:59:59.999] de la semaine (Europe/Paris) contenant `ref`.
+function getParisWeekBounds(ref = new Date()) {
+  const paris = new Date(ref.toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
+  const day = (paris.getDay() + 6) % 7; // lundi = 0
+  const monday = new Date(paris.getFullYear(), paris.getMonth(), paris.getDate() - day, 0, 0, 0, 0);
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59, 999);
+  return { start: monday, end: sunday };
+}
+
+// Somme des minutes gagnées à partir d'un groupBy Prisma [{ type, _count:{_all} }]
+function sumMinutes(grouped) {
+  return grouped.reduce((total, row) => total + (MINUTES_BY_TYPE[row.type] || 0) * row._count._all, 0);
+}
 
 const createKine = async (req, res) => {
   const { uid, email, acceptedLegalAt } = req.body;
@@ -493,7 +508,13 @@ const getPatientSessionsByDate = async (req, res) => {
     // 4. Formatter les données pour la réponse
     const patients = patientsWithSessions.map(programme => {
       const validation = programme.sessionValidations[0]; // Il ne peut y en avoir qu'une par date
-      
+
+      // Séance X/N : N = durée (jours), X = jour courant du programme (clampé)
+      const total = programme.duree || 0;
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const elapsed = Math.floor((targetDate.getTime() - new Date(programme.dateDebut).setHours(0, 0, 0, 0)) / msPerDay);
+      const index = total > 0 ? Math.min(Math.max(elapsed + 1, 1), total) : 0;
+
       return {
         patient: {
           id: programme.patient.id,
@@ -509,6 +530,7 @@ const getPatientSessionsByDate = async (req, res) => {
           dateFin: programme.dateFin,
           isArchived: programme.isArchived  // 🆕 Info archivage
         },
+        seance: { index, total },
         session: {
           isValidated: !!validation?.isValidated,
           painLevel: validation?.painLevel || null,
@@ -676,6 +698,143 @@ const deleteKineAvatar = async (req, res) => {
   }
 };
 
+/**
+ * GET /kine/dashboard-stats
+ * Stats du hero : temps gagné (semaine + delta), bilans générés (total), programmes actifs.
+ */
+const getDashboardStats = async (req, res) => {
+  const uid = req.uid;
+  try {
+    const prisma = prismaService.getInstance();
+    const kine = await prisma.kine.findUnique({ where: { uid }, select: { id: true } });
+    if (!kine) {
+      return res.status(404).json({ success: false, error: 'Kiné non trouvé.' });
+    }
+
+    const now = new Date();
+    const thisWeek = getParisWeekBounds(now);
+    const lastWeekRef = new Date(thisWeek.start.getFullYear(), thisWeek.start.getMonth(), thisWeek.start.getDate() - 7);
+    const lastWeek = getParisWeekBounds(lastWeekRef);
+
+    const [thisWeekGrouped, lastWeekGrouped, bilansGeneratedTotal, programmesActiveToday] = await Promise.all([
+      prisma.kineActivityEvent.groupBy({
+        by: ['type'],
+        where: { kineId: kine.id, createdAt: { gte: thisWeek.start, lte: thisWeek.end } },
+        _count: { _all: true },
+      }),
+      prisma.kineActivityEvent.groupBy({
+        by: ['type'],
+        where: { kineId: kine.id, createdAt: { gte: lastWeek.start, lte: lastWeek.end } },
+        _count: { _all: true },
+      }),
+      prisma.kineActivityEvent.count({ where: { kineId: kine.id, type: 'BILAN_GENERATED' } }),
+      prisma.programme.count({ where: { isArchived: false, patient: { kineId: kine.id, isActive: true } } }),
+    ]);
+
+    const thisWeekMinutes = sumMinutes(thisWeekGrouped);
+    const lastWeekMinutes = sumMinutes(lastWeekGrouped);
+
+    res.json({
+      success: true,
+      timeSaved: {
+        thisWeekMinutes,
+        lastWeekMinutes,
+        deltaMinutes: thisWeekMinutes - lastWeekMinutes,
+        formatted: { hours: Math.floor(thisWeekMinutes / 60), minutes: thisWeekMinutes % 60 },
+      },
+      bilansGeneratedTotal,
+      programmesActiveToday,
+    });
+  } catch (err) {
+    logger.error('❌ Erreur dashboard-stats:', err.message);
+    res.status(500).json({ success: false, error: 'Erreur serveur.' });
+  }
+};
+
+// Compte les séances prévues/réalisées d'une semaine donnée pour un kiné.
+async function computeWeekAdherence(prisma, kineId, weekStart, weekEnd, todayParisMidnight) {
+  const programmes = await prisma.programme.findMany({
+    where: {
+      isActive: true,
+      patient: { kineId, isActive: true },
+      dateDebut: { lte: weekEnd },
+      dateFin: { gte: weekStart },
+    },
+    include: {
+      sessionValidations: { where: { date: { gte: weekStart, lte: weekEnd } } },
+    },
+  });
+
+  let total = 0;
+  let done = 0;
+  let missed = 0;
+  let plannedToday = 0;
+
+  for (const prog of programmes) {
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i);
+      if (day < prog.dateDebut || day > prog.dateFin) continue; // pas prévu ce jour
+      total += 1;
+      const validated = prog.sessionValidations.some(
+        (v) => v.isValidated && new Date(v.date).toDateString() === day.toDateString()
+      );
+      if (validated) done += 1;
+      const isToday = day.toDateString() === todayParisMidnight.toDateString();
+      if (isToday) plannedToday += 1;
+      if (!validated && day < todayParisMidnight) missed += 1;
+    }
+  }
+
+  const percentage = total > 0 ? Math.round((done / total) * 100) : 0;
+  return { total, done, missed, plannedToday, percentage };
+}
+
+/**
+ * GET /kine/adherence-week/:date
+ * Adhérence agrégée sur les 7 jours de la semaine (Europe/Paris) contenant :date.
+ */
+const getAdherenceWeek = async (req, res) => {
+  const uid = req.uid;
+  const { date } = req.params;
+  try {
+    const prisma = prismaService.getInstance();
+    const kine = await prisma.kine.findUnique({ where: { uid }, select: { id: true } });
+    if (!kine) {
+      return res.status(404).json({ success: false, error: 'Kiné non trouvé.' });
+    }
+
+    const ref = new Date(date + 'T12:00:00');
+    const week = getParisWeekBounds(ref);
+    const prevRef = new Date(week.start.getFullYear(), week.start.getMonth(), week.start.getDate() - 7);
+    const prevWeek = getParisWeekBounds(prevRef);
+
+    const nowParis = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
+    const todayParisMidnight = new Date(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate());
+
+    const [current, previous] = await Promise.all([
+      computeWeekAdherence(prisma, kine.id, week.start, week.end, todayParisMidnight),
+      computeWeekAdherence(prisma, kine.id, prevWeek.start, prevWeek.end, todayParisMidnight),
+    ]);
+
+    res.json({
+      success: true,
+      week: {
+        start: week.start.toISOString().split('T')[0],
+        end: week.end.toISOString().split('T')[0],
+      },
+      totalSessions: current.total,
+      doneSessions: current.done,
+      missedSessions: current.missed,
+      plannedToday: current.plannedToday,
+      percentage: current.percentage,
+      deltaVsLastWeek: current.percentage - previous.percentage,
+    });
+  } catch (err) {
+    logger.error('❌ Erreur adherence-week:', err.message);
+    res.status(500).json({ success: false, error: 'Erreur serveur.' });
+  }
+};
+
 module.exports = {
   createKine,
   getKineProfile,
@@ -683,5 +842,7 @@ module.exports = {
   uploadKineAvatar,
   deleteKineAvatar,
   getAdherenceByDate,
-  getPatientSessionsByDate
+  getPatientSessionsByDate,
+  getDashboardStats,
+  getAdherenceWeek
 };
