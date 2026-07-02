@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   FolderOpen, Loader2, FileText, Trash2, Eye, AlertCircle,
   FileSearch, ArrowLeft, PenLine, Send, XCircle, Download, Inbox, SendHorizonal, Landmark, CheckCircle2
@@ -61,6 +62,7 @@ const TYPE_LABELS: Record<ContractRow['type'], string> = {
 
 export default function MesContratsModal({ open, onOpenChange, refreshKey }: MesContratsModalProps) {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [contracts, setContracts] = useState<ContractRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [previewContractId, setPreviewContractId] = useState<number | null>(null);
@@ -188,6 +190,18 @@ export default function MesContratsModal({ open, onOpenChange, refreshKey }: Mes
     } finally {
       setPreviewLoading(false);
     }
+  };
+
+  // Mobile : Android n'affiche pas de PDF inline dans une iframe (surtout depuis un blob:).
+  // On télécharge le blob déjà fetché plutôt que de tenter un rendu inline.
+  const handleDownloadPreview = () => {
+    if (!previewUrl) return;
+    const a = document.createElement('a');
+    a.href = previewUrl;
+    a.download = `apercu-contrat${previewContractId ? `-${previewContractId}` : ''}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   const handleSignConfirm = async (signatureText: string, mention: string) => {
@@ -486,11 +500,23 @@ export default function MesContratsModal({ open, onOpenChange, refreshKey }: Mes
                 </div>
               )}
               {previewUrl && (
-                <iframe
-                  src={previewUrl}
-                  title="Aperçu PDF contrat"
-                  className="w-full flex-1 min-h-[500px] border rounded-lg"
-                />
+                isMobile ? (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-3 border-2 border-dashed border-[#3899aa]/30 rounded-lg p-6 text-center">
+                    <FileText className="h-10 w-10 text-[#3899aa]" />
+                    <p className="text-sm text-muted-foreground">
+                      Sur mobile, télécharge le PDF pour le consulter.
+                    </p>
+                    <Button type="button" onClick={handleDownloadPreview} className="btn-teal">
+                      <Download className="h-4 w-4 mr-1" /> Télécharger le PDF
+                    </Button>
+                  </div>
+                ) : (
+                  <iframe
+                    src={previewUrl}
+                    title="Aperçu PDF contrat"
+                    className="w-full flex-1 min-h-[500px] border rounded-lg"
+                  />
+                )
               )}
             </div>
           )}
