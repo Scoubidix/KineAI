@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/components/AppLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { matchesAllTokens } from '@/utils/textSearch';
 
@@ -47,6 +47,18 @@ export default function PatientsPage() {
     email: '',
     goals: '',
   });
+
+  // Ouverture auto de la modal de création si redirigé depuis l'accueil (?new=1)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setDialogOpen(true);
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('new');
+      router.replace(`/dashboard/kine/patients${params.toString() ? `?${params.toString()}` : ''}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Fonction pour formater la date au format JJ/MM/AAAA
   const formatDate = (dateString: string) => {
