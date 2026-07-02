@@ -725,7 +725,7 @@ const getDashboardStats = async (req, res) => {
     const todayStart = new Date(Date.UTC(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate(), 0, 0, 0, 0));
     const todayEnd = new Date(Date.UTC(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate(), 23, 59, 59, 999));
 
-    const [thisWeekGrouped, lastWeekGrouped, bilansGeneratedTotal, programmesActiveToday] = await Promise.all([
+    const [thisWeekGrouped, lastWeekGrouped, bilansGeneratedTotal, iaSearchesTotal, programmesActiveToday] = await Promise.all([
       prisma.kineActivityEvent.groupBy({
         by: ['type'],
         where: { kineId: kine.id, createdAt: { gte: thisWeek.start, lte: thisWeek.end } },
@@ -737,6 +737,9 @@ const getDashboardStats = async (req, res) => {
         _count: { _all: true },
       }),
       prisma.kineActivityEvent.count({ where: { kineId: kine.id, type: 'BILAN_GENERATED' } }),
+      // Total recherches IA — journal d'événements découplé de l'historique conversations
+      // (supprimer ses conversations ne décrémente PAS ce compteur)
+      prisma.kineActivityEvent.count({ where: { kineId: kine.id, type: 'IA_SEARCH' } }),
       // « En cours aujourd'hui » : actif, non archivé, et couvrant la date du jour
       prisma.programme.count({
         where: {
@@ -761,6 +764,7 @@ const getDashboardStats = async (req, res) => {
         formatted: { hours: Math.floor(thisWeekMinutes / 60), minutes: thisWeekMinutes % 60 },
       },
       bilansGeneratedTotal,
+      iaSearchesTotal,
       programmesActiveToday,
     });
   } catch (err) {

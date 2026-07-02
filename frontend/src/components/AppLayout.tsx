@@ -1289,7 +1289,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       label: 'Principal',
       items: [
         { href: '/dashboard/kine/home', label: 'Accueil Kiné', icon: Home, emoji: '🏠', highlight: false },
-        { href: '/dashboard/kine/chat', label: 'Assistant IA', icon: Wand2, emoji: '🤖', highlight: true },
+        { href: '/dashboard/kine/chat', label: 'Copilote IA', icon: Wand2, emoji: '🤖', highlight: true },
       ],
     },
     {
