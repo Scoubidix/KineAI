@@ -13,7 +13,6 @@ import {
   FolderOpen, Loader2, FileText, Trash2, Eye, AlertCircle,
   FileSearch, ArrowLeft, PenLine, Send, XCircle, Download, Inbox, SendHorizonal, Landmark, CheckCircle2
 } from 'lucide-react';
-import { useUser } from '@/context/UserContext';
 import { matchesAllTokens } from '@/utils/textSearch';
 import SignatureDialog from './SignatureDialog';
 import EnvoiInvitationDialog from './EnvoiInvitationDialog';
@@ -62,7 +61,6 @@ const TYPE_LABELS: Record<ContractRow['type'], string> = {
 
 export default function MesContratsModal({ open, onOpenChange, refreshKey }: MesContratsModalProps) {
   const { toast } = useToast();
-  const user = useUser();
   const [contracts, setContracts] = useState<ContractRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [previewContractId, setPreviewContractId] = useState<number | null>(null);
@@ -72,6 +70,11 @@ export default function MesContratsModal({ open, onOpenChange, refreshKey }: Mes
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [signingContractId, setSigningContractId] = useState<number | null>(null);
   const [signing, setSigning] = useState(false);
+  // Nom attendu à la signature = nom de l'initiateur PORTÉ PAR LE CONTRAT (table Kine),
+  // exactement ce que le backend valide (contractService.signInitiator). On n'utilise PAS
+  // UserContext (Firestore), qui peut être vide/divergent et bloquait la signature.
+  const signingContract = contracts.find((c) => c.id === signingContractId) || null;
+  const signerExpectedName = `${signingContract?.kineInitiateur?.firstName || ''} ${signingContract?.kineInitiateur?.lastName || ''}`.trim();
   const [sendingContract, setSendingContract] = useState<ContractRow | null>(null);
   const [revokingId, setRevokingId] = useState<number | null>(null);
   const [tab, setTab] = useState<TabKey>('INITIATEUR');
@@ -497,7 +500,7 @@ export default function MesContratsModal({ open, onOpenChange, refreshKey }: Mes
       <SignatureDialog
         open={signingContractId !== null}
         onOpenChange={(o) => { if (!o) setSigningContractId(null); }}
-        expectedName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim()}
+        expectedName={signerExpectedName}
         title="Signer le brouillon"
         description="Tu signes ce contrat en tant qu'initiateur."
         onConfirm={handleSignConfirm}
