@@ -391,12 +391,14 @@ export default function NouveauCourrierModal({
     try {
       setIsSending(true);
       const mailto = `mailto:${encodeURIComponent(targetEmail)}?subject=${encodeURIComponent(editedSubject)}&body=${encodeURIComponent(editedBody)}`;
-      window.location.href = mailto;
 
-      // Save to history
+      // Enregistrer l'envoi AVANT d'ouvrir le client mail : modifier window.location.href
+      // interrompt le fetch lancé juste après (l'historique n'était jamais écrit).
+      // keepalive garantit l'aboutissement de la requête même en cas de navigation.
       const token = await getAuthToken();
-      await fetch(`${apiBase}/api/templates/history`, {
+      const historyRes = await fetch(`${apiBase}/api/templates/history`, {
         method: 'POST',
+        keepalive: true,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           patientId: selectedPatient?.id || null,
@@ -411,7 +413,22 @@ export default function NouveauCourrierModal({
         })
       });
 
-      setEmailSent(true);
+      // fetch ne lève pas sur 4xx/5xx : vérifier explicitement, sinon l'échec est silencieux
+      if (!historyRes.ok) {
+        let detail = '';
+        try { detail = JSON.stringify(await historyRes.json()); } catch { /* corps non JSON */ }
+        console.error('Historique courrier non enregistré', historyRes.status, detail);
+        toast({
+          title: `Courrier non enregistré (HTTP ${historyRes.status})`,
+          description: detail || 'Voir la console pour le détail',
+          variant: 'destructive',
+        });
+      } else {
+        setEmailSent(true);
+      }
+
+      // Ouvrir le client mail en dernier (l'enregistrement est déjà parti)
+      window.location.href = mailto;
     } catch (error) {
       console.error('Erreur envoi email:', error);
       toast({ title: 'Erreur', description: 'Erreur lors de l\'ouverture du client mail', variant: 'destructive' });

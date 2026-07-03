@@ -166,10 +166,11 @@ router.post('/history', authenticate, requireAssistant('TEMPLATES_ADMIN'), valid
     const kine = await getKineId(req.uid);
     if (!kine) return res.status(404).json({ success: false, error: 'Kiné introuvable' });
 
-    if (!templateTitle || !subject || !body || !method) {
+    // subject peut être vide (courrier sans objet) : autorisé par le schéma Zod et la colonne DB
+    if (!templateTitle || !body || !method) {
       return res.status(400).json({
         success: false,
-        error: 'Données manquantes (templateTitle, subject, body, method requis)'
+        error: 'Données manquantes (templateTitle, body, method requis)'
       });
     }
 
