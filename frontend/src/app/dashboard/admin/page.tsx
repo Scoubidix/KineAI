@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, Layers, Zap, ImagePlus, X, Pencil, Trash2 } from 'lucide-react';
+import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, TrendingDown, Minus, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, FileSignature, Gift, Activity, Layers, Zap, ImagePlus, X, Pencil, Trash2 } from 'lucide-react';
 import BilanFieldsTab from './components/BilanFieldsTab';
 import BilanTemplatesTab from './components/BilanTemplatesTab';
 import TokenUsageTab from './components/TokenUsageTab';
@@ -26,6 +26,34 @@ interface PlanChange {
   from: string;
   to: string;
   date: string;
+}
+
+// Comparatif période courante vs précédente (semaine ou mois)
+interface Comparison {
+  current: number;
+  previous: number;
+  deltaPct: number | null; // null si période précédente à 0
+}
+
+interface Metric {
+  total: number | null;
+  week: Comparison;
+  month: Comparison;
+}
+
+interface LettersMetric extends Metric {
+  byMethod: { email: Metric; whatsapp: Metric };
+}
+
+interface ActivityStats {
+  kines: Metric;
+  subscriptions: Metric;
+  patients: Metric;
+  programmes: Metric;
+  bilans: Metric;
+  contracts: Metric;
+  referrals: Metric;
+  letters: LettersMetric;
 }
 
 interface DashboardStats {
@@ -47,6 +75,70 @@ interface DashboardStats {
   cancelsThisWeek: number;
   cancelsThisMonth: number;
   planChanges: PlanChange[];
+  activity: ActivityStats;
+}
+
+// Badge de variation vs période précédente (vert ↑ / rouge ↓ / neutre —)
+function DeltaBadge({ pct }: { pct: number | null }) {
+  if (pct === null) {
+    return <span className="text-muted-foreground" title="Rien sur la période précédente">—</span>;
+  }
+  if (pct === 0) {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-muted-foreground">
+        <Minus className="h-3 w-3" />0%
+      </span>
+    );
+  }
+  const up = pct > 0;
+  return (
+    <span className={`inline-flex items-center gap-0.5 ${up ? 'text-green-600' : 'text-red-600'}`}>
+      {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+      {up ? '+' : ''}{pct}%
+    </span>
+  );
+}
+
+// Carte de statistique : total + comparatifs semaine / mois
+function StatCard({
+  title,
+  icon: Icon,
+  metric,
+  footer,
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  metric: Metric;
+  footer?: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+          <Icon className="h-4 w-4" />
+          {title}
+        </div>
+        <p className="text-3xl font-bold mt-1">{metric.total ?? '—'}</p>
+        <div className="mt-3 space-y-1 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">Cette sem.</span>
+            <span className="flex items-center gap-1.5">
+              <span className="font-medium">{metric.week.current}</span>
+              <DeltaBadge pct={metric.week.deltaPct} />
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">Ce mois</span>
+            <span className="flex items-center gap-1.5">
+              <span className="font-medium">{metric.month.current}</span>
+              <DeltaBadge pct={metric.month.deltaPct} />
+            </span>
+          </div>
+        </div>
+        {footer && <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">{footer}</div>}
+      </CardContent>
+    </Card>
+  );
 }
 
 interface UnverifiedKine {
@@ -417,66 +509,26 @@ export default function AdminDashboardPage() {
             <TabsContent value="dashboard" className="space-y-6 mt-4">
           {stats && (
             <>
-              {/* KPIs */}
+              {/* KPIs + usage des features (total + comparatif semaine/mois) */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                      <Users className="h-4 w-4" />
-                      Total kines
-                    </div>
-                    <p className="text-3xl font-bold mt-1">{stats.totalKines}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                      <UserCheck className="h-4 w-4" />
-                      Abonnements actifs
-                    </div>
-                    <p className="text-3xl font-bold mt-1">{stats.activeSubscriptions}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                      <Users className="h-4 w-4" />
-                      Patients actifs
-                    </div>
-                    <p className="text-3xl font-bold mt-1">{stats.totalPatients}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                      <ClipboardList className="h-4 w-4" />
-                      Programmes actifs
-                    </div>
-                    <p className="text-3xl font-bold mt-1">{stats.activeProgrammes}</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Nouveaux inscrits */}
-              <div className="grid grid-cols-2 gap-4">
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                      <UserPlus className="h-4 w-4" />
-                      Inscrits cette semaine
-                    </div>
-                    <p className="text-3xl font-bold mt-1">{stats.newThisWeek}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                      <UserPlus className="h-4 w-4" />
-                      Inscrits ce mois
-                    </div>
-                    <p className="text-3xl font-bold mt-1">{stats.newThisMonth}</p>
-                  </CardContent>
-                </Card>
+                <StatCard title="Kinés inscrits" icon={Users} metric={stats.activity.kines} />
+                <StatCard title="Abonnements" icon={UserCheck} metric={stats.activity.subscriptions} />
+                <StatCard title="Patients" icon={Activity} metric={stats.activity.patients} />
+                <StatCard title="Programmes" icon={ClipboardList} metric={stats.activity.programmes} />
+                <StatCard title="Bilans générés" icon={FileText} metric={stats.activity.bilans} />
+                <StatCard title="Contrats" icon={FileSignature} metric={stats.activity.contracts} />
+                <StatCard title="Parrainages" icon={Gift} metric={stats.activity.referrals} />
+                <StatCard
+                  title="Courriers envoyés"
+                  icon={Mail}
+                  metric={stats.activity.letters}
+                  footer={
+                    <span className="flex items-center gap-3">
+                      <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" />{stats.activity.letters.byMethod.email.total}</span>
+                      <span className="inline-flex items-center gap-1"><MessageSquare className="h-3 w-3" />{stats.activity.letters.byMethod.whatsapp.total}</span>
+                    </span>
+                  }
+                />
               </div>
 
               {/* Résiliations */}

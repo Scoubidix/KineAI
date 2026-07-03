@@ -3,6 +3,171 @@ const prismaService = require('./prismaService');
 const stripeService = require('./StripeService');
 const logger = require('../utils/logger');
 
+const PARIS_TZ = 'Europe/Paris';
+
+/**
+ * Instant UTC correspondant à minuit (heure murale Paris) d'une date calendaire.
+ * Calcule l'offset Paris pour cette date précise → gère l'heure d'été.
+ */
+function parisMidnightUtc(year, month /* 1-12 */, day) {
+  const naiveUtc = Date.UTC(year, month - 1, day, 0, 0, 0);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: PARIS_TZ, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date(naiveUtc)).reduce((acc, p) => {
+    if (p.type !== 'literal') acc[p.type] = Number(p.value);
+    return acc;
+  }, {});
+  const hour = parts.hour === 24 ? 0 : parts.hour; // certaines plateformes rendent minuit en "24"
+  const wallAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, hour, parts.minute, parts.second);
+  const offset = wallAsUtc - naiveUtc;
+  return new Date(naiveUtc - offset);
+}
+
+/** Date calendaire {year, month, day} d'un instant, en heure Paris. */
+function parisYmd(date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: PARIS_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date).reduce((acc, p) => {
+    if (p.type !== 'literal') acc[p.type] = Number(p.value);
+    return acc;
+  }, {});
+  return { year: parts.year, month: parts.month, day: parts.day };
+}
+
+/** Jour de la semaine Paris : 1 = lundi ... 7 = dimanche. */
+function parisWeekday(date) {
+  const wd = new Intl.DateTimeFormat('en-US', { timeZone: PARIS_TZ, weekday: 'short' }).format(date);
+  return { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 }[wd];
+}
+
+/** Ajoute n jours à une date calendaire {year, month, day}. */
+function addDays(ymd, n) {
+  const d = new Date(Date.UTC(ymd.year, ymd.month - 1, ymd.day));
+  d.setUTCDate(d.getUTCDate() + n);
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+}
+
+/**
+ * Bornes de période (instants UTC ancrés sur l'heure murale Europe/Paris) :
+ * - semaine du lundi 00:00 au dimanche (weekStart), semaine précédente (prevWeekStart)
+ * - mois du 1er 00:00 (monthStart), mois précédent (prevMonthStart)
+ * Corrige le bug du dimanche de l'ancien calcul et respecte lundi→dimanche / 1er→fin de mois.
+ */
+function getParisPeriodRanges(now = new Date()) {
+  const today = parisYmd(now);
+  const weekday = parisWeekday(now); // 1..7
+  const mondayYmd = addDays(today, -(weekday - 1));
+  const prevMondayYmd = addDays(mondayYmd, -7);
+
+  const nextMonth = today.month === 12
+    ? { year: today.year + 1, month: 1 }
+    : { year: today.year, month: today.month + 1 };
+  const prevMonth = today.month === 1
+    ? { year: today.year - 1, month: 12 }
+    : { year: today.year, month: today.month - 1 };
+
+  return {
+    weekStart: parisMidnightUtc(mondayYmd.year, mondayYmd.month, mondayYmd.day),
+    prevWeekStart: parisMidnightUtc(prevMondayYmd.year, prevMondayYmd.month, prevMondayYmd.day),
+    monthStart: parisMidnightUtc(today.year, today.month, 1),
+    monthEnd: parisMidnightUtc(nextMonth.year, nextMonth.month, 1),
+    prevMonthStart: parisMidnightUtc(prevMonth.year, prevMonth.month, 1),
+  };
+}
+
+/** Variation en % (arrondie à 1 décimale). null si base précédente nulle (pas de division par zéro). */
+function computeDeltaPct(current, previous) {
+  if (!previous || previous === 0) return null;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+}
+
+/** Normalise une métrique : total + comparatifs semaine et mois. */
+function buildMetric({ total, weekCurrent, weekPrevious, monthCurrent, monthPrevious }) {
+  return {
+    total,
+    week: { current: weekCurrent, previous: weekPrevious, deltaPct: computeDeltaPct(weekCurrent, weekPrevious) },
+    month: { current: monthCurrent, previous: monthPrevious, deltaPct: computeDeltaPct(monthCurrent, monthPrevious) },
+  };
+}
+
+/**
+ * Statistiques d'usage des features (issues de la DB uniquement).
+ * Pour chaque entité : total + comptages semaine/mois courants et précédents (comparatif).
+ * NB : la semaine/mois "courant" compte l'activité depuis le début de la période (partielle),
+ * comparée à la période précédente complète.
+ * subscriptions.total est laissé à null (renseigné par Stripe dans getDashboardStats).
+ */
+async function getActivityStats(now = new Date(), ranges = getParisPeriodRanges(now)) {
+  const prisma = prismaService.getInstance();
+  const { weekStart, prevWeekStart, monthStart, prevMonthStart } = ranges;
+
+  const inWeek = { gte: weekStart };
+  const inPrevWeek = { gte: prevWeekStart, lt: weekStart };
+  const inMonth = { gte: monthStart };
+  const inPrevMonth = { gte: prevMonthStart, lt: monthStart };
+
+  // Métrique d'une entité datée par createdAt (total peut avoir un filtre différent des périodes).
+  const countByCreatedAt = (model, totalWhere = {}, periodBase = {}) =>
+    Promise.all([
+      model.count({ where: totalWhere }),
+      model.count({ where: { ...periodBase, createdAt: inWeek } }),
+      model.count({ where: { ...periodBase, createdAt: inPrevWeek } }),
+      model.count({ where: { ...periodBase, createdAt: inMonth } }),
+      model.count({ where: { ...periodBase, createdAt: inPrevMonth } }),
+    ]).then(([total, wc, wp, mc, mp]) =>
+      buildMetric({ total, weekCurrent: wc, weekPrevious: wp, monthCurrent: mc, monthPrevious: mp }));
+
+  // Nouveaux abonnements : datés par subscriptionStartDate (total renseigné plus tard via Stripe).
+  const countSubscriptions = () =>
+    Promise.all([
+      prisma.kine.count({ where: { subscriptionStartDate: inWeek } }),
+      prisma.kine.count({ where: { subscriptionStartDate: inPrevWeek } }),
+      prisma.kine.count({ where: { subscriptionStartDate: inMonth } }),
+      prisma.kine.count({ where: { subscriptionStartDate: inPrevMonth } }),
+    ]).then(([wc, wp, mc, mp]) =>
+      buildMetric({ total: null, weekCurrent: wc, weekPrevious: wp, monthCurrent: mc, monthPrevious: mp }));
+
+  // Courriers : groupBy method sur chaque période (EMAIL / WHATSAPP).
+  const lettersGroup = (sentAt) =>
+    prisma.templateSentHistory.groupBy({ by: ['method'], where: sentAt ? { sentAt } : {}, _count: { _all: true } });
+
+  const [kines, patients, programmes, bilans, contracts, referrals, subscriptions, letterGroups] =
+    await Promise.all([
+      countByCreatedAt(prisma.kine),
+      countByCreatedAt(prisma.patient, { isActive: true }),
+      countByCreatedAt(prisma.programme, { isActive: true, isArchived: false }),
+      // Bilans = événements « Générer le bilan » (KineActivityEvent), comptés au clic,
+      // indépendamment de l'enregistrement sur un patient (cf. chatKineController).
+      countByCreatedAt(prisma.kineActivityEvent, { type: 'BILAN_GENERATED' }, { type: 'BILAN_GENERATED' }),
+      countByCreatedAt(prisma.contract),
+      countByCreatedAt(prisma.referral),
+      countSubscriptions(),
+      Promise.all([
+        lettersGroup(null), lettersGroup(inWeek), lettersGroup(inPrevWeek), lettersGroup(inMonth), lettersGroup(inPrevMonth),
+      ]),
+    ]);
+
+  // Agrégation des courriers (total tous canaux + ventilation par méthode)
+  const [ltTotal, ltWeek, ltPrevWeek, ltMonth, ltPrevMonth] = letterGroups;
+  const sumAll = (groups) => groups.reduce((s, g) => s + (g._count?._all || 0), 0);
+  const byMethod = (groups, method) => groups.find((g) => g.method === method)?._count?._all || 0;
+  const lettersMetric = (pick) => buildMetric({
+    total: pick(ltTotal),
+    weekCurrent: pick(ltWeek), weekPrevious: pick(ltPrevWeek),
+    monthCurrent: pick(ltMonth), monthPrevious: pick(ltPrevMonth),
+  });
+
+  const letters = lettersMetric(sumAll);
+  letters.byMethod = {
+    email: lettersMetric((g) => byMethod(g, 'EMAIL')),
+    whatsapp: lettersMetric((g) => byMethod(g, 'WHATSAPP')),
+  };
+
+  return { kines, subscriptions, patients, programmes, bilans, contracts, referrals, letters };
+}
+
 /**
  * Récupère les abonnements actifs depuis Stripe (source de vérité)
  * Utilise auto-pagination pour parcourir tous les résultats
@@ -93,13 +258,10 @@ async function getLastPayout() {
 /**
  * Récupère les résiliations et changements de plan récents depuis Stripe
  */
-async function getRecentSubscriptionEvents() {
+async function getRecentSubscriptionEvents(ranges = getParisPeriodRanges()) {
   try {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay() + 1);
-    startOfWeek.setHours(0, 0, 0, 0);
+    const startOfMonth = ranges.monthStart;
+    const startOfWeek = ranges.weekStart;
 
     const createdGte = Math.floor(startOfMonth.getTime() / 1000);
 
@@ -159,60 +321,48 @@ async function getRecentSubscriptionEvents() {
  * Statistiques globales pour le dashboard admin
  */
 async function getDashboardStats() {
-  const prisma = prismaService.getInstance();
+  const now = new Date();
+  const ranges = getParisPeriodRanges(now);
 
   // Abonnements depuis Stripe (source de vérité, pas de faux abonnements)
   const { planCounts, activeSubscriptions, mrr } = await getStripeSubscriptionStats();
 
-  // Dernier virement Stripe vers compte bancaire + événements récents
-  const [lastPayout, subscriptionEvents] = await Promise.all([
+  // Dernier virement Stripe, événements récents, usage des features (DB) — en parallèle
+  const [lastPayout, subscriptionEvents, activity] = await Promise.all([
     getLastPayout(),
-    getRecentSubscriptionEvents(),
+    getRecentSubscriptionEvents(ranges),
+    getActivityStats(now, ranges),
   ]);
 
-  // Total kinés inscrits (depuis Prisma, car Stripe ne gère pas les FREE)
-  const totalKines = await prisma.kine.count();
+  // Le total abonnements actifs vient de Stripe
+  activity.subscriptions.total = activeSubscriptions;
 
-  // Nombre de FREE = total kinés - abonnés payants Stripe
+  const totalKines = activity.kines.total;
   const freeCount = Math.max(0, totalKines - activeSubscriptions);
-
-  // Total patients
-  const totalPatients = await prisma.patient.count({
-    where: { isActive: true },
-  });
-
-  // Total programmes actifs
-  const activeProgrammes = await prisma.programme.count({
-    where: { isActive: true, isArchived: false },
-  });
-
-  // Nouveaux inscrits cette semaine / ce mois
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay() + 1); // Lundi
-  startOfWeek.setHours(0, 0, 0, 0);
-
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  const [newThisWeek, newThisMonth] = await Promise.all([
-    prisma.kine.count({ where: { createdAt: { gte: startOfWeek } } }),
-    prisma.kine.count({ where: { createdAt: { gte: startOfMonth } } }),
-  ]);
 
   return {
     planCounts: { FREE: freeCount, ...planCounts },
     totalKines,
     activeSubscriptions,
-    totalPatients,
-    activeProgrammes,
+    totalPatients: activity.patients.total,
+    activeProgrammes: activity.programmes.total,
     mrr,
     lastPayout,
-    newThisWeek,
-    newThisMonth,
+    // Champs "à plat" conservés pour compatibilité de l'existant
+    newThisWeek: activity.kines.week.current,
+    newThisMonth: activity.kines.month.current,
     cancelsThisWeek: subscriptionEvents.cancelsThisWeek,
     cancelsThisMonth: subscriptionEvents.cancelsThisMonth,
     planChanges: subscriptionEvents.planChanges,
+    // Bloc complet avec comparatifs semaine/mois pour chaque entité
+    activity,
   };
 }
 
-module.exports = { getDashboardStats };
+module.exports = {
+  getDashboardStats,
+  getActivityStats,
+  getParisPeriodRanges,
+  computeDeltaPct,
+  buildMetric,
+};
