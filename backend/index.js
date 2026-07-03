@@ -126,7 +126,7 @@ const corsOptions = {
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      logger.info(`❌ CORS: Origine non autorisée: ${origin}`);
+      logger.warn(`❌ CORS: Origine non autorisée: ${origin}`);
       callback(new Error('Non autorisé par CORS'));
     }
   },
