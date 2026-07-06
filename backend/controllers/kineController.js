@@ -9,6 +9,7 @@ const { uploadAvatar, deleteAvatar, generateSignedUrl, validateImageBuffer } = r
 const { normalizeFirstName, normalizeLastName } = require('../utils/nameNormalization');
 const LEGAL_VERSIONS = require('../config/legalVersions');
 const stripeService = require('../services/StripeService');
+const trialService = require('../services/trialService');
 const { MINUTES_BY_TYPE } = require('../config/timeSaved');
 const fs = require('fs');
 
@@ -73,6 +74,14 @@ const createKine = async (req, res) => {
     });
 
     logger.warn("✅ Kiné créé - ID:", sanitizeId(newKine.id), "Email:", sanitizeEmail(newKine.email), "Legal accepté:", !!legalDate);
+
+    // Démarrer l'essai gratuit 14 jours. Non bloquant : une erreur ici ne doit
+    // jamais empêcher la création du compte.
+    try {
+      await trialService.startTrial(newKine.id);
+    } catch (trialErr) {
+      logger.error('[signup] Démarrage essai échoué (non bloquant):', trialErr.message);
+    }
 
     return res.status(201).json(newKine);
   } catch (err) {
