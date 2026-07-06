@@ -5,6 +5,7 @@ const prismaService = require('../services/prismaService');
 const tokenUsageService = require('../services/tokenUsageService');
 const { getQuotaForPlan } = require('../config/tokenQuotas');
 const logger = require('../utils/logger');
+const { getEffectivePlan } = require('../services/planService');
 
 const checkTokenQuota = async (req, res, next) => {
   try {
@@ -17,7 +18,7 @@ const checkTokenQuota = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Kinésithérapeute non trouvé', code: 'KINE_NOT_FOUND' });
     }
 
-    const planType = kine.planType || 'FREE';
+    const planType = getEffectivePlan(kine);
     const limit = getQuotaForPlan(planType);
     const tokensUsed = await tokenUsageService.getDailyUsage(kine.id);
 
