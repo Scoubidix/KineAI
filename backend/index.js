@@ -118,6 +118,11 @@ const corsOptions = {
 
     const allowedOrigins = [
       process.env.FRONTEND_URL,
+      // Ancien domaine Vercel : les clients PWA (service worker Serwist) qui ont
+      // l'app en cache tournent encore sous cette origine et appellent l'API
+      // directement (la redirection Vercel ne s'applique qu'à la navigation, pas
+      // aux fetch/XHR). À garder tant que du trafic arrive dessus, puis retirer.
+      'https://monassistantkine.vercel.app',
       ...(process.env.NODE_ENV !== 'production'
         ? ['http://localhost:3000', 'http://localhost:3001']
         : []),
