@@ -4,6 +4,7 @@ const router = express.Router();
 const prismaService = require('../services/prismaService');
 const StripeService = require('../services/StripeService');
 const { authenticate } = require('../middleware/authenticate');
+const trialService = require('../services/trialService');
 
 const prisma = prismaService.getInstance();
 
@@ -239,6 +240,28 @@ router.post('/usage/refresh', authenticate, async (req, res) => {
   } catch (error) {
     logger.error('Erreur refresh usage:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// POST /kine/trial/start - Démarre l'essai gratuit 14 jours (opt-in FREE existants)
+router.post('/trial/start', authenticate, async (req, res) => {
+  try {
+    const kine = await prisma.kine.findUnique({
+      where: { uid: req.uid },
+      select: { id: true },
+    });
+    if (!kine) {
+      return res.status(404).json({ success: false, error: 'Kinésithérapeute non trouvé', code: 'KINE_NOT_FOUND' });
+    }
+
+    const { trialEndDate } = await trialService.startTrial(kine.id);
+    return res.json({ success: true, trialEndDate });
+  } catch (error) {
+    if (error.code === 'TRIAL_NOT_ELIGIBLE') {
+      return res.status(409).json({ success: false, error: 'Essai non disponible pour ce compte', code: 'TRIAL_NOT_ELIGIBLE' });
+    }
+    logger.error('Erreur démarrage essai:', error);
+    return res.status(500).json({ success: false, error: 'Erreur interne du serveur', code: 'TRIAL_START_ERROR' });
   }
 });
 
