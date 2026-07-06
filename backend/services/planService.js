@@ -14,10 +14,13 @@ function isTrialActive(kine, now = new Date()) {
   return new Date(kine.trialEndDate).getTime() > now.getTime();
 }
 
-/** Plan effectif : abo payé > essai actif (EXPERT) > FREE. */
+/** Plan effectif : abo payé > essai actif (EXPERT) > FREE.
+ * On se base sur planType seul (pas de subscriptionId) : pendant l'essai
+ * planType reste FREE, donc planType ∈ PAID_PLANS signifie un vrai plan payé
+ * ou accordé manuellement — cohérent avec le gating historique. */
 function getEffectivePlan(kine, now = new Date()) {
   if (!kine) return 'FREE';
-  if (kine.subscriptionId && PAID_PLANS.includes(kine.planType)) {
+  if (PAID_PLANS.includes(kine.planType)) {
     return kine.planType;
   }
   if (isTrialActive(kine, now)) return TRIAL_PLAN;

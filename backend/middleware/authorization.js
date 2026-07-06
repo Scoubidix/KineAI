@@ -30,7 +30,7 @@ const canCreateProgramme = async (req, res, next) => {
     const prisma = prismaService.getInstance();
     const kine = await prisma.kine.findUnique({
       where: { uid: req.uid },
-      select: { id: true, planType: true, subscriptionId: true, trialEndDate: true }
+      select: { id: true, planType: true, trialEndDate: true }
     });
 
     if (!kine) {
@@ -116,7 +116,7 @@ const requireAssistant = (assistantType) => {
       const prisma = prismaService.getInstance();
       const kine = await prisma.kine.findUnique({
         where: { uid: req.uid },
-        select: { id: true, planType: true, subscriptionId: true, trialEndDate: true }
+        select: { id: true, planType: true, trialEndDate: true }
       });
 
       if (!kine) {
@@ -166,7 +166,7 @@ const requireAssistantOrPreview = (assistantType) => {
       const prisma = prismaService.getInstance();
       const kine = await prisma.kine.findUnique({
         where: { uid: req.uid },
-        select: { id: true, planType: true, subscriptionId: true, trialEndDate: true }
+        select: { id: true, planType: true, trialEndDate: true }
       });
 
       if (!kine) {
@@ -199,7 +199,7 @@ const getPlanInfo = async (req, res, next) => {
     const prisma = prismaService.getInstance();
     const kine = await prisma.kine.findUnique({
       where: { uid: req.uid },
-      select: { id: true, planType: true, subscriptionId: true, trialEndDate: true }
+      select: { id: true, planType: true, trialEndDate: true }
     });
 
     if (!kine) {

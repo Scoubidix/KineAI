@@ -39,6 +39,11 @@ describe('planService.getEffectivePlan', () => {
   test('kine null → FREE', () => {
     expect(getEffectivePlan(null, NOW)).toBe('FREE');
   });
+
+  test('planType payant SANS subscriptionId → plan réel (plan accordé manuellement)', () => {
+    const kine = { planType: 'PRATIQUE', subscriptionId: null, trialEndDate: null };
+    expect(getEffectivePlan(kine, NOW)).toBe('PRATIQUE');
+  });
 });
 
 describe('planService.isTrialEligible', () => {
@@ -65,6 +70,14 @@ describe('planService.getTrialInfo', () => {
     expect(info.isTrialing).toBe(false);
     expect(info.daysLeft).toBe(0);
     expect(info.trialEligible).toBe(true);
+  });
+
+  test('kine null → non trialing, non éligible, trialEndDate null', () => {
+    const info = getTrialInfo(null, NOW);
+    expect(info.isTrialing).toBe(false);
+    expect(info.daysLeft).toBe(0);
+    expect(info.trialEligible).toBe(false);
+    expect(info.trialEndDate).toBeNull();
   });
 });
 

@@ -26,7 +26,7 @@ const MOCK_KINE = {
   rpps: '12345678901',
   adresseCabinet: '10 rue de la Santé, 75013 Paris',
   planType: 'EXPERT',
-  subscriptionId: 'sub_mock_expert',
+  subscriptionId: null,
   stripeCustomerId: null,
   referralCode: 'ABC123',
   createdAt: new Date('2025-01-01'),
@@ -49,7 +49,6 @@ const MOCK_KINE_DECLIC = {
   uid: 'test-declic-uid',
   email: 'declic@kine.fr',
   planType: 'DECLIC',
-  subscriptionId: 'sub_mock_declic',
 };
 
 const MOCK_KINE_PRATIQUE = {
@@ -58,7 +57,6 @@ const MOCK_KINE_PRATIQUE = {
   uid: 'test-pratique-uid',
   email: 'pratique@kine.fr',
   planType: 'PRATIQUE',
-  subscriptionId: 'sub_mock_pratique',
 };
 
 const MOCK_PATIENT = {
