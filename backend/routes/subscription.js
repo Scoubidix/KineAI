@@ -5,6 +5,7 @@ const prismaService = require('../services/prismaService');
 const StripeService = require('../services/StripeService');
 const { authenticate } = require('../middleware/authenticate');
 const trialService = require('../services/trialService');
+const { getEffectivePlan, getTrialInfo } = require('../services/planService');
 
 const prisma = prismaService.getInstance();
 
@@ -19,7 +20,9 @@ router.get('/subscription', authenticate, async (req, res) => {
         firstName: true,
         lastName: true,
         subscriptionId: true,
+        stripeCustomerId: true,
         planType: true,
+        trialEndDate: true,
         createdAt: true
       }
     });
@@ -35,15 +38,20 @@ router.get('/subscription', authenticate, async (req, res) => {
       lastName: kine.lastName
     };
 
-    // Si pas d'abonnement Stripe, retourner plan FREE
+    // Si pas d'abonnement Stripe : plan effectif (inclut l'essai gratuit) + infos essai
     if (!kine.subscriptionId) {
+      const trial = getTrialInfo(kine);
       return res.json({
         subscription: {
-          planType: kine.planType || 'FREE',
-          status: 'active',
-          currentPeriodEnd: null,
+          planType: getEffectivePlan(kine),
+          status: trial.isTrialing ? 'trialing' : 'active',
+          currentPeriodEnd: trial.isTrialing ? kine.trialEndDate : null,
           cancelAtPeriodEnd: false,
-          createdAt: kine.createdAt
+          createdAt: kine.createdAt,
+          isTrialing: trial.isTrialing,
+          trialEndDate: trial.trialEndDate,
+          daysLeft: trial.daysLeft,
+          trialEligible: trial.trialEligible
         },
         kine: kineInfo
       });
@@ -75,7 +83,11 @@ router.get('/subscription', authenticate, async (req, res) => {
           status: stripeSub.status,
           currentPeriodEnd: nextPaymentDate,
           cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
-          createdAt: new Date(stripeSub.start_date * 1000)
+          createdAt: new Date(stripeSub.start_date * 1000),
+          isTrialing: false,
+          trialEndDate: null,
+          daysLeft: 0,
+          trialEligible: false,
         },
         kine: kineInfo
       });
@@ -87,7 +99,11 @@ router.get('/subscription', authenticate, async (req, res) => {
           status: 'active',
           currentPeriodEnd: null,
           cancelAtPeriodEnd: false,
-          createdAt: kine.createdAt
+          createdAt: kine.createdAt,
+          isTrialing: false,
+          trialEndDate: null,
+          daysLeft: 0,
+          trialEligible: false,
         },
         kine: kineInfo
       });
