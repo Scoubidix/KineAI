@@ -10,7 +10,7 @@ const { normalizeFirstName, normalizeLastName } = require('../utils/nameNormaliz
 const LEGAL_VERSIONS = require('../config/legalVersions');
 const stripeService = require('../services/StripeService');
 const trialService = require('../services/trialService');
-const { MINUTES_BY_TYPE } = require('../config/timeSaved');
+const { sumMinutes } = require('../config/timeSaved');
 const fs = require('fs');
 
 // Bornes [lundi 00:00, dimanche 23:59:59.999] de la semaine (Europe/Paris) contenant `ref`.
@@ -23,10 +23,6 @@ function getParisWeekBounds(ref = new Date()) {
   return { start: monday, end: sunday };
 }
 
-// Somme des minutes gagnées à partir d'un groupBy Prisma [{ type, _count:{_all} }]
-function sumMinutes(grouped) {
-  return grouped.reduce((total, row) => total + (MINUTES_BY_TYPE[row.type] || 0) * row._count._all, 0);
-}
 
 const createKine = async (req, res) => {
   const { uid, email, acceptedLegalAt } = req.body;
