@@ -6,6 +6,7 @@ const prismaService = require('./prismaService');
 const logger = require('../utils/logger');
 const { TRIAL_DURATION_DAYS, getEffectivePlan } = require('./planService');
 const { sendTemplateEmail } = require('./brevoMailService');
+const { addToBilanList } = require('./brevoTrialService');
 const { sumMinutes } = require('../config/timeSaved');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -21,9 +22,8 @@ function trialStart(trialEndDate) {
  */
 async function sendFirstBilanMails(now = new Date()) {
   const prisma = prismaService.getInstance();
-  const templateId = process.env.BREVO_TRIAL_BILAN_TEMPLATE_ID;
-  if (!templateId) {
-    logger.warn('[trialMail] BREVO_TRIAL_BILAN_TEMPLATE_ID absent — envoi 1er bilan ignoré');
+  if (!process.env.BREVO_TRIAL_BILAN_LIST_ID) {
+    logger.warn('[trialMail] BREVO_TRIAL_BILAN_LIST_ID absent — inscription liste 1er bilan ignorée');
     return { sent: 0, skipped: 0 };
   }
 
@@ -55,15 +55,11 @@ async function sendFirstBilanMails(now = new Date()) {
     if (claim.count !== 1) { skipped++; continue; }
 
     try {
-      await sendTemplateEmail({
-        toEmail: kine.email,
-        toName: kine.firstName || undefined,
-        templateId,
-        params: { PRENOM: kine.firstName || '' },
-      });
+      // Inscription à la liste Brevo « 1er bilan » → déclenche l'automation mail.
+      await addToBilanList({ email: kine.email, firstName: kine.firstName });
       sent++;
     } catch (err) {
-      logger.warn(`[trialMail] envoi 1er bilan échoué (kiné ${kine.id}): ${err.message}`);
+      logger.warn(`[trialMail] inscription liste 1er bilan échouée (kiné ${kine.id}): ${err.message}`);
     }
   }
   logger.info(`[trialMail] 1er bilan : ${sent} envoyé(s), ${skipped} ignoré(s)`);
@@ -104,14 +100,14 @@ async function sendTrialRecapMails(now = new Date()) {
     const start = trialStart(kine.trialEndDate);
     const window = { gte: start, lte: kine.trialEndDate };
 
-    const [grouped, patientsCount] = await Promise.all([
-      prisma.kineActivityEvent.groupBy({
-        by: ['type'],
-        where: { kineId: kine.id, createdAt: window },
-        _count: { _all: true },
-      }),
-      prisma.patient.count({ where: { kineId: kine.id, createdAt: window } }),
-    ]);
+    // Agrégation de l'usage sur la fenêtre d'essai (barème canonique du dashboard).
+    // Le total « temps gagné » compte TOUS les types d'activité (dont courriers/contrats),
+    // même si on n'affiche pas leur détail dans le mail.
+    const grouped = await prisma.kineActivityEvent.groupBy({
+      by: ['type'],
+      where: { kineId: kine.id, createdAt: window },
+      _count: { _all: true },
+    });
 
     const byType = Object.fromEntries(grouped.map((g) => [g.type, g._count._all]));
     const totalMinutes = sumMinutes(grouped);
@@ -126,8 +122,6 @@ async function sendTrialRecapMails(now = new Date()) {
           NB_BILANS: byType.BILAN_GENERATED || 0,
           NB_PROGRAMMES: byType.PROGRAMME_CREATED || 0,
           NB_REQUETES_IA: byType.IA_SEARCH || 0,
-          NB_COURRIERS: byType.ADMIN_LETTER || 0,
-          NB_PATIENTS: patientsCount,
           TEMPS_GAGNE_H: Math.floor(totalMinutes / 60),
           TEMPS_GAGNE_MIN: totalMinutes % 60,
         },
