@@ -131,65 +131,7 @@ async function sendTransactionalEmail({
   throwErr('Erreur Brevo inattendue', ERROR_CODES.UNKNOWN);
 }
 
-/**
- * Envoie un email via un TEMPLATE transactionnel Brevo (templateId + params).
- * L'expéditeur provient du template Brevo (pas de sender/HTML ici).
- * @param {Object} p
- * @param {string} p.toEmail
- * @param {string} [p.toName]
- * @param {number|string} p.templateId
- * @param {Object} [p.params] - variables du template (ex: { PRENOM, NB_BILANS, ... })
- * @returns {Promise<{ messageId: string }>}
- */
-async function sendTemplateEmail({ toEmail, toName, templateId, params }) {
-  const { apiKey } = getConfig();
-
-  if (!toEmail || !templateId) {
-    throwErr('Paramètres email template incomplets', ERROR_CODES.VALIDATION);
-  }
-
-  const payload = {
-    templateId: Number(templateId),
-    to: [{ email: toEmail, ...(toName ? { name: toName } : {}) }],
-    ...(params ? { params } : {}),
-  };
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  let response;
-  try {
-    response = await fetch(BREVO_ENDPOINT, {
-      method: 'POST',
-      headers: { 'accept': 'application/json', 'content-type': 'application/json', 'api-key': apiKey },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timer);
-    logger.error('Brevo template : échec réseau', { name: err.name, message: err.message });
-    throwErr('Échec d\'envoi email template (réseau)', ERROR_CODES.UNKNOWN);
-  }
-  clearTimeout(timer);
-
-  let body = null;
-  try { body = await response.json(); } catch { body = null; }
-
-  if (response.status === 201) {
-    const messageId = body?.messageId || null;
-    logger.info(`Brevo template : email envoyé (status ${response.status}, messageId ${messageId || 'n/a'})`);
-    return { messageId };
-  }
-
-  logger.error('Brevo template : envoi refusé', { status: response.status, code: body?.code, message: body?.message });
-  if (response.status === 401 || response.status === 403) throwErr('Authentification Brevo refusée', ERROR_CODES.AUTH);
-  if (response.status === 429) throwErr('Limite de taux Brevo atteinte', ERROR_CODES.RATE_LIMIT);
-  if (response.status >= 400 && response.status < 500) throwErr(body?.message || 'Email refusé par Brevo', ERROR_CODES.VALIDATION);
-  throwErr('Erreur Brevo inattendue', ERROR_CODES.UNKNOWN);
-}
-
 module.exports = {
   ERROR_CODES,
   sendTransactionalEmail,
-  sendTemplateEmail,
 };

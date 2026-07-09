@@ -143,4 +143,29 @@ async function addToBilanList({ email, firstName }) {
   });
 }
 
-module.exports = { ERROR_CODES, upsertTrialContact, addToBilanList };
+/**
+ * Ajoute le kiné à la liste « Récap fin d'essai » avec ses stats en attributs
+ * (déclenche l'automation mail récap).
+ * @param {Object} params
+ * @param {string} params.email
+ * @param {string} [params.firstName]
+ * @param {Object} params.stats - { nbBilans, nbProgrammes, nbRequetesIa, tempsGagneH, tempsGagneMin }
+ * @returns {Promise<void>}
+ */
+async function addToRecapList({ email, firstName, stats }) {
+  return postContactToList({
+    email,
+    listId: process.env.BREVO_TRIAL_RECAP_LIST_ID,
+    attributes: {
+      PRENOM: firstName || '',
+      NB_BILANS: stats.nbBilans,
+      NB_PROGRAMMES: stats.nbProgrammes,
+      NB_REQUETES_IA: stats.nbRequetesIa,
+      TEMPS_GAGNE_H: stats.tempsGagneH,
+      TEMPS_GAGNE_MIN: stats.tempsGagneMin,
+    },
+    context: 'récap',
+  });
+}
+
+module.exports = { ERROR_CODES, upsertTrialContact, addToBilanList, addToRecapList };

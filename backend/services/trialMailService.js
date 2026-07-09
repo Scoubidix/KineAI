@@ -5,8 +5,7 @@
 const prismaService = require('./prismaService');
 const logger = require('../utils/logger');
 const { TRIAL_DURATION_DAYS, getEffectivePlan } = require('./planService');
-const { sendTemplateEmail } = require('./brevoMailService');
-const { addToBilanList } = require('./brevoTrialService');
+const { addToBilanList, addToRecapList } = require('./brevoTrialService');
 const { sumMinutes } = require('../config/timeSaved');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -73,9 +72,8 @@ async function sendFirstBilanMails(now = new Date()) {
  */
 async function sendTrialRecapMails(now = new Date()) {
   const prisma = prismaService.getInstance();
-  const templateId = process.env.BREVO_TRIAL_RECAP_TEMPLATE_ID;
-  if (!templateId) {
-    logger.warn('[trialMail] BREVO_TRIAL_RECAP_TEMPLATE_ID absent — envoi récap ignoré');
+  if (!process.env.BREVO_TRIAL_RECAP_LIST_ID) {
+    logger.warn('[trialMail] BREVO_TRIAL_RECAP_LIST_ID absent — inscription liste récap ignorée');
     return { sent: 0, skipped: 0 };
   }
 
@@ -113,22 +111,21 @@ async function sendTrialRecapMails(now = new Date()) {
     const totalMinutes = sumMinutes(grouped);
 
     try {
-      await sendTemplateEmail({
-        toEmail: kine.email,
-        toName: kine.firstName || undefined,
-        templateId,
-        params: {
-          PRENOM: kine.firstName || '',
-          NB_BILANS: byType.BILAN_GENERATED || 0,
-          NB_PROGRAMMES: byType.PROGRAMME_CREATED || 0,
-          NB_REQUETES_IA: byType.IA_SEARCH || 0,
-          TEMPS_GAGNE_H: Math.floor(totalMinutes / 60),
-          TEMPS_GAGNE_MIN: totalMinutes % 60,
+      // Inscription à la liste Brevo « Récap » avec les stats en attributs de contact.
+      await addToRecapList({
+        email: kine.email,
+        firstName: kine.firstName,
+        stats: {
+          nbBilans: byType.BILAN_GENERATED || 0,
+          nbProgrammes: byType.PROGRAMME_CREATED || 0,
+          nbRequetesIa: byType.IA_SEARCH || 0,
+          tempsGagneH: Math.floor(totalMinutes / 60),
+          tempsGagneMin: totalMinutes % 60,
         },
       });
       sent++;
     } catch (err) {
-      logger.warn(`[trialMail] envoi récap échoué (kiné ${kine.id}): ${err.message}`);
+      logger.warn(`[trialMail] inscription liste récap échouée (kiné ${kine.id}): ${err.message}`);
     }
   }
   logger.info(`[trialMail] récap : ${sent} envoyé(s), ${skipped} ignoré(s)`);
