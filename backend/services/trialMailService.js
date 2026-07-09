@@ -94,6 +94,13 @@ async function sendTrialRecapMails(now = new Date()) {
     // Exclure les convertis : plan effectif encore payant → pas de récap "fin d'essai".
     if (getEffectivePlan(kine, now) !== 'FREE') { skipped++; continue; }
 
+    // Réservation atomique : une seule instance « gagne » et agrège + envoie.
+    const claim = await prisma.kine.updateMany({
+      where: { id: kine.id, trialRecapMailSentAt: null },
+      data: { trialRecapMailSentAt: now },
+    });
+    if (claim.count !== 1) { skipped++; continue; }
+
     const start = trialStart(kine.trialEndDate);
     const window = { gte: start, lte: kine.trialEndDate };
 
@@ -108,13 +115,6 @@ async function sendTrialRecapMails(now = new Date()) {
 
     const byType = Object.fromEntries(grouped.map((g) => [g.type, g._count._all]));
     const totalMinutes = sumMinutes(grouped);
-
-    // Réservation atomique.
-    const claim = await prisma.kine.updateMany({
-      where: { id: kine.id, trialRecapMailSentAt: null },
-      data: { trialRecapMailSentAt: now },
-    });
-    if (claim.count !== 1) { skipped++; continue; }
 
     try {
       await sendTemplateEmail({
