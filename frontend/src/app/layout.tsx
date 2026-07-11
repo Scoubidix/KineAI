@@ -4,7 +4,6 @@ import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/ThemeProvider';
-import { UserProvider } from '@/context/UserContext'; // ✅ Import du contexte utilisateur
 import Analytics from '@/components/Analytics';
 import CookieBanner from '@/components/CookieBanner';
 
@@ -48,11 +47,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <UserProvider> {/* ✅ Contexte utilisateur ajouté ici */}
-            {children}
-            <Toaster />
-            <CookieBanner />
-          </UserProvider>
+          {children}
+          <Toaster />
+          <CookieBanner />
         </ThemeProvider>
       </body>
     </html>
