@@ -65,8 +65,10 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
     fetchPioneerSlots();
   }, [fetchPioneerSlots]);
 
-  // Vérifier si c'est un changement de plan ou un nouvel abonnement
-  const isUpgrade = subscription && subscription.planType && subscription.planType !== 'FREE';
+  // Vérifier si c'est un changement de plan ou un nouvel abonnement.
+  // Pendant l'essai, le plan effectif est EXPERT mais il n'y a AUCUN abonnement Stripe
+  // (subscriptionId null) → on traite comme un nouvel abonnement (checkout neuf), pas un changement.
+  const isUpgrade = subscription && !subscription.isTrialing && subscription.planType && subscription.planType !== 'FREE';
 
   // Créer une session de checkout (défini en premier car utilisé par handlePlanClick)
   const handleUpgrade = useCallback(async (planType) => {
@@ -214,7 +216,8 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
     return colors[planType] || colors['DECLIC'];
   };
 
-  const currentPlan = subscription?.planType;
+  // Pendant l'essai : aucune carte n'est "plan actuel" → toutes sélectionnables (EXPERT inclus).
+  const currentPlan = subscription?.isTrialing ? null : subscription?.planType;
   const recommendedPlan = !subscription || subscription.planType === 'FREE' ? 'PRATIQUE' : 'EXPERT';
 
   return (
