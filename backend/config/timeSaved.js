@@ -7,4 +7,9 @@ const MINUTES_BY_TYPE = {
   CONTRACT_CREATED: 30,
 };
 
-module.exports = { MINUTES_BY_TYPE };
+// Somme des minutes gagnées à partir d'un groupBy Prisma [{ type, _count:{_all} }]
+function sumMinutes(grouped) {
+  return grouped.reduce((total, row) => total + (MINUTES_BY_TYPE[row.type] || 0) * row._count._all, 0);
+}
+
+module.exports = { MINUTES_BY_TYPE, sumMinutes };

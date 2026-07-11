@@ -1,0 +1,146 @@
+/**
+ * Service Brevo — gestion des contacts d'essai (listes marketing + attributs).
+ *
+ * Distinct de brevoMailService (transactionnel /v3/smtp/email). Ici on utilise
+ * l'API Contacts (/v3/contacts) pour ajouter le kiné à une liste ; l'entrée dans
+ * la liste déclenche l'automation mail construite dans Brevo (côté Sylvain).
+ *  - Liste « Essai en cours » : séquence J0…J13 (via TRIAL_END_DATE).
+ *  - Liste « 1er bilan » : mail événement quand le kiné génère son 1er bilan.
+ *
+ * Logs sans PII : on ne log que le statut HTTP.
+ */
+
+const logger = require('../utils/logger');
+
+const BREVO_CONTACTS_ENDPOINT = 'https://api.brevo.com/v3/contacts';
+const REQUEST_TIMEOUT_MS = 10000;
+
+const ERROR_CODES = {
+  CONFIG_MISSING: 'BREVO_CONFIG_MISSING',
+  AUTH: 'BREVO_AUTH',
+  VALIDATION: 'BREVO_VALIDATION',
+  RATE_LIMIT: 'BREVO_RATE_LIMIT',
+  UNKNOWN: 'BREVO_UNKNOWN',
+};
+
+function throwErr(message, code) {
+  const err = new Error(message);
+  err.code = code;
+  throw err;
+}
+
+/** Format YYYY-MM-DD attendu par les attributs date Brevo. */
+function toBrevoDate(date) {
+  return new Date(date).toISOString().slice(0, 10);
+}
+
+/**
+ * Coeur : crée/met à jour un contact et l'ajoute à une liste Brevo.
+ * Ajoute à la liste sans retirer des autres (union). Non spécifique à un usage.
+ * @param {Object} p
+ * @param {string} p.email
+ * @param {number|string} p.listId
+ * @param {Object} [p.attributes]
+ * @param {string} p.context - libellé pour les logs (ex: 'essai', '1er bilan')
+ * @returns {Promise<void>}
+ */
+async function postContactToList({ email, listId, attributes, context }) {
+  const apiKey = process.env.BREVO_API_KEY;
+
+  if (!apiKey || !listId) {
+    throwErr(`Configuration Brevo ${context} manquante`, ERROR_CODES.CONFIG_MISSING);
+  }
+  if (!email) {
+    throwErr('Email requis pour le contact Brevo', ERROR_CODES.VALIDATION);
+  }
+
+  const payload = {
+    email,
+    updateEnabled: true,
+    listIds: [Number(listId)],
+    ...(attributes ? { attributes } : {}),
+  };
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response;
+  try {
+    response = await fetch(BREVO_CONTACTS_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'content-type': 'application/json',
+        'api-key': apiKey,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    logger.error(`Brevo ${context} : échec réseau`, { name: err.name, message: err.message });
+    throwErr('Échec ajout contact Brevo (réseau)', ERROR_CODES.UNKNOWN);
+  }
+  clearTimeout(timer);
+
+  // 201 = contact créé, 204 = contact existant mis à jour → succès.
+  if (response.status === 201 || response.status === 204) {
+    logger.info(`Brevo ${context} : contact synchronisé (status ${response.status})`);
+    return;
+  }
+
+  let body = null;
+  try { body = await response.json(); } catch { body = null; }
+  logger.error(`Brevo ${context} : ajout refusé`, { status: response.status, message: body?.message });
+
+  if (response.status === 401 || response.status === 403) {
+    throwErr('Authentification Brevo refusée', ERROR_CODES.AUTH);
+  }
+  if (response.status === 429) {
+    throwErr('Limite de taux Brevo atteinte', ERROR_CODES.RATE_LIMIT);
+  }
+  if (response.status >= 400 && response.status < 500) {
+    throwErr(body?.message || 'Contact refusé par Brevo', ERROR_CODES.VALIDATION);
+  }
+  throwErr('Erreur Brevo inattendue', ERROR_CODES.UNKNOWN);
+}
+
+/**
+ * Ajoute le kiné à la liste « Essai en cours » (séquence J0…J13) avec ses attributs.
+ * @param {Object} params
+ * @param {string} params.email
+ * @param {string} [params.firstName]
+ * @param {Date} params.trialStartDate
+ * @param {Date} params.trialEndDate
+ * @returns {Promise<void>}
+ */
+async function upsertTrialContact({ email, firstName, trialStartDate, trialEndDate }) {
+  return postContactToList({
+    email,
+    listId: process.env.BREVO_TRIAL_LIST_ID,
+    attributes: {
+      PRENOM: firstName || '',
+      TRIAL_START_DATE: toBrevoDate(trialStartDate),
+      TRIAL_END_DATE: toBrevoDate(trialEndDate),
+    },
+    context: 'essai',
+  });
+}
+
+/**
+ * Ajoute le kiné à la liste « Pionniers » (abonnés au plan PIONNIER).
+ * @param {Object} params
+ * @param {string} params.email
+ * @param {string} [params.firstName]
+ * @returns {Promise<void>}
+ */
+async function addToPionnierList({ email, firstName }) {
+  return postContactToList({
+    email,
+    listId: process.env.BREVO_PIONNIER_LIST_ID,
+    attributes: { PRENOM: firstName || '' },
+    context: 'pionnier',
+  });
+}
+
+module.exports = { ERROR_CODES, upsertTrialContact, addToPionnierList };

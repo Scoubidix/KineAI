@@ -2,6 +2,7 @@
 const logger = require('../utils/logger');
 const { sanitizeEmail } = require('../utils/logSanitizer');
 const prismaService = require('../services/prismaService');
+const { getEffectivePlan } = require('../services/planService');
 // Middleware pour vérifier les autorisations selon le plan d'abonnement
 
 // Matrice des features IA gatées par plan — source unique pour requireAssistant
@@ -29,14 +30,14 @@ const canCreateProgramme = async (req, res, next) => {
     const prisma = prismaService.getInstance();
     const kine = await prisma.kine.findUnique({
       where: { uid: req.uid },
-      select: { id: true, planType: true }
+      select: { id: true, planType: true, trialEndDate: true }
     });
 
     if (!kine) {
       return res.status(404).json({ error: 'Kinésithérapeute non trouvé' });
     }
 
-    const planType = kine.planType || 'FREE';
+    const planType = getEffectivePlan(kine);
 
     // Définir les limites par plan
     const limits = {
@@ -115,14 +116,14 @@ const requireAssistant = (assistantType) => {
       const prisma = prismaService.getInstance();
       const kine = await prisma.kine.findUnique({
         where: { uid: req.uid },
-        select: { id: true, planType: true }
+        select: { id: true, planType: true, trialEndDate: true }
       });
 
       if (!kine) {
         return res.status(404).json({ error: 'Kinésithérapeute non trouvé' });
       }
 
-      const planType = kine.planType || 'FREE';
+      const planType = getEffectivePlan(kine);
 
       const availableAssistants = ASSISTANTS_BY_PLAN[planType] || [];
 
@@ -165,14 +166,14 @@ const requireAssistantOrPreview = (assistantType) => {
       const prisma = prismaService.getInstance();
       const kine = await prisma.kine.findUnique({
         where: { uid: req.uid },
-        select: { id: true, planType: true }
+        select: { id: true, planType: true, trialEndDate: true }
       });
 
       if (!kine) {
         return res.status(404).json({ error: 'Kinésithérapeute non trouvé' });
       }
 
-      const planType = kine.planType || 'FREE';
+      const planType = getEffectivePlan(kine);
 
       const availableAssistants = ASSISTANTS_BY_PLAN[planType] || [];
       const hasAccess = availableAssistants.includes(assistantType);
@@ -198,7 +199,7 @@ const getPlanInfo = async (req, res, next) => {
     const prisma = prismaService.getInstance();
     const kine = await prisma.kine.findUnique({
       where: { uid: req.uid },
-      select: { id: true, planType: true }
+      select: { id: true, planType: true, trialEndDate: true }
     });
 
     if (!kine) {
@@ -206,7 +207,7 @@ const getPlanInfo = async (req, res, next) => {
     }
 
     req.kineId = kine.id;
-    req.planType = kine.planType || 'FREE';
+    req.planType = getEffectivePlan(kine);
     next();
 
   } catch (error) {

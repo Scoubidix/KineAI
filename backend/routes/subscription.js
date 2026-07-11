@@ -4,6 +4,8 @@ const router = express.Router();
 const prismaService = require('../services/prismaService');
 const StripeService = require('../services/StripeService');
 const { authenticate } = require('../middleware/authenticate');
+const trialService = require('../services/trialService');
+const { getEffectivePlan, getTrialInfo } = require('../services/planService');
 
 const prisma = prismaService.getInstance();
 
@@ -18,7 +20,9 @@ router.get('/subscription', authenticate, async (req, res) => {
         firstName: true,
         lastName: true,
         subscriptionId: true,
+        stripeCustomerId: true,
         planType: true,
+        trialEndDate: true,
         createdAt: true
       }
     });
@@ -34,15 +38,20 @@ router.get('/subscription', authenticate, async (req, res) => {
       lastName: kine.lastName
     };
 
-    // Si pas d'abonnement Stripe, retourner plan FREE
+    // Si pas d'abonnement Stripe : plan effectif (inclut l'essai gratuit) + infos essai
     if (!kine.subscriptionId) {
+      const trial = getTrialInfo(kine);
       return res.json({
         subscription: {
-          planType: kine.planType || 'FREE',
-          status: 'active',
-          currentPeriodEnd: null,
+          planType: getEffectivePlan(kine),
+          status: trial.isTrialing ? 'trialing' : 'active',
+          currentPeriodEnd: trial.isTrialing ? kine.trialEndDate : null,
           cancelAtPeriodEnd: false,
-          createdAt: kine.createdAt
+          createdAt: kine.createdAt,
+          isTrialing: trial.isTrialing,
+          trialEndDate: trial.trialEndDate,
+          daysLeft: trial.daysLeft,
+          trialEligible: trial.trialEligible
         },
         kine: kineInfo
       });
@@ -74,7 +83,11 @@ router.get('/subscription', authenticate, async (req, res) => {
           status: stripeSub.status,
           currentPeriodEnd: nextPaymentDate,
           cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
-          createdAt: new Date(stripeSub.start_date * 1000)
+          createdAt: new Date(stripeSub.start_date * 1000),
+          isTrialing: false,
+          trialEndDate: null,
+          daysLeft: 0,
+          trialEligible: false,
         },
         kine: kineInfo
       });
@@ -86,7 +99,11 @@ router.get('/subscription', authenticate, async (req, res) => {
           status: 'active',
           currentPeriodEnd: null,
           cancelAtPeriodEnd: false,
-          createdAt: kine.createdAt
+          createdAt: kine.createdAt,
+          isTrialing: false,
+          trialEndDate: null,
+          daysLeft: 0,
+          trialEligible: false,
         },
         kine: kineInfo
       });
@@ -239,6 +256,28 @@ router.post('/usage/refresh', authenticate, async (req, res) => {
   } catch (error) {
     logger.error('Erreur refresh usage:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// POST /kine/trial/start - Démarre l'essai gratuit 14 jours (opt-in FREE existants)
+router.post('/trial/start', authenticate, async (req, res) => {
+  try {
+    const kine = await prisma.kine.findUnique({
+      where: { uid: req.uid },
+      select: { id: true },
+    });
+    if (!kine) {
+      return res.status(404).json({ success: false, error: 'Kinésithérapeute non trouvé', code: 'KINE_NOT_FOUND' });
+    }
+
+    const { trialEndDate } = await trialService.startTrial(kine.id);
+    return res.json({ success: true, trialEndDate });
+  } catch (error) {
+    if (error.code === 'TRIAL_NOT_ELIGIBLE') {
+      return res.status(409).json({ success: false, error: 'Essai non disponible pour ce compte', code: 'TRIAL_NOT_ELIGIBLE' });
+    }
+    logger.error('Erreur démarrage essai:', error);
+    return res.status(500).json({ success: false, error: 'Erreur interne du serveur', code: 'TRIAL_START_ERROR' });
   }
 });
 

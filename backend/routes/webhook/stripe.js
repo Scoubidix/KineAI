@@ -7,6 +7,7 @@ const stripeService = require('../../services/StripeService');
 const logger = require('../../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../../utils/logSanitizer');
 const { notifyNewSubscription } = require('../../services/telegramService');
+const { addToPionnierList } = require('../../services/brevoTrialService');
 
 const router = express.Router();
 const prisma = prismaService.getInstance();
@@ -323,7 +324,16 @@ async function handleCheckoutCompleted(session, eventId) {
         where: { id: kineId },
         data: updateData
       });
-      
+
+      // Abonné PIONNIER → ajout à la liste Brevo « Pionniers » (non bloquant).
+      if (planType === 'PIONNIER') {
+        try {
+          await addToPionnierList({ email: kine.email, firstName: kine.firstName });
+        } catch (brevoErr) {
+          logger.warn(`⚠️ [${eventId}] Ajout liste Pionniers Brevo échoué (non bloquant): ${brevoErr.message}`);
+        }
+      }
+
       const duration = Date.now() - startTime;
       const successMessage = `Abonnement ${planType} créé pour kiné ${kineId}`;
 

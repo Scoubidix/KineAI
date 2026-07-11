@@ -106,6 +106,8 @@ import { usePWAInstall } from '@/hooks/usePWAInstall';
 import LegalAcceptanceModal from './LegalAcceptanceModal';
 import { useLegalAcceptance } from '@/hooks/useLegalAcceptance';
 import AnnouncementBanner from './AnnouncementBanner';
+import TrialWelcomeModal from '@/components/TrialWelcomeModal';
+import TrialOptInBanner from '@/components/TrialOptInBanner';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -1335,18 +1337,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const avatarInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Ouvrir automatiquement la modal profil si ?openProfile=true (depuis le wizard onboarding)
+  // Ouvre automatiquement une modal selon le query param :
+  //  - ?openProfile=true  → modal profil (wizard onboarding)
+  //  - ?openPaywall=true  → modal de choix des abonnements (ex: bouton mail récap fin d'essai)
   const searchParams = useSearchParams();
   useEffect(() => {
-    if (searchParams.get('openProfile') === 'true') {
-      setIsSettingsOpen(true);
-      // Nettoie le query param openProfile sans toucher au reste (autres params, hash).
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete('openProfile');
-      const hash = typeof window !== 'undefined' ? window.location.hash : '';
-      const qs = params.toString();
-      router.replace(`${currentPathname}${qs ? `?${qs}` : ''}${hash}`);
-    }
+    const openProfile = searchParams.get('openProfile') === 'true';
+    const openPaywall = searchParams.get('openPaywall') === 'true';
+    if (!openProfile && !openPaywall) return;
+
+    if (openProfile) setIsSettingsOpen(true);
+    if (openPaywall) setIsPaywallHeaderOpen(true);
+
+    // Nettoie les query params consommés sans toucher au reste (autres params, hash).
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('openProfile');
+    params.delete('openPaywall');
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    const qs = params.toString();
+    router.replace(`${currentPathname}${qs ? `?${qs}` : ''}${hash}`);
     // currentPathname/router sont stables, on ne s'intéresse qu'au changement de searchParams
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -1563,7 +1572,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </span>
             <div className="flex-1" />
             <div className="flex items-center gap-1">
-              {role === 'kine' && headerSubscription && headerSubscription.planType === 'FREE' && (
+              {role === 'kine' && headerSubscription?.isTrialing && (
+                <button
+                  onClick={() => setIsPaywallHeaderOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-white text-xs font-bold shadow-md transition-all duration-200 hover:scale-105"
+                  title="Passer à un plan payant"
+                >
+                  <Crown className="h-3.5 w-3.5" />
+                  Essai · J-{headerSubscription.daysLeft}
+                </button>
+              )}
+              {role === 'kine' && headerSubscription && !headerSubscription.isTrialing && headerSubscription.planType === 'FREE' && (
                 <button
                   onClick={() => setIsPaywallHeaderOpen(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sky-400 hover:bg-sky-300 text-white text-xs font-bold shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg"
@@ -1572,7 +1591,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   Passer à Premium
                 </button>
               )}
-              {role === 'kine' && headerSubscription && headerSubscription.planType && headerSubscription.planType !== 'FREE' && (() => {
+              {role === 'kine' && headerSubscription && !headerSubscription.isTrialing && headerSubscription.planType && headerSubscription.planType !== 'FREE' && (() => {
                 const currentPlan = getPlanByType(headerSubscription.planType);
                 const canUpgrade = ['DECLIC', 'PRATIQUE'].includes(headerSubscription.planType);
                 return (
@@ -1750,7 +1769,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
             style={{ background: 'radial-gradient(circle, #3899aa, transparent 70%)' }}
           />
           <div className="relative z-10">
+            {role === 'kine' && <TrialWelcomeModal />}
             <AnnouncementBanner />
+            {role === 'kine' && <TrialOptInBanner />}
             {children}
           </div>
         </div>

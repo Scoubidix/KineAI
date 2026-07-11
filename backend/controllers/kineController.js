@@ -9,7 +9,8 @@ const { uploadAvatar, deleteAvatar, generateSignedUrl, validateImageBuffer } = r
 const { normalizeFirstName, normalizeLastName } = require('../utils/nameNormalization');
 const LEGAL_VERSIONS = require('../config/legalVersions');
 const stripeService = require('../services/StripeService');
-const { MINUTES_BY_TYPE } = require('../config/timeSaved');
+const trialService = require('../services/trialService');
+const { sumMinutes } = require('../config/timeSaved');
 const fs = require('fs');
 
 // Bornes [lundi 00:00, dimanche 23:59:59.999] de la semaine (Europe/Paris) contenant `ref`.
@@ -22,10 +23,6 @@ function getParisWeekBounds(ref = new Date()) {
   return { start: monday, end: sunday };
 }
 
-// Somme des minutes gagnées à partir d'un groupBy Prisma [{ type, _count:{_all} }]
-function sumMinutes(grouped) {
-  return grouped.reduce((total, row) => total + (MINUTES_BY_TYPE[row.type] || 0) * row._count._all, 0);
-}
 
 const createKine = async (req, res) => {
   const { uid, email, acceptedLegalAt } = req.body;
@@ -73,6 +70,14 @@ const createKine = async (req, res) => {
     });
 
     logger.warn("✅ Kiné créé - ID:", sanitizeId(newKine.id), "Email:", sanitizeEmail(newKine.email), "Legal accepté:", !!legalDate);
+
+    // Démarrer l'essai gratuit 14 jours. Non bloquant : une erreur ici ne doit
+    // jamais empêcher la création du compte.
+    try {
+      await trialService.startTrial(newKine.id);
+    } catch (trialErr) {
+      logger.error('[signup] Démarrage essai échoué (non bloquant):', trialErr.message);
+    }
 
     return res.status(201).json(newKine);
   } catch (err) {
