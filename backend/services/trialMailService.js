@@ -5,7 +5,7 @@
 const prismaService = require('./prismaService');
 const logger = require('../utils/logger');
 const { TRIAL_DURATION_DAYS, getEffectivePlan } = require('./planService');
-const { addToBilanList, addToRecapList } = require('./brevoTrialService');
+const { sendTemplateEmail } = require('./brevoMailService');
 const { sumMinutes } = require('../config/timeSaved');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -21,8 +21,9 @@ function trialStart(trialEndDate) {
  */
 async function sendFirstBilanMails(now = new Date()) {
   const prisma = prismaService.getInstance();
-  if (!process.env.BREVO_TRIAL_BILAN_LIST_ID) {
-    logger.warn('[trialMail] BREVO_TRIAL_BILAN_LIST_ID absent — inscription liste 1er bilan ignorée');
+  const templateId = process.env.BREVO_TRIAL_BILAN_TEMPLATE_ID;
+  if (!templateId) {
+    logger.warn('[trialMail] BREVO_TRIAL_BILAN_TEMPLATE_ID absent — envoi 1er bilan ignoré');
     return { sent: 0, skipped: 0 };
   }
 
@@ -54,11 +55,15 @@ async function sendFirstBilanMails(now = new Date()) {
     if (claim.count !== 1) { skipped++; continue; }
 
     try {
-      // Inscription à la liste Brevo « 1er bilan » → déclenche l'automation mail.
-      await addToBilanList({ email: kine.email, firstName: kine.firstName });
+      await sendTemplateEmail({
+        toEmail: kine.email,
+        toName: kine.firstName || undefined,
+        templateId,
+        params: { PRENOM: kine.firstName || '' },
+      });
       sent++;
     } catch (err) {
-      logger.warn(`[trialMail] inscription liste 1er bilan échouée (kiné ${kine.id}): ${err.message}`);
+      logger.warn(`[trialMail] envoi 1er bilan échoué (kiné ${kine.id}): ${err.message}`);
     }
   }
   logger.info(`[trialMail] 1er bilan : ${sent} envoyé(s), ${skipped} ignoré(s)`);
@@ -72,8 +77,9 @@ async function sendFirstBilanMails(now = new Date()) {
  */
 async function sendTrialRecapMails(now = new Date()) {
   const prisma = prismaService.getInstance();
-  if (!process.env.BREVO_TRIAL_RECAP_LIST_ID) {
-    logger.warn('[trialMail] BREVO_TRIAL_RECAP_LIST_ID absent — inscription liste récap ignorée');
+  const templateId = process.env.BREVO_TRIAL_RECAP_TEMPLATE_ID;
+  if (!templateId) {
+    logger.warn('[trialMail] BREVO_TRIAL_RECAP_TEMPLATE_ID absent — envoi récap ignoré');
     return { sent: 0, skipped: 0 };
   }
 
@@ -111,21 +117,22 @@ async function sendTrialRecapMails(now = new Date()) {
     const totalMinutes = sumMinutes(grouped);
 
     try {
-      // Inscription à la liste Brevo « Récap » avec les stats en attributs de contact.
-      await addToRecapList({
-        email: kine.email,
-        firstName: kine.firstName,
-        stats: {
-          nbBilans: byType.BILAN_GENERATED || 0,
-          nbProgrammes: byType.PROGRAMME_CREATED || 0,
-          nbRequetesIa: byType.IA_SEARCH || 0,
-          tempsGagneH: Math.floor(totalMinutes / 60),
-          tempsGagneMin: totalMinutes % 60,
+      await sendTemplateEmail({
+        toEmail: kine.email,
+        toName: kine.firstName || undefined,
+        templateId,
+        params: {
+          PRENOM: kine.firstName || '',
+          NB_BILANS: byType.BILAN_GENERATED || 0,
+          NB_PROGRAMMES: byType.PROGRAMME_CREATED || 0,
+          NB_REQUETES_IA: byType.IA_SEARCH || 0,
+          TEMPS_GAGNE_H: Math.floor(totalMinutes / 60),
+          TEMPS_GAGNE_MIN: totalMinutes % 60,
         },
       });
       sent++;
     } catch (err) {
-      logger.warn(`[trialMail] inscription liste récap échouée (kiné ${kine.id}): ${err.message}`);
+      logger.warn(`[trialMail] envoi récap échoué (kiné ${kine.id}): ${err.message}`);
     }
   }
   logger.info(`[trialMail] récap : ${sent} envoyé(s), ${skipped} ignoré(s)`);
