@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, TrendingDown, Minus, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, FileSignature, Gift, Activity, Layers, Zap, ImagePlus, X, Pencil, Trash2 } from 'lucide-react';
+import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, TrendingDown, Minus, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, FileSignature, Gift, Activity, Layers, Zap, ImagePlus, X, Pencil, Trash2, Sparkles } from 'lucide-react';
 import BilanFieldsTab from './components/BilanFieldsTab';
 import BilanTemplatesTab from './components/BilanTemplatesTab';
 import TokenUsageTab from './components/TokenUsageTab';
@@ -48,6 +48,7 @@ interface LettersMetric extends Metric {
 interface ActivityStats {
   kines: Metric;
   subscriptions: Metric;
+  trials: Metric;
   patients: Metric;
   programmes: Metric;
   bilans: Metric;
@@ -513,6 +514,7 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatCard title="Kinés inscrits" icon={Users} metric={stats.activity.kines} />
                 <StatCard title="Abonnements" icon={UserCheck} metric={stats.activity.subscriptions} />
+                <StatCard title="Essais en cours" icon={Sparkles} metric={stats.activity.trials} />
                 <StatCard title="Patients" icon={Activity} metric={stats.activity.patients} />
                 <StatCard title="Programmes" icon={ClipboardList} metric={stats.activity.programmes} />
                 <StatCard title="Bilans générés" icon={FileText} metric={stats.activity.bilans} />
