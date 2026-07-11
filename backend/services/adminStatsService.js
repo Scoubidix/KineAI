@@ -2,6 +2,7 @@
 const prismaService = require('./prismaService');
 const stripeService = require('./StripeService');
 const logger = require('../utils/logger');
+const { TRIAL_DURATION_DAYS } = require('./planService');
 
 const PARIS_TZ = 'Europe/Paris';
 
@@ -129,11 +130,32 @@ async function getActivityStats(now = new Date(), ranges = getParisPeriodRanges(
     ]).then(([wc, wp, mc, mp]) =>
       buildMetric({ total: null, weekCurrent: wc, weekPrevious: wp, monthCurrent: mc, monthPrevious: mp }));
 
+  // Essais gratuits : total = actuellement EN COURS (trialEndDate > now, non convertis) ;
+  // comparatif semaine/mois = essais DÉMARRÉS sur la période. Un essai démarré dans une
+  // période P équivaut à trialEndDate dans P décalée de la durée d'essai (fin = début + N jours).
+  const TRIAL_MS = TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000;
+  const shiftFwd = (range) => {
+    const r = {};
+    if (range.gte) r.gte = new Date(range.gte.getTime() + TRIAL_MS);
+    if (range.lt) r.lt = new Date(range.lt.getTime() + TRIAL_MS);
+    return r;
+  };
+  const trialActiveWhere = { trialEndDate: { gt: now }, OR: [{ planType: null }, { planType: 'FREE' }] };
+  const countTrials = () =>
+    Promise.all([
+      prisma.kine.count({ where: trialActiveWhere }),
+      prisma.kine.count({ where: { trialEndDate: shiftFwd(inWeek) } }),
+      prisma.kine.count({ where: { trialEndDate: shiftFwd(inPrevWeek) } }),
+      prisma.kine.count({ where: { trialEndDate: shiftFwd(inMonth) } }),
+      prisma.kine.count({ where: { trialEndDate: shiftFwd(inPrevMonth) } }),
+    ]).then(([total, wc, wp, mc, mp]) =>
+      buildMetric({ total, weekCurrent: wc, weekPrevious: wp, monthCurrent: mc, monthPrevious: mp }));
+
   // Courriers : groupBy method sur chaque période (EMAIL / WHATSAPP).
   const lettersGroup = (sentAt) =>
     prisma.templateSentHistory.groupBy({ by: ['method'], where: sentAt ? { sentAt } : {}, _count: { _all: true } });
 
-  const [kines, patients, programmes, bilans, contracts, referrals, subscriptions, letterGroups] =
+  const [kines, patients, programmes, bilans, contracts, referrals, subscriptions, trials, letterGroups] =
     await Promise.all([
       countByCreatedAt(prisma.kine),
       countByCreatedAt(prisma.patient, { isActive: true }),
@@ -144,6 +166,7 @@ async function getActivityStats(now = new Date(), ranges = getParisPeriodRanges(
       countByCreatedAt(prisma.contract),
       countByCreatedAt(prisma.referral),
       countSubscriptions(),
+      countTrials(),
       Promise.all([
         lettersGroup(null), lettersGroup(inWeek), lettersGroup(inPrevWeek), lettersGroup(inMonth), lettersGroup(inPrevMonth),
       ]),
@@ -165,7 +188,7 @@ async function getActivityStats(now = new Date(), ranges = getParisPeriodRanges(
     whatsapp: lettersMetric((g) => byMethod(g, 'WHATSAPP')),
   };
 
-  return { kines, subscriptions, patients, programmes, bilans, contracts, referrals, letters };
+  return { kines, subscriptions, trials, patients, programmes, bilans, contracts, referrals, letters };
 }
 
 /**
