@@ -127,4 +127,20 @@ async function upsertTrialContact({ email, firstName, trialStartDate, trialEndDa
   });
 }
 
-module.exports = { ERROR_CODES, upsertTrialContact };
+/**
+ * Ajoute le kiné à la liste « Pionniers » (abonnés au plan PIONNIER).
+ * @param {Object} params
+ * @param {string} params.email
+ * @param {string} [params.firstName]
+ * @returns {Promise<void>}
+ */
+async function addToPionnierList({ email, firstName }) {
+  return postContactToList({
+    email,
+    listId: process.env.BREVO_PIONNIER_LIST_ID,
+    attributes: { PRENOM: firstName || '' },
+    context: 'pionnier',
+  });
+}
+
+module.exports = { ERROR_CODES, upsertTrialContact, addToPionnierList };
