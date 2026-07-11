@@ -4,7 +4,7 @@
 
 const prismaService = require('./prismaService');
 const logger = require('../utils/logger');
-const { TRIAL_DURATION_DAYS, getEffectivePlan } = require('./planService');
+const { TRIAL_DURATION_DAYS, PAID_PLANS } = require('./planService');
 const { sendTemplateEmail } = require('./brevoMailService');
 const { sumMinutes } = require('../config/timeSaved');
 
@@ -71,8 +71,9 @@ async function sendFirstBilanMails(now = new Date()) {
 }
 
 /**
- * Mail récap de fin d'essai : kinés dont l'essai est terminé, NON convertis,
- * non encore notifiés. Agrège l'usage sur la fenêtre d'essai (barème canonique).
+ * Mail récap de fin d'essai : kinés à qui il reste moins d'1 jour d'essai (ou dont
+ * l'essai est déjà terminé), NON convertis, non encore notifiés. Agrège l'usage sur
+ * la fenêtre d'essai (barème canonique).
  * @returns {Promise<{ sent: number, skipped: number }>}
  */
 async function sendTrialRecapMails(now = new Date()) {
@@ -83,16 +84,21 @@ async function sendTrialRecapMails(now = new Date()) {
     return { sent: 0, skipped: 0 };
   }
 
+  // Déclenche quand il reste moins d'1 jour d'essai (fin d'essai ≤ now + 24h),
+  // ce qui couvre aussi les essais déjà terminés non encore notifiés.
+  const cutoff = new Date(now.getTime() + MS_PER_DAY);
   const candidates = await prisma.kine.findMany({
-    where: { trialEndDate: { lte: now }, trialRecapMailSentAt: null },
+    where: { trialEndDate: { lte: cutoff }, trialRecapMailSentAt: null },
     select: { id: true, email: true, firstName: true, planType: true, subscriptionId: true, trialEndDate: true },
   });
 
   let sent = 0;
   let skipped = 0;
   for (const kine of candidates) {
-    // Exclure les convertis : plan effectif encore payant → pas de récap "fin d'essai".
-    if (getEffectivePlan(kine, now) !== 'FREE') { skipped++; continue; }
+    // Exclure les convertis : un plan payant RÉEL (l'essai garde planType=FREE, donc
+    // planType payant ⟺ abonnement pris). NE PAS utiliser le plan effectif ici : pendant
+    // un essai encore actif il vaut EXPERT et exclurait à tort les non-convertis.
+    if (PAID_PLANS.includes(kine.planType)) { skipped++; continue; }
 
     // Réservation atomique : une seule instance « gagne » et agrège + envoie.
     const claim = await prisma.kine.updateMany({
