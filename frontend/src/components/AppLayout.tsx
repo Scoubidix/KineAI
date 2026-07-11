@@ -1337,18 +1337,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const avatarInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Ouvrir automatiquement la modal profil si ?openProfile=true (depuis le wizard onboarding)
+  // Ouvre automatiquement une modal selon le query param :
+  //  - ?openProfile=true  → modal profil (wizard onboarding)
+  //  - ?openPaywall=true  → modal de choix des abonnements (ex: bouton mail récap fin d'essai)
   const searchParams = useSearchParams();
   useEffect(() => {
-    if (searchParams.get('openProfile') === 'true') {
-      setIsSettingsOpen(true);
-      // Nettoie le query param openProfile sans toucher au reste (autres params, hash).
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete('openProfile');
-      const hash = typeof window !== 'undefined' ? window.location.hash : '';
-      const qs = params.toString();
-      router.replace(`${currentPathname}${qs ? `?${qs}` : ''}${hash}`);
-    }
+    const openProfile = searchParams.get('openProfile') === 'true';
+    const openPaywall = searchParams.get('openPaywall') === 'true';
+    if (!openProfile && !openPaywall) return;
+
+    if (openProfile) setIsSettingsOpen(true);
+    if (openPaywall) setIsPaywallHeaderOpen(true);
+
+    // Nettoie les query params consommés sans toucher au reste (autres params, hash).
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('openProfile');
+    params.delete('openPaywall');
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    const qs = params.toString();
+    router.replace(`${currentPathname}${qs ? `?${qs}` : ''}${hash}`);
     // currentPathname/router sont stables, on ne s'intéresse qu'au changement de searchParams
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
