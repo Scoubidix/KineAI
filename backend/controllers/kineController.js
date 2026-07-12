@@ -10,6 +10,8 @@ const { normalizeFirstName, normalizeLastName } = require('../utils/nameNormaliz
 const LEGAL_VERSIONS = require('../config/legalVersions');
 const stripeService = require('../services/StripeService');
 const trialService = require('../services/trialService');
+const { updateTrialContactName } = require('../services/brevoTrialService');
+const { isTrialActive } = require('../services/planService');
 const { sumMinutes } = require('../config/timeSaved');
 const fs = require('fs');
 
@@ -214,6 +216,17 @@ const updateKineProfile = async (req, res) => {
         });
       } catch (e) {
         logger.warn("⚠️ Sync nom Stripe customer échoué (non-bloquant):", e.message);
+      }
+    }
+
+    // Essai : le prénom est saisi à l'onboarding, APRÈS le démarrage de l'essai. Si l'essai
+    // est encore actif, re-synchroniser l'attribut PRENOM du contact Brevo pour que les mails
+    // de la séquence (J3+) l'affichent. Non bloquant, sans re-déclencher l'automation.
+    if (firstName !== undefined && updatedKine.firstName && isTrialActive(existingKine)) {
+      try {
+        await updateTrialContactName({ email: updatedKine.email, firstName: updatedKine.firstName });
+      } catch (e) {
+        logger.warn("⚠️ Re-synchro prénom Brevo échouée (non-bloquant):", e.message);
       }
     }
 

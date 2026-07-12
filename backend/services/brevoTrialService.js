@@ -44,23 +44,7 @@ function toBrevoDate(date) {
  * @param {string} p.context - libellé pour les logs (ex: 'essai', '1er bilan')
  * @returns {Promise<void>}
  */
-async function postContactToList({ email, listId, attributes, context }) {
-  const apiKey = process.env.BREVO_API_KEY;
-
-  if (!apiKey || !listId) {
-    throwErr(`Configuration Brevo ${context} manquante`, ERROR_CODES.CONFIG_MISSING);
-  }
-  if (!email) {
-    throwErr('Email requis pour le contact Brevo', ERROR_CODES.VALIDATION);
-  }
-
-  const payload = {
-    email,
-    updateEnabled: true,
-    listIds: [Number(listId)],
-    ...(attributes ? { attributes } : {}),
-  };
-
+async function postContact(payload, context) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -71,7 +55,7 @@ async function postContactToList({ email, listId, attributes, context }) {
       headers: {
         'accept': 'application/json',
         'content-type': 'application/json',
-        'api-key': apiKey,
+        'api-key': process.env.BREVO_API_KEY,
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -79,7 +63,7 @@ async function postContactToList({ email, listId, attributes, context }) {
   } catch (err) {
     clearTimeout(timer);
     logger.error(`Brevo ${context} : échec réseau`, { name: err.name, message: err.message });
-    throwErr('Échec ajout contact Brevo (réseau)', ERROR_CODES.UNKNOWN);
+    throwErr('Échec contact Brevo (réseau)', ERROR_CODES.UNKNOWN);
   }
   clearTimeout(timer);
 
@@ -91,7 +75,7 @@ async function postContactToList({ email, listId, attributes, context }) {
 
   let body = null;
   try { body = await response.json(); } catch { body = null; }
-  logger.error(`Brevo ${context} : ajout refusé`, { status: response.status, message: body?.message });
+  logger.error(`Brevo ${context} : refusé`, { status: response.status, message: body?.message });
 
   if (response.status === 401 || response.status === 403) {
     throwErr('Authentification Brevo refusée', ERROR_CODES.AUTH);
@@ -103,6 +87,22 @@ async function postContactToList({ email, listId, attributes, context }) {
     throwErr(body?.message || 'Contact refusé par Brevo', ERROR_CODES.VALIDATION);
   }
   throwErr('Erreur Brevo inattendue', ERROR_CODES.UNKNOWN);
+}
+
+async function postContactToList({ email, listId, attributes, context }) {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey || !listId) {
+    throwErr(`Configuration Brevo ${context} manquante`, ERROR_CODES.CONFIG_MISSING);
+  }
+  if (!email) {
+    throwErr('Email requis pour le contact Brevo', ERROR_CODES.VALIDATION);
+  }
+  return postContact({
+    email,
+    updateEnabled: true,
+    listIds: [Number(listId)],
+    ...(attributes ? { attributes } : {}),
+  }, context);
 }
 
 /**
@@ -143,4 +143,27 @@ async function addToPionnierList({ email, firstName }) {
   });
 }
 
-module.exports = { ERROR_CODES, upsertTrialContact, addToPionnierList };
+/**
+ * Met à jour l'attribut PRENOM d'un contact Brevo SANS toucher à ses listes
+ * (donc sans re-déclencher la séquence d'automation). Utilisé quand le prénom est
+ * saisi à l'onboarding, après le démarrage de l'essai.
+ * @param {Object} params
+ * @param {string} params.email
+ * @param {string} [params.firstName]
+ * @returns {Promise<void>}
+ */
+async function updateTrialContactName({ email, firstName }) {
+  if (!process.env.BREVO_API_KEY) {
+    throwErr('Configuration Brevo manquante', ERROR_CODES.CONFIG_MISSING);
+  }
+  if (!email) {
+    throwErr('Email requis pour le contact Brevo', ERROR_CODES.VALIDATION);
+  }
+  return postContact({
+    email,
+    updateEnabled: true,
+    attributes: { PRENOM: firstName || '' },
+  }, 'maj prénom');
+}
+
+module.exports = { ERROR_CODES, upsertTrialContact, addToPionnierList, updateTrialContactName };
