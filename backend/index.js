@@ -44,6 +44,7 @@ const prismaService = require('./services/prismaService');
 // Import du nouveau système d'archivage
 const { startProgramCleanupCron } = require('./utils/chatCleanup');
 const { startTrialMailCron } = require('./utils/trialMailCron');
+const { runBilanSeed } = require('./services/bilanSeedService');
 
 // 🚦 Rate limiters utilisés au niveau app.use (le reste est déplacé dans les routeurs après authenticate)
 const {
@@ -685,6 +686,15 @@ const gracefulShutdown = async (signal) => {
 };
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+// Seed versionné des champs & templates de bilan (best-effort, ne bloque pas le boot).
+(async () => {
+  try {
+    await runBilanSeed();
+  } catch (err) {
+    logger.error('Seed bilan : échec non bloquant au boot', err);
+  }
+})();
 
 // Démarrage du serveur
 app.listen(PORT, '0.0.0.0', () => {

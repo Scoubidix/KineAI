@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "fields": [
+    { "key": "eva_repos", "label": "EVA au repos", "type": "NUMERIC", "unit": "/10", "rangeMin": 0, "rangeMax": 10, "category": "Douleur", "order": 1 },
+    { "key": "eva_effort", "label": "EVA à l'effort", "type": "NUMERIC", "unit": "/10", "rangeMin": 0, "rangeMax": 10, "category": "Douleur", "order": 2 },
+    { "key": "eva_nuit", "label": "EVA nocturne", "type": "NUMERIC", "unit": "/10", "rangeMin": 0, "rangeMax": 10, "category": "Douleur", "order": 3 },
+
+    { "key": "flexion_genou", "label": "Flexion genou", "type": "NUMERIC", "category": "Amplitudes", "order": 0 },
+    { "key": "extension_genou", "label": "Extension genou", "type": "NUMERIC", "category": "Amplitudes", "order": 0 },
+
+    { "key": "flexion_epaule", "label": "Flexion", "type": "NUMERIC", "unit": "°", "rangeMin": 0, "rangeMax": 180, "category": "Epaule", "order": 0 },
+    { "key": "extension_epaule", "label": "Extension", "type": "NUMERIC", "unit": "°", "rangeMin": 0, "rangeMax": 60, "category": "Epaule", "order": 0 },
+    { "key": "abduction_epaule", "label": "Abduction", "type": "NUMERIC", "unit": "°", "rangeMin": 0, "rangeMax": 180, "category": "Epaule", "order": 0, "isActive": false },
+    { "key": "adduction_epaule", "label": "Adduction", "type": "NUMERIC", "unit": "°", "rangeMin": 0, "rangeMax": 45, "category": "Epaule", "order": 0, "isActive": false },
+    { "key": "rotation_externe_1", "label": "RE1", "type": "NUMERIC", "unit": "°", "rangeMin": 0, "rangeMax": 80, "category": "Epaule", "order": 0, "isActive": false },
+
+    { "key": "test_neer", "label": "Test de Neer", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+    { "key": "test_jobe", "label": "Test de Jobe (\"Empty Can Test\")", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+    { "key": "test_patte", "label": "Test de Patte", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+    { "key": "test_gerber", "label": "Test de Gerber ('Lift-off Test\")", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+    { "key": "test_speed", "label": "Test de Speed (\"Palm-Up Test\")", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+    { "key": "test_yergason", "label": "Test de Yergason", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+    { "key": "test_hawkins_kennedy", "label": "Test de Hawkins-Kennedy", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+    { "key": "test_yocum", "label": "Test de Yocum", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+    { "key": "test_adduction_forcee", "label": "Test d'adduction forcée (\"Cross-Body Adduction Test\")", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+    { "key": "test_crank", "label": "Test de Crank", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+    { "key": "test_apprehension_posterieure", "label": "Test d'Appréhension Postérieure", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+    { "key": "test_apprehension_anterieure", "label": "Test d'Appréhension Antérieure", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+    { "key": "test_recentrage", "label": "Test de Recentrage (\"Jobe's Relocation Test\")", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+    { "key": "load_and_shift_test", "label": "Load and Shift Test", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
+
+    { "key": "quad_dynamo", "label": "Mesure de force Quadriceps au dynamo", "type": "NUMERIC", "unit": "N", "category": "Force", "order": 0 },
+    { "key": "ij_dynalmo", "label": "Mesure de force I-J au dynamo", "type": "NUMERIC", "unit": "N", "category": "Force", "order": 0 },
+
+    { "key": "test_provocation_valgus_genou", "label": "Test de Provocation en Valgus", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+    { "key": "test_provocation_varus_genou", "label": "Test de Provocation en Varus", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+    { "key": "test_lachman", "label": "Test de Lachman", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+    { "key": "test_ressaut_rotatoire", "label": "Test du Ressaut Rotatoire (\"Pivot Shift\")", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+    { "key": "tiroir_anterieur_genou", "label": "Tiroir Antérieur du Genou", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+    { "key": "tiroir_posterieur_genou", "label": "Tiroir Postérieur du Genou", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+    { "key": "test_godfrey", "label": "Test de Godfrey (\"Posterior Sag Sign\")", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+    { "key": "test_muller", "label": "Test de Muller (\"Quadriceps Active Test\")", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+    { "key": "palpation_interligne_articulaire_genou", "label": "Palpation de l'interligne articulaire du Genou", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+    { "key": "test_apley", "label": "Test d'Apley (\"Grinding Test\")", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+    { "key": "test_thessaly", "label": "Test de Thessaly", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+    { "key": "test_mcmurray", "label": "Test de McMurray", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+    { "key": "test_apprehension_smilie", "label": "Test d'Appréhension de Smilie", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+    { "key": "test_noble", "label": "Test de Noble", "type": "BOOLEAN", "category": "Genou", "order": 0 },
+
+    { "key": "mobilite_rotule", "label": "Mobilité de la rotule", "type": "BOOLEAN", "category": "Mobilité", "order": 0 },
+    { "key": "circonference_susrotulienne", "label": "Circonférence sus-rotulienne", "type": "NUMERIC", "category": "Oedème", "order": 0 },
+
+    { "key": "test_phalen", "label": "Test de Phalen", "type": "BOOLEAN", "category": "Poignet/Main", "order": 0 },
+    { "key": "signe_tinel", "label": "Signe de Tinel", "type": "BOOLEAN", "category": "Poignet/Main", "order": 0 },
+
+    { "key": "test_laseuge", "label": "Test de Lasègue", "type": "BOOLEAN", "category": "Rachis/Bassin", "order": 0 }
+  ],
+  "templates": [
+    {
+      "name": "Prothèse de genou",
+      "category": "Genou",
+      "items": [
+        { "kind": "canonical", "key": "eva_repos" },
+        { "kind": "canonical", "key": "eva_effort" },
+        { "kind": "canonical", "key": "eva_nuit" },
+        { "kind": "canonical", "key": "flexion_genou" },
+        { "kind": "canonical", "key": "extension_genou" },
+        { "kind": "canonical", "key": "mobilite_rotule" },
+        { "kind": "canonical", "key": "circonference_susrotulienne" },
+        { "kind": "canonical", "key": "quad_dynamo" },
+        { "kind": "canonical", "key": "ij_dynalmo" }
+      ]
+    }
+  ]
+}
