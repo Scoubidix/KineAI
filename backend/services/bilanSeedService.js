@@ -87,4 +87,59 @@ function validateSeed(data) {
   return errors;
 }
 
-module.exports = { loadSeedFile, validateSeed, DEFAULT_SEED_PATH };
+/**
+ * Applique le seed si la version du JSON dépasse celle déjà appliquée.
+ * Best-effort : ne throw jamais pour un JSON absent/invalide/à jour.
+ * @param {{ prisma?: object, data?: object }} [opts] injection pour les tests
+ */
+async function runBilanSeed({ prisma, data } = {}) {
+  prisma = prisma || prismaService.getInstance();
+  data = data !== undefined ? data : loadSeedFile();
+
+  if (!data) {
+    logger.warn('Seed bilan : fichier absent ou illisible, ignoré');
+    return;
+  }
+
+  const errors = validateSeed(data);
+  if (errors.length) {
+    logger.error(`Seed bilan : JSON invalide (${errors.length} erreurs), ignoré`, errors);
+    return;
+  }
+
+  const state = await prisma.bilanSeedState.findFirst();
+  const applied = state ? state.version : 0;
+  if (data.version <= applied) {
+    logger.info(`Seed bilan : déjà à jour (v${applied})`);
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.bilanCanonicalField.deleteMany({});
+    await tx.bilanTemplate.deleteMany({ where: { isPublic: true, kineId: null } });
+    await tx.bilanCanonicalField.createMany({ data: data.fields });
+    for (const t of data.templates) {
+      await tx.bilanTemplate.create({
+        data: {
+          name: t.name,
+          description: t.description ?? null,
+          category: t.category,
+          items: t.items,
+          isPublic: true,
+          kineId: null,
+        },
+      });
+    }
+    if (state) {
+      await tx.bilanSeedState.update({ where: { id: state.id }, data: { version: data.version } });
+    } else {
+      await tx.bilanSeedState.create({ data: { version: data.version } });
+    }
+  });
+
+  logger.info(
+    `Seed bilan : appliqué v${applied} → v${data.version} (${data.fields.length} champs, ${data.templates.length} templates)`
+  );
+}
+
+module.exports = { loadSeedFile, validateSeed, runBilanSeed, DEFAULT_SEED_PATH };
