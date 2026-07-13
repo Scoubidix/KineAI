@@ -973,3 +973,13 @@ model KineActivityEvent {
   @@index([kineId, type])
   @@map("kine_activity_events")
 }
+
+/// État du seed des champs & templates de bilan (une seule ligne).
+/// Mémorise la dernière version de backend/data/bilanSeed.json appliquée.
+model BilanSeedState {
+  id        Int      @id @default(autoincrement())
+  version   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@map("bilan_seed_state")
+}
