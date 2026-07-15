@@ -1,74 +1,7644 @@
 {
-  "version": 1,
+  "version": 2,
   "fields": [
-    { "key": "eva_repos", "label": "EVA au repos", "type": "NUMERIC", "unit": "/10", "rangeMin": 0, "rangeMax": 10, "category": "Douleur", "order": 1 },
-    { "key": "eva_effort", "label": "EVA à l'effort", "type": "NUMERIC", "unit": "/10", "rangeMin": 0, "rangeMax": 10, "category": "Douleur", "order": 2 },
-    { "key": "eva_nuit", "label": "EVA nocturne", "type": "NUMERIC", "unit": "/10", "rangeMin": 0, "rangeMax": 10, "category": "Douleur", "order": 3 },
-
-    { "key": "flexion_genou", "label": "Flexion genou", "type": "NUMERIC", "category": "Amplitudes", "order": 0 },
-    { "key": "extension_genou", "label": "Extension genou", "type": "NUMERIC", "category": "Amplitudes", "order": 0 },
-
-    { "key": "flexion_epaule", "label": "Flexion", "type": "NUMERIC", "unit": "°", "rangeMin": 0, "rangeMax": 180, "category": "Epaule", "order": 0 },
-    { "key": "extension_epaule", "label": "Extension", "type": "NUMERIC", "unit": "°", "rangeMin": 0, "rangeMax": 60, "category": "Epaule", "order": 0 },
-    { "key": "abduction_epaule", "label": "Abduction", "type": "NUMERIC", "unit": "°", "rangeMin": 0, "rangeMax": 180, "category": "Epaule", "order": 0, "isActive": false },
-    { "key": "adduction_epaule", "label": "Adduction", "type": "NUMERIC", "unit": "°", "rangeMin": 0, "rangeMax": 45, "category": "Epaule", "order": 0, "isActive": false },
-    { "key": "rotation_externe_1", "label": "RE1", "type": "NUMERIC", "unit": "°", "rangeMin": 0, "rangeMax": 80, "category": "Epaule", "order": 0, "isActive": false },
-
-    { "key": "test_neer", "label": "Test de Neer", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-    { "key": "test_jobe", "label": "Test de Jobe (\"Empty Can Test\")", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-    { "key": "test_patte", "label": "Test de Patte", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-    { "key": "test_gerber", "label": "Test de Gerber ('Lift-off Test\")", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-    { "key": "test_speed", "label": "Test de Speed (\"Palm-Up Test\")", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-    { "key": "test_yergason", "label": "Test de Yergason", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-    { "key": "test_hawkins_kennedy", "label": "Test de Hawkins-Kennedy", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-    { "key": "test_yocum", "label": "Test de Yocum", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-    { "key": "test_adduction_forcee", "label": "Test d'adduction forcée (\"Cross-Body Adduction Test\")", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-    { "key": "test_crank", "label": "Test de Crank", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-    { "key": "test_apprehension_posterieure", "label": "Test d'Appréhension Postérieure", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-    { "key": "test_apprehension_anterieure", "label": "Test d'Appréhension Antérieure", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-    { "key": "test_recentrage", "label": "Test de Recentrage (\"Jobe's Relocation Test\")", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-    { "key": "load_and_shift_test", "label": "Load and Shift Test", "type": "BOOLEAN", "category": "Epaule", "order": 0 },
-
-    { "key": "quad_dynamo", "label": "Mesure de force Quadriceps au dynamo", "type": "NUMERIC", "unit": "N", "category": "Force", "order": 0 },
-    { "key": "ij_dynalmo", "label": "Mesure de force I-J au dynamo", "type": "NUMERIC", "unit": "N", "category": "Force", "order": 0 },
-
-    { "key": "test_provocation_valgus_genou", "label": "Test de Provocation en Valgus", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-    { "key": "test_provocation_varus_genou", "label": "Test de Provocation en Varus", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-    { "key": "test_lachman", "label": "Test de Lachman", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-    { "key": "test_ressaut_rotatoire", "label": "Test du Ressaut Rotatoire (\"Pivot Shift\")", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-    { "key": "tiroir_anterieur_genou", "label": "Tiroir Antérieur du Genou", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-    { "key": "tiroir_posterieur_genou", "label": "Tiroir Postérieur du Genou", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-    { "key": "test_godfrey", "label": "Test de Godfrey (\"Posterior Sag Sign\")", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-    { "key": "test_muller", "label": "Test de Muller (\"Quadriceps Active Test\")", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-    { "key": "palpation_interligne_articulaire_genou", "label": "Palpation de l'interligne articulaire du Genou", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-    { "key": "test_apley", "label": "Test d'Apley (\"Grinding Test\")", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-    { "key": "test_thessaly", "label": "Test de Thessaly", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-    { "key": "test_mcmurray", "label": "Test de McMurray", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-    { "key": "test_apprehension_smilie", "label": "Test d'Appréhension de Smilie", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-    { "key": "test_noble", "label": "Test de Noble", "type": "BOOLEAN", "category": "Genou", "order": 0 },
-
-    { "key": "mobilite_rotule", "label": "Mobilité de la rotule", "type": "BOOLEAN", "category": "Mobilité", "order": 0 },
-    { "key": "circonference_susrotulienne", "label": "Circonférence sus-rotulienne", "type": "NUMERIC", "category": "Oedème", "order": 0 },
-
-    { "key": "test_phalen", "label": "Test de Phalen", "type": "BOOLEAN", "category": "Poignet/Main", "order": 0 },
-    { "key": "signe_tinel", "label": "Signe de Tinel", "type": "BOOLEAN", "category": "Poignet/Main", "order": 0 },
-
-    { "key": "test_laseuge", "label": "Test de Lasègue", "type": "BOOLEAN", "category": "Rachis/Bassin", "order": 0 }
+    {
+      "key": "eva_repos",
+      "label": "EVA au repos",
+      "type": "NUMERIC",
+      "category": "Douleur",
+      "order": 1,
+      "unit": "/10",
+      "rangeMin": 0,
+      "rangeMax": 10
+    },
+    {
+      "key": "eva_effort",
+      "label": "EVA à l'effort",
+      "type": "NUMERIC",
+      "category": "Douleur",
+      "order": 2,
+      "unit": "/10",
+      "rangeMin": 0,
+      "rangeMax": 10
+    },
+    {
+      "key": "eva_nuit",
+      "label": "EVA la nuit",
+      "type": "NUMERIC",
+      "category": "Douleur",
+      "order": 3,
+      "unit": "/10",
+      "rangeMin": 0,
+      "rangeMax": 10
+    },
+    {
+      "key": "flexion_genou",
+      "label": "Flexion de genou",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 30,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 160
+    },
+    {
+      "key": "extension_genou",
+      "label": "Extension de genou (déficit)",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 31,
+      "unit": "°",
+      "rangeMin": -10,
+      "rangeMax": 10
+    },
+    {
+      "key": "flexion_epaule",
+      "label": "Flexion d'épaule",
+      "type": "NUMERIC",
+      "category": "Epaule",
+      "order": 1,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 180
+    },
+    {
+      "key": "extension_epaule",
+      "label": "Extension d'épaule",
+      "type": "NUMERIC",
+      "category": "Epaule",
+      "order": 2,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 60
+    },
+    {
+      "key": "abduction_epaule",
+      "label": "Abduction d'épaule",
+      "type": "NUMERIC",
+      "category": "Epaule",
+      "order": 3,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 180
+    },
+    {
+      "key": "adduction_epaule",
+      "label": "Adduction d'épaule",
+      "type": "NUMERIC",
+      "category": "Epaule",
+      "order": 4,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 45
+    },
+    {
+      "key": "rotation_externe_1",
+      "label": "Rotation externe RE1 (coude au corps)",
+      "type": "NUMERIC",
+      "category": "Epaule",
+      "order": 5,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 90
+    },
+    {
+      "key": "test_neer",
+      "label": "Test de Neer",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 10
+    },
+    {
+      "key": "test_jobe",
+      "label": "Test de Jobe",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 11
+    },
+    {
+      "key": "test_patte",
+      "label": "Test de Patte",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 12
+    },
+    {
+      "key": "test_gerber",
+      "label": "Test de Gerber (lift-off)",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 13
+    },
+    {
+      "key": "test_speed",
+      "label": "Test de Speed (palm-up)",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 14
+    },
+    {
+      "key": "test_yergason",
+      "label": "Test de Yergason",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 15
+    },
+    {
+      "key": "test_hawkins_kennedy",
+      "label": "Test de Hawkins-Kennedy",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 16
+    },
+    {
+      "key": "test_yocum",
+      "label": "Test de Yocum",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 17
+    },
+    {
+      "key": "test_adduction_forcee",
+      "label": "Test d'adduction forcée (cross-body)",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 18
+    },
+    {
+      "key": "test_crank",
+      "label": "Crank test",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 19
+    },
+    {
+      "key": "test_apprehension_posterieure",
+      "label": "Test d'appréhension postérieure",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 20
+    },
+    {
+      "key": "test_apprehension_anterieure",
+      "label": "Test d'appréhension antérieure",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 21
+    },
+    {
+      "key": "test_recentrage",
+      "label": "Test de recentrage (relocation)",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 22
+    },
+    {
+      "key": "load_and_shift_test",
+      "label": "Load and shift test",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 23
+    },
+    {
+      "key": "quad_dynamo",
+      "label": "Quadriceps — dynamomètre",
+      "type": "NUMERIC",
+      "category": "Force",
+      "order": 1,
+      "unit": "kg",
+      "rangeMin": 0,
+      "rangeMax": 100
+    },
+    {
+      "key": "ij_dynalmo",
+      "label": "Ischio-jambiers — dynamomètre",
+      "type": "NUMERIC",
+      "category": "Force",
+      "order": 2,
+      "unit": "kg",
+      "rangeMin": 0,
+      "rangeMax": 100
+    },
+    {
+      "key": "test_provocation_valgus_genou",
+      "label": "Test de provocation en valgus",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 1
+    },
+    {
+      "key": "test_provocation_varus_genou",
+      "label": "Test de provocation en varus",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 2
+    },
+    {
+      "key": "test_lachman",
+      "label": "Test de Lachman",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 3
+    },
+    {
+      "key": "test_ressaut_rotatoire",
+      "label": "Ressaut rotatoire (pivot shift)",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 4
+    },
+    {
+      "key": "tiroir_anterieur_genou",
+      "label": "Tiroir antérieur",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 5
+    },
+    {
+      "key": "tiroir_posterieur_genou",
+      "label": "Tiroir postérieur",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 6
+    },
+    {
+      "key": "test_godfrey",
+      "label": "Test de Godfrey",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 7
+    },
+    {
+      "key": "test_muller",
+      "label": "Test de Muller",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 8
+    },
+    {
+      "key": "palpation_interligne_articulaire_genou",
+      "label": "Palpation de l'interligne articulaire",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 9
+    },
+    {
+      "key": "test_apley",
+      "label": "Test d'Apley",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 10
+    },
+    {
+      "key": "test_thessaly",
+      "label": "Test de Thessaly",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 11
+    },
+    {
+      "key": "test_mcmurray",
+      "label": "Test de McMurray",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 12
+    },
+    {
+      "key": "test_apprehension_smilie",
+      "label": "Test d'appréhension de Smillie",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 13
+    },
+    {
+      "key": "test_noble",
+      "label": "Test de Noble",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 14
+    },
+    {
+      "key": "mobilite_rotule",
+      "label": "Mobilité de la rotule",
+      "type": "ENUM",
+      "category": "Mobilité",
+      "order": 1,
+      "options": [
+        "Hypomobile",
+        "Normale",
+        "Hypermobile"
+      ]
+    },
+    {
+      "key": "circonference_susrotulienne",
+      "label": "Circonférence sus-rotulienne",
+      "type": "NUMERIC",
+      "category": "Oedème",
+      "order": 1,
+      "unit": "cm",
+      "rangeMin": 20,
+      "rangeMax": 80
+    },
+    {
+      "key": "test_phalen",
+      "label": "Test de Phalen",
+      "type": "BOOLEAN",
+      "category": "Poignet/Main",
+      "order": 1
+    },
+    {
+      "key": "signe_tinel",
+      "label": "Signe de Tinel",
+      "type": "BOOLEAN",
+      "category": "Poignet/Main",
+      "order": 2
+    },
+    {
+      "key": "test_laseuge",
+      "label": "Test de Lasègue",
+      "type": "BOOLEAN",
+      "category": "Rachis/Bassin",
+      "order": 1
+    },
+    {
+      "key": "motif_consultation",
+      "label": "Motif de consultation / histoire de la maladie",
+      "type": "TEXT",
+      "category": "Anamnèse",
+      "order": 1
+    },
+    {
+      "key": "antecedents",
+      "label": "Antécédents médico-chirurgicaux",
+      "type": "TEXT",
+      "category": "Anamnèse",
+      "order": 2
+    },
+    {
+      "key": "date_lesion_chirurgie",
+      "label": "Date de la lésion / de la chirurgie",
+      "type": "TEXT",
+      "category": "Anamnèse",
+      "order": 3
+    },
+    {
+      "key": "protocole_chirurgical",
+      "label": "Protocole / consignes du chirurgien",
+      "type": "TEXT",
+      "category": "Anamnèse",
+      "order": 4
+    },
+    {
+      "key": "profession_activites",
+      "label": "Profession et activités quotidiennes",
+      "type": "TEXT",
+      "category": "Anamnèse",
+      "order": 5
+    },
+    {
+      "key": "activite_sportive",
+      "label": "Activités sportives (type, fréquence, niveau)",
+      "type": "TEXT",
+      "category": "Anamnèse",
+      "order": 6
+    },
+    {
+      "key": "traitement_en_cours",
+      "label": "Traitements en cours",
+      "type": "TEXT",
+      "category": "Anamnèse",
+      "order": 7
+    },
+    {
+      "key": "examens_imagerie",
+      "label": "Examens complémentaires / imagerie",
+      "type": "TEXT",
+      "category": "Anamnèse",
+      "order": 8
+    },
+    {
+      "key": "objectifs_patient",
+      "label": "Objectifs et attentes du patient",
+      "type": "TEXT",
+      "category": "Anamnèse",
+      "order": 9
+    },
+    {
+      "key": "drapeaux_rouges",
+      "label": "Drapeaux rouges (screening)",
+      "type": "TEXT",
+      "category": "Anamnèse",
+      "order": 10
+    },
+    {
+      "key": "douleur_nocturne",
+      "label": "Douleur nocturne / réveils",
+      "type": "BOOLEAN",
+      "category": "Douleur",
+      "order": 4
+    },
+    {
+      "key": "localisation_douleur",
+      "label": "Localisation de la douleur",
+      "type": "TEXT",
+      "category": "Douleur",
+      "order": 5
+    },
+    {
+      "key": "type_douleur",
+      "label": "Type de douleur",
+      "type": "ENUM",
+      "category": "Douleur",
+      "order": 6,
+      "options": [
+        "Mécanique",
+        "Inflammatoire",
+        "Neuropathique",
+        "Mixte"
+      ]
+    },
+    {
+      "key": "irradiations",
+      "label": "Irradiations / trajet douloureux",
+      "type": "TEXT",
+      "category": "Douleur",
+      "order": 7
+    },
+    {
+      "key": "dn4_score",
+      "label": "Score DN4",
+      "type": "NUMERIC",
+      "category": "Douleur",
+      "order": 8,
+      "unit": "/10",
+      "rangeMin": 0,
+      "rangeMax": 10
+    },
+    {
+      "key": "etat_cicatrice",
+      "label": "État de la cicatrice",
+      "type": "ENUM",
+      "category": "Cicatrice/Trophicité",
+      "order": 1,
+      "options": [
+        "Non concerné",
+        "Propre / fermée",
+        "Inflammatoire",
+        "Désunion / suintante",
+        "Chéloïde / hypertrophique"
+      ]
+    },
+    {
+      "key": "adherences_cicatrice",
+      "label": "Adhérences cicatricielles",
+      "type": "BOOLEAN",
+      "category": "Cicatrice/Trophicité",
+      "order": 2
+    },
+    {
+      "key": "chaleur_locale",
+      "label": "Chaleur locale",
+      "type": "BOOLEAN",
+      "category": "Cicatrice/Trophicité",
+      "order": 3
+    },
+    {
+      "key": "rougeur_locale",
+      "label": "Rougeur locale",
+      "type": "BOOLEAN",
+      "category": "Cicatrice/Trophicité",
+      "order": 4
+    },
+    {
+      "key": "signe_du_godet",
+      "label": "Signe du godet",
+      "type": "BOOLEAN",
+      "category": "Cicatrice/Trophicité",
+      "order": 5
+    },
+    {
+      "key": "troubles_trophiques",
+      "label": "Troubles trophiques (peau, ongles, sudation…)",
+      "type": "TEXT",
+      "category": "Cicatrice/Trophicité",
+      "order": 6
+    },
+    {
+      "key": "circonference_cuisse",
+      "label": "Circonférence de cuisse (15 cm au-dessus de la rotule)",
+      "type": "NUMERIC",
+      "category": "Oedème",
+      "order": 2,
+      "unit": "cm",
+      "rangeMin": 20,
+      "rangeMax": 90
+    },
+    {
+      "key": "circonference_mollet",
+      "label": "Circonférence du mollet",
+      "type": "NUMERIC",
+      "category": "Oedème",
+      "order": 3,
+      "unit": "cm",
+      "rangeMin": 20,
+      "rangeMax": 60
+    },
+    {
+      "key": "circonference_cheville_huit",
+      "label": "Périmètre de cheville (figure en 8)",
+      "type": "NUMERIC",
+      "category": "Oedème",
+      "order": 4,
+      "unit": "cm",
+      "rangeMin": 30,
+      "rangeMax": 80
+    },
+    {
+      "key": "circonference_poignet",
+      "label": "Circonférence du poignet",
+      "type": "NUMERIC",
+      "category": "Oedème",
+      "order": 5,
+      "unit": "cm",
+      "rangeMin": 10,
+      "rangeMax": 30
+    },
+    {
+      "key": "circonference_main",
+      "label": "Circonférence de la main (têtes métacarpiennes)",
+      "type": "NUMERIC",
+      "category": "Oedème",
+      "order": 6,
+      "unit": "cm",
+      "rangeMin": 15,
+      "rangeMax": 30
+    },
+    {
+      "key": "flexion_cervicale",
+      "label": "Flexion cervicale",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 1,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 50
+    },
+    {
+      "key": "extension_cervicale",
+      "label": "Extension cervicale",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 2,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 60
+    },
+    {
+      "key": "rotation_cervicale_droite",
+      "label": "Rotation cervicale droite",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 3,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 80
+    },
+    {
+      "key": "rotation_cervicale_gauche",
+      "label": "Rotation cervicale gauche",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 4,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 80
+    },
+    {
+      "key": "inclinaison_cervicale_droite",
+      "label": "Inclinaison cervicale droite",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 5,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 45
+    },
+    {
+      "key": "inclinaison_cervicale_gauche",
+      "label": "Inclinaison cervicale gauche",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 6,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 45
+    },
+    {
+      "key": "distance_menton_sternum",
+      "label": "Distance menton-sternum",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 7,
+      "unit": "cm",
+      "rangeMin": 0,
+      "rangeMax": 10
+    },
+    {
+      "key": "indice_schober",
+      "label": "Indice de Schober",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 10,
+      "unit": "cm",
+      "rangeMin": 10,
+      "rangeMax": 17
+    },
+    {
+      "key": "distance_doigt_sol",
+      "label": "Distance doigts-sol",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 11,
+      "unit": "cm",
+      "rangeMin": 0,
+      "rangeMax": 60
+    },
+    {
+      "key": "extension_lombaire",
+      "label": "Extension lombaire",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 12,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 30
+    },
+    {
+      "key": "flexion_hanche",
+      "label": "Flexion de hanche",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 20,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 130
+    },
+    {
+      "key": "extension_hanche",
+      "label": "Extension de hanche",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 21,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 30
+    },
+    {
+      "key": "abduction_hanche",
+      "label": "Abduction de hanche",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 22,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 45
+    },
+    {
+      "key": "adduction_hanche",
+      "label": "Adduction de hanche",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 23,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 30
+    },
+    {
+      "key": "rotation_interne_hanche",
+      "label": "Rotation interne de hanche",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 24,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 45
+    },
+    {
+      "key": "rotation_externe_hanche",
+      "label": "Rotation externe de hanche",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 25,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 60
+    },
+    {
+      "key": "flexion_dorsale_cheville",
+      "label": "Flexion dorsale de cheville",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 40,
+      "unit": "°",
+      "rangeMin": -20,
+      "rangeMax": 30
+    },
+    {
+      "key": "flexion_plantaire_cheville",
+      "label": "Flexion plantaire de cheville",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 41,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 50
+    },
+    {
+      "key": "knee_to_wall",
+      "label": "Knee to wall (flexion dorsale en charge)",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 42,
+      "unit": "cm",
+      "rangeMin": 0,
+      "rangeMax": 15
+    },
+    {
+      "key": "inversion_cheville",
+      "label": "Inversion de cheville",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 43,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 40
+    },
+    {
+      "key": "eversion_cheville",
+      "label": "Éversion de cheville",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 44,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 20
+    },
+    {
+      "key": "flexion_dorsale_hallux",
+      "label": "Flexion dorsale de l'hallux (MTP1)",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 45,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 70
+    },
+    {
+      "key": "flexion_coude",
+      "label": "Flexion de coude",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 50,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 150
+    },
+    {
+      "key": "extension_coude",
+      "label": "Extension de coude (déficit)",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 51,
+      "unit": "°",
+      "rangeMin": -10,
+      "rangeMax": 10
+    },
+    {
+      "key": "pronation_avant_bras",
+      "label": "Pronation de l'avant-bras",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 52,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 90
+    },
+    {
+      "key": "supination_avant_bras",
+      "label": "Supination de l'avant-bras",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 53,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 90
+    },
+    {
+      "key": "flexion_poignet",
+      "label": "Flexion de poignet",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 60,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 90
+    },
+    {
+      "key": "extension_poignet",
+      "label": "Extension de poignet",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 61,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 90
+    },
+    {
+      "key": "inclinaison_radiale_poignet",
+      "label": "Inclinaison radiale du poignet",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 62,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 25
+    },
+    {
+      "key": "inclinaison_ulnaire_poignet",
+      "label": "Inclinaison ulnaire du poignet",
+      "type": "NUMERIC",
+      "category": "Amplitudes",
+      "order": 63,
+      "unit": "°",
+      "rangeMin": 0,
+      "rangeMax": 45
+    },
+    {
+      "key": "rotation_interne_main_dos",
+      "label": "Rotation interne (main-dos, niveau vertébral atteint)",
+      "type": "TEXT",
+      "category": "Epaule",
+      "order": 6
+    },
+    {
+      "key": "sulcus_test",
+      "label": "Sulcus test",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 24
+    },
+    {
+      "key": "test_o_brien",
+      "label": "Test de O'Brien (active compression)",
+      "type": "BOOLEAN",
+      "category": "Epaule",
+      "order": 25
+    },
+    {
+      "key": "force_prehension",
+      "label": "Force de préhension (Jamar)",
+      "type": "NUMERIC",
+      "category": "Force",
+      "order": 3,
+      "unit": "kg",
+      "rangeMin": 0,
+      "rangeMax": 80
+    },
+    {
+      "key": "testing_quadriceps",
+      "label": "Testing quadriceps",
+      "type": "ENUM",
+      "category": "Force",
+      "order": 4,
+      "options": [
+        "0/5",
+        "1/5",
+        "2/5",
+        "3/5",
+        "4/5",
+        "5/5"
+      ]
+    },
+    {
+      "key": "testing_ischio_jambiers",
+      "label": "Testing ischio-jambiers",
+      "type": "ENUM",
+      "category": "Force",
+      "order": 5,
+      "options": [
+        "0/5",
+        "1/5",
+        "2/5",
+        "3/5",
+        "4/5",
+        "5/5"
+      ]
+    },
+    {
+      "key": "testing_moyen_fessier",
+      "label": "Testing moyen fessier",
+      "type": "ENUM",
+      "category": "Force",
+      "order": 6,
+      "options": [
+        "0/5",
+        "1/5",
+        "2/5",
+        "3/5",
+        "4/5",
+        "5/5"
+      ]
+    },
+    {
+      "key": "testing_grand_fessier",
+      "label": "Testing grand fessier",
+      "type": "ENUM",
+      "category": "Force",
+      "order": 7,
+      "options": [
+        "0/5",
+        "1/5",
+        "2/5",
+        "3/5",
+        "4/5",
+        "5/5"
+      ]
+    },
+    {
+      "key": "testing_psoas",
+      "label": "Testing psoas-iliaque",
+      "type": "ENUM",
+      "category": "Force",
+      "order": 8,
+      "options": [
+        "0/5",
+        "1/5",
+        "2/5",
+        "3/5",
+        "4/5",
+        "5/5"
+      ]
+    },
+    {
+      "key": "testing_tibial_anterieur",
+      "label": "Testing tibial antérieur (releveurs)",
+      "type": "ENUM",
+      "category": "Force",
+      "order": 9,
+      "options": [
+        "0/5",
+        "1/5",
+        "2/5",
+        "3/5",
+        "4/5",
+        "5/5"
+      ]
+    },
+    {
+      "key": "testing_fibulaires",
+      "label": "Testing fibulaires (éverseurs)",
+      "type": "ENUM",
+      "category": "Force",
+      "order": 10,
+      "options": [
+        "0/5",
+        "1/5",
+        "2/5",
+        "3/5",
+        "4/5",
+        "5/5"
+      ]
+    },
+    {
+      "key": "testing_triceps_sural",
+      "label": "Testing triceps sural",
+      "type": "ENUM",
+      "category": "Force",
+      "order": 11,
+      "options": [
+        "0/5",
+        "1/5",
+        "2/5",
+        "3/5",
+        "4/5",
+        "5/5"
+      ]
+    },
+    {
+      "key": "releves_mollet_unipodal",
+      "label": "Relevés de mollet unipodaux (nombre)",
+      "type": "NUMERIC",
+      "category": "Force",
+      "order": 12,
+      "unit": "rép.",
+      "rangeMin": 0,
+      "rangeMax": 40
+    },
+    {
+      "key": "testing_deltoide",
+      "label": "Testing deltoïde",
+      "type": "ENUM",
+      "category": "Force",
+      "order": 13,
+      "options": [
+        "0/5",
+        "1/5",
+        "2/5",
+        "3/5",
+        "4/5",
+        "5/5"
+      ]
+    },
+    {
+      "key": "testing_biceps_brachial",
+      "label": "Testing biceps brachial",
+      "type": "ENUM",
+      "category": "Force",
+      "order": 14,
+      "options": [
+        "0/5",
+        "1/5",
+        "2/5",
+        "3/5",
+        "4/5",
+        "5/5"
+      ]
+    },
+    {
+      "key": "testing_triceps_brachial",
+      "label": "Testing triceps brachial",
+      "type": "ENUM",
+      "category": "Force",
+      "order": 15,
+      "options": [
+        "0/5",
+        "1/5",
+        "2/5",
+        "3/5",
+        "4/5",
+        "5/5"
+      ]
+    },
+    {
+      "key": "sorensen_secondes",
+      "label": "Test de Sorensen (endurance extenseurs)",
+      "type": "NUMERIC",
+      "category": "Force",
+      "order": 16,
+      "unit": "s",
+      "rangeMin": 0,
+      "rangeMax": 240
+    },
+    {
+      "key": "gainage_ventral_secondes",
+      "label": "Gainage ventral (planche)",
+      "type": "NUMERIC",
+      "category": "Force",
+      "order": 17,
+      "unit": "s",
+      "rangeMin": 0,
+      "rangeMax": 240
+    },
+    {
+      "key": "choc_rotulien",
+      "label": "Choc rotulien (épanchement)",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 15
+    },
+    {
+      "key": "signe_du_rabot",
+      "label": "Signe du rabot",
+      "type": "BOOLEAN",
+      "category": "Genou",
+      "order": 16
+    },
+    {
+      "key": "test_fadir",
+      "label": "Test FADIR (conflit antérieur)",
+      "type": "BOOLEAN",
+      "category": "Hanche",
+      "order": 1
+    },
+    {
+      "key": "test_faber",
+      "label": "Test FABER (Patrick)",
+      "type": "BOOLEAN",
+      "category": "Hanche",
+      "order": 2
+    },
+    {
+      "key": "signe_trendelenburg",
+      "label": "Signe de Trendelenburg",
+      "type": "BOOLEAN",
+      "category": "Hanche",
+      "order": 3
+    },
+    {
+      "key": "test_thomas",
+      "label": "Test de Thomas (flessum de hanche)",
+      "type": "BOOLEAN",
+      "category": "Hanche",
+      "order": 4
+    },
+    {
+      "key": "douleur_palpation_grand_trochanter",
+      "label": "Douleur à la palpation du grand trochanter",
+      "type": "BOOLEAN",
+      "category": "Hanche",
+      "order": 5
+    },
+    {
+      "key": "douleur_abduction_resistee",
+      "label": "Douleur à l'abduction résistée",
+      "type": "BOOLEAN",
+      "category": "Hanche",
+      "order": 6
+    },
+    {
+      "key": "test_squeeze_adducteurs",
+      "label": "Squeeze test des adducteurs",
+      "type": "BOOLEAN",
+      "category": "Hanche",
+      "order": 7
+    },
+    {
+      "key": "douleur_palpation_pubis",
+      "label": "Douleur à la palpation de la symphyse pubienne",
+      "type": "BOOLEAN",
+      "category": "Hanche",
+      "order": 8
+    },
+    {
+      "key": "tiroir_anterieur_cheville",
+      "label": "Tiroir antérieur de cheville",
+      "type": "BOOLEAN",
+      "category": "Cheville/Pied",
+      "order": 1
+    },
+    {
+      "key": "test_inversion_forcee",
+      "label": "Test en varus forcé (inversion)",
+      "type": "BOOLEAN",
+      "category": "Cheville/Pied",
+      "order": 2
+    },
+    {
+      "key": "squeeze_test",
+      "label": "Squeeze test (syndesmose)",
+      "type": "BOOLEAN",
+      "category": "Cheville/Pied",
+      "order": 3
+    },
+    {
+      "key": "test_kleiger",
+      "label": "Test de Kleiger (rotation externe)",
+      "type": "BOOLEAN",
+      "category": "Cheville/Pied",
+      "order": 4
+    },
+    {
+      "key": "test_thompson",
+      "label": "Test de Thompson",
+      "type": "BOOLEAN",
+      "category": "Cheville/Pied",
+      "order": 5
+    },
+    {
+      "key": "douleur_palpation_lle",
+      "label": "Douleur à la palpation du LLE (LTFA/LCF)",
+      "type": "BOOLEAN",
+      "category": "Cheville/Pied",
+      "order": 6
+    },
+    {
+      "key": "douleur_palpation_tendon_achille",
+      "label": "Douleur à la palpation du tendon d'Achille",
+      "type": "BOOLEAN",
+      "category": "Cheville/Pied",
+      "order": 7
+    },
+    {
+      "key": "douleur_palpation_aponevrose_plantaire",
+      "label": "Douleur à la palpation de l'aponévrose plantaire",
+      "type": "BOOLEAN",
+      "category": "Cheville/Pied",
+      "order": 8
+    },
+    {
+      "key": "windlass_test",
+      "label": "Windlass test",
+      "type": "BOOLEAN",
+      "category": "Cheville/Pied",
+      "order": 9
+    },
+    {
+      "key": "test_cozen",
+      "label": "Test de Cozen",
+      "type": "BOOLEAN",
+      "category": "Coude",
+      "order": 1
+    },
+    {
+      "key": "test_mill",
+      "label": "Test de Mill",
+      "type": "BOOLEAN",
+      "category": "Coude",
+      "order": 2
+    },
+    {
+      "key": "test_maudsley",
+      "label": "Test de Maudsley (extension résistée du majeur)",
+      "type": "BOOLEAN",
+      "category": "Coude",
+      "order": 3
+    },
+    {
+      "key": "test_golfers_elbow",
+      "label": "Test d'épitrochléite (golfer's elbow test)",
+      "type": "BOOLEAN",
+      "category": "Coude",
+      "order": 4
+    },
+    {
+      "key": "palpation_epicondyle_lateral",
+      "label": "Douleur à la palpation de l'épicondyle latéral",
+      "type": "BOOLEAN",
+      "category": "Coude",
+      "order": 5
+    },
+    {
+      "key": "palpation_epicondyle_medial",
+      "label": "Douleur à la palpation de l'épicondyle médial",
+      "type": "BOOLEAN",
+      "category": "Coude",
+      "order": 6
+    },
+    {
+      "key": "test_finkelstein",
+      "label": "Test de Finkelstein",
+      "type": "BOOLEAN",
+      "category": "Poignet/Main",
+      "order": 3
+    },
+    {
+      "key": "grind_test_pouce",
+      "label": "Grind test du pouce (TMC)",
+      "type": "BOOLEAN",
+      "category": "Poignet/Main",
+      "order": 4
+    },
+    {
+      "key": "palpation_tabatiere_anatomique",
+      "label": "Douleur à la palpation de la tabatière anatomique",
+      "type": "BOOLEAN",
+      "category": "Poignet/Main",
+      "order": 5
+    },
+    {
+      "key": "test_watson",
+      "label": "Test de Watson",
+      "type": "BOOLEAN",
+      "category": "Poignet/Main",
+      "order": 6
+    },
+    {
+      "key": "test_valgus_mp_pouce",
+      "label": "Laxité en valgus de la MCP du pouce",
+      "type": "BOOLEAN",
+      "category": "Poignet/Main",
+      "order": 7
+    },
+    {
+      "key": "test_slump",
+      "label": "Test de Slump",
+      "type": "BOOLEAN",
+      "category": "Rachis/Bassin",
+      "order": 2
+    },
+    {
+      "key": "test_leri",
+      "label": "Test de Léri (Lasègue inversé)",
+      "type": "BOOLEAN",
+      "category": "Rachis/Bassin",
+      "order": 3
+    },
+    {
+      "key": "signe_de_la_sonnette",
+      "label": "Signe de la sonnette",
+      "type": "BOOLEAN",
+      "category": "Rachis/Bassin",
+      "order": 4
+    },
+    {
+      "key": "test_provocation_sacro_iliaque",
+      "label": "Tests de provocation sacro-iliaque (cluster)",
+      "type": "BOOLEAN",
+      "category": "Rachis/Bassin",
+      "order": 5
+    },
+    {
+      "key": "test_spurling",
+      "label": "Test de Spurling",
+      "type": "BOOLEAN",
+      "category": "Cervical",
+      "order": 1
+    },
+    {
+      "key": "test_distraction_cervicale",
+      "label": "Test de distraction cervicale",
+      "type": "BOOLEAN",
+      "category": "Cervical",
+      "order": 2
+    },
+    {
+      "key": "test_ulnt1",
+      "label": "ULNT1 (mise en tension neurale du membre supérieur)",
+      "type": "BOOLEAN",
+      "category": "Cervical",
+      "order": 3
+    },
+    {
+      "key": "endurance_flechisseurs_profonds",
+      "label": "Endurance des fléchisseurs profonds du cou",
+      "type": "NUMERIC",
+      "category": "Cervical",
+      "order": 4,
+      "unit": "s",
+      "rangeMin": 0,
+      "rangeMax": 120
+    },
+    {
+      "key": "paresthesies",
+      "label": "Paresthésies",
+      "type": "BOOLEAN",
+      "category": "Neurologique",
+      "order": 1
+    },
+    {
+      "key": "sensibilite",
+      "label": "Sensibilité (territoires, hypoesthésie…)",
+      "type": "TEXT",
+      "category": "Neurologique",
+      "order": 2
+    },
+    {
+      "key": "reflexes_osteotendineux",
+      "label": "Réflexes ostéo-tendineux (ROT)",
+      "type": "TEXT",
+      "category": "Neurologique",
+      "order": 3
+    },
+    {
+      "key": "force_myotomes",
+      "label": "Force par myotomes (déficit moteur)",
+      "type": "TEXT",
+      "category": "Neurologique",
+      "order": 4
+    },
+    {
+      "key": "troubles_sphincteriens",
+      "label": "Troubles sphinctériens / anesthésie en selle",
+      "type": "BOOLEAN",
+      "category": "Neurologique",
+      "order": 5
+    },
+    {
+      "key": "boiterie",
+      "label": "Boiterie",
+      "type": "BOOLEAN",
+      "category": "Fonctionnel",
+      "order": 1
+    },
+    {
+      "key": "analyse_marche",
+      "label": "Analyse qualitative de la marche",
+      "type": "TEXT",
+      "category": "Fonctionnel",
+      "order": 2
+    },
+    {
+      "key": "aides_techniques",
+      "label": "Aides techniques",
+      "type": "ENUM",
+      "category": "Fonctionnel",
+      "order": 3,
+      "options": [
+        "Aucune",
+        "1 canne",
+        "2 cannes anglaises",
+        "Déambulateur",
+        "Fauteuil roulant"
+      ]
+    },
+    {
+      "key": "perimetre_marche",
+      "label": "Périmètre de marche",
+      "type": "TEXT",
+      "category": "Fonctionnel",
+      "order": 4
+    },
+    {
+      "key": "montee_descente_escaliers",
+      "label": "Montée / descente des escaliers",
+      "type": "ENUM",
+      "category": "Fonctionnel",
+      "order": 5,
+      "options": [
+        "Impossible",
+        "Avec aide / rampe",
+        "Marche par marche",
+        "Normale"
+      ]
+    },
+    {
+      "key": "appui_monopodal_secondes",
+      "label": "Appui monopodal (tenue)",
+      "type": "NUMERIC",
+      "category": "Fonctionnel",
+      "order": 6,
+      "unit": "s",
+      "rangeMin": 0,
+      "rangeMax": 60
+    },
+    {
+      "key": "tug_secondes",
+      "label": "Timed Up and Go (TUG)",
+      "type": "NUMERIC",
+      "category": "Fonctionnel",
+      "order": 7,
+      "unit": "s",
+      "rangeMin": 0,
+      "rangeMax": 60
+    },
+    {
+      "key": "tinetti_score",
+      "label": "Score de Tinetti",
+      "type": "NUMERIC",
+      "category": "Fonctionnel",
+      "order": 8,
+      "unit": "/28",
+      "rangeMin": 0,
+      "rangeMax": 28
+    },
+    {
+      "key": "test_6_minutes_marche",
+      "label": "Test de marche de 6 minutes",
+      "type": "NUMERIC",
+      "category": "Fonctionnel",
+      "order": 9,
+      "unit": "m",
+      "rangeMin": 0,
+      "rangeMax": 800
+    },
+    {
+      "key": "nombre_chutes_12_mois",
+      "label": "Nombre de chutes sur les 12 derniers mois",
+      "type": "NUMERIC",
+      "category": "Fonctionnel",
+      "order": 10,
+      "rangeMin": 0,
+      "rangeMax": 50
+    },
+    {
+      "key": "peur_de_chuter",
+      "label": "Peur de chuter",
+      "type": "BOOLEAN",
+      "category": "Fonctionnel",
+      "order": 11
+    },
+    {
+      "key": "step_down_test",
+      "label": "Step down test (douleur / contrôle)",
+      "type": "BOOLEAN",
+      "category": "Fonctionnel",
+      "order": 12
+    },
+    {
+      "key": "squat_douloureux",
+      "label": "Squat douloureux",
+      "type": "BOOLEAN",
+      "category": "Fonctionnel",
+      "order": 13
+    },
+    {
+      "key": "saut_unipodal_distance",
+      "label": "Single leg hop test (distance)",
+      "type": "NUMERIC",
+      "category": "Fonctionnel",
+      "order": 14,
+      "unit": "cm",
+      "rangeMin": 0,
+      "rangeMax": 250
+    },
+    {
+      "key": "score_fonctionnel",
+      "label": "Score fonctionnel utilisé + résultat (Oswestry, KOOS, DASH…)",
+      "type": "TEXT",
+      "category": "Fonctionnel",
+      "order": 15
+    },
+    {
+      "key": "observation_generale",
+      "label": "Observation générale / synthèse du bilan",
+      "type": "TEXT",
+      "category": "Fonctionnel",
+      "order": 16
+    }
   ],
   "templates": [
     {
-      "name": "Prothèse de genou",
+      "name": "Genou — Prothèse totale de genou (PTG)",
+      "description": "Bilan initial post-opératoire de prothèse totale de genou.",
       "category": "Genou",
       "items": [
-        { "kind": "canonical", "key": "eva_repos" },
-        { "kind": "canonical", "key": "eva_effort" },
-        { "kind": "canonical", "key": "eva_nuit" },
-        { "kind": "canonical", "key": "flexion_genou" },
-        { "kind": "canonical", "key": "extension_genou" },
-        { "kind": "canonical", "key": "mobilite_rotule" },
-        { "kind": "canonical", "key": "circonference_susrotulienne" },
-        { "kind": "canonical", "key": "quad_dynamo" },
-        { "kind": "canonical", "key": "ij_dynalmo" }
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "adherences_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rougeur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_du_godet"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_susrotulienne"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_cuisse"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_mollet"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "mobilite_rotule"
+        },
+        {
+          "kind": "canonical",
+          "key": "choc_rotulien"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_quadriceps"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_ischio_jambiers"
+        },
+        {
+          "kind": "canonical",
+          "key": "quad_dynamo"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "analyse_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "aides_techniques"
+        },
+        {
+          "kind": "canonical",
+          "key": "perimetre_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "montee_descente_escaliers"
+        },
+        {
+          "kind": "canonical",
+          "key": "appui_monopodal_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "tug_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Genou — Ligamentoplastie du LCA (post-op)",
+      "description": "Bilan post-opératoire de reconstruction du ligament croisé antérieur.",
+      "category": "Genou",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "adherences_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rougeur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "choc_rotulien"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_susrotulienne"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_cuisse"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "mobilite_rotule"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_lachman"
+        },
+        {
+          "kind": "canonical",
+          "key": "tiroir_anterieur_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_ressaut_rotatoire"
+        },
+        {
+          "kind": "canonical",
+          "key": "palpation_interligne_articulaire_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_quadriceps"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_ischio_jambiers"
+        },
+        {
+          "kind": "canonical",
+          "key": "quad_dynamo"
+        },
+        {
+          "kind": "canonical",
+          "key": "ij_dynalmo"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "aides_techniques"
+        },
+        {
+          "kind": "canonical",
+          "key": "appui_monopodal_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "squat_douloureux"
+        },
+        {
+          "kind": "canonical",
+          "key": "saut_unipodal_distance"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Genou — Entorse du genou (LLI / LCA non opéré)",
+      "description": "Bilan d'entorse du genou en traitement conservateur.",
+      "category": "Genou",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "choc_rotulien"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_susrotulienne"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_provocation_valgus_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_provocation_varus_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_lachman"
+        },
+        {
+          "kind": "canonical",
+          "key": "tiroir_anterieur_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "tiroir_posterieur_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_ressaut_rotatoire"
+        },
+        {
+          "kind": "canonical",
+          "key": "palpation_interligne_articulaire_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_mcmurray"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_quadriceps"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_ischio_jambiers"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "appui_monopodal_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "squat_douloureux"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Genou — Lésion méniscale",
+      "description": "Bilan de lésion méniscale (conservateur ou post-méniscectomie).",
+      "category": "Genou",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "choc_rotulien"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_susrotulienne"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "palpation_interligne_articulaire_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_mcmurray"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_apley"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_thessaly"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_lachman"
+        },
+        {
+          "kind": "canonical",
+          "key": "tiroir_anterieur_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_provocation_valgus_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_provocation_varus_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_quadriceps"
+        },
+        {
+          "kind": "canonical",
+          "key": "squat_douloureux"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Genou — Gonarthrose",
+      "description": "Bilan de gonarthrose (arthrose fémoro-tibiale / fémoro-patellaire).",
+      "category": "Genou",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "choc_rotulien"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_susrotulienne"
+        },
+        {
+          "kind": "canonical",
+          "key": "mobilite_rotule"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_du_rabot"
+        },
+        {
+          "kind": "canonical",
+          "key": "palpation_interligne_articulaire_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_provocation_valgus_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_provocation_varus_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_quadriceps"
+        },
+        {
+          "kind": "canonical",
+          "key": "quad_dynamo"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "aides_techniques"
+        },
+        {
+          "kind": "canonical",
+          "key": "perimetre_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "montee_descente_escaliers"
+        },
+        {
+          "kind": "canonical",
+          "key": "tug_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Genou — Syndrome fémoro-patellaire",
+      "description": "Bilan de syndrome douloureux fémoro-patellaire.",
+      "category": "Genou",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "mobilite_rotule"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_du_rabot"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_apprehension_smilie"
+        },
+        {
+          "kind": "canonical",
+          "key": "choc_rotulien"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_quadriceps"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_moyen_fessier"
+        },
+        {
+          "kind": "canonical",
+          "key": "step_down_test"
+        },
+        {
+          "kind": "canonical",
+          "key": "squat_douloureux"
+        },
+        {
+          "kind": "custom",
+          "label": "Alignement du membre inférieur / valgus dynamique"
+        },
+        {
+          "kind": "canonical",
+          "key": "analyse_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "montee_descente_escaliers"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Genou — Tendinopathie rotulienne",
+      "description": "Bilan de tendinopathie patellaire (jumper's knee).",
+      "category": "Genou",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "custom",
+          "label": "Palpation de la pointe de la rotule / tendon patellaire"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_genou"
+        },
+        {
+          "kind": "canonical",
+          "key": "choc_rotulien"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_quadriceps"
+        },
+        {
+          "kind": "canonical",
+          "key": "quad_dynamo"
+        },
+        {
+          "kind": "custom",
+          "label": "Extensibilité du quadriceps (talon-fesse)"
+        },
+        {
+          "kind": "canonical",
+          "key": "squat_douloureux"
+        },
+        {
+          "kind": "custom",
+          "label": "Decline squat test (plan incliné 25°)"
+        },
+        {
+          "kind": "canonical",
+          "key": "step_down_test"
+        },
+        {
+          "kind": "canonical",
+          "key": "saut_unipodal_distance"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Genou — Syndrome de l'essuie-glace (bandelette ilio-tibiale)",
+      "description": "Bilan de syndrome de friction de la bandelette ilio-tibiale (coureur).",
+      "category": "Genou",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_noble"
+        },
+        {
+          "kind": "custom",
+          "label": "Test de Renne"
+        },
+        {
+          "kind": "custom",
+          "label": "Test d'Ober (extensibilité TFL/BIT)"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_moyen_fessier"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_abduction_resistee"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_trendelenburg"
+        },
+        {
+          "kind": "canonical",
+          "key": "step_down_test"
+        },
+        {
+          "kind": "canonical",
+          "key": "appui_monopodal_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "analyse_marche"
+        },
+        {
+          "kind": "custom",
+          "label": "Analyse de la course / volume d'entraînement"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Hanche — Prothèse totale de hanche (PTH)",
+      "description": "Bilan initial post-opératoire de prothèse totale de hanche.",
+      "category": "Hanche",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "adherences_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rougeur_locale"
+        },
+        {
+          "kind": "custom",
+          "label": "Voie d'abord et consignes anti-luxation"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "abduction_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_moyen_fessier"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_grand_fessier"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_psoas"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_quadriceps"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_trendelenburg"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_cuisse"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "analyse_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "aides_techniques"
+        },
+        {
+          "kind": "canonical",
+          "key": "perimetre_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "montee_descente_escaliers"
+        },
+        {
+          "kind": "canonical",
+          "key": "appui_monopodal_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "tug_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Hanche — Coxarthrose",
+      "description": "Bilan de coxarthrose en traitement conservateur.",
+      "category": "Hanche",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "abduction_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "adduction_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_interne_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_externe_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_fadir"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_faber"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_thomas"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_trendelenburg"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_moyen_fessier"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_psoas"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "aides_techniques"
+        },
+        {
+          "kind": "canonical",
+          "key": "perimetre_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "montee_descente_escaliers"
+        },
+        {
+          "kind": "canonical",
+          "key": "tug_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Hanche — Tendinopathie du moyen fessier",
+      "description": "Bilan de tendinopathie glutéale / syndrome douloureux du grand trochanter.",
+      "category": "Hanche",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_palpation_grand_trochanter"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_abduction_resistee"
+        },
+        {
+          "kind": "custom",
+          "label": "Test de dérotation externe résistée"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_trendelenburg"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_faber"
+        },
+        {
+          "kind": "canonical",
+          "key": "abduction_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_interne_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_moyen_fessier"
+        },
+        {
+          "kind": "canonical",
+          "key": "appui_monopodal_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "step_down_test"
+        },
+        {
+          "kind": "canonical",
+          "key": "analyse_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Hanche — Pubalgie",
+      "description": "Bilan de douleur pubienne / pathologie des adducteurs et de la paroi abdominale.",
+      "category": "Hanche",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_palpation_pubis"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_squeeze_adducteurs"
+        },
+        {
+          "kind": "custom",
+          "label": "Adduction résistée à 0° / 45° / 90° (douleur)"
+        },
+        {
+          "kind": "custom",
+          "label": "Extensibilité des adducteurs"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_interne_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_externe_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_fadir"
+        },
+        {
+          "kind": "canonical",
+          "key": "gainage_ventral_secondes"
+        },
+        {
+          "kind": "custom",
+          "label": "Testing des abdominaux / obliques"
+        },
+        {
+          "kind": "custom",
+          "label": "Douleur à la course / aux changements de direction"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Hanche — Fracture du col fémoral (ostéosynthèse)",
+      "description": "Bilan post-opératoire de fracture de l'extrémité supérieure du fémur.",
+      "category": "Hanche",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "adherences_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rougeur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "abduction_hanche"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_moyen_fessier"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_grand_fessier"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_psoas"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_quadriceps"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_trendelenburg"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "aides_techniques"
+        },
+        {
+          "kind": "canonical",
+          "key": "perimetre_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "appui_monopodal_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "tug_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "nombre_chutes_12_mois"
+        },
+        {
+          "kind": "canonical",
+          "key": "peur_de_chuter"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Cheville — Entorse latérale de cheville",
+      "description": "Bilan d'entorse du ligament collatéral latéral.",
+      "category": "Cheville/Pied",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_du_godet"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_cheville_huit"
+        },
+        {
+          "kind": "custom",
+          "label": "Critères d'Ottawa (palpation malléoles, base M5, naviculaire, 4 pas)"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_dorsale_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_plantaire_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "inversion_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "eversion_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "knee_to_wall"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_palpation_lle"
+        },
+        {
+          "kind": "canonical",
+          "key": "tiroir_anterieur_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_inversion_forcee"
+        },
+        {
+          "kind": "canonical",
+          "key": "squeeze_test"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_kleiger"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_fibulaires"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_tibial_anterieur"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "appui_monopodal_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "saut_unipodal_distance"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Cheville — Instabilité chronique de cheville",
+      "description": "Bilan d'instabilité chronique après entorses à répétition.",
+      "category": "Cheville/Pied",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "tiroir_anterieur_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_inversion_forcee"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_dorsale_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "knee_to_wall"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_fibulaires"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_tibial_anterieur"
+        },
+        {
+          "kind": "canonical",
+          "key": "releves_mollet_unipodal"
+        },
+        {
+          "kind": "canonical",
+          "key": "appui_monopodal_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "saut_unipodal_distance"
+        },
+        {
+          "kind": "custom",
+          "label": "Y-Balance test / SEBT"
+        },
+        {
+          "kind": "custom",
+          "label": "Score CAIT / sensation de dérobement"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Cheville — Fracture de cheville (post-op / post-immobilisation)",
+      "description": "Bilan après fracture malléolaire opérée ou immobilisée.",
+      "category": "Cheville/Pied",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "adherences_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rougeur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_du_godet"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_cheville_huit"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_mollet"
+        },
+        {
+          "kind": "canonical",
+          "key": "troubles_trophiques"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_dorsale_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_plantaire_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "inversion_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "eversion_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "knee_to_wall"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_fibulaires"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_tibial_anterieur"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_triceps_sural"
+        },
+        {
+          "kind": "canonical",
+          "key": "releves_mollet_unipodal"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "aides_techniques"
+        },
+        {
+          "kind": "canonical",
+          "key": "perimetre_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "appui_monopodal_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Cheville — Tendinopathie d'Achille",
+      "description": "Bilan de tendinopathie achilléenne (corporéale ou d'insertion).",
+      "category": "Cheville/Pied",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_palpation_tendon_achille"
+        },
+        {
+          "kind": "custom",
+          "label": "Épaississement / nodule tendineux (localisation)"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_dorsale_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "knee_to_wall"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_triceps_sural"
+        },
+        {
+          "kind": "canonical",
+          "key": "releves_mollet_unipodal"
+        },
+        {
+          "kind": "custom",
+          "label": "Sautillements / hop test (douleur)"
+        },
+        {
+          "kind": "canonical",
+          "key": "analyse_marche"
+        },
+        {
+          "kind": "custom",
+          "label": "Score VISA-A"
+        },
+        {
+          "kind": "custom",
+          "label": "Chaussage et charge d'entraînement"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Cheville — Rupture du tendon d'Achille (opérée)",
+      "description": "Bilan post-opératoire de suture du tendon d'Achille.",
+      "category": "Cheville/Pied",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "adherences_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rougeur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_mollet"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_thompson"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_dorsale_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_plantaire_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "knee_to_wall"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_triceps_sural"
+        },
+        {
+          "kind": "canonical",
+          "key": "releves_mollet_unipodal"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "aides_techniques"
+        },
+        {
+          "kind": "canonical",
+          "key": "analyse_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Pied — Aponévrosite plantaire",
+      "description": "Bilan de fasciapathie plantaire (talalgie).",
+      "category": "Cheville/Pied",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_palpation_aponevrose_plantaire"
+        },
+        {
+          "kind": "canonical",
+          "key": "windlass_test"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_dorsale_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_dorsale_hallux"
+        },
+        {
+          "kind": "canonical",
+          "key": "knee_to_wall"
+        },
+        {
+          "kind": "custom",
+          "label": "Examen de l'appui / type de pied (creux, plat)"
+        },
+        {
+          "kind": "canonical",
+          "key": "releves_mollet_unipodal"
+        },
+        {
+          "kind": "canonical",
+          "key": "analyse_marche"
+        },
+        {
+          "kind": "custom",
+          "label": "Chaussage habituel / activité en charge"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Pied — Hallux valgus (post-opératoire)",
+      "description": "Bilan post-opératoire de chirurgie de l'hallux valgus.",
+      "category": "Cheville/Pied",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "adherences_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rougeur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_du_godet"
+        },
+        {
+          "kind": "canonical",
+          "key": "troubles_trophiques"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_dorsale_hallux"
+        },
+        {
+          "kind": "custom",
+          "label": "Flexion plantaire de l'hallux"
+        },
+        {
+          "kind": "custom",
+          "label": "Mobilité du 1er rayon"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "aides_techniques"
+        },
+        {
+          "kind": "canonical",
+          "key": "analyse_marche"
+        },
+        {
+          "kind": "custom",
+          "label": "Déroulé du pas / appui pulpaire du gros orteil"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Musculaire — Lésion des ischio-jambiers",
+      "description": "Bilan de lésion myo-aponévrotique des ischio-jambiers.",
+      "category": "Musculaire",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "custom",
+          "label": "Palpation : localisation précise de la lésion"
+        },
+        {
+          "kind": "custom",
+          "label": "Ecchymose / encoche palpable"
+        },
+        {
+          "kind": "custom",
+          "label": "Extensibilité des IJ (angle poplité)"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_laseuge"
+        },
+        {
+          "kind": "custom",
+          "label": "Contraction isométrique à 15° / 45° / 90° (douleur)"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_ischio_jambiers"
+        },
+        {
+          "kind": "canonical",
+          "key": "ij_dynalmo"
+        },
+        {
+          "kind": "canonical",
+          "key": "analyse_marche"
+        },
+        {
+          "kind": "custom",
+          "label": "Douleur au sprint / à l'accélération"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Musculaire — Lésion du mollet (tennis leg)",
+      "description": "Bilan de lésion du gastrocnémien médial.",
+      "category": "Musculaire",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "custom",
+          "label": "Palpation de la jonction myotendineuse du gastrocnémien médial"
+        },
+        {
+          "kind": "custom",
+          "label": "Ecchymose / encoche"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_du_godet"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_mollet"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_thompson"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_dorsale_cheville"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_triceps_sural"
+        },
+        {
+          "kind": "canonical",
+          "key": "releves_mollet_unipodal"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "analyse_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Musculaire — Lésion du quadriceps / droit fémoral",
+      "description": "Bilan de lésion musculaire du quadriceps.",
+      "category": "Musculaire",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "custom",
+          "label": "Palpation : localisation de la lésion (droit fémoral, vastes)"
+        },
+        {
+          "kind": "custom",
+          "label": "Ecchymose / encoche palpable"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_genou"
+        },
+        {
+          "kind": "custom",
+          "label": "Extensibilité du quadriceps (talon-fesse)"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_quadriceps"
+        },
+        {
+          "kind": "canonical",
+          "key": "quad_dynamo"
+        },
+        {
+          "kind": "canonical",
+          "key": "analyse_marche"
+        },
+        {
+          "kind": "custom",
+          "label": "Douleur à la montée de marche / course"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Rachis lombaire — Lombalgie aiguë",
+      "description": "Bilan de lombalgie commune aiguë (< 6 semaines).",
+      "category": "Rachis lombaire",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "drapeaux_rouges"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "irradiations"
+        },
+        {
+          "kind": "canonical",
+          "key": "indice_schober"
+        },
+        {
+          "kind": "canonical",
+          "key": "distance_doigt_sol"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_lombaire"
+        },
+        {
+          "kind": "custom",
+          "label": "Attitude antalgique / shift latéral"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_laseuge"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_slump"
+        },
+        {
+          "kind": "canonical",
+          "key": "paresthesies"
+        },
+        {
+          "kind": "canonical",
+          "key": "sensibilite"
+        },
+        {
+          "kind": "canonical",
+          "key": "reflexes_osteotendineux"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_myotomes"
+        },
+        {
+          "kind": "canonical",
+          "key": "troubles_sphincteriens"
+        },
+        {
+          "kind": "custom",
+          "label": "Préférence directionnelle (McKenzie)"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Rachis lombaire — Lombalgie chronique",
+      "description": "Bilan de lombalgie chronique (> 3 mois).",
+      "category": "Rachis lombaire",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "indice_schober"
+        },
+        {
+          "kind": "canonical",
+          "key": "distance_doigt_sol"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_lombaire"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_laseuge"
+        },
+        {
+          "kind": "canonical",
+          "key": "sorensen_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "gainage_ventral_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_grand_fessier"
+        },
+        {
+          "kind": "custom",
+          "label": "Croyances / kinésiophobie (FABQ, TSK)"
+        },
+        {
+          "kind": "custom",
+          "label": "Retentissement sur le sommeil / le travail"
+        },
+        {
+          "kind": "canonical",
+          "key": "perimetre_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "tug_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Rachis lombaire — Lombosciatique / lombocruralgie",
+      "description": "Bilan de radiculalgie du membre inférieur.",
+      "category": "Rachis lombaire",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "drapeaux_rouges"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "irradiations"
+        },
+        {
+          "kind": "canonical",
+          "key": "dn4_score"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_laseuge"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_slump"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_leri"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_de_la_sonnette"
+        },
+        {
+          "kind": "canonical",
+          "key": "indice_schober"
+        },
+        {
+          "kind": "canonical",
+          "key": "distance_doigt_sol"
+        },
+        {
+          "kind": "canonical",
+          "key": "paresthesies"
+        },
+        {
+          "kind": "canonical",
+          "key": "sensibilite"
+        },
+        {
+          "kind": "canonical",
+          "key": "reflexes_osteotendineux"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_myotomes"
+        },
+        {
+          "kind": "canonical",
+          "key": "troubles_sphincteriens"
+        },
+        {
+          "kind": "custom",
+          "label": "Marche sur les talons / sur les pointes"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Rachis lombaire — Hernie discale opérée",
+      "description": "Bilan post-opératoire de chirurgie discale lombaire.",
+      "category": "Rachis lombaire",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "adherences_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rougeur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "irradiations"
+        },
+        {
+          "kind": "canonical",
+          "key": "indice_schober"
+        },
+        {
+          "kind": "canonical",
+          "key": "distance_doigt_sol"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_laseuge"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_slump"
+        },
+        {
+          "kind": "canonical",
+          "key": "paresthesies"
+        },
+        {
+          "kind": "canonical",
+          "key": "sensibilite"
+        },
+        {
+          "kind": "canonical",
+          "key": "reflexes_osteotendineux"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_myotomes"
+        },
+        {
+          "kind": "canonical",
+          "key": "troubles_sphincteriens"
+        },
+        {
+          "kind": "canonical",
+          "key": "sorensen_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "gainage_ventral_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "perimetre_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Rachis lombaire — Canal lombaire étroit",
+      "description": "Bilan de sténose canalaire lombaire (claudication neurogène).",
+      "category": "Rachis lombaire",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "irradiations"
+        },
+        {
+          "kind": "custom",
+          "label": "Périmètre de marche avant claudication / signes déclenchants"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_lombaire"
+        },
+        {
+          "kind": "canonical",
+          "key": "indice_schober"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_laseuge"
+        },
+        {
+          "kind": "canonical",
+          "key": "paresthesies"
+        },
+        {
+          "kind": "canonical",
+          "key": "sensibilite"
+        },
+        {
+          "kind": "canonical",
+          "key": "reflexes_osteotendineux"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_myotomes"
+        },
+        {
+          "kind": "canonical",
+          "key": "troubles_sphincteriens"
+        },
+        {
+          "kind": "custom",
+          "label": "Soulagement en flexion (test du caddie)"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_6_minutes_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "tug_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "nombre_chutes_12_mois"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Rachis cervical — Cervicalgie commune",
+      "description": "Bilan de cervicalgie mécanique.",
+      "category": "Rachis cervical",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_cervicale"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_cervicale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_cervicale_droite"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_cervicale_gauche"
+        },
+        {
+          "kind": "canonical",
+          "key": "inclinaison_cervicale_droite"
+        },
+        {
+          "kind": "canonical",
+          "key": "inclinaison_cervicale_gauche"
+        },
+        {
+          "kind": "canonical",
+          "key": "distance_menton_sternum"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_spurling"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_distraction_cervicale"
+        },
+        {
+          "kind": "canonical",
+          "key": "endurance_flechisseurs_profonds"
+        },
+        {
+          "kind": "custom",
+          "label": "Palpation / tension des trapèzes et élévateurs de la scapula"
+        },
+        {
+          "kind": "custom",
+          "label": "Ergonomie / poste de travail"
+        },
+        {
+          "kind": "canonical",
+          "key": "paresthesies"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Rachis cervical — Névralgie cervico-brachiale",
+      "description": "Bilan de radiculalgie du membre supérieur.",
+      "category": "Rachis cervical",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "drapeaux_rouges"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "irradiations"
+        },
+        {
+          "kind": "canonical",
+          "key": "dn4_score"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_cervicale"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_cervicale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_cervicale_droite"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_cervicale_gauche"
+        },
+        {
+          "kind": "canonical",
+          "key": "inclinaison_cervicale_droite"
+        },
+        {
+          "kind": "canonical",
+          "key": "inclinaison_cervicale_gauche"
+        },
+        {
+          "kind": "canonical",
+          "key": "distance_menton_sternum"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_spurling"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_distraction_cervicale"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_ulnt1"
+        },
+        {
+          "kind": "canonical",
+          "key": "paresthesies"
+        },
+        {
+          "kind": "canonical",
+          "key": "sensibilite"
+        },
+        {
+          "kind": "canonical",
+          "key": "reflexes_osteotendineux"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_myotomes"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_biceps_brachial"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_triceps_brachial"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_prehension"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Rachis cervical — Whiplash (coup du lapin)",
+      "description": "Bilan après accélération-décélération cervicale (accident).",
+      "category": "Rachis cervical",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "drapeaux_rouges"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_cervicale"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_cervicale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_cervicale_droite"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_cervicale_gauche"
+        },
+        {
+          "kind": "canonical",
+          "key": "inclinaison_cervicale_droite"
+        },
+        {
+          "kind": "canonical",
+          "key": "inclinaison_cervicale_gauche"
+        },
+        {
+          "kind": "canonical",
+          "key": "distance_menton_sternum"
+        },
+        {
+          "kind": "custom",
+          "label": "Vertiges / céphalées / troubles visuels ou de concentration"
+        },
+        {
+          "kind": "canonical",
+          "key": "endurance_flechisseurs_profonds"
+        },
+        {
+          "kind": "custom",
+          "label": "Test de flexion-rotation (C1-C2)"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_spurling"
+        },
+        {
+          "kind": "canonical",
+          "key": "paresthesies"
+        },
+        {
+          "kind": "custom",
+          "label": "Score NDI (Neck Disability Index)"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Rachis — Dorsalgie",
+      "description": "Bilan de douleur thoracique / interscapulaire d'origine mécanique.",
+      "category": "Rachis cervical",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "drapeaux_rouges"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "custom",
+          "label": "Mobilité thoracique en rotation (assis)"
+        },
+        {
+          "kind": "custom",
+          "label": "Ampliation thoracique (cm)"
+        },
+        {
+          "kind": "custom",
+          "label": "Palpation de la charnière cervico-thoracique et des étages thoraciques"
+        },
+        {
+          "kind": "custom",
+          "label": "Statique rachidienne (cyphose, scoliose, posture)"
+        },
+        {
+          "kind": "canonical",
+          "key": "sorensen_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "gainage_ventral_secondes"
+        },
+        {
+          "kind": "custom",
+          "label": "Ergonomie / poste de travail"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Épaule — Tendinopathie de la coiffe des rotateurs",
+      "description": "Bilan de tendinopathie de coiffe non opérée.",
+      "category": "Épaule",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "abduction_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_externe_1"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_interne_main_dos"
+        },
+        {
+          "kind": "custom",
+          "label": "Arc douloureux (60°-120°)"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_neer"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_hawkins_kennedy"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_yocum"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_jobe"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_patte"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_gerber"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_speed"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_yergason"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_deltoide"
+        },
+        {
+          "kind": "custom",
+          "label": "RE / RI résistées (douleur, force)"
+        },
+        {
+          "kind": "custom",
+          "label": "Dyskinésie scapulaire (observation)"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Épaule — Réparation de coiffe (post-opératoire)",
+      "description": "Bilan post-opératoire de suture de la coiffe des rotateurs.",
+      "category": "Épaule",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "adherences_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rougeur_locale"
+        },
+        {
+          "kind": "custom",
+          "label": "Phase du protocole (passif / actif aidé / actif / renforcement)"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "abduction_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_externe_1"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_interne_main_dos"
+        },
+        {
+          "kind": "custom",
+          "label": "Comparatif amplitudes passives vs actives"
+        },
+        {
+          "kind": "custom",
+          "label": "Compensations scapulo-thoraciques (sonnette, haussement)"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_deltoide"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Épaule — Capsulite rétractile",
+      "description": "Bilan d'épaule gelée.",
+      "category": "Épaule",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "abduction_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "adduction_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_externe_1"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_interne_main_dos"
+        },
+        {
+          "kind": "custom",
+          "label": "Comparatif actif vs passif (schéma capsulaire)"
+        },
+        {
+          "kind": "custom",
+          "label": "Phase clinique (douloureuse / enraidissement / récupération)"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_neer"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_hawkins_kennedy"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Épaule — Instabilité gléno-humérale",
+      "description": "Bilan d'instabilité / luxation récidivante d'épaule.",
+      "category": "Épaule",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_apprehension_anterieure"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_recentrage"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_apprehension_posterieure"
+        },
+        {
+          "kind": "canonical",
+          "key": "load_and_shift_test"
+        },
+        {
+          "kind": "canonical",
+          "key": "sulcus_test"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_o_brien"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_crank"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "abduction_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_externe_1"
+        },
+        {
+          "kind": "custom",
+          "label": "Hyperlaxité généralisée (score de Beighton)"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_deltoide"
+        },
+        {
+          "kind": "custom",
+          "label": "RE / RI résistées (force)"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Épaule — Prothèse d'épaule",
+      "description": "Bilan post-opératoire de prothèse d'épaule (anatomique ou inversée).",
+      "category": "Épaule",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "adherences_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rougeur_locale"
+        },
+        {
+          "kind": "custom",
+          "label": "Type de prothèse (anatomique / inversée) et consignes"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "abduction_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_externe_1"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_interne_main_dos"
+        },
+        {
+          "kind": "custom",
+          "label": "Compensations scapulo-thoraciques"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_deltoide"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_biceps_brachial"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Épaule — Fracture de l'extrémité supérieure de l'humérus",
+      "description": "Bilan après fracture de l'humérus proximal (orthopédique ou opérée).",
+      "category": "Épaule",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "troubles_trophiques"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "abduction_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_externe_1"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_interne_main_dos"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_coude"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_coude"
+        },
+        {
+          "kind": "canonical",
+          "key": "pronation_avant_bras"
+        },
+        {
+          "kind": "canonical",
+          "key": "supination_avant_bras"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_deltoide"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_biceps_brachial"
+        },
+        {
+          "kind": "custom",
+          "label": "Mobilité scapulo-thoracique"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_main"
+        },
+        {
+          "kind": "custom",
+          "label": "Œdème / raideur de la main (syndrome épaule-main)"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Épaule — Entorse acromio-claviculaire",
+      "description": "Bilan de disjonction acromio-claviculaire.",
+      "category": "Épaule",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "custom",
+          "label": "Déformation / touche de piano"
+        },
+        {
+          "kind": "custom",
+          "label": "Palpation de l'articulation acromio-claviculaire"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_adduction_forcee"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_o_brien"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "abduction_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_deltoide"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Épaule — Fracture de clavicule",
+      "description": "Bilan après fracture de clavicule (orthopédique ou opérée).",
+      "category": "Épaule",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "custom",
+          "label": "Palpation du foyer de fracture / cal osseux"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "abduction_epaule"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_externe_1"
+        },
+        {
+          "kind": "canonical",
+          "key": "rotation_interne_main_dos"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_deltoide"
+        },
+        {
+          "kind": "custom",
+          "label": "Mobilité scapulaire / dyskinésie"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Coude — Épicondylite latérale (tennis elbow)",
+      "description": "Bilan de tendinopathie des épicondyliens latéraux.",
+      "category": "Coude",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "palpation_epicondyle_lateral"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_cozen"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_mill"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_maudsley"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_coude"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_coude"
+        },
+        {
+          "kind": "canonical",
+          "key": "pronation_avant_bras"
+        },
+        {
+          "kind": "canonical",
+          "key": "supination_avant_bras"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_prehension"
+        },
+        {
+          "kind": "custom",
+          "label": "Geste déclenchant (travail / sport / bricolage)"
+        },
+        {
+          "kind": "custom",
+          "label": "ULNT2b (nerf radial)"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Coude — Épitrochléite (golf elbow)",
+      "description": "Bilan de tendinopathie des épitrochléens.",
+      "category": "Coude",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "palpation_epicondyle_medial"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_golfers_elbow"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_coude"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_coude"
+        },
+        {
+          "kind": "canonical",
+          "key": "pronation_avant_bras"
+        },
+        {
+          "kind": "canonical",
+          "key": "supination_avant_bras"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_prehension"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_tinel"
+        },
+        {
+          "kind": "custom",
+          "label": "Geste déclenchant (travail / sport)"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Coude — Raideur post-traumatique",
+      "description": "Bilan de raideur du coude après fracture ou immobilisation.",
+      "category": "Coude",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "adherences_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rougeur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "troubles_trophiques"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_coude"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_coude"
+        },
+        {
+          "kind": "canonical",
+          "key": "pronation_avant_bras"
+        },
+        {
+          "kind": "canonical",
+          "key": "supination_avant_bras"
+        },
+        {
+          "kind": "custom",
+          "label": "Arrêt dur / mou en fin d'amplitude"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_biceps_brachial"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_triceps_brachial"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_prehension"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Poignet — Syndrome du canal carpien (opéré)",
+      "description": "Bilan post-opératoire de libération du nerf médian.",
+      "category": "Poignet/Main",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "adherences_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "rougeur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_phalen"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_tinel"
+        },
+        {
+          "kind": "canonical",
+          "key": "paresthesies"
+        },
+        {
+          "kind": "canonical",
+          "key": "sensibilite"
+        },
+        {
+          "kind": "custom",
+          "label": "Discrimination de 2 points (Weber)"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_poignet"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_poignet"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_prehension"
+        },
+        {
+          "kind": "custom",
+          "label": "Opposition du pouce / testing thénarien"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_main"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Poignet — Fracture du poignet (Pouteau-Colles)",
+      "description": "Bilan après fracture du radius distal.",
+      "category": "Poignet/Main",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "date_lesion_chirurgie"
+        },
+        {
+          "kind": "canonical",
+          "key": "protocole_chirurgical"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "etat_cicatrice"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_du_godet"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_poignet"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_main"
+        },
+        {
+          "kind": "canonical",
+          "key": "troubles_trophiques"
+        },
+        {
+          "kind": "canonical",
+          "key": "flexion_poignet"
+        },
+        {
+          "kind": "canonical",
+          "key": "extension_poignet"
+        },
+        {
+          "kind": "canonical",
+          "key": "inclinaison_radiale_poignet"
+        },
+        {
+          "kind": "canonical",
+          "key": "inclinaison_ulnaire_poignet"
+        },
+        {
+          "kind": "canonical",
+          "key": "pronation_avant_bras"
+        },
+        {
+          "kind": "canonical",
+          "key": "supination_avant_bras"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_prehension"
+        },
+        {
+          "kind": "custom",
+          "label": "Enroulement des doigts / distance pulpe-paume"
+        },
+        {
+          "kind": "custom",
+          "label": "Signes de SDRC (douleur disproportionnée, raideur diffuse)"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Main — Rhizarthrose",
+      "description": "Bilan d'arthrose trapézo-métacarpienne.",
+      "category": "Poignet/Main",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "grind_test_pouce"
+        },
+        {
+          "kind": "custom",
+          "label": "Palpation TMC / déformation en Z"
+        },
+        {
+          "kind": "custom",
+          "label": "Opposition du pouce (score de Kapandji)"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_prehension"
+        },
+        {
+          "kind": "custom",
+          "label": "Pince pouce-index (key pinch)"
+        },
+        {
+          "kind": "custom",
+          "label": "Gênes fonctionnelles (ouvrir un bocal, tourner une clé…)"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Poignet — Ténosynovite de De Quervain",
+      "description": "Bilan de ténosynovite du 1er compartiment des extenseurs.",
+      "category": "Poignet/Main",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_finkelstein"
+        },
+        {
+          "kind": "canonical",
+          "key": "palpation_tabatiere_anatomique"
+        },
+        {
+          "kind": "custom",
+          "label": "Palpation du 1er compartiment / crépitation"
+        },
+        {
+          "kind": "canonical",
+          "key": "inclinaison_radiale_poignet"
+        },
+        {
+          "kind": "canonical",
+          "key": "inclinaison_ulnaire_poignet"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_prehension"
+        },
+        {
+          "kind": "custom",
+          "label": "Gestes déclenchants (portage de bébé, téléphone…)"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Main — Entorse du pouce (pouce du skieur)",
+      "description": "Bilan d'entorse du ligament collatéral ulnaire de la MCP du pouce.",
+      "category": "Poignet/Main",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_valgus_mp_pouce"
+        },
+        {
+          "kind": "custom",
+          "label": "Palpation du LCU / recherche d'effet Stener"
+        },
+        {
+          "kind": "custom",
+          "label": "Flexion / extension de la MCP du pouce"
+        },
+        {
+          "kind": "canonical",
+          "key": "force_prehension"
+        },
+        {
+          "kind": "custom",
+          "label": "Pince pouce-index (force, douleur)"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "SDRC — Syndrome douloureux régional complexe",
+      "description": "Bilan de SDRC (algodystrophie), toute localisation.",
+      "category": "Général",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "profession_activites"
+        },
+        {
+          "kind": "canonical",
+          "key": "activite_sportive"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "examens_imagerie"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "dn4_score"
+        },
+        {
+          "kind": "custom",
+          "label": "Allodynie / hyperesthésie"
+        },
+        {
+          "kind": "canonical",
+          "key": "rougeur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "chaleur_locale"
+        },
+        {
+          "kind": "canonical",
+          "key": "signe_du_godet"
+        },
+        {
+          "kind": "canonical",
+          "key": "troubles_trophiques"
+        },
+        {
+          "kind": "custom",
+          "label": "Sudation / pilosité / aspect des ongles"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_poignet"
+        },
+        {
+          "kind": "canonical",
+          "key": "circonference_main"
+        },
+        {
+          "kind": "custom",
+          "label": "Amplitudes articulaires de la région concernée (comparatif)"
+        },
+        {
+          "kind": "custom",
+          "label": "Reconnaissance de latéralité / négligence du membre"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
+      ]
+    },
+    {
+      "name": "Gériatrie — Bilan équilibre et risque de chute",
+      "description": "Bilan de la personne âgée à risque de chute.",
+      "category": "Général",
+      "items": [
+        {
+          "kind": "canonical",
+          "key": "motif_consultation"
+        },
+        {
+          "kind": "canonical",
+          "key": "antecedents"
+        },
+        {
+          "kind": "canonical",
+          "key": "traitement_en_cours"
+        },
+        {
+          "kind": "canonical",
+          "key": "objectifs_patient"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_repos"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_effort"
+        },
+        {
+          "kind": "canonical",
+          "key": "eva_nuit"
+        },
+        {
+          "kind": "canonical",
+          "key": "douleur_nocturne"
+        },
+        {
+          "kind": "canonical",
+          "key": "localisation_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "type_douleur"
+        },
+        {
+          "kind": "canonical",
+          "key": "nombre_chutes_12_mois"
+        },
+        {
+          "kind": "canonical",
+          "key": "peur_de_chuter"
+        },
+        {
+          "kind": "canonical",
+          "key": "tug_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "appui_monopodal_secondes"
+        },
+        {
+          "kind": "canonical",
+          "key": "tinetti_score"
+        },
+        {
+          "kind": "canonical",
+          "key": "test_6_minutes_marche"
+        },
+        {
+          "kind": "custom",
+          "label": "Test des 5 relevés de chaise (secondes)"
+        },
+        {
+          "kind": "canonical",
+          "key": "aides_techniques"
+        },
+        {
+          "kind": "canonical",
+          "key": "perimetre_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "analyse_marche"
+        },
+        {
+          "kind": "canonical",
+          "key": "montee_descente_escaliers"
+        },
+        {
+          "kind": "canonical",
+          "key": "boiterie"
+        },
+        {
+          "kind": "canonical",
+          "key": "testing_quadriceps"
+        },
+        {
+          "kind": "custom",
+          "label": "Environnement domicile (tapis, éclairage, escaliers)"
+        },
+        {
+          "kind": "custom",
+          "label": "Vision / audition / chaussage"
+        },
+        {
+          "kind": "canonical",
+          "key": "score_fonctionnel"
+        },
+        {
+          "kind": "canonical",
+          "key": "observation_generale"
+        }
       ]
     }
   ]
