@@ -16,13 +16,13 @@ function generateVisioToken(seanceId, patientId, scheduledAt) {
   try {
     const exp = Math.floor((new Date(scheduledAt).getTime() + WINDOW_MS) / 1000);
     const payload = {
-      seanceId: parseInt(seanceId),
-      patientId: parseInt(patientId),
+      seanceId: parseInt(seanceId, 10),
+      patientId: parseInt(patientId, 10),
       type: TOKEN_TYPE,
       iat: Math.floor(Date.now() / 1000),
       exp,
     };
-    const token = jwt.sign(payload, PATIENT_JWT_SECRET);
+    const token = jwt.sign(payload, PATIENT_JWT_SECRET, { algorithm: 'HS256' });
     return { success: true, token, expiresAt: new Date(exp * 1000).toISOString() };
   } catch (error) {
     logger.error('Erreur generation token visio:', error.message);
