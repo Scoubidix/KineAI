@@ -84,14 +84,18 @@ function registerVisioNamespace(io) {
       if (role !== 'KINE') return;
       const prisma = prismaService.getInstance();
       const fresh = await prisma.visioSeance.findUnique({ where: { id: socket.data.seance.id } });
-      if (!canHostStart(fresh)) {
+      if (!fresh || !canHostStart(fresh)) {
         return socket.emit('host-start-refused', { code: 'CONSENT_REQUIRED' });
       }
-      await prisma.visioSeance.update({
-        where: { id: fresh.id },
-        data: { status: 'LIVE', startedAt: fresh.startedAt || new Date() },
-      });
-      ns.to(roomId).emit('host-start');
+      try {
+        await prisma.visioSeance.update({
+          where: { id: fresh.id },
+          data: { status: 'LIVE', startedAt: fresh.startedAt || new Date() },
+        });
+        socket.to(roomId).emit('host-start');
+      } catch (e) {
+        logger.error('host-start update:', e.message);
+      }
     });
 
     // Relais WebRTC
@@ -105,7 +109,7 @@ function registerVisioNamespace(io) {
         where: { id: socket.data.seance.id },
         data: { status: 'ENDED', endedAt: new Date() },
       }).catch((e) => logger.error('hangup update:', e.message));
-      ns.to(roomId).emit('hangup');
+      socket.to(roomId).emit('hangup');
     });
 
     socket.on('disconnect', () => {
