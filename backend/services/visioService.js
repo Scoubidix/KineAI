@@ -1,0 +1,127 @@
+const crypto = require('crypto');
+const prismaService = require('../services/prismaService');
+const logger = require('../utils/logger');
+const { generateVisioToken } = require('./visioTokenService');
+const { sendSeanceLink } = require('./visioLinkService');
+const { isMobileFR } = require('./phoneUtils');
+
+class VisioError extends Error {
+  constructor(message, code, httpStatus = 400) {
+    super(message);
+    this.code = code;
+    this.httpStatus = httpStatus;
+  }
+}
+
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
+
+async function createSeance(kineId, { patientId, scheduledAt, deliveryChannel, prereqsAttested }) {
+  if (prereqsAttested !== true) {
+    throw new VisioError('Pre-requis telesoin non attestes', 'PREREQS_NOT_ATTESTED', 400);
+  }
+  if (!['EMAIL', 'WHATSAPP'].includes(deliveryChannel)) {
+    throw new VisioError('Canal de transmission invalide', 'INVALID_CHANNEL', 400);
+  }
+  const when = new Date(scheduledAt);
+  if (Number.isNaN(when.getTime()) || when.getTime() < Date.now()) {
+    throw new VisioError('Date de seance invalide', 'INVALID_SCHEDULE', 400);
+  }
+
+  const prisma = prismaService.getInstance();
+  const patient = await prisma.patient.findFirst({
+    where: { id: parseInt(patientId), kineId, isActive: true },
+  });
+  if (!patient) {
+    throw new VisioError('Patient introuvable', 'PATIENT_NOT_FOUND', 404);
+  }
+  if (deliveryChannel === 'EMAIL' && !patient.email) {
+    throw new VisioError('Le patient n\'a pas d\'email', 'NO_EMAIL', 400);
+  }
+  if (deliveryChannel === 'WHATSAPP' && !isMobileFR(patient.phone)) {
+    throw new VisioError('Le numero n\'est pas un mobile', 'NOT_MOBILE', 400);
+  }
+
+  const roomId = crypto.randomUUID();
+  const now = new Date();
+  const seance = await prisma.visioSeance.create({
+    data: {
+      roomId,
+      scheduledAt: when,
+      status: 'SCHEDULED',
+      deliveryChannel,
+      prereqsAttested: true,
+      prereqsValidatedAt: now,
+      kineId,
+      patientId: patient.id,
+    },
+  });
+
+  const gen = generateVisioToken(seance.id, patient.id, when);
+  if (!gen.success) {
+    throw new VisioError('Erreur generation du lien', 'TOKEN_ERROR', 500);
+  }
+  const seanceUrl = `${FRONTEND_URL}/visio/${gen.token}`;
+
+  const sent = await sendSeanceLink({
+    channel: deliveryChannel, patient, token: gen.token, seanceUrl, scheduledAt: when,
+  });
+  const updated = await prisma.visioSeance.update({
+    where: { id: seance.id },
+    data: { linkSentAt: sent.success ? now : null },
+  });
+
+  return { seance: updated, seanceUrl, linkSent: sent.success };
+}
+
+async function listSeances(kineId) {
+  const prisma = prismaService.getInstance();
+  return prisma.visioSeance.findMany({
+    where: { kineId, isActive: true },
+    orderBy: { scheduledAt: 'desc' },
+    include: { patient: { select: { id: true, firstName: true, lastName: true } } },
+  });
+}
+
+async function getSeanceForKine(kineId, seanceId) {
+  const prisma = prismaService.getInstance();
+  return prisma.visioSeance.findFirst({
+    where: { id: parseInt(seanceId), kineId, isActive: true },
+    include: { patient: { select: { id: true, firstName: true, lastName: true } } },
+  });
+}
+
+async function requireOwnedSeance(kineId, seanceId) {
+  const prisma = prismaService.getInstance();
+  const seance = await prisma.visioSeance.findFirst({
+    where: { id: parseInt(seanceId), kineId, isActive: true },
+  });
+  if (!seance) throw new VisioError('Seance introuvable', 'SEANCE_NOT_FOUND', 404);
+  return seance;
+}
+
+async function setConsent(kineId, seanceId) {
+  await requireOwnedSeance(kineId, seanceId);
+  const prisma = prismaService.getInstance();
+  return prisma.visioSeance.update({
+    where: { id: parseInt(seanceId) },
+    data: { consentOralAt: new Date() },
+  });
+}
+
+async function cancelSeance(kineId, seanceId) {
+  await requireOwnedSeance(kineId, seanceId);
+  const prisma = prismaService.getInstance();
+  return prisma.visioSeance.update({
+    where: { id: parseInt(seanceId) },
+    data: { status: 'CANCELLED' },
+  });
+}
+
+module.exports = {
+  VisioError,
+  createSeance,
+  listSeances,
+  getSeanceForKine,
+  setConsent,
+  cancelSeance,
+};
