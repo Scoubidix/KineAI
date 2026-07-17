@@ -34,12 +34,15 @@ if (process.env.GENERATION_PROVIDER === 'mistral' && !process.env.MISTRAL_API_KE
   process.exit(1);
 }
 
+const http = require('http');
 const logger = require('./utils/logger');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const bodyParser = require('body-parser');
 const prismaService = require('./services/prismaService');
+const { Server } = require('socket.io');
+const { registerVisioNamespace } = require('./services/visioSignaling');
 
 // Import du nouveau système d'archivage
 const { startProgramCleanupCron } = require('./utils/chatCleanup');
@@ -578,6 +581,9 @@ app.use('/api/contracts', contractsRoutes);
 // 🔗 CONTRATS — Routes publiques d'accès via magic link (pas d'auth Firebase, sécurité via token)
 app.use('/api/contract-access', contractAccessRoutes);
 
+// 🎥 VISIO : télésoin kiné↔patient (WebRTC signaling)
+app.use('/api/visio', require('./routes/visio'));
+
 // 📧 TEMPLATES ADMIN : rate limiting dans le routeur APRÈS authenticate
 app.use('/api/templates', templatesRoutes);
 
@@ -697,9 +703,20 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 })();
 
 // Démarrage du serveur
-app.listen(PORT, '0.0.0.0', () => {
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: (process.env.FRONTEND_URL || 'http://localhost:3001').split(','),
+    methods: ['GET', 'POST'],
+  },
+});
+registerVisioNamespace(io);
+
+server.listen(PORT, '0.0.0.0', () => {
   logger.info(`🚀 KineAI Backend running on port ${PORT}`);
   logger.info(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`🎥 Visio signaling (Socket.IO): namespace /visio`);
   logger.info(`🔗 Health check: http://localhost:${PORT}/health`);
   logger.info(`🤖 Chat unifié (SSE): /api/chat/kine/chat`);
   logger.info(`🤖 Conversations: /api/chat/kine/conversations`);
