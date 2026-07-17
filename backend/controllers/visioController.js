@@ -74,12 +74,13 @@ async function cancelSeance(req, res) {
 }
 
 // ---- Patient (req.visioSeance posé par le middleware) ----
-async function getSession(req, res) {
+function getSession(req, res) {
   const s = req.visioSeance;
   return res.status(200).json({
     scheduledAt: s.scheduledAt,
     status: s.status,
     patientInfoAcknowledged: !!s.patientInfoAckAt,
+    seanceId: s.id,
   });
 }
 
