@@ -21,14 +21,19 @@ async function sendSeanceLink({ channel, patient, token, seanceUrl, scheduledAt 
 <p>Pour la rejoindre, cliquez sur ce lien à l'heure du rendez-vous :</p>
 <p><a href="${seanceUrl}">${seanceUrl}</a></p>
 <p>Assurez-vous d'être dans un endroit calme et confidentiel, avec une bonne connexion internet.</p>`;
-    await sendTransactionalEmail({
-      toEmail: patient.email,
-      toName: patient.firstName,
-      subject: 'Votre séance de télésoin',
-      htmlContent,
-      textContent: `Votre séance de télésoin est prévue le ${dateStr}. Lien : ${seanceUrl}`,
-    });
-    return { success: true };
+    try {
+      await sendTransactionalEmail({
+        toEmail: patient.email,
+        toName: patient.firstName,
+        subject: 'Votre séance de télésoin',
+        htmlContent,
+        textContent: `Votre séance de télésoin est prévue le ${dateStr}. Lien : ${seanceUrl}`,
+      });
+      return { success: true };
+    } catch (err) {
+      logger.error('Echec envoi email visio (Brevo):', err.message);
+      return { success: false };
+    }
   }
 
   if (channel === 'WHATSAPP') {
