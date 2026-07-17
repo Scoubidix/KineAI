@@ -110,6 +110,10 @@ model Kine {
   // ========== RELATION ACTIVITÉ (temps gagné) ==========
   activityEvents KineActivityEvent[]
   // =====================================================
+
+  // ========== RELATION VISIOTRANSMISSION ==========
+  visioSeances VisioSeance[]
+  // ================================================
 }
 
 model Patient {
@@ -142,6 +146,7 @@ model Patient {
   notifications        Notification[]
   templatesSentHistory TemplateSentHistory[]
   bilans               BilanKine[]
+  visioSeances         VisioSeance[]
 }
 
 model ExerciceModele {
@@ -983,3 +988,49 @@ model BilanSeedState {
 
   @@map("bilan_seed_state")
 }
+
+// ========== VISIOTRANSMISSION TÉLÉSOIN ==========
+
+model VisioSeance {
+  id              Int          @id @default(autoincrement())
+  roomId          String       @unique
+  scheduledAt     DateTime
+  status          VisioStatus  @default(SCHEDULED)
+  deliveryChannel VisioChannel
+
+  linkSentAt         DateTime?
+  prereqsAttested    Boolean   @default(false)
+  prereqsValidatedAt DateTime?
+  patientInfoAckAt   DateTime?
+  consentOralAt      DateTime?
+
+  startedAt DateTime?
+  endedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+
+  kineId    Int
+  kine      Kine    @relation(fields: [kineId], references: [id])
+  patientId Int
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  @@index([kineId, scheduledAt])
+  @@index([patientId])
+  @@map("visio_seances")
+}
+
+enum VisioStatus {
+  SCHEDULED
+  LIVE
+  ENDED
+  CANCELLED
+}
+
+enum VisioChannel {
+  EMAIL
+  WHATSAPP
+}
+
+// =================================================
