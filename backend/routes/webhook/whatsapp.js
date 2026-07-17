@@ -269,9 +269,47 @@ async function sendMessageTemplate(phoneNumber, messageContent) {
   }
 }
 
+// Envoi du lien de séance visio via le template visio_kine (bouton URL = token)
+async function sendVisioLink(phoneNumber, token) {
+  try {
+    const response = await fetch(WHATSAPP_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: phoneNumber,
+        type: 'template',
+        template: {
+          name: 'visio_kine',
+          language: { code: 'fr' },
+          components: [
+            {
+              type: 'BUTTON',
+              sub_type: 'URL',
+              index: 0,
+              parameters: [{ type: 'TEXT', text: token }],
+            },
+          ],
+        },
+      }),
+    });
+    const result = await response.json();
+    if (response.ok) return { success: true, data: result };
+    logger.error('❌ ERREUR TEMPLATE VISIO_KINE:', result);
+    return { success: false, error: result };
+  } catch (error) {
+    logger.error('❌ ERREUR TECHNIQUE TEMPLATE VISIO_KINE:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 module.exports = {
   router,
   sendWhatsAppMessage,
   sendProgramLink,
-  sendMessageTemplate
+  sendMessageTemplate,
+  sendVisioLink
 };
