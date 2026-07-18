@@ -69,12 +69,21 @@ function registerVisioNamespace(io) {
   ns.on('connection', (socket) => {
     const { roomId, role } = socket.data;
     const room = ns.adapter.rooms.get(roomId);
-    if (room && room.size >= 2) {
+    // IDs déjà présents AVANT que ce socket rejoigne
+    const existingIds = room ? [...room] : [];
+    if (existingIds.length >= 2) {
       socket.emit('room-full');
       return socket.disconnect(true);
     }
     socket.join(roomId);
+    // Prévenir les pairs déjà présents de l'arrivée de ce socket
     socket.to(roomId).emit('peer-ready', { role });
+    // Prévenir ce socket des pairs déjà présents — sinon celui qui rejoint en
+    // second (typiquement le kiné) ne découvre jamais l'autre (reste "en attente").
+    for (const id of existingIds) {
+      const other = ns.sockets.get(id);
+      if (other) socket.emit('peer-ready', { role: other.data.role });
+    }
 
     // Le kiné annonce qu'il est prêt / présent
     socket.on('peer-ready', () => socket.to(roomId).emit('peer-ready', { role }));
