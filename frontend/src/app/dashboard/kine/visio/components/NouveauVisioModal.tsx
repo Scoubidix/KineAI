@@ -9,7 +9,8 @@ import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
 import { getAuth } from 'firebase/auth';
 import { ArrowLeft, Loader2, User, Check, Mail, Phone, Video, AlertCircle, Search, Calendar } from 'lucide-react';
-import { createSeance, VisioChannel } from '@/lib/visioApi';
+import { createSeance, VisioChannel, VisioSeance } from '@/lib/visioApi';
+import VisioDateTimePicker from './VisioDateTimePicker';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,6 +27,7 @@ interface NouveauVisioModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  existingSeances?: VisioSeance[];
 }
 
 type StepKey = 'PATIENT' | 'SCHEDULE' | 'CHANNEL' | 'PREREQS' | 'CONFIRM';
@@ -59,7 +61,7 @@ const STEPS: StepKey[] = ['PATIENT', 'SCHEDULE', 'CHANNEL', 'PREREQS', 'CONFIRM'
 // ---------------------------------------------------------------------------
 // Composant principal
 // ---------------------------------------------------------------------------
-export default function NouveauVisioModal({ open, onOpenChange, onCreated }: NouveauVisioModalProps) {
+export default function NouveauVisioModal({ open, onOpenChange, onCreated, existingSeances = [] }: NouveauVisioModalProps) {
   const { toast } = useToast();
 
   // ----- Navigation stepper -----
@@ -171,10 +173,25 @@ export default function NouveauVisioModal({ open, onOpenChange, onCreated }: Nou
     return null;
   }, [selectedPatient]);
 
+  // Avance directement vers une étape (utilisé pour l'auto-avance au clic)
+  const goForwardTo = useCallback((key: StepKey) => {
+    setDirection('forward');
+    setCurrentKey(key);
+  }, []);
+
   const pickChannel = useCallback((ch: VisioChannel) => {
     setChannel(ch);
-    setChannelError(getChannelError(ch));
-  }, [getChannelError]);
+    const err = getChannelError(ch);
+    setChannelError(err);
+    // Canal valide → on avance direct (sinon on reste pour afficher l'erreur)
+    if (!err) goForwardTo('PREREQS');
+  }, [getChannelError, goForwardTo]);
+
+  // Sélection d'un patient → passe directement à l'étape suivante (évite un clic)
+  const handlePickPatient = useCallback((p: PatientOption) => {
+    setSelectedPatient(p);
+    goForwardTo('SCHEDULE');
+  }, [goForwardTo]);
 
   // ----- Navigation -----
   const advance = useCallback(async () => {
@@ -245,6 +262,21 @@ export default function NouveauVisioModal({ open, onOpenChange, onCreated }: Nou
       p.lastName.toLowerCase().includes(q)
     );
   }, [patients, patientSearch]);
+
+  // ----- Doublon même patient / même jour (avertissement non bloquant) -----
+  const duplicateSeance = useMemo(() => {
+    if (!selectedPatient || !scheduledAt) return null;
+    const d = new Date(scheduledAt);
+    const key = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    return (
+      existingSeances.find((s) => {
+        if (s.patient?.id !== selectedPatient.id) return false;
+        if (s.status !== 'SCHEDULED' && s.status !== 'LIVE') return false;
+        const sd = new Date(s.scheduledAt);
+        return new Date(sd.getFullYear(), sd.getMonth(), sd.getDate()).getTime() === key;
+      }) ?? null
+    );
+  }, [selectedPatient, scheduledAt, existingSeances]);
 
   // ----- UI helpers -----
   const progress = ((currentIdx + 1) / STEPS.length) * 100;
@@ -329,8 +361,8 @@ export default function NouveauVisioModal({ open, onOpenChange, onCreated }: Nou
                           key={p.id}
                           role="button"
                           tabIndex={0}
-                          onClick={() => setSelectedPatient(p)}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPatient(p); } }}
+                          onClick={() => handlePickPatient(p)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePickPatient(p); } }}
                           className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all hover:scale-[1.01] cursor-pointer ${
                             selectedPatient?.id === p.id
                               ? 'border-[#3899aa] bg-[#3899aa]/5'
@@ -358,24 +390,21 @@ export default function NouveauVisioModal({ open, onOpenChange, onCreated }: Nou
             {currentKey === 'SCHEDULE' && (
               <div className="space-y-5 max-w-md mx-auto">
                 <h2 className="text-xl font-semibold text-center">Date et heure de la séance ?</h2>
-                <div className="space-y-2">
-                  <Input
-                    ref={scheduleRef}
-                    type="datetime-local"
-                    value={scheduledAt}
-                    onChange={(e) => {
-                      setScheduledAt(e.target.value);
-                      validateSchedule(e.target.value);
-                    }}
-                    className="text-center text-lg h-12"
-                  />
-                  {scheduleError && (
-                    <div className="flex items-center gap-2 text-sm text-red-600">
-                      <AlertCircle className="h-4 w-4 shrink-0" />
-                      {scheduleError}
-                    </div>
-                  )}
-                </div>
+                <VisioDateTimePicker
+                  initialValue={scheduledAt}
+                  onChange={(v) => {
+                    setScheduledAt(v);
+                    validateSchedule(v);
+                    // Créneau valide choisi → on avance direct vers le canal
+                    if (v && new Date(v).getTime() > Date.now()) goForwardTo('CHANNEL');
+                  }}
+                />
+                {scheduleError && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-red-600">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {scheduleError}
+                  </div>
+                )}
               </div>
             )}
 
@@ -490,6 +519,14 @@ export default function NouveauVisioModal({ open, onOpenChange, onCreated }: Nou
                     </div>
                   </div>
                 </div>
+                {duplicateSeance && (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 text-sm text-amber-800 dark:text-amber-300">
+                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span>
+                      Ce patient a déjà une séance prévue le {formatScheduledAt(duplicateSeance.scheduledAt)}. Créer quand même&nbsp;?
+                    </span>
+                  </div>
+                )}
                 {submitError && (
                   <div className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/20 p-3 text-sm text-red-700 dark:text-red-300">
                     <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />

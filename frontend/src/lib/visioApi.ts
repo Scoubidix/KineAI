@@ -47,3 +47,10 @@ export async function setConsent(id: number) {
 export async function cancelSeance(id: number) {
   return json<VisioSeance>(await fetchWithAuth(`${BASE}/seances/${id}/cancel`, { method: 'PATCH' }));
 }
+export async function rescheduleSeance(id: number, scheduledAt: string) {
+  const res = await fetchWithAuth(`${BASE}/seances/${id}/reschedule`, {
+    method: 'PATCH',
+    body: JSON.stringify({ scheduledAt }),
+  });
+  return json<VisioSeance>(res);
+}
