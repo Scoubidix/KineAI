@@ -28,8 +28,8 @@ export default function VisioPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
 
-  const fetchSeances = useCallback(() => {
-    setLoading(true);
+  const fetchSeances = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     listSeances()
       .then(setSeances)
@@ -39,6 +39,9 @@ export default function VisioPage() {
 
   useEffect(() => {
     fetchSeances();
+    // Rafraîchissement silencieux pour refléter la présence du patient en (quasi) temps réel
+    const t = setInterval(() => fetchSeances(true), 10000);
+    return () => clearInterval(t);
   }, [fetchSeances]);
 
   const handleCancel = async (id: number) => {
@@ -89,6 +92,12 @@ export default function VisioPage() {
                   >
                     {STATUS_LABELS[s.status]}
                   </span>
+                  {joinable && s.patientPresent && (
+                    <span className="flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                      Patient en salle
+                    </span>
+                  )}
                   {joinable && (
                     <Button
                       size="sm"

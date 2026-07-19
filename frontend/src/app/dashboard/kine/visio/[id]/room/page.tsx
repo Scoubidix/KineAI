@@ -22,7 +22,17 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { getSeance, setConsent, VisioSeance } from '@/lib/visioApi';
-import { useVisioRoom, ConnState } from '@/hooks/useVisioRoom';
+import { useVisioRoom, ConnState, mediaErrorMessage } from '@/hooks/useVisioRoom';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 // ---------------------------------------------------------------------------
 // Helper : vignette vidéo
@@ -164,8 +174,11 @@ export default function KineVisioRoomPage() {
   // ---------------------------------------------------------------------------
   // 2. Hook WebRTC — reste idle tant que firebaseToken est vide (hook gère le guard)
   // ---------------------------------------------------------------------------
-  const { localStream, remoteStream, state, peerPresent, hostStart, hangup, retryCount, mediaError } =
+  const { localStream, remoteStream, state, peerPresent, hostStart, endSession, retryCount, mediaError, mediaErrorReason } =
     useVisioRoom({ role: 'KINE', seanceId, token: firebaseToken || '' });
+
+  // Modal de confirmation de fin de consultation
+  const [endConfirmOpen, setEndConfirmOpen] = useState(false);
 
   // ---------------------------------------------------------------------------
   // 3. Bip + animation à la connexion (une seule fois par session)
@@ -316,8 +329,7 @@ export default function KineVisioRoomPage() {
           <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
             <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
             <p className="text-sm text-destructive">
-              L'accès à la caméra et au microphone a été refusé. Autorise l'accès dans les paramètres
-              de ton navigateur puis recharge la page.
+              {mediaErrorMessage(mediaErrorReason ?? 'other')}
             </p>
           </div>
         )}
@@ -348,22 +360,31 @@ export default function KineVisioRoomPage() {
           {!isConnected && (
             <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/80 z-20">
               <div className="text-center text-white space-y-3 px-6">
-                {state === 'idle' && !mediaError && (
-                  <>
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-white/60" />
-                    <p className="text-sm text-white/70">Initialisation de la caméra…</p>
-                  </>
-                )}
-                {state === 'waiting' && (
-                  <>
-                    <Clock className="h-8 w-8 mx-auto text-amber-400" />
-                    <p className="font-medium">En attente du patient…</p>
-                    <p className="text-sm text-white/60">
-                      {!consentChecked
-                        ? 'Coche le consentement ci-dessous pour pouvoir démarrer.'
-                        : 'Le patient doit rejoindre la salle avant de démarrer.'}
-                    </p>
-                  </>
+                {(state === 'idle' || state === 'waiting') && !mediaError && (
+                  !localStream ? (
+                    <>
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto text-white/60" />
+                      <p className="text-sm text-white/70">Initialisation de la caméra…</p>
+                    </>
+                  ) : peerPresent ? (
+                    <>
+                      <UserCheck className="h-8 w-8 mx-auto text-green-400" />
+                      <p className="font-medium">Patient prêt</p>
+                      <p className="text-sm text-white/60">
+                        {!consentChecked
+                          ? 'Coche le consentement ci-dessous, puis clique « Démarrer la vidéo ».'
+                          : 'Clique « Démarrer la vidéo » pour lancer la séance.'}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-8 w-8 mx-auto text-amber-400" />
+                      <p className="font-medium">En attente du patient…</p>
+                      <p className="text-sm text-white/60">
+                        Le patient doit ouvrir son lien et rejoindre la salle.
+                      </p>
+                    </>
+                  )
                 )}
                 {state === 'connecting' && (
                   <>
@@ -482,19 +503,44 @@ export default function KineVisioRoomPage() {
               {camEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
             </Button>
 
-            {/* Raccrocher */}
-            {(isConnected || state === 'connecting') && (
+            {/* Terminer la consultation (kiné uniquement, avec confirmation) */}
+            {!isEnded && (
               <Button
                 variant="destructive"
-                onClick={hangup}
-                title="Raccrocher"
+                onClick={() => setEndConfirmOpen(true)}
+                title="Terminer la consultation"
               >
                 <PhoneOff className="h-4 w-4 mr-2" />
-                Raccrocher
+                Terminer
               </Button>
             )}
           </div>
         </div>
+
+        {/* Confirmation de fin de consultation */}
+        <AlertDialog open={endConfirmOpen} onOpenChange={setEndConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Terminer la consultation ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                La séance sera définitivement terminée, pour vous comme pour le patient.
+                Le patient ne pourra plus rejoindre cette salle.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setEndConfirmOpen(false);
+                  endSession();
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Terminer la séance
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
     </div>
   );

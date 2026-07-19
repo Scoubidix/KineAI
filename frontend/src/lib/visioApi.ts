@@ -13,6 +13,7 @@ export interface VisioSeance {
   deliveryChannel: VisioChannel;
   consentOralAt: string | null;
   patient?: { id: number; firstName: string; lastName: string };
+  patientPresent?: boolean; // patient actuellement connecté à la room (présence live)
 }
 
 export interface CreateSeanceInput {

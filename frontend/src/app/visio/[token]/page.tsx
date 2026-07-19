@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useVisioRoom } from '@/hooks/useVisioRoom';
+import { useVisioRoom, mediaErrorMessage } from '@/hooks/useVisioRoom';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,7 +44,7 @@ interface SessionData {
   patientInfoAcknowledged: boolean;
 }
 
-type PageState = 'loading' | 'error' | 'info' | 'waiting' | 'in-call' | 'ended' | 'failed';
+type PageState = 'loading' | 'error' | 'info' | 'waiting' | 'in-call' | 'ended' | 'failed' | 'left';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -109,10 +109,11 @@ interface RoomProps {
   scheduledAt: string;
   onEnded: () => void;
   onFailed: () => void;
+  onLeave: () => void;
 }
 
-function VisioRoom({ seanceId, token, scheduledAt, onEnded, onFailed }: RoomProps) {
-  const { localStream, remoteStream, state, hangup, retryCount, mediaError } = useVisioRoom({
+function VisioRoom({ seanceId, token, scheduledAt, onEnded, onFailed, onLeave }: RoomProps) {
+  const { localStream, remoteStream, state, retryCount, mediaError, mediaErrorReason } = useVisioRoom({
     role: 'PATIENT',
     seanceId,
     token,
@@ -129,8 +130,10 @@ function VisioRoom({ seanceId, token, scheduledAt, onEnded, onFailed }: RoomProp
   // Callbacks vers la page parente
   const onEndedRef = useRef(onEnded);
   const onFailedRef = useRef(onFailed);
+  const onLeaveRef = useRef(onLeave);
   onEndedRef.current = onEnded;
   onFailedRef.current = onFailed;
+  onLeaveRef.current = onLeave;
 
   useEffect(() => {
     if (state === 'ended') {
@@ -184,21 +187,22 @@ function VisioRoom({ seanceId, token, scheduledAt, onEnded, onFailed }: RoomProp
     setCamEnabled(enabled);
   }, [localStream, camEnabled]);
 
-  // Quitter
-  const handleHangup = useCallback(() => {
-    hangup();
-    onEndedRef.current();
-  }, [hangup]);
+  // Quitter la séance : le patient QUITTE la salle mais ne termine PAS la consultation.
+  // Il pourra re-rejoindre tant que le kiné n'a pas terminé. (Le démontage du composant
+  // déclenche le cleanup du hook → déconnexion socket → 'peer-left' côté kiné.)
+  const handleLeave = useCallback(() => {
+    onLeaveRef.current();
+  }, []);
 
   // Erreur d'accès caméra/micro
   if (mediaError) {
     return (
-      <CenteredCard icon={<Camera className="h-10 w-10 text-amber-500" />} title="Accès refusé">
+      <CenteredCard
+        icon={<Camera className="h-10 w-10 text-amber-500" />}
+        title={mediaErrorReason === 'notfound' ? 'Aucun périphérique' : 'Accès caméra/micro'}
+      >
         <p className="text-center text-muted-foreground">
-          Autorise l'accès à ta caméra et ton micro pour rejoindre la séance.
-        </p>
-        <p className="mt-2 text-center text-sm text-muted-foreground">
-          Vérifie les permissions dans les réglages de ton navigateur, puis recharge la page.
+          {mediaErrorMessage(mediaErrorReason ?? 'other')}
         </p>
       </CenteredCard>
     );
@@ -286,8 +290,9 @@ function VisioRoom({ seanceId, token, scheduledAt, onEnded, onFailed }: RoomProp
         </button>
 
         <button
-          onClick={handleHangup}
+          onClick={handleLeave}
           aria-label="Quitter la séance"
+          title="Quitter (vous pourrez rejoindre)"
           className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 transition-colors hover:bg-red-500 active:bg-red-700"
         >
           <PhoneOff className="h-6 w-6" />
@@ -339,58 +344,57 @@ export default function VisioPatientPage() {
   // ------------------------------------------------------------------
   // Étape 1 : Charger la session
   // ------------------------------------------------------------------
-  useEffect(() => {
+  const loadSession = useCallback(async () => {
     if (!token) {
       setErrorMessage('Lien invalide.');
       setPageState('error');
       return;
     }
-
-    const load = async () => {
-      try {
-        const res = await fetch(`${apiUrl}/api/visio/session/${token}`);
-        if (!res.ok) {
-          // 401 lien expiré/invalide, 403 annulé, etc.
-          let msg = 'Lien invalide, expiré ou séance annulée.';
-          try {
-            const body = await res.json();
-            if (body?.error) msg = body.error;
-          } catch {
-            // ignorer
-          }
-          setErrorMessage(msg);
-          setPageState('error');
-          return;
+    setPageState('loading');
+    try {
+      const res = await fetch(`${apiUrl}/api/visio/session/${token}`);
+      if (!res.ok) {
+        // 401 lien expiré/invalide, 403 annulé, etc.
+        let msg = 'Lien invalide, expiré ou séance annulée.';
+        try {
+          const body = await res.json();
+          if (body?.error) msg = body.error;
+        } catch {
+          // ignorer
         }
-
-        const data: SessionData = await res.json();
-        setSession(data);
-
-        if (data.status === 'CANCELLED' || data.status === 'ENDED') {
-          setErrorMessage(
-            data.status === 'CANCELLED'
-              ? 'Cette séance a été annulée.'
-              : 'Cette séance est déjà terminée.'
-          );
-          setPageState('error');
-          return;
-        }
-
-        // Choisir l'état initial
-        if (!data.patientInfoAcknowledged) {
-          setPageState('info');
-        } else {
-          setPageState('waiting');
-        }
-      } catch {
-        setErrorMessage('Impossible de charger la séance. Vérifie ta connexion internet.');
+        setErrorMessage(msg);
         setPageState('error');
+        return;
       }
-    };
 
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+      const data: SessionData = await res.json();
+      setSession(data);
+
+      if (data.status === 'CANCELLED' || data.status === 'ENDED') {
+        setErrorMessage(
+          data.status === 'CANCELLED'
+            ? 'Cette séance a été annulée.'
+            : 'Cette séance est déjà terminée.'
+        );
+        setPageState('error');
+        return;
+      }
+
+      // Choisir l'état initial
+      if (!data.patientInfoAcknowledged) {
+        setPageState('info');
+      } else {
+        setPageState('waiting');
+      }
+    } catch {
+      setErrorMessage('Impossible de charger la séance. Vérifie ta connexion internet.');
+      setPageState('error');
+    }
+  }, [token, apiUrl]);
+
+  useEffect(() => {
+    loadSession();
+  }, [loadSession]);
 
   // ------------------------------------------------------------------
   // Étape 2 : Accusé de réception des infos
@@ -509,6 +513,23 @@ export default function VisioPatientPage() {
     );
   }
 
+  // ---- Patient a quitté la séance (peut rejoindre) ----
+  if (pageState === 'left') {
+    return (
+      <CenteredCard
+        icon={<PhoneOff className="h-10 w-10 text-zinc-400" />}
+        title="Vous avez quitté la séance"
+      >
+        <p className="text-center text-muted-foreground">
+          Vous pouvez rejoindre à nouveau tant que votre praticien n'a pas terminé la consultation.
+        </p>
+        <Button onClick={() => loadSession()} className="mt-2 w-full" size="lg">
+          Rejoindre à nouveau
+        </Button>
+      </CenteredCard>
+    );
+  }
+
   // ---- Connexion impossible ----
   if (pageState === 'failed') {
     return (
@@ -542,6 +563,7 @@ export default function VisioPatientPage() {
         scheduledAt={session.scheduledAt}
         onEnded={() => setPageState('ended')}
         onFailed={() => setPageState('failed')}
+        onLeave={() => setPageState('left')}
       />
     );
   }

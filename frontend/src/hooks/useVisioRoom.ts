@@ -14,15 +14,55 @@ import { io, Socket } from 'socket.io-client';
 export type VisioRole = 'KINE' | 'PATIENT';
 export type ConnState = 'idle' | 'waiting' | 'connecting' | 'connected' | 'failed' | 'ended';
 
+// Raison d'un échec d'accès caméra/micro (getUserMedia), pour un message précis.
+export type MediaErrorReason = 'notfound' | 'denied' | 'inuse' | 'insecure' | 'other';
+
+/** Mappe le nom de l'exception getUserMedia vers une raison exploitable. */
+export function mediaErrorReasonFromError(err: unknown): MediaErrorReason {
+  const name = (err as Error)?.name;
+  switch (name) {
+    case 'NotFoundError':
+    case 'OverconstrainedError':
+      return 'notfound';
+    case 'NotAllowedError':
+    case 'SecurityError':
+      return 'denied';
+    case 'NotReadableError':
+    case 'AbortError':
+      return 'inuse';
+    case 'TypeError':
+      return 'insecure';
+    default:
+      return 'other';
+  }
+}
+
+/** Message utilisateur (FR) pour une raison d'échec média. */
+export function mediaErrorMessage(reason: MediaErrorReason): string {
+  switch (reason) {
+    case 'notfound':
+      return "Aucune caméra ou micro détecté sur cet appareil. Branche un périphérique puis recharge la page.";
+    case 'denied':
+      return "L'accès à la caméra et au micro a été refusé. Autorise-les dans les réglages de ton navigateur, puis recharge la page.";
+    case 'inuse':
+      return "Ta caméra ou ton micro est déjà utilisé(e) par une autre application (Zoom, Teams…). Ferme-la puis recharge la page.";
+    case 'insecure':
+      return "La visio nécessite une connexion sécurisée (HTTPS) ou localhost pour accéder à la caméra.";
+    default:
+      return "Impossible d'accéder à la caméra ou au micro. Vérifie tes périphériques et tes permissions, puis recharge la page.";
+  }
+}
+
 export interface UseVisioRoom {
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
   state: ConnState;
   peerPresent: boolean;
   hostStart: () => void; // KINE uniquement
-  hangup: () => void;
+  endSession: () => void; // KINE uniquement : termine la séance (ENDED)
   retryCount: number;
   mediaError: boolean; // true si getUserMedia refusé/échoué
+  mediaErrorReason: MediaErrorReason | null; // détail de l'échec (null si pas d'erreur)
 }
 
 const MAX_RETRIES = 3;
@@ -46,6 +86,7 @@ export function useVisioRoom(opts: {
   const [peerPresent, setPeerPresent] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [mediaError, setMediaError] = useState(false);
+  const [mediaErrorReason, setMediaErrorReason] = useState<MediaErrorReason | null>(null);
 
   // Refs stables entre renders — évitent les captures de closures périmées
   const socketRef = useRef<Socket | null>(null);
@@ -180,7 +221,8 @@ export function useVisioRoom(opts: {
           '-',
           (err as Error)?.message
         );
-        if (!mountedRef.current) return;
+        if (cancelled) return;
+        setMediaErrorReason(mediaErrorReasonFromError(err));
         setMediaError(true);
         setState('failed');
         return; // Pas de socket si pas de média
@@ -273,8 +315,8 @@ export function useVisioRoom(opts: {
         }
       });
 
-      // hangup reçu de l'autre côté
-      socket.on('hangup', () => {
+      // Le kiné a terminé la consultation → état terminal des deux côtés
+      socket.on('session-ended', () => {
         if (!mountedRef.current) return;
         cleanupCall();
         setState('ended');
@@ -373,12 +415,13 @@ export function useVisioRoom(opts: {
     socket.emit('offer', { sdp: offer });
   }, [role, createPc]);
 
-  /** Les deux rôles : raccrocher */
-  const hangup = useCallback(() => {
+  /** KINE uniquement : termine la consultation (séance → ENDED). */
+  const endSession = useCallback(() => {
     const socket = socketRef.current;
     if (socket) {
-      socket.emit('hangup');
+      socket.emit('end-session');
     }
+    // Le serveur renvoie 'session-ended' à la room ; on nettoie aussi localement par sécurité.
     cleanupCall();
     if (localStreamRef.current) {
       for (const t of localStreamRef.current.getTracks()) t.stop();
@@ -402,8 +445,9 @@ export function useVisioRoom(opts: {
     state,
     peerPresent,
     hostStart,
-    hangup,
+    endSession,
     retryCount,
     mediaError,
+    mediaErrorReason,
   };
 }
