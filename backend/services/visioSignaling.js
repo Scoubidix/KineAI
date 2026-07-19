@@ -131,13 +131,18 @@ function registerVisioNamespace(io) {
     socket.on('answer', (payload) => socket.to(roomId).emit('answer', payload));
     socket.on('ice-candidate', (payload) => socket.to(roomId).emit('ice-candidate', payload));
 
-    socket.on('hangup', async () => {
+    // Seul le KINE peut terminer la consultation (séance → ENDED, terminal).
+    // Le patient qui « quitte » se contente de se déconnecter (disconnect → peer-left) :
+    // la séance reste ouverte et il peut re-rejoindre tant qu'elle n'est pas terminée.
+    socket.on('end-session', async () => {
+      if (role !== 'KINE') return;
       const prisma = prismaService.getInstance();
       await prisma.visioSeance.update({
         where: { id: socket.data.seance.id },
         data: { status: 'ENDED', endedAt: new Date() },
-      }).catch((e) => logger.error('hangup update:', e.message));
-      socket.to(roomId).emit('hangup');
+      }).catch((e) => logger.error('end-session update:', e.message));
+      // Notifie toute la room (kiné inclus) → état terminé des deux côtés.
+      ns.to(roomId).emit('session-ended');
     });
 
     socket.on('disconnect', () => {
