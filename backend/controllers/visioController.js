@@ -1,6 +1,7 @@
 const prismaService = require('../services/prismaService');
 const logger = require('../utils/logger');
 const visioService = require('../services/visioService');
+const { isPatientPresent } = require('../services/visioSignaling');
 
 // Résout le kiné authentifié à partir de req.uid
 async function resolveKine(req) {
@@ -33,7 +34,12 @@ async function listSeances(req, res) {
     const kine = await resolveKine(req);
     if (!kine) return res.status(404).json({ success: false, error: 'Kine introuvable', code: 'KINE_NOT_FOUND' });
     const seances = await visioService.listSeances(kine.id);
-    return res.status(200).json(seances);
+    // Annoter chaque séance avec la présence live du patient dans la room
+    const withPresence = seances.map((s) => ({
+      ...s,
+      patientPresent: isPatientPresent(s.roomId),
+    }));
+    return res.status(200).json(withPresence);
   } catch (error) {
     return handleError(res, error, 'listSeances');
   }
@@ -45,7 +51,7 @@ async function getSeance(req, res) {
     if (!kine) return res.status(404).json({ success: false, error: 'Kine introuvable', code: 'KINE_NOT_FOUND' });
     const seance = await visioService.getSeanceForKine(kine.id, req.params.id);
     if (!seance) return res.status(404).json({ success: false, error: 'Seance introuvable', code: 'SEANCE_NOT_FOUND' });
-    return res.status(200).json(seance);
+    return res.status(200).json({ ...seance, patientPresent: isPatientPresent(seance.roomId) });
   } catch (error) {
     return handleError(res, error, 'getSeance');
   }

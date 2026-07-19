@@ -51,8 +51,27 @@ function canHostStart(seance) {
 /**
  * Attache le namespace /visio : auth au handshake, room = roomId, relais du signaling.
  */
+// Référence au namespace /visio, pour interroger la présence en dehors des handlers.
+let visioNamespace = null;
+
+/**
+ * Indique si un patient est actuellement connecté à la room d'une séance.
+ * Single-instance : lit les sockets locaux du namespace.
+ */
+function isPatientPresent(roomId) {
+  if (!visioNamespace || !roomId) return false;
+  const room = visioNamespace.adapter.rooms.get(roomId);
+  if (!room) return false;
+  for (const id of room) {
+    const s = visioNamespace.sockets.get(id);
+    if (s && s.data.role === 'PATIENT') return true;
+  }
+  return false;
+}
+
 function registerVisioNamespace(io) {
   const ns = io.of('/visio');
+  visioNamespace = ns;
 
   ns.use(async (socket, next) => {
     try {
@@ -129,4 +148,4 @@ function registerVisioNamespace(io) {
   return ns;
 }
 
-module.exports = { authenticateSocket, canHostStart, registerVisioNamespace };
+module.exports = { authenticateSocket, canHostStart, registerVisioNamespace, isPatientPresent };
