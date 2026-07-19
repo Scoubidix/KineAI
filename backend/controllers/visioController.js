@@ -79,6 +79,17 @@ async function cancelSeance(req, res) {
   }
 }
 
+async function rescheduleSeance(req, res) {
+  try {
+    const kine = await resolveKine(req);
+    if (!kine) return res.status(404).json({ success: false, error: 'Kine introuvable', code: 'KINE_NOT_FOUND' });
+    const seance = await visioService.rescheduleSeance(kine.id, req.params.id, req.body.scheduledAt);
+    return res.status(200).json({ ...seance, patientPresent: isPatientPresent(seance.roomId) });
+  } catch (error) {
+    return handleError(res, error, 'rescheduleSeance');
+  }
+}
+
 // ---- Patient (req.visioSeance posé par le middleware) ----
 function getSession(req, res) {
   const s = req.visioSeance;
@@ -104,6 +115,6 @@ async function ackInfo(req, res) {
 }
 
 module.exports = {
-  createSeance, listSeances, getSeance, setConsent, cancelSeance,
+  createSeance, listSeances, getSeance, setConsent, cancelSeance, rescheduleSeance,
   getSession, ackInfo,
 };

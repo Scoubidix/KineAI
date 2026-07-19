@@ -117,6 +117,44 @@ async function cancelSeance(kineId, seanceId) {
   });
 }
 
+/**
+ * Reprogramme une séance SCHEDULED : nouvel horaire, régénère le token patient
+ * et renvoie le lien via le canal d'origine.
+ */
+async function rescheduleSeance(kineId, seanceId, scheduledAt) {
+  const when = new Date(scheduledAt);
+  if (Number.isNaN(when.getTime()) || when.getTime() < Date.now()) {
+    throw new VisioError('Date de seance invalide', 'INVALID_SCHEDULE', 400);
+  }
+
+  const prisma = prismaService.getInstance();
+  const seance = await prisma.visioSeance.findFirst({
+    where: { id: parseInt(seanceId), kineId, isActive: true },
+  });
+  if (!seance) throw new VisioError('Seance introuvable', 'SEANCE_NOT_FOUND', 404);
+  if (seance.status !== 'SCHEDULED') {
+    throw new VisioError('Seance non reprogrammable', 'NOT_RESCHEDULABLE', 409);
+  }
+
+  const patient = await prisma.patient.findFirst({
+    where: { id: seance.patientId, kineId, isActive: true },
+  });
+  if (!patient) throw new VisioError('Patient introuvable', 'PATIENT_NOT_FOUND', 404);
+
+  const gen = generateVisioToken(seance.id, patient.id, when);
+  if (!gen.success) throw new VisioError('Erreur generation du lien', 'TOKEN_ERROR', 500);
+  const seanceUrl = `${FRONTEND_URL}/visio/${gen.token}`;
+
+  const sent = await sendSeanceLink({
+    channel: seance.deliveryChannel, patient, token: gen.token, seanceUrl, scheduledAt: when,
+  });
+
+  return prisma.visioSeance.update({
+    where: { id: seance.id },
+    data: { scheduledAt: when, linkSentAt: sent.success ? new Date() : null },
+  });
+}
+
 module.exports = {
   VisioError,
   createSeance,
@@ -124,4 +162,5 @@ module.exports = {
   getSeanceForKine,
   setConsent,
   cancelSeance,
+  rescheduleSeance,
 };

@@ -7,7 +7,7 @@ if (!PATIENT_JWT_SECRET) {
 }
 
 const TOKEN_TYPE = 'patient_visio';
-const WINDOW_MS = 2 * 60 * 60 * 1000; // lien valide jusqu'a scheduledAt + 2h
+const WINDOW_MS = 24 * 60 * 60 * 1000; // lien valide jusqu'a scheduledAt + 24h
 
 /**
  * Génère un JWT dédié à une séance visio. Expire à scheduledAt + 2h.
