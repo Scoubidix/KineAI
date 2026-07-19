@@ -88,7 +88,8 @@ import {
   Crown,
   MessageCircle,
   Camera,
-  HelpCircle
+  HelpCircle,
+  Video
 } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { normalizeFirstName, normalizeLastName } from '@/utils/nameNormalization';
@@ -1303,6 +1304,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { href: '/dashboard/kine/bilan-kine', label: 'Bilan Kiné', icon: ClipboardCheck, emoji: '📝', highlight: false },
         { href: '/dashboard/kine/chatbot-admin', label: 'Module administratif', icon: FileText, emoji: '📁', highlight: false },
         { href: '/dashboard/kine/contrats', label: 'Mes Contrats', icon: Briefcase, emoji: '📄', highlight: false },
+        { href: '/dashboard/kine/visio', label: 'Vidéotransmission', icon: Video, emoji: '📹', highlight: false },
       ],
     },
     {
