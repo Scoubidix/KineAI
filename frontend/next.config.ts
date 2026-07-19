@@ -15,6 +15,10 @@ try {
   apiOrigin = 'http://localhost:3000';
 }
 
+// Origine WebSocket du signaling visio (Socket.IO) : ws:// en dev, wss:// en prod.
+// http -> ws, https -> wss (le /^http/ transforme aussi "https" en "wss").
+const wsOrigin = apiOrigin.replace(/^http/, 'ws');
+
 const isDev = process.env.NODE_ENV === 'development';
 
 // Content-Security-Policy : whitelist des domaines autorises dans le navigateur
@@ -28,7 +32,7 @@ const csp = [
   // Styles : 'unsafe-inline' requis par React inline styles + Tailwind
   "style-src 'self' 'unsafe-inline'",
   // Connexions API : backend + Firebase Auth + GCS + GA4
-  `connect-src 'self' ${apiOrigin} *.googleapis.com *.firebaseapp.com storage.googleapis.com https://www.google-analytics.com https://*.analytics.google.com https://*.google-analytics.com`,
+  `connect-src 'self' ${apiOrigin} ${wsOrigin} *.googleapis.com *.firebaseapp.com storage.googleapis.com https://www.google-analytics.com https://*.analytics.google.com https://*.google-analytics.com`,
   "worker-src 'self'",
   // Images : GCS (GIFs exercices) + picsum (placeholder) + data: (SVG inline) + GA4 (pixels)
   "img-src 'self' data: blob: picsum.photos storage.googleapis.com www.google.com https://www.google-analytics.com",
