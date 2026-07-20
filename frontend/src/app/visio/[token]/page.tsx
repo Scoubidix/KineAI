@@ -66,9 +66,10 @@ interface VideoTileProps {
   muted?: boolean;
   className?: string;
   label?: string;
+  fit?: 'cover' | 'contain';
 }
 
-function VideoTile({ stream, muted = false, className = '', label }: VideoTileProps) {
+function VideoTile({ stream, muted = false, className = '', label, fit = 'cover' }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -88,7 +89,7 @@ function VideoTile({ stream, muted = false, className = '', label }: VideoTilePr
         autoPlay
         playsInline
         muted={muted}
-        className="h-full w-full object-cover"
+        className={`h-full w-full ${fit === 'contain' ? 'object-contain' : 'object-cover'}`}
       />
       {label && (
         <span className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white">
@@ -220,6 +221,7 @@ function VisioRoom({ seanceId, token, scheduledAt, onEnded, onFailed, onLeave }:
             stream={remoteStream}
             className="h-full w-full"
             label="Votre praticien"
+            fit="contain"
           />
           {/* Vidéo locale (patient) — muted obligatoire */}
           <div className="absolute bottom-4 right-4 h-32 w-24 shadow-lg sm:h-40 sm:w-28">

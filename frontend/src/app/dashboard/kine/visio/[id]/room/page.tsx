@@ -43,12 +43,14 @@ function VideoTile({
   label,
   className = '',
   animate = false,
+  fit = 'cover',
 }: {
   stream: MediaStream | null;
   muted?: boolean;
   label?: string;
   className?: string;
   animate?: boolean;
+  fit?: 'cover' | 'contain';
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -70,7 +72,7 @@ function VideoTile({
           autoPlay
           playsInline
           muted={muted}
-          className="w-full h-full object-cover"
+          className={`w-full h-full ${fit === 'contain' ? 'object-contain' : 'object-cover'}`}
         />
       ) : (
         <div className="flex flex-col items-center gap-2 text-zinc-500">
@@ -343,6 +345,7 @@ export default function KineVisioRoomPage() {
             label={patientName}
             className="absolute inset-0 w-full h-full rounded-none"
             animate={isConnected}
+            fit="contain"
           />
 
           {/* Flux local (PiP) */}
