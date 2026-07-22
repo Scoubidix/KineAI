@@ -269,8 +269,9 @@ async function sendMessageTemplate(phoneNumber, messageContent) {
   }
 }
 
-// Envoi du lien de séance visio via le template visio_kine (bouton URL = token)
-async function sendVisioLink(phoneNumber, token) {
+// Envoi du lien de séance visio via le template visio_kine.
+// BODY {{1}} = date/heure du RDV ; BOUTON URL {{1}} = token de séance.
+async function sendVisioLink(phoneNumber, token, dateStr = '') {
   try {
     const response = await fetch(WHATSAPP_API_URL, {
       method: 'POST',
@@ -286,6 +287,10 @@ async function sendVisioLink(phoneNumber, token) {
           name: 'visio_kine',
           language: { code: 'fr' },
           components: [
+            {
+              type: 'BODY',
+              parameters: [{ type: 'TEXT', text: dateStr }],
+            },
             {
               type: 'BUTTON',
               sub_type: 'URL',
