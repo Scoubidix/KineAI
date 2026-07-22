@@ -117,6 +117,30 @@ async function cancelSeance(kineId, seanceId) {
   });
 }
 
+/** Enregistre le texte du compte-rendu (DB HDS uniquement). */
+async function setCompteRendu(kineId, seanceId, compteRendu) {
+  await requireOwnedSeance(kineId, seanceId);
+  const prisma = prismaService.getInstance();
+  return prisma.visioSeance.update({
+    where: { id: parseInt(seanceId) },
+    data: { compteRendu: compteRendu ?? '', compteRenduAt: new Date() },
+  });
+}
+
+/** Récupère une séance du kiné avec patient + kine (pour générer le PDF / envoyer un doc). */
+async function getSeanceFull(kineId, seanceId) {
+  const prisma = prismaService.getInstance();
+  const seance = await prisma.visioSeance.findFirst({
+    where: { id: parseInt(seanceId), kineId, isActive: true },
+    include: {
+      patient: { select: { id: true, firstName: true, lastName: true, email: true } },
+      kine: { select: { id: true, firstName: true, lastName: true } },
+    },
+  });
+  if (!seance) throw new VisioError('Seance introuvable', 'SEANCE_NOT_FOUND', 404);
+  return seance;
+}
+
 /**
  * Reprogramme une séance SCHEDULED : nouvel horaire, régénère le token patient
  * et renvoie le lien via le canal d'origine.
@@ -155,6 +179,51 @@ async function rescheduleSeance(kineId, seanceId, scheduledAt) {
   });
 }
 
+/**
+ * Renvoie le lien d'une séance (SCHEDULED ou LIVE) via le canal choisi
+ * (éventuellement différent de l'original). Régénère un token pour l'horaire courant.
+ * Met à jour le canal de la séance sur celui choisi.
+ */
+async function resendLink(kineId, seanceId, deliveryChannel) {
+  if (!['EMAIL', 'WHATSAPP'].includes(deliveryChannel)) {
+    throw new VisioError('Canal de transmission invalide', 'INVALID_CHANNEL', 400);
+  }
+
+  const prisma = prismaService.getInstance();
+  const seance = await prisma.visioSeance.findFirst({
+    where: { id: parseInt(seanceId), kineId, isActive: true },
+  });
+  if (!seance) throw new VisioError('Seance introuvable', 'SEANCE_NOT_FOUND', 404);
+  if (!['SCHEDULED', 'LIVE'].includes(seance.status)) {
+    throw new VisioError('Lien non renvoyable', 'NOT_RESENDABLE', 409);
+  }
+
+  const patient = await prisma.patient.findFirst({
+    where: { id: seance.patientId, kineId, isActive: true },
+  });
+  if (!patient) throw new VisioError('Patient introuvable', 'PATIENT_NOT_FOUND', 404);
+  if (deliveryChannel === 'EMAIL' && !patient.email) {
+    throw new VisioError('Le patient n\'a pas d\'email', 'NO_EMAIL', 400);
+  }
+  if (deliveryChannel === 'WHATSAPP' && !isMobileFR(patient.phone)) {
+    throw new VisioError('Le numero n\'est pas un mobile', 'NOT_MOBILE', 400);
+  }
+
+  const gen = generateVisioToken(seance.id, patient.id, seance.scheduledAt);
+  if (!gen.success) throw new VisioError('Erreur generation du lien', 'TOKEN_ERROR', 500);
+  const seanceUrl = `${FRONTEND_URL}/visio/${gen.token}`;
+
+  const sent = await sendSeanceLink({
+    channel: deliveryChannel, patient, token: gen.token, seanceUrl, scheduledAt: seance.scheduledAt,
+  });
+  if (!sent.success) throw new VisioError('Echec de l\'envoi du lien', 'SEND_FAILED', 502);
+
+  return prisma.visioSeance.update({
+    where: { id: seance.id },
+    data: { deliveryChannel, linkSentAt: new Date() },
+  });
+}
+
 module.exports = {
   VisioError,
   createSeance,
@@ -162,5 +231,8 @@ module.exports = {
   getSeanceForKine,
   setConsent,
   cancelSeance,
+  resendLink,
   rescheduleSeance,
+  setCompteRendu,
+  getSeanceFull,
 };

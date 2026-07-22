@@ -1004,6 +1004,11 @@ model VisioSeance {
   patientInfoAckAt   DateTime?
   consentOralAt      DateTime?
 
+  // Compte-rendu de fin de séance (donnée de santé) : texte en DB HDS uniquement.
+  // Le PDF est généré à la volée et jamais stocké.
+  compteRendu   String?   @db.Text
+  compteRenduAt DateTime?
+
   startedAt DateTime?
   endedAt   DateTime?
   createdAt DateTime  @default(now())
