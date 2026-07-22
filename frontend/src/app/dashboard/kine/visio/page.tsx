@@ -3,9 +3,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { listSeances, cancelSeance, VisioSeance, VisioStatus } from '@/lib/visioApi';
 import { Button } from '@/components/ui/button';
-import { Plus, Video, X, Pencil } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Plus, Video, X, Pencil, Send } from 'lucide-react';
+import { matchesAllTokens } from '@/utils/textSearch';
 import NouveauVisioModal from './components/NouveauVisioModal';
 import RescheduleVisioModal from './components/RescheduleVisioModal';
+import ResendLinkModal from './components/ResendLinkModal';
 
 const STATUS_LABELS: Record<VisioStatus, string> = {
   SCHEDULED: 'Programmée',
@@ -73,7 +76,9 @@ export default function VisioPage() {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>('a-venir');
   const [period, setPeriod] = useState<Period>('jour');
+  const [search, setSearch] = useState('');
   const [rescheduleTarget, setRescheduleTarget] = useState<VisioSeance | null>(null);
+  const [resendTarget, setResendTarget] = useState<VisioSeance | null>(null);
 
   const fetchSeances = useCallback((silent = false) => {
     if (!silent) setLoading(true);
@@ -103,28 +108,133 @@ export default function VisioPage() {
     }
   };
 
+  // Filtre par nom de patient (barre de recherche, insensible casse/accents)
+  const matchesPatient = useCallback(
+    (s: VisioSeance) => {
+      if (!search.trim()) return true;
+      const name = s.patient ? `${s.patient.firstName} ${s.patient.lastName}` : '';
+      return matchesAllTokens(name, search);
+    },
+    [search]
+  );
+
   const upcoming = useMemo(
     () =>
       seances
         .filter(isUpcoming)
         .filter((s) => matchesPeriod(s, period))
+        .filter(matchesPatient)
         .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()),
-    [seances, period]
+    [seances, period, matchesPatient]
   );
   const history = useMemo(
     () =>
       seances
         .filter(isHistory)
+        .filter(matchesPatient)
         .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime()),
-    [seances]
+    [seances, matchesPatient]
   );
 
   const rows = tab === 'a-venir' ? upcoming : history;
 
+  // Groupage par jour (activé sur À venir quand période = semaine/tous)
+  const showGroups = tab === 'a-venir' && period !== 'jour';
+  const grouped = useMemo(() => {
+    const groups: { key: string; label: string; items: VisioSeance[] }[] = [];
+    for (const s of rows) {
+      const d = new Date(s.scheduledAt);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const label = d.toLocaleDateString('fr-FR', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+      });
+      let g = groups.find((x) => x.key === key);
+      if (!g) { g = { key, label, items: [] }; groups.push(g); }
+      g.items.push(s);
+    }
+    return groups;
+  }, [rows]);
+
+  // Rendu d'une ligne de séance. timeOnly=true → n'affiche que l'heure (date dans le sous-titre).
+  const renderRow = (s: VisioSeance, timeOnly = false) => {
+    const joinable = s.status === 'SCHEDULED' || s.status === 'LIVE';
+    const inUpcoming = tab === 'a-venir';
+    const when = new Date(s.scheduledAt);
+    const dateLabel = timeOnly
+      ? when.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      : when.toLocaleString('fr-FR');
+    return (
+      <li
+        key={s.id}
+        className="flex flex-wrap items-center justify-between gap-3 rounded border p-3"
+      >
+        <div className="flex flex-col">
+          <span className="font-medium">
+            {s.patient?.firstName} {s.patient?.lastName}
+          </span>
+          <span className="text-sm text-muted-foreground">{dateLabel}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_CLASSES[s.status]}`}>
+            {STATUS_LABELS[s.status]}
+          </span>
+          {inUpcoming && joinable && s.patientPresent && (
+            <span className="flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+              Patient en salle
+            </span>
+          )}
+          {inUpcoming && joinable && (
+            <Button
+              size="sm"
+              className="btn-teal gap-1.5"
+              onClick={() => router.push(`/dashboard/kine/visio/${s.id}/room`)}
+            >
+              <Video className="h-4 w-4" />
+              Rejoindre
+            </Button>
+          )}
+          {inUpcoming && (s.status === 'SCHEDULED' || s.status === 'LIVE') && (
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setResendTarget(s)}>
+              <Send className="h-4 w-4" />
+              Renvoyer
+            </Button>
+          )}
+          {inUpcoming && s.status === 'SCHEDULED' && (
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setRescheduleTarget(s)}>
+              <Pencil className="h-4 w-4" />
+              Modifier
+            </Button>
+          )}
+          {inUpcoming && s.status === 'SCHEDULED' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              disabled={cancellingId === s.id}
+              onClick={() => handleCancel(s.id)}
+            >
+              <X className="h-4 w-4" />
+              {cancellingId === s.id ? 'Annulation…' : 'Annuler'}
+            </Button>
+          )}
+        </div>
+      </li>
+    );
+  };
+
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">Vidéotransmission</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <h1 className="text-2xl font-semibold">Vidéotransmission</h1>
+          <Input
+            className="w-full sm:w-72"
+            placeholder="Rechercher un patient..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
         <Button onClick={() => setModalOpen(true)} className="btn-teal gap-2">
           <Plus className="h-4 w-4" />
           Nouveau RDV
@@ -172,78 +282,24 @@ export default function VisioPage() {
       {loading && <p className="text-muted-foreground">Chargement…</p>}
       {error && <p className="text-red-600">{error}</p>}
       {!loading && !error && (
-        <ul className="space-y-2">
-          {rows.map((s) => {
-            const joinable = s.status === 'SCHEDULED' || s.status === 'LIVE';
-            const inUpcoming = tab === 'a-venir';
-            return (
-              <li
-                key={s.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded border p-3"
-              >
-                <div className="flex flex-col">
-                  <span className="font-medium">
-                    {s.patient?.firstName} {s.patient?.lastName}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {new Date(s.scheduledAt).toLocaleString('fr-FR')}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_CLASSES[s.status]}`}
-                  >
-                    {STATUS_LABELS[s.status]}
-                  </span>
-                  {inUpcoming && joinable && s.patientPresent && (
-                    <span className="flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                      <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                      Patient en salle
-                    </span>
-                  )}
-                  {inUpcoming && joinable && (
-                    <Button
-                      size="sm"
-                      className="btn-teal gap-1.5"
-                      onClick={() => router.push(`/dashboard/kine/visio/${s.id}/room`)}
-                    >
-                      <Video className="h-4 w-4" />
-                      Rejoindre
-                    </Button>
-                  )}
-                  {inUpcoming && s.status === 'SCHEDULED' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={() => setRescheduleTarget(s)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                      Modifier
-                    </Button>
-                  )}
-                  {inUpcoming && s.status === 'SCHEDULED' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      disabled={cancellingId === s.id}
-                      onClick={() => handleCancel(s.id)}
-                    >
-                      <X className="h-4 w-4" />
-                      {cancellingId === s.id ? 'Annulation…' : 'Annuler'}
-                    </Button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-          {rows.length === 0 && (
-            <li className="text-muted-foreground">
-              {tab === 'a-venir' ? 'Aucune séance sur cette période.' : 'Aucune séance passée.'}
-            </li>
-          )}
-        </ul>
+        rows.length === 0 ? (
+          <p className="text-muted-foreground">
+            {tab === 'a-venir' ? 'Aucune séance sur cette période.' : 'Aucune séance passée.'}
+          </p>
+        ) : showGroups ? (
+          <div className="space-y-6">
+            {grouped.map((g) => (
+              <div key={g.key}>
+                <h3 className="mb-2 text-sm font-semibold capitalize text-muted-foreground">
+                  {g.label}
+                </h3>
+                <ul className="space-y-2">{g.items.map((s) => renderRow(s, true))}</ul>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <ul className="space-y-2">{rows.map((s) => renderRow(s))}</ul>
+        )
       )}
 
       <NouveauVisioModal
@@ -258,6 +314,13 @@ export default function VisioPage() {
         onOpenChange={(o) => !o && setRescheduleTarget(null)}
         seance={rescheduleTarget}
         onRescheduled={fetchSeances}
+      />
+
+      <ResendLinkModal
+        open={resendTarget !== null}
+        onOpenChange={(o) => !o && setResendTarget(null)}
+        seance={resendTarget}
+        onResent={fetchSeances}
       />
     </div>
   );

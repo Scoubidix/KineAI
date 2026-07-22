@@ -20,9 +20,14 @@ import {
   CheckCircle,
   WifiOff,
   RefreshCw,
+  FileText,
+  Paperclip,
+  Dumbbell,
 } from 'lucide-react';
 import { getSeance, setConsent, VisioSeance } from '@/lib/visioApi';
 import { useVisioRoom, ConnState, mediaErrorMessage } from '@/hooks/useVisioRoom';
+import CompteRenduModal from '../../components/CompteRenduModal';
+import SendDocumentModal from '../../components/SendDocumentModal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -182,6 +187,10 @@ export default function KineVisioRoomPage() {
   // Modal de confirmation de fin de consultation
   const [endConfirmOpen, setEndConfirmOpen] = useState(false);
 
+  // Sous-modals du panneau fin de séance
+  const [crOpen, setCrOpen] = useState(false);
+  const [docOpen, setDocOpen] = useState(false);
+
   // ---------------------------------------------------------------------------
   // 3. Bip + animation à la connexion (une seule fois par session)
   // ---------------------------------------------------------------------------
@@ -287,10 +296,79 @@ export default function KineVisioRoomPage() {
   });
 
   // ---------------------------------------------------------------------------
+  // Panneau de fin de séance : actions optionnelles enchaînables
+  // ---------------------------------------------------------------------------
+  if (state === 'ended') {
+    return (
+      <div className="mx-auto max-w-lg p-6">
+        <div className="mb-6 text-center">
+          <CheckCircle className="mx-auto mb-2 h-10 w-10 text-green-500" />
+          <h1 className="text-xl font-semibold">Séance terminée</h1>
+          <p className="text-sm text-muted-foreground">{patientName}</p>
+        </div>
+
+        <p className="mb-3 text-sm text-muted-foreground">Vous pouvez, si besoin :</p>
+        <div className="space-y-3">
+          <button
+            onClick={() => setCrOpen(true)}
+            className="flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors hover:border-[#3899aa]/50 hover:bg-[#3899aa]/5"
+          >
+            <FileText className="h-5 w-5 text-[#3899aa]" />
+            <div>
+              <div className="font-medium">Rédiger un compte-rendu</div>
+              <div className="text-xs text-muted-foreground">Note de séance, exportable en PDF</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setDocOpen(true)}
+            className="flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors hover:border-[#3899aa]/50 hover:bg-[#3899aa]/5"
+          >
+            <Paperclip className="h-5 w-5 text-[#3899aa]" />
+            <div>
+              <div className="font-medium">Envoyer un document au patient</div>
+              <div className="text-xs text-muted-foreground">Par email — documents non confidentiels</div>
+            </div>
+          </button>
+
+          <button
+            disabled
+            title="Bientôt disponible"
+            className="flex w-full items-center gap-3 rounded-xl border p-4 text-left opacity-50"
+          >
+            <Dumbbell className="h-5 w-5 text-[#3899aa]" />
+            <div>
+              <div className="font-medium">Créer un programme</div>
+              <div className="text-xs text-muted-foreground">Bientôt disponible</div>
+            </div>
+          </button>
+        </div>
+
+        <div className="mt-6 flex justify-end">
+          <Button variant="outline" onClick={() => window.history.back()}>
+            Fermer
+          </Button>
+        </div>
+
+        <CompteRenduModal
+          open={crOpen}
+          onOpenChange={setCrOpen}
+          seanceId={seanceId}
+          initialValue={seance.compteRendu ?? ''}
+          onSaved={async () => { try { setSeance(await getSeance(seanceId)); } catch { /* noop */ } }}
+        />
+        <SendDocumentModal open={docOpen} onOpenChange={setDocOpen} seanceId={seanceId} />
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // Calcul du statut : message + icône
   // ---------------------------------------------------------------------------
   const isConnected = state === 'connected';
-  const isEnded = state === 'ended';
+  // L'état 'ended' est géré par le panneau de fin de séance (early return plus haut) :
+  // ici state ≠ 'ended', donc isEnded est toujours faux (conservé pour lisibilité des gardes).
+  const isEnded = false;
   const isFailed = state === 'failed';
 
   const startDisabled = !consentChecked || !peerPresent || state !== 'waiting';
@@ -410,20 +488,6 @@ export default function KineVisioRoomPage() {
                     >
                       <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                       Réessayer
-                    </Button>
-                  </>
-                )}
-                {state === 'ended' && (
-                  <>
-                    <CheckCircle className="h-8 w-8 mx-auto text-green-400" />
-                    <p className="font-semibold text-lg">Séance terminée.</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                      onClick={() => window.history.back()}
-                    >
-                      Retour
                     </Button>
                   </>
                 )}
