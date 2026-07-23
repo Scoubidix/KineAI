@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
+import { CreateProgrammeModal } from '@/components/CreateProgrammeModal';
 
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,6 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Checkbox } from '@/components/ui/checkbox';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
-import { handleProgrammeCreationError } from '@/utils/handleProgrammeError';
 
 interface PatientData {
   id: number;
@@ -148,9 +148,6 @@ export default function PatientDetailPage() {
   
   // États pour la création
   const [openCreateModal, setOpenCreateModal] = useState(false);
-  const [createTitle, setCreateTitle] = useState('');
-  const [createDescription, setCreateDescription] = useState('');
-  const [createDuration, setCreateDuration] = useState(1);
   
   // États pour la modification
   const [openEditModal, setOpenEditModal] = useState(false);
@@ -603,18 +600,6 @@ export default function PatientDetailPage() {
     }
   };
 
-  const resetCreateForm = () => {
-    setCreateTitle('');
-    setCreateDescription('');
-    setCreateDuration(1);
-    setSelectedExercises([]);
-    setTypeFilters([]);
-    setTagFilters([]);
-    setExerciseSearchQuery('');
-    setCheckedExerciseIds([]);
-    setCheckedTemplateIds([]);
-  };
-
   const resetEditForm = () => {
     setEditTitle('');
     setEditDescription('');
@@ -628,42 +613,6 @@ export default function PatientDetailPage() {
     setEditingProgramme(null);
   };
 
-  const handleCreateProgramme = async () => {
-    try {
-      const dateFin = new Date();
-      dateFin.setDate(dateFin.getDate() + createDuration);
-
-      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/programmes`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          titre: createTitle,
-          description: createDescription,
-          duree: createDuration,
-          patientId: parseInt(patientId as string),
-          dateFin: dateFin.toISOString(),
-          exercises: selectedExercises.map((ex) => ({
-            exerciceId: ex.exerciseId,
-            series: ex.series,
-            repetitions: ex.repetitions,
-            tempsRepos: ex.restTime,
-            tempsTravail: ex.tempsTravail || 0,
-            instructions: ex.instructions || ''
-          }))
-        })
-      });
-      if (!res.ok) throw res; // Passer la Response pour que handleProgrammeCreationError puisse lire le status et le JSON
-      
-      setOpenCreateModal(false);
-      resetCreateForm();
-      await refreshProgrammes();
-    } catch (err) {
-      // Utiliser le gestionnaire d'erreur centralisé
-      await handleProgrammeCreationError(err, toast);
-    }
-  };
 
   const handleEditProgramme = (programme: Programme) => {
     setEditingProgramme(programme);
@@ -846,13 +795,14 @@ export default function PatientDetailPage() {
   );
 
   const renderProgrammeModal = (isEdit: boolean) => {
-    const title = isEdit ? editTitle : createTitle;
-    const setTitle = isEdit ? setEditTitle : setCreateTitle;
-    const description = isEdit ? editDescription : createDescription;
-    const setDescription = isEdit ? setEditDescription : setCreateDescription;
-    const duration = isEdit ? editDuration : createDuration;
-    const setDuration = isEdit ? setEditDuration : setCreateDuration;
-    const handleSubmit = isEdit ? handleUpdateProgramme : handleCreateProgramme;
+    // renderProgrammeModal n'est utilisé QUE pour l'édition ; la création passe par CreateProgrammeModal.
+    const title = editTitle;
+    const setTitle = setEditTitle;
+    const description = editDescription;
+    const setDescription = setEditDescription;
+    const duration = editDuration;
+    const setDuration = setEditDuration;
+    const handleSubmit = handleUpdateProgramme;
     const modalTitle = isEdit ? "Modifier le programme" : "Créer un nouveau programme";
     const buttonText = isEdit ? "Mettre à jour le programme" : "Créer le programme";
 
@@ -1245,13 +1195,8 @@ export default function PatientDetailPage() {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  if (isEdit) {
-                    setOpenEditModal(false);
-                    resetEditForm();
-                  } else {
-                    setOpenCreateModal(false);
-                    resetCreateForm();
-                  }
+                  setOpenEditModal(false);
+                  resetEditForm();
                 }}
                 className="flex-1 sm:flex-none text-sm sm:text-base"
               >
@@ -1373,18 +1318,21 @@ export default function PatientDetailPage() {
               </p>
             </div>
             {programmesData.length === 0 && (
-              <Dialog open={openCreateModal} onOpenChange={(open) => {
-                setOpenCreateModal(open);
-                if (!open) resetCreateForm();
-              }}>
-                <DialogTrigger asChild>
-                  <Button className="btn-teal w-full sm:w-auto">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nouveau programme
-                  </Button>
-                </DialogTrigger>
-                {renderProgrammeModal(false)}
-              </Dialog>
+              <>
+                <Button
+                  className="btn-teal w-full sm:w-auto"
+                  onClick={() => setOpenCreateModal(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nouveau programme
+                </Button>
+                <CreateProgrammeModal
+                  open={openCreateModal}
+                  onOpenChange={setOpenCreateModal}
+                  patientId={parseInt(patientId as string, 10)}
+                  onCreated={async () => { await refreshProgrammes(); }}
+                />
+              </>
             )}
           </CardHeader>
           
