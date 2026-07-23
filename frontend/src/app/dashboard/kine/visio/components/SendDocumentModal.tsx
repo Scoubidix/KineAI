@@ -74,7 +74,7 @@ export default function SendDocumentModal({ open, onOpenChange, seanceId }: Send
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
               Réservé aux documents <strong>non confidentiels</strong> (fiche d'exercices, informations
-              pratiques). Les documents médicaux doivent passer par un canal sécurisé.
+              pratiques).
             </span>
           </div>
 
