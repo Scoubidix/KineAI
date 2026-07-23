@@ -2,21 +2,18 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { CreateProgrammeModal } from '@/components/CreateProgrammeModal';
+import { ProgrammeModal } from '@/components/ProgrammeModal';
 
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Target, Filter, Dumbbell, Clock, Activity, MessageCircle, CheckCircle, AlertCircle, Search, Archive, ArrowLeft, ChevronRight, FileText, Download, Eye, EyeOff } from 'lucide-react';
+import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Dumbbell, Clock, Activity, MessageCircle, CheckCircle, AlertCircle, Search, Archive, ArrowLeft, ChevronRight, FileText, Download } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Checkbox } from '@/components/ui/checkbox';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,23 +27,6 @@ interface PatientData {
   goals?: string;
 }
 
-interface ExerciseOption {
-  id: number;
-  nom: string;
-  isPublic: boolean;
-  tags?: string;
-}
-
-interface ProgrammeExercise {
-  exerciseId: number;
-  nom: string;
-  series: number;
-  repetitions: number;
-  restTime: number;
-  tempsTravail: number;
-  instructions: string;
-}
-
 interface Programme {
   id: number;
   titre: string;
@@ -54,26 +34,6 @@ interface Programme {
   duree: number;
   dateFin: string;
   exercices: any[];
-}
-
-interface ExerciceTemplate {
-  id: number;
-  nom: string;
-  description?: string;
-  isPublic: boolean;
-  items: Array<{
-    id: number;
-    ordre: number;
-    series: number;
-    repetitions: number;
-    tempsRepos: number;
-    tempsTravail?: number;
-    instructions?: string;
-    exerciceModele: {
-      id: number;
-      nom: string;
-    };
-  }>;
 }
 
 interface BilanSummary {
@@ -134,11 +94,6 @@ function formatDate(birthDateStr: string): string {
   return `${day}/${month}/${year}`;
 }
 
-function parseTagsFromString(tagsString?: string): string[] {
-  if (!tagsString) return [];
-  return tagsString.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
-}
-
 export default function PatientDetailPage() {
   const { patientId } = useParams();
   const { toast } = useToast();
@@ -152,28 +107,6 @@ export default function PatientDetailPage() {
   // États pour la modification
   const [openEditModal, setOpenEditModal] = useState(false);
   const [editingProgramme, setEditingProgramme] = useState<Programme | null>(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [editDuration, setEditDuration] = useState(1);
-  
-  // États communs
-  const [allExercises, setAllExercises] = useState<ExerciseOption[]>([]);
-  const [filteredExercises, setFilteredExercises] = useState<ExerciseOption[]>([]);
-  const [selectedExercises, setSelectedExercises] = useState<ProgrammeExercise[]>([]);
-  
-  // États pour les filtres (nouvelle UI chips)
-  const [typeFilters, setTypeFilters] = useState<string[]>([]);
-  const [tagFilters, setTagFilters] = useState<string[]>([]);
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
-  const [exerciseSearchQuery, setExerciseSearchQuery] = useState<string>('');
-  const [checkedExerciseIds, setCheckedExerciseIds] = useState<number[]>([]);
-
-  // Ref pour scroll automatique vers exercices sélectionnés
-  const selectedExercisesRef = useRef<HTMLDivElement>(null);
-
-  // États pour les templates
-  const [allTemplates, setAllTemplates] = useState<ExerciceTemplate[]>([]);
-  const [checkedTemplateIds, setCheckedTemplateIds] = useState<number[]>([]);
   
   // États pour génération de lien et WhatsApp
   const [generatingLink, setGeneratingLink] = useState<number | null>(null);
@@ -232,76 +165,6 @@ export default function PatientDetailPage() {
     };
     if (patientId) fetchProgrammes();
   }, [patientId]);
-
-  useEffect(() => {
-    const fetchExercisesAndTemplates = async () => {
-      try {
-        // Charger exercices
-        const [priv, pub] = await Promise.all([
-          fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/exercices/private`).then(r => r.json()),
-          fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/exercices/public`).then(r => r.json())
-        ]);
-        const combined = [...priv, ...pub];
-        setAllExercises(combined);
-
-        // Extraire tous les tags uniques
-        const allTags = new Set<string>();
-        combined.forEach(exercise => {
-          if (exercise.tags) {
-            parseTagsFromString(exercise.tags).forEach(tag => allTags.add(tag));
-          }
-        });
-        setAvailableTags(Array.from(allTags).sort());
-
-        // Charger templates
-        const templates = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/exercice-templates/all`).then(r => r.json());
-        setAllTemplates(templates);
-
-      } catch (err) {
-        console.error('Erreur chargement exercices/templates', err);
-      }
-    };
-    if (openCreateModal || openEditModal) fetchExercisesAndTemplates();
-  }, [openCreateModal, openEditModal]);
-
-  // Effet pour filtrer les exercices selon les filtres sélectionnés
-  useEffect(() => {
-    let filtered = [...allExercises];
-
-    // Filtre par type (multi-select)
-    if (typeFilters.length > 0 && !typeFilters.includes('templates')) {
-      filtered = filtered.filter(ex => {
-        if (typeFilters.includes('public') && ex.isPublic) return true;
-        if (typeFilters.includes('private') && !ex.isPublic) return true;
-        return false;
-      });
-    }
-
-    // Filtre par tags (multi-select - AND logic)
-    if (tagFilters.length > 0) {
-      filtered = filtered.filter(ex => {
-        if (!ex.tags) return false;
-        const exerciseTags = parseTagsFromString(ex.tags);
-        return tagFilters.every(selectedTag => exerciseTags.includes(selectedTag));
-      });
-    }
-
-    // Filtre par recherche textuelle
-    if (exerciseSearchQuery.trim()) {
-      const searchLower = exerciseSearchQuery.toLowerCase().trim();
-      filtered = filtered.filter(ex =>
-        ex.nom.toLowerCase().includes(searchLower) ||
-        (ex.tags && ex.tags.toLowerCase().includes(searchLower))
-      );
-    }
-
-    // Exclure les exercices déjà configurés
-    filtered = filtered.filter(ex =>
-      !selectedExercises.find(selected => selected.exerciseId === ex.id)
-    );
-
-    setFilteredExercises(filtered);
-  }, [allExercises, typeFilters, tagFilters, exerciseSearchQuery, selectedExercises]);
 
   // Charger les bilans du patient
   useEffect(() => {
@@ -482,114 +345,6 @@ export default function PatientDetailPage() {
     setTimeout(() => { printWindow.focus(); printWindow.print(); }, 250);
   };
 
-  // Fonctions de gestion des filtres chips
-  const toggleTypeFilter = (type: string) => {
-    setTypeFilters(prev =>
-      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-    );
-  };
-
-  const toggleTagFilter = (tag: string) => {
-    setTagFilters(prev =>
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-    );
-  };
-
-  const clearAllFilters = () => {
-    setTypeFilters([]);
-    setTagFilters([]);
-    setExerciseSearchQuery('');
-  };
-
-  // Fonctions de gestion des checkboxes exercices
-  const toggleExerciseCheck = (exerciseId: number) => {
-    setCheckedExerciseIds(prev =>
-      prev.includes(exerciseId) ? prev.filter(id => id !== exerciseId) : [...prev, exerciseId]
-    );
-  };
-
-  const handleCheckAll = () => {
-    const allIds = filteredExercises.map(ex => ex.id);
-    setCheckedExerciseIds(allIds);
-  };
-
-  const handleUncheckAll = () => {
-    setCheckedExerciseIds([]);
-  };
-
-  // Confirmer la sélection d'exercices et les ajouter
-  const handleConfirmSelection = () => {
-    const newExercises = checkedExerciseIds.map(id => {
-      const exercise = allExercises.find(ex => ex.id === id);
-      return {
-        exerciseId: id,
-        nom: exercise?.nom || '',
-        series: 3,
-        repetitions: 10,
-        restTime: 30,
-        tempsTravail: 0,
-        instructions: '',
-      };
-    });
-    setSelectedExercises([...selectedExercises, ...newExercises]);
-    setCheckedExerciseIds([]);
-    // Scroll vers la section des exercices sélectionnés
-    setTimeout(() => {
-      selectedExercisesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
-  };
-
-  // Fonctions de gestion des templates
-  const toggleTemplateCheck = (templateId: number) => {
-    setCheckedTemplateIds(prev =>
-      prev.includes(templateId) ? prev.filter(id => id !== templateId) : [...prev, templateId]
-    );
-  };
-
-  const handleConfirmTemplateSelection = () => {
-    const newExercises: ProgrammeExercise[] = [];
-
-    checkedTemplateIds.forEach(templateId => {
-      const template = allTemplates.find(t => t.id === templateId);
-      if (template) {
-        template.items.forEach(item => {
-          // Vérifier que l'exercice n'est pas déjà dans la liste
-          if (!selectedExercises.find(e => e.exerciseId === item.exerciceModele.id) &&
-              !newExercises.find(e => e.exerciseId === item.exerciceModele.id)) {
-            newExercises.push({
-              exerciseId: item.exerciceModele.id,
-              nom: item.exerciceModele.nom,
-              series: item.series,
-              repetitions: item.repetitions,
-              restTime: item.tempsRepos,
-              tempsTravail: item.tempsTravail || 0,
-              instructions: item.instructions || '',
-            });
-          }
-        });
-      }
-    });
-
-    setSelectedExercises([...selectedExercises, ...newExercises]);
-    setCheckedTemplateIds([]);
-    // Scroll vers la section des exercices sélectionnés
-    setTimeout(() => {
-      selectedExercisesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
-  };
-
-  const handleInputChange = (index: number, field: keyof ProgrammeExercise, value: string | number) => {
-    const updated = [...selectedExercises];
-    (updated[index] as any)[field] = value;
-    setSelectedExercises(updated);
-  };
-
-  const handleRemoveExercise = (index: number) => {
-    const updated = [...selectedExercises];
-    updated.splice(index, 1);
-    setSelectedExercises(updated);
-  };
-
   const refreshProgrammes = async () => {
     try {
       const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/programmes/${patientId}`);
@@ -600,72 +355,9 @@ export default function PatientDetailPage() {
     }
   };
 
-  const resetEditForm = () => {
-    setEditTitle('');
-    setEditDescription('');
-    setEditDuration(1);
-    setSelectedExercises([]);
-    setTypeFilters([]);
-    setTagFilters([]);
-    setExerciseSearchQuery('');
-    setCheckedExerciseIds([]);
-    setCheckedTemplateIds([]);
-    setEditingProgramme(null);
-  };
-
-
   const handleEditProgramme = (programme: Programme) => {
     setEditingProgramme(programme);
-    setEditTitle(programme.titre);
-    setEditDescription(programme.description);
-    setEditDuration(programme.duree);
-    
-    const exercises = (programme.exercices || []).map(ex => ({
-      exerciseId: ex.exerciceModele?.id || ex.exerciceId,
-      nom: ex.exerciceModele?.nom || ex.nom,
-      series: ex.series,
-      repetitions: ex.repetitions,
-      restTime: ex.pause || ex.tempsRepos || ex.restTime || 30,
-      tempsTravail: ex.tempsTravail || 0,
-      instructions: ex.consigne || ex.instructions || '',
-    }));
-    
-    setSelectedExercises(exercises);
     setOpenEditModal(true);
-  };
-
-  const handleUpdateProgramme = async () => {
-    if (!editingProgramme) return;
-    
-    try {
-      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/programmes/${editingProgramme.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          titre: editTitle,
-          description: editDescription,
-          duree: editDuration,
-          exercises: selectedExercises.map((ex) => ({
-            exerciceId: ex.exerciseId,
-            series: ex.series,
-            repetitions: ex.repetitions,
-            tempsRepos: ex.restTime,
-            tempsTravail: ex.tempsTravail || 0,
-            instructions: ex.instructions || ''
-          }))
-        })
-      });
-
-      if (!res.ok) throw new Error("Erreur mise à jour programme");
-      
-      setOpenEditModal(false);
-      resetEditForm();
-      await refreshProgrammes();
-    } catch (err) {
-      console.error("Erreur mise à jour programme :", err);
-    }
   };
 
   const handleDeleteProgramme = async (programmeId: number) => {
@@ -794,432 +486,6 @@ export default function PatientDetailPage() {
     p.description.toLowerCase().includes(archivedSearchQuery.toLowerCase())
   );
 
-  const renderProgrammeModal = (isEdit: boolean) => {
-    // renderProgrammeModal n'est utilisé QUE pour l'édition ; la création passe par CreateProgrammeModal.
-    const title = editTitle;
-    const setTitle = setEditTitle;
-    const description = editDescription;
-    const setDescription = setEditDescription;
-    const duration = editDuration;
-    const setDuration = setEditDuration;
-    const handleSubmit = handleUpdateProgramme;
-    const modalTitle = isEdit ? "Modifier le programme" : "Créer un nouveau programme";
-    const buttonText = isEdit ? "Mettre à jour le programme" : "Créer le programme";
-
-    return (
-      <DialogContent className="w-[95vw] sm:max-w-6xl max-h-[95vh] overflow-y-auto top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
-        <DialogHeader className="-mx-6 -mt-6 px-6 py-4 rounded-t-lg border-b">
-          <DialogTitle className="text-lg sm:text-xl font-semibold text-[#3899aa]">
-            {modalTitle}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 sm:space-y-6 py-4">
-          {/* Section Informations du programme */}
-          <div className="space-y-3 sm:space-y-4">
-            <h3 className="text-base sm:text-lg font-medium text-foreground flex items-center gap-2">
-              <div className="w-1 h-5 sm:h-6 bg-[#3899aa] rounded-full"></div>
-              Informations du programme
-            </h3>
-            
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="programme-title" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Titre du programme *
-                </Label>
-                <Input 
-                  id="programme-title"
-                  placeholder="Entre le titre du programme"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="programme-description" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Objectifs du programme *
-                </Label>
-                <Textarea
-                  id="programme-description"
-                  placeholder="Décris les objectifs et le contenu du programme..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                  rows={3}
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="programme-duration" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Durée (jours) *
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="programme-duration"
-                    type="number"
-                    min={1}
-                    max={30}
-                    value={duration}
-                    onChange={(e) => setDuration(Number(e.target.value))}
-                    placeholder="Durée en jours (max 30)"
-                    className={`text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isEdit ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''}`}
-                    required
-                    disabled={isEdit}
-                  />
-                  {duration > 30 && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-red-600 font-medium">
-                      max 30j
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {isEdit ? 'La durée ne peut pas être modifiée après création' : 'Durée recommandée : 7-14 jours'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Section Exercices avec filtres et sélection */}
-          <div className="space-y-3 sm:space-y-4">
-            <h3 className="text-base sm:text-lg font-medium text-foreground flex items-center gap-2">
-              <div className="w-1 h-5 sm:h-6 bg-[#3899aa] rounded-full"></div>
-              Exercices du programme
-            </h3>
-
-            <div className="space-y-4">
-              {/* Filtres par chips cliquables */}
-              <div className="space-y-3">
-                {/* Barre de recherche en premier */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Rechercher par nom d'exercice..."
-                    value={exerciseSearchQuery}
-                    onChange={(e) => setExerciseSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-
-                {/* Filtres Type */}
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-gray-600 dark:text-gray-400">Type</Label>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge
-                      variant={typeFilters.includes('public') ? 'default' : 'outline'}
-                      className="cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => toggleTypeFilter('public')}
-                    >
-                      Exercices Publics
-                    </Badge>
-                    <Badge
-                      variant={typeFilters.includes('private') ? 'default' : 'outline'}
-                      className="cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => toggleTypeFilter('private')}
-                    >
-                      Mes exercices
-                    </Badge>
-                    <Badge
-                      variant={typeFilters.includes('templates') ? 'default' : 'outline'}
-                      className="cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => toggleTypeFilter('templates')}
-                    >
-                      📋 Templates
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Filtres Tags */}
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-gray-600 dark:text-gray-400">Catégories</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {availableTags.map(tag => (
-                      <Badge
-                        key={tag}
-                        variant={tagFilters.includes(tag) ? 'default' : 'outline'}
-                        className="cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => toggleTagFilter(tag)}
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Résumé + Actions */}
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>
-                    {filteredExercises.length} exercice{filteredExercises.length > 1 ? 's' : ''} disponible{filteredExercises.length > 1 ? 's' : ''}
-                  </span>
-                  {(typeFilters.length > 0 || tagFilters.length > 0 || exerciseSearchQuery) && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearAllFilters}
-                      className="h-6 text-xs"
-                    >
-                      <X className="w-3 h-3 mr-1" />
-                      Réinitialiser
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {/* Liste des exercices/templates avec checkboxes - Hauteur fixe pour stabilité UX */}
-              <div className="flex flex-col h-[300px] sm:h-[480px] border rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between p-2 sm:p-3 border-b bg-gray-50 dark:bg-gray-800 flex-shrink-0 gap-2">
-                  <Label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 flex-shrink-0">
-                    {typeFilters.includes('templates') ? 'Sélectionner des templates' : 'Sélectionner des exercices'}
-                  </Label>
-                  <div className="flex gap-2 flex-wrap justify-end">
-                    {(typeFilters.includes('templates') ? checkedTemplateIds.length > 0 : checkedExerciseIds.length > 0) && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={typeFilters.includes('templates') ? handleConfirmTemplateSelection : handleConfirmSelection}
-                        className="h-7 text-xs btn-teal"
-                      >
-                        <Plus className="w-3 h-3 mr-1" />
-                        {typeFilters.includes('templates')
-                          ? `Ajouter (${checkedTemplateIds.length})`
-                          : `Ajouter (${checkedExerciseIds.length})`
-                        }
-                      </Button>
-                    )}
-                    {(typeFilters.includes('templates') ? allTemplates.length > 0 : filteredExercises.length > 0) && (
-                      <>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={typeFilters.includes('templates') ? () => setCheckedTemplateIds(allTemplates.map(t => t.id)) : handleCheckAll}
-                          className="h-7 text-xs"
-                        >
-                          Tout sélectionner
-                        </Button>
-                        {(typeFilters.includes('templates') ? checkedTemplateIds.length > 0 : checkedExerciseIds.length > 0) && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={typeFilters.includes('templates') ? () => setCheckedTemplateIds([]) : handleUncheckAll}
-                            className="h-7 text-xs"
-                          >
-                            Tout désélectionner
-                          </Button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto">
-                  {typeFilters.includes('templates') ? (
-                    // AFFICHAGE DES TEMPLATES
-                    allTemplates.length === 0 ? (
-                      <div className="flex items-center justify-center h-full p-4 text-center text-sm text-gray-500">
-                        Aucun template disponible
-                      </div>
-                    ) : (
-                      <div className="divide-y">
-                        {allTemplates.map(template => (
-                          <div
-                            key={template.id}
-                            className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-start gap-3 cursor-pointer"
-                            onClick={() => toggleTemplateCheck(template.id)}
-                          >
-                            <Checkbox
-                              checked={checkedTemplateIds.includes(template.id)}
-                              className="mt-0.5 pointer-events-none"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                                {template.nom}
-                              </p>
-                              {template.description && (
-                                <p className="text-xs text-gray-500 mt-0.5">{template.description}</p>
-                              )}
-                              <div className="flex gap-1 mt-1 flex-wrap">
-                                <Badge variant={template.isPublic ? "default" : "secondary"} className="text-xs">
-                                  {template.isPublic ? 'Public' : 'Privé'}
-                                </Badge>
-                                <Badge variant="outline" className="text-xs">
-                                  {template.items.length} exercice{template.items.length > 1 ? 's' : ''}
-                                </Badge>
-                              </div>
-                              <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                {template.items.slice(0, 2).map(item => item.exerciceModele.nom).join(', ')}
-                                {template.items.length > 2 && ` +${template.items.length - 2} autre${template.items.length - 2 > 1 ? 's' : ''}`}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  ) : (
-                    // AFFICHAGE DES EXERCICES
-                    filteredExercises.length === 0 ? (
-                      <div className="flex items-center justify-center h-full p-4 text-center text-sm text-gray-500">
-                        {exerciseSearchQuery || typeFilters.length > 0 || tagFilters.length > 0
-                          ? 'Aucun exercice trouvé pour ces filtres'
-                          : 'Aucun exercice disponible'}
-                      </div>
-                    ) : (
-                      <div className="divide-y">
-                        {filteredExercises.map(exercise => (
-                          <div
-                            key={exercise.id}
-                            className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-start gap-3 cursor-pointer"
-                            onClick={() => toggleExerciseCheck(exercise.id)}
-                          >
-                            <Checkbox
-                              checked={checkedExerciseIds.includes(exercise.id)}
-                              className="mt-0.5 pointer-events-none"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                                {exercise.nom}
-                              </p>
-                              <div className="flex gap-1 mt-1 flex-wrap">
-                                <Badge variant={exercise.isPublic ? "default" : "secondary"} className="text-xs">
-                                  {exercise.isPublic ? 'Public' : 'Privé'}
-                                </Badge>
-                                {exercise.tags && parseTagsFromString(exercise.tags).slice(0, 3).map(tag => (
-                                  <Badge key={tag} variant="outline" className="text-xs">
-                                    {tag}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  )}
-                </div>
-
-              </div>
-
-              {/* Exercices sélectionnés */}
-              {selectedExercises.length > 0 && (
-                <div ref={selectedExercisesRef} className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Dumbbell className="w-4 h-4 text-[#3899aa]" />
-                    <span className="text-sm font-medium text-foreground">
-                      Exercices sélectionnés ({selectedExercises.length})
-                    </span>
-                  </div>
-                  {selectedExercises.map((ex, index) => (
-                    <div key={index} className="p-3 sm:p-4 border rounded-lg bg-gray-50 dark:bg-gray-800 relative">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="absolute top-2 right-2 text-gray-500 hover:text-red-600 h-6 w-6"
-                        onClick={() => handleRemoveExercise(index)}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                      
-                      <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3 pr-8">
-                        {ex.nom}
-                      </h4>
-                      
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-xs font-medium text-gray-600">Séries</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={ex.series}
-                            onChange={(e) => handleInputChange(index, 'series', Number(e.target.value))}
-                            className="text-sm"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs font-medium text-gray-600">Répétitions</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={ex.repetitions}
-                            onChange={(e) => handleInputChange(index, 'repetitions', Number(e.target.value))}
-                            className="text-sm"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs font-medium text-gray-600">Travail (sec)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={ex.tempsTravail}
-                            onChange={(e) => handleInputChange(index, 'tempsTravail', Number(e.target.value))}
-                            className="text-sm"
-                            placeholder="0"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs font-medium text-gray-600">Pause (sec)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={ex.restTime}
-                            onChange={(e) => handleInputChange(index, 'restTime', Number(e.target.value))}
-                            className="text-sm"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="mt-3 space-y-1">
-                        <Label className="text-xs font-medium text-gray-600">Consignes spécifiques</Label>
-                        <Textarea
-                          value={ex.instructions}
-                          onChange={(e) => handleInputChange(index, 'instructions', e.target.value)}
-                          placeholder="Instructions particulières pour cet exercice..."
-                          className="text-sm resize-none"
-                          rows={2}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Section validation */}
-          <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setOpenEditModal(false);
-                  resetEditForm();
-                }}
-                className="flex-1 sm:flex-none text-sm sm:text-base"
-              >
-                Annuler
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                className="flex-1 btn-teal text-sm sm:text-base"
-                disabled={!title || !description || selectedExercises.length === 0 || duration <= 0 || duration > 30}
-              >
-                {buttonText}
-              </Button>
-            </div>
-            
-            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-              * Champs obligatoires - Au moins un exercice requis
-            </p>
-          </div>
-        </div>
-      </DialogContent>
-    );
-  };
-
   return (
     <>
       <div className="p-4 sm:p-6 space-y-6 overflow-x-hidden">
@@ -1326,7 +592,7 @@ export default function PatientDetailPage() {
                   <Plus className="h-4 w-4 mr-2" />
                   Nouveau programme
                 </Button>
-                <CreateProgrammeModal
+                <ProgrammeModal
                   open={openCreateModal}
                   onOpenChange={setOpenCreateModal}
                   patientId={parseInt(patientId as string, 10)}
@@ -1392,22 +658,21 @@ export default function PatientDetailPage() {
                             Envoyer à mon Patient
                           </Button>
 
-                          <Dialog open={openEditModal && editingProgramme?.id === programme.id} onOpenChange={(open) => {
-                            setOpenEditModal(open);
-                            if (!open) resetEditForm();
-                          }}>
-                            <DialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEditProgramme(programme)}
-                                className="hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-200 dark:hover:border-blue-700"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                            </DialogTrigger>
-                            {renderProgrammeModal(true)}
-                          </Dialog>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditProgramme(programme)}
+                            className="hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-200 dark:hover:border-blue-700"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <ProgrammeModal
+                            open={openEditModal && editingProgramme?.id === programme.id}
+                            onOpenChange={setOpenEditModal}
+                            patientId={parseInt(patientId as string, 10)}
+                            programme={editingProgramme ?? undefined}
+                            onCreated={async () => { await refreshProgrammes(); }}
+                          />
 
                           <AlertDialog>
                             <AlertDialogTrigger asChild>

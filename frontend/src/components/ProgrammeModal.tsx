@@ -62,12 +62,22 @@ interface ExerciceTemplate {
   }>;
 }
 
-export interface CreateProgrammeModalProps {
+export interface ProgrammeToEdit {
+  id: number;
+  titre: string;
+  description: string;
+  duree: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  exercices?: any[]; // exercices du programme existant (shape backend)
+}
+
+export interface ProgrammeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   patientId: number;
   patientName?: string; // pour le titre "Créer un programme pour {patientName}"
-  onCreated?: () => void; // appelé après succès ; la PAGE hôte gère toast/redirect/refresh
+  programme?: ProgrammeToEdit | null; // présent => mode ÉDITION ; absent/null => mode CRÉATION
+  onCreated?: () => void; // appelé après succès (création OU mise à jour) ; la PAGE hôte gère toast/redirect/refresh
 }
 
 // ---------------------------------------------------------------------------
@@ -142,13 +152,16 @@ function ExercisePreviewPopover({ exercise }: { exercise: ExerciseOption }) {
 // Composant principal
 // ---------------------------------------------------------------------------
 
-export function CreateProgrammeModal({
+export function ProgrammeModal({
   open,
   onOpenChange,
   patientId,
   patientName,
+  programme,
   onCreated,
-}: CreateProgrammeModalProps) {
+}: ProgrammeModalProps) {
+
+  const isEditMode = Boolean(programme);
 
   // --- États formulaire ---
   const [createTitle, setCreateTitle] = useState('');
@@ -165,7 +178,7 @@ export function CreateProgrammeModal({
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [checkedExerciseIds, setCheckedExerciseIds] = useState<number[]>([]);
   const [exerciseSearchQuery, setExerciseSearchQuery] = useState('');
-  const [creatingProgramme, setCreatingProgramme] = useState(false);
+  const [submittingProgramme, setSubmittingProgramme] = useState(false);
 
   // --- Ref scroll ---
   const selectedExercisesRef = useRef<HTMLDivElement>(null);
@@ -178,7 +191,7 @@ export function CreateProgrammeModal({
   // Reset du formulaire
   // ---------------------------------------------------------------------------
 
-  const resetCreateForm = () => {
+  const resetForm = () => {
     setCreateTitle('');
     setCreateDescription('');
     setCreateDuration(1);
@@ -191,10 +204,37 @@ export function CreateProgrammeModal({
     setCreateError(null);
   };
 
-  // Réinitialiser à chaque ouverture/fermeture
+  // Pré-remplissage en mode édition
+  const prefillFromProgramme = (prog: ProgrammeToEdit) => {
+    setCreateTitle(prog.titre);
+    setCreateDescription(prog.description);
+    setCreateDuration(prog.duree);
+    const exercises: ProgrammeExercise[] = (prog.exercices || []).map((ex) => ({
+      exerciseId: ex.exerciceModele?.id ?? ex.exerciceId,
+      nom: ex.exerciceModele?.nom ?? ex.nom,
+      series: ex.series,
+      repetitions: ex.repetitions,
+      restTime: ex.pause ?? ex.tempsRepos ?? ex.restTime ?? 30,
+      tempsTravail: ex.tempsTravail ?? 0,
+      instructions: ex.consigne ?? ex.instructions ?? '',
+    }));
+    setSelectedExercises(exercises);
+    setTypeFilters([]);
+    setTagFilters([]);
+    setCheckedExerciseIds([]);
+    setCheckedTemplateIds([]);
+    setExerciseSearchQuery('');
+    setCreateError(null);
+  };
+
+  // À chaque ouverture/fermeture : reset ou pré-remplissage
   useEffect(() => {
     if (open) {
-      resetCreateForm();
+      if (programme) {
+        prefillFromProgramme(programme);
+      } else {
+        resetForm();
+      }
       fetchExercises();
       fetchTemplates();
     }
@@ -405,50 +445,79 @@ export function CreateProgrammeModal({
   };
 
   // ---------------------------------------------------------------------------
-  // Création du programme
+  // Soumission : POST (création) ou PUT (édition)
   // ---------------------------------------------------------------------------
 
-  const handleCreateProgramme = async () => {
+  const handleSubmit = async () => {
     setCreateError(null);
-    setCreatingProgramme(true);
+    setSubmittingProgramme(true);
     try {
-      const dateFin = new Date();
-      dateFin.setDate(dateFin.getDate() + createDuration);
+      if (isEditMode && programme) {
+        // --- MODE ÉDITION ---
+        const res = await fetchWithAuth(
+          `${process.env.NEXT_PUBLIC_API_URL}/programmes/${programme.id}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              titre: createTitle,
+              description: createDescription,
+              duree: createDuration,
+              exercises: selectedExercises.map((ex) => ({
+                exerciceId: ex.exerciseId,
+                series: ex.series,
+                repetitions: ex.repetitions,
+                tempsRepos: ex.restTime,
+                tempsTravail: ex.tempsTravail || 0,
+                instructions: ex.instructions || '',
+              })),
+            }),
+          }
+        );
 
-      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/programmes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          titre: createTitle,
-          description: createDescription,
-          duree: createDuration,
-          patientId,
-          dateFin: dateFin.toISOString(),
-          exercises: selectedExercises.map((ex) => ({
-            exerciceId: ex.exerciseId,
-            series: ex.series,
-            repetitions: ex.repetitions,
-            tempsRepos: ex.restTime,
-            tempsTravail: ex.tempsTravail || 0,
-            instructions: ex.instructions || '',
-          })),
-        }),
-      });
-
-      if (res.ok) {
-        onCreated?.();
-        onOpenChange(false);
+        if (res.ok) {
+          onCreated?.();
+          onOpenChange(false);
+        } else {
+          setCreateError('Une erreur serveur est survenue. Réessaie.');
+        }
       } else {
-        // Gérer les erreurs métier (paywall, limite plan…)
-        await handlePostError(res);
+        // --- MODE CRÉATION ---
+        const dateFin = new Date();
+        dateFin.setDate(dateFin.getDate() + createDuration);
+
+        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/programmes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            titre: createTitle,
+            description: createDescription,
+            duree: createDuration,
+            patientId,
+            dateFin: dateFin.toISOString(),
+            exercises: selectedExercises.map((ex) => ({
+              exerciceId: ex.exerciseId,
+              series: ex.series,
+              repetitions: ex.repetitions,
+              tempsRepos: ex.restTime,
+              tempsTravail: ex.tempsTravail || 0,
+              instructions: ex.instructions || '',
+            })),
+          }),
+        });
+
+        if (res.ok) {
+          onCreated?.();
+          onOpenChange(false);
+        } else {
+          await handlePostError(res);
+        }
       }
     } catch (err) {
-      console.error('Erreur création programme:', err);
+      console.error('Erreur soumission programme:', err);
       setCreateError('Impossible de contacter le serveur. Vérifie ta connexion.');
     } finally {
-      setCreatingProgramme(false);
+      setSubmittingProgramme(false);
     }
   };
 
@@ -480,6 +549,19 @@ export function CreateProgrammeModal({
   };
 
   // ---------------------------------------------------------------------------
+  // Libellés selon le mode
+  // ---------------------------------------------------------------------------
+
+  const modalTitle = isEditMode
+    ? 'Modifier le programme'
+    : patientName
+    ? `Créer un programme pour ${patientName}`
+    : 'Créer un programme';
+
+  const submitLabel = isEditMode ? 'Mettre à jour le programme' : 'Créer le programme';
+  const submittingLabel = isEditMode ? 'Mise à jour en cours...' : 'Création en cours...';
+
+  // ---------------------------------------------------------------------------
   // Rendu
   // ---------------------------------------------------------------------------
 
@@ -489,7 +571,7 @@ export function CreateProgrammeModal({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen) resetCreateForm();
+        if (!nextOpen) resetForm();
         onOpenChange(nextOpen);
       }}
     >
@@ -499,7 +581,7 @@ export function CreateProgrammeModal({
       >
         <DialogHeader className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
           <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
-            {patientName ? `Créer un programme pour ${patientName}` : 'Créer un programme'}
+            {modalTitle}
           </DialogTitle>
         </DialogHeader>
 
@@ -557,17 +639,22 @@ export function CreateProgrammeModal({
                     value={createDuration}
                     onChange={(e) => setCreateDuration(Number(e.target.value))}
                     placeholder="Durée en jours (max 30)"
-                    className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    disabled={isEditMode}
+                    className={`text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none${
+                      isEditMode ? ' opacity-60 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''
+                    }`}
                     required
                   />
-                  {createDuration > 30 && (
+                  {!isEditMode && createDuration > 30 && (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-red-600 font-medium">
                       max 30j
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Durée recommandée : 7-14 jours
+                  {isEditMode
+                    ? 'La durée ne peut pas être modifiée après création'
+                    : 'Durée recommandée : 7-14 jours'}
                 </p>
               </div>
             </div>
@@ -906,7 +993,7 @@ export function CreateProgrammeModal({
           </div>
 
           {/* ---------------------------------------------------------------- */}
-          {/* Erreur POST                                                       */}
+          {/* Erreur                                                            */}
           {/* ---------------------------------------------------------------- */}
           {createError && (
             <div className="rounded-md border border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800 p-3 text-sm text-red-700 dark:text-red-400">
@@ -923,33 +1010,32 @@ export function CreateProgrammeModal({
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  resetCreateForm();
+                  resetForm();
                   onOpenChange(false);
                 }}
                 className="flex-1 sm:flex-none text-sm sm:text-base"
-                disabled={creatingProgramme}
+                disabled={submittingProgramme}
               >
                 Annuler
               </Button>
               <Button
-                onClick={handleCreateProgramme}
+                onClick={handleSubmit}
                 className="btn-teal flex-1 text-sm sm:text-base"
                 disabled={
                   !createTitle ||
                   !createDescription ||
                   selectedExercises.length === 0 ||
-                  creatingProgramme ||
-                  createDuration <= 0 ||
-                  createDuration > 30
+                  submittingProgramme ||
+                  (!isEditMode && (createDuration <= 0 || createDuration > 30))
                 }
               >
-                {creatingProgramme ? (
+                {submittingProgramme ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                    Création en cours...
+                    {submittingLabel}
                   </>
                 ) : (
-                  'Créer le programme'
+                  submitLabel
                 )}
               </Button>
             </div>

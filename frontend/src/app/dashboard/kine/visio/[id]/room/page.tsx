@@ -28,6 +28,9 @@ import { getSeance, setConsent, saveCompteRendu, VisioSeance } from '@/lib/visio
 import { useVisioRoom, ConnState, mediaErrorMessage } from '@/hooks/useVisioRoom';
 import CompteRenduModal from '../../components/CompteRenduModal';
 import SendDocumentModal from '../../components/SendDocumentModal';
+import { ProgrammeModal, ProgrammeToEdit } from '@/components/ProgrammeModal';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -191,6 +194,8 @@ export default function KineVisioRoomPage() {
   // Sous-modals du panneau fin de séance
   const [crOpen, setCrOpen] = useState(false);
   const [docOpen, setDocOpen] = useState(false);
+  const [progOpen, setProgOpen] = useState(false);
+  const { toast } = useToast();
 
   // Notes de séance (= brouillon du compte-rendu), autosave débounced
   const [notes, setNotes] = useState('');
@@ -205,6 +210,26 @@ export default function KineVisioRoomPage() {
     if (notesTimer.current) { clearTimeout(notesTimer.current); notesTimer.current = null; }
     try { await saveCompteRendu(seanceId, notes); } catch { /* noop */ }
   }, [seanceId, notes]);
+
+  // Programme actif du patient (pour le panneau fin de séance : créer si aucun, sinon modifier)
+  // undefined = pas encore chargé ; null = aucun programme actif ; objet = programme à modifier
+  const [patientProgramme, setPatientProgramme] = useState<ProgrammeToEdit | null | undefined>(undefined);
+  const loadPatientProgramme = useCallback(async () => {
+    const pid = seance?.patient?.id;
+    if (!pid) return;
+    try {
+      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/programmes/${pid}`);
+      if (!res.ok) { setPatientProgramme(null); return; }
+      const data = await res.json();
+      setPatientProgramme(Array.isArray(data) && data.length > 0 ? data[0] : null);
+    } catch {
+      setPatientProgramme(null);
+    }
+  }, [seance]);
+  // Charger le programme du patient une fois la séance terminée (panneau affiché)
+  useEffect(() => {
+    if (state === 'ended') loadPatientProgramme();
+  }, [state, loadPatientProgramme]);
 
   // ---------------------------------------------------------------------------
   // 3. Bip + animation à la connexion (une seule fois par session)
@@ -347,14 +372,22 @@ export default function KineVisioRoomPage() {
           </button>
 
           <button
-            disabled
-            title="Bientôt disponible"
-            className="flex w-full items-center gap-3 rounded-xl border p-4 text-left opacity-50"
+            onClick={() => setProgOpen(true)}
+            disabled={!seance.patient || patientProgramme === undefined}
+            className="flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors hover:border-[#3899aa]/50 hover:bg-[#3899aa]/5 disabled:opacity-50"
           >
             <Dumbbell className="h-5 w-5 text-[#3899aa]" />
             <div>
-              <div className="font-medium">Créer un programme</div>
-              <div className="text-xs text-muted-foreground">Bientôt disponible</div>
+              <div className="font-medium">
+                {patientProgramme ? 'Modifier le programme' : 'Créer un programme'}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {patientProgramme === undefined
+                  ? 'Chargement…'
+                  : patientProgramme
+                  ? 'Ajuster le programme du patient'
+                  : 'Prescrire des exercices au patient'}
+              </div>
             </div>
           </button>
         </div>
@@ -373,6 +406,23 @@ export default function KineVisioRoomPage() {
           onSaved={(text) => setNotes(text)}
         />
         <SendDocumentModal open={docOpen} onOpenChange={setDocOpen} seanceId={seanceId} />
+        {seance.patient && (
+          <ProgrammeModal
+            open={progOpen}
+            onOpenChange={setProgOpen}
+            patientId={seance.patient.id}
+            patientName={patientName}
+            programme={patientProgramme ?? undefined}
+            onCreated={() => {
+              setProgOpen(false);
+              toast({
+                title: patientProgramme ? 'Programme mis à jour' : 'Programme créé',
+                description: `Pour ${patientName}.`,
+              });
+              loadPatientProgramme();
+            }}
+          />
+        )}
       </div>
     );
   }

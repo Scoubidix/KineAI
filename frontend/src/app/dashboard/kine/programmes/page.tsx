@@ -30,7 +30,7 @@ import { fr } from 'date-fns/locale';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
-import { CreateProgrammeModal } from '@/components/CreateProgrammeModal';
+import { ProgrammeModal } from '@/components/ProgrammeModal';
 
 interface Programme {
   id: number;
@@ -573,7 +573,7 @@ export default function ProgrammesPage() {
 
       {/* Modal de création de programme */}
       {selectedPatient && (
-        <CreateProgrammeModal
+        <ProgrammeModal
           open={showCreateModal}
           onOpenChange={setShowCreateModal}
           patientId={selectedPatient.id}
