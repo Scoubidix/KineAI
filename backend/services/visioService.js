@@ -134,7 +134,7 @@ async function getSeanceFull(kineId, seanceId) {
     where: { id: parseInt(seanceId), kineId, isActive: true },
     include: {
       patient: { select: { id: true, firstName: true, lastName: true, email: true } },
-      kine: { select: { id: true, firstName: true, lastName: true } },
+      kine: { select: { id: true, firstName: true, lastName: true, rpps: true, adresseCabinet: true } },
     },
   });
   if (!seance) throw new VisioError('Seance introuvable', 'SEANCE_NOT_FOUND', 404);

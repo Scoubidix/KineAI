@@ -29,34 +29,61 @@ function formatDateFr(value) {
  * @param {{ compteRendu: string, scheduledAt: Date|string, kine: object, patient: object }} p
  */
 function renderCompteRenduHtml({ compteRendu, scheduledAt, kine, patient }) {
-  const kineName = kine ? escapeHtml(`${kine.firstName || ''} ${kine.lastName || ''}`.trim()) : '';
+  const kineName = kine
+    ? escapeHtml(`${kine.firstName || ''} ${(kine.lastName || '').toUpperCase()}`.trim())
+    : '';
+  const rpps = kine && kine.rpps ? escapeHtml(kine.rpps) : '';
+  const adresseCabinet = kine && kine.adresseCabinet ? escapeHtml(kine.adresseCabinet) : '';
   const patientName = patient ? escapeHtml(`${patient.firstName || ''} ${patient.lastName || ''}`.trim()) : '';
   const dateStr = escapeHtml(formatDateFr(scheduledAt));
   const bodyHtml = escapeHtml(compteRendu).replace(/\r?\n/g, '<br>');
+
+  // Le logo est servi par le frontend (public/logo.png), pas le backend.
+  const frontendOrigin = (process.env.FRONTEND_URL || '').split(',')[0].trim();
+  const logoUrl = frontendOrigin ? `${frontendOrigin}/logo.png` : '';
 
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
 <style>
-  body { font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; font-size: 13px; line-height: 1.6; }
-  .header { border-bottom: 2px solid #3899aa; padding-bottom: 12px; margin-bottom: 20px; }
-  .header h1 { color: #3899aa; font-size: 20px; margin: 0 0 8px; }
-  .meta { font-size: 12px; color: #555; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; font-size: 11pt; line-height: 1.5; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5em; }
+  .header-left { font-size: 11pt; line-height: 1.4; }
+  .header-name { font-weight: bold; font-size: 13pt; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .header-logo { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
+  .header-app-name { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; font-weight: bold; color: #1a1a1a; }
+  .header-app-name .brand { color: #3899aa; }
+  .header-separator { height: 3px; background: linear-gradient(to right, #4db3c5, #1f5c6a); border: none; border-radius: 2px; margin: 0.6em 0 1.2em 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .doc-title { font-size: 15pt; font-weight: bold; color: #1f5c6a; margin: 0 0 6px; }
+  .meta { font-size: 10.5pt; color: #555; margin-bottom: 16px; }
   .meta strong { color: #1a1a1a; }
-  .content { white-space: normal; margin-top: 16px; }
-  .footer { margin-top: 40px; font-size: 11px; color: #888; border-top: 1px solid #ddd; padding-top: 8px; }
+  .content { margin-top: 8px; }
+  .footer { margin-top: 40px; font-size: 9pt; color: #888; border-top: 1px solid #ddd; padding-top: 8px; }
 </style>
 </head>
 <body>
   <div class="header">
-    <h1>Compte-rendu de séance de télésoin</h1>
-    <div class="meta">
-      ${kineName ? `<div>Praticien : <strong>${kineName}</strong></div>` : ''}
-      ${patientName ? `<div>Patient : <strong>${patientName}</strong></div>` : ''}
-      ${dateStr ? `<div>Séance du : <strong>${dateStr}</strong></div>` : ''}
+    <div class="header-left">
+      <div class="header-name">${kineName}</div>
+      <div>Masseur-Kinésithérapeute D.E.</div>
+      ${rpps ? `<div>RPPS : ${rpps}</div>` : ''}
+      ${adresseCabinet ? `<div>${adresseCabinet}</div>` : ''}
+    </div>
+    <div class="header-right">
+      ${logoUrl ? `<img src="${logoUrl}" alt="Logo" class="header-logo" />` : ''}
+      <div class="header-app-name"><span class="brand">M</span>on <span class="brand">A</span>ssistant <span class="brand">K</span>iné</div>
     </div>
   </div>
+  <div class="header-separator"></div>
+
+  <div class="doc-title">Compte-rendu de séance de télésoin</div>
+  <div class="meta">
+    ${patientName ? `<div>Patient : <strong>${patientName}</strong></div>` : ''}
+    ${dateStr ? `<div>Séance du : <strong>${dateStr}</strong></div>` : ''}
+  </div>
+
   <div class="content">${bodyHtml || '<em>(compte-rendu vide)</em>'}</div>
   <div class="footer">Document généré par Mon Assistant Kiné — usage professionnel.</div>
 </body>
