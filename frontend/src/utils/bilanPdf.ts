@@ -57,7 +57,7 @@ export function generateBilanPdf({
         </div>
         <div class="header-right">
           <img src="${logoUrl}" alt="Logo" class="header-logo" />
-          <div class="header-app-name">Mon Assistant Kiné</div>
+          <div class="header-app-name"><span class="brand">M</span>on <span class="brand">A</span>ssistant <span class="brand">K</span>iné</div>
         </div>
       </div>
       <div class="header-separator"></div>
@@ -93,7 +93,8 @@ export function generateBilanPdf({
           .header-name { font-weight: bold; font-size: 13pt; }
           .header-right { display: flex; align-items: center; gap: 10px; }
           .header-logo { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
-          .header-app-name { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; font-weight: bold; color: #3899aa; }
+          .header-app-name { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; font-weight: bold; color: #1a1a1a; }
+          .header-app-name .brand { color: #3899aa; }
           .header-separator { height: 3px; background: linear-gradient(to right, #4db3c5, #1f5c6a); border: none; border-radius: 2px; margin: 0.6em 0 1.2em 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .patient-info { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; margin-bottom: 1em; padding: 0.5em 0; border-bottom: 1px solid #ccc; }
           .bilan-date { text-align: right; font-size: 10pt; color: #555; font-family: Arial, Helvetica, sans-serif; margin-bottom: -0.5em; }

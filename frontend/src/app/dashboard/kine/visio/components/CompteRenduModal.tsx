@@ -17,7 +17,7 @@ interface CompteRenduModalProps {
   onOpenChange: (open: boolean) => void;
   seanceId: number;
   initialValue?: string;
-  onSaved?: () => void;
+  onSaved?: (text: string) => void;
 }
 
 export default function CompteRenduModal({
@@ -49,7 +49,7 @@ export default function CompteRenduModal({
       await saveCompteRendu(seanceId, text);
       setSavedOnce(true);
       toast({ title: 'Compte-rendu enregistré' });
-      onSaved?.();
+      onSaved?.(text);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -63,7 +63,7 @@ export default function CompteRenduModal({
     try {
       // Enregistrer d'abord si le texte a changé, pour que le PDF reflète la saisie
       await saveCompteRendu(seanceId, text);
-      onSaved?.();
+      onSaved?.(text);
       await downloadCompteRenduPdf(seanceId);
     } catch (e) {
       setError((e as Error).message);

@@ -4,11 +4,12 @@ import { useRouter } from 'next/navigation';
 import { listSeances, cancelSeance, VisioSeance, VisioStatus } from '@/lib/visioApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Video, X, Pencil, Send } from 'lucide-react';
+import { Plus, Video, X, Pencil, Send, FileText } from 'lucide-react';
 import { matchesAllTokens } from '@/utils/textSearch';
 import NouveauVisioModal from './components/NouveauVisioModal';
 import RescheduleVisioModal from './components/RescheduleVisioModal';
 import ResendLinkModal from './components/ResendLinkModal';
+import CompteRenduModal from './components/CompteRenduModal';
 
 const STATUS_LABELS: Record<VisioStatus, string> = {
   SCHEDULED: 'Programmée',
@@ -79,6 +80,7 @@ export default function VisioPage() {
   const [search, setSearch] = useState('');
   const [rescheduleTarget, setRescheduleTarget] = useState<VisioSeance | null>(null);
   const [resendTarget, setResendTarget] = useState<VisioSeance | null>(null);
+  const [crTarget, setCrTarget] = useState<VisioSeance | null>(null);
 
   const fetchSeances = useCallback((silent = false) => {
     if (!silent) setLoading(true);
@@ -178,6 +180,12 @@ export default function VisioPage() {
           <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_CLASSES[s.status]}`}>
             {STATUS_LABELS[s.status]}
           </span>
+          {!inUpcoming && (
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setCrTarget(s)}>
+              <FileText className="h-4 w-4" />
+              Compte-rendu
+            </Button>
+          )}
           {inUpcoming && joinable && s.patientPresent && (
             <span className="flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
               <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -322,6 +330,16 @@ export default function VisioPage() {
         seance={resendTarget}
         onResent={fetchSeances}
       />
+
+      {crTarget && (
+        <CompteRenduModal
+          open={crTarget !== null}
+          onOpenChange={(o) => !o && setCrTarget(null)}
+          seanceId={crTarget.id}
+          initialValue={crTarget.compteRendu ?? ''}
+          onSaved={() => fetchSeances(true)}
+        />
+      )}
     </div>
   );
 }

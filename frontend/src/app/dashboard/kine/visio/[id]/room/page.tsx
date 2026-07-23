@@ -24,7 +24,7 @@ import {
   Paperclip,
   Dumbbell,
 } from 'lucide-react';
-import { getSeance, setConsent, VisioSeance } from '@/lib/visioApi';
+import { getSeance, setConsent, saveCompteRendu, VisioSeance } from '@/lib/visioApi';
 import { useVisioRoom, ConnState, mediaErrorMessage } from '@/hooks/useVisioRoom';
 import CompteRenduModal from '../../components/CompteRenduModal';
 import SendDocumentModal from '../../components/SendDocumentModal';
@@ -163,6 +163,7 @@ export default function KineVisioRoomPage() {
         if (cancelled) return;
         setFirebaseToken(token);
         setSeance(seanceData);
+        setNotes(seanceData.compteRendu ?? '');
         // Si le consentement a déjà été enregistré
         if (seanceData.consentOralAt) setConsentChecked(true);
         setReady(true);
@@ -190,6 +191,20 @@ export default function KineVisioRoomPage() {
   // Sous-modals du panneau fin de séance
   const [crOpen, setCrOpen] = useState(false);
   const [docOpen, setDocOpen] = useState(false);
+
+  // Notes de séance (= brouillon du compte-rendu), autosave débounced
+  const [notes, setNotes] = useState('');
+  const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleNotesSave = useCallback((value: string) => {
+    if (notesTimer.current) clearTimeout(notesTimer.current);
+    notesTimer.current = setTimeout(() => {
+      saveCompteRendu(seanceId, value).catch(() => {/* réessai au prochain edit */});
+    }, 1500);
+  }, [seanceId]);
+  const flushNotes = useCallback(async () => {
+    if (notesTimer.current) { clearTimeout(notesTimer.current); notesTimer.current = null; }
+    try { await saveCompteRendu(seanceId, notes); } catch { /* noop */ }
+  }, [seanceId, notes]);
 
   // ---------------------------------------------------------------------------
   // 3. Bip + animation à la connexion (une seule fois par session)
@@ -354,8 +369,8 @@ export default function KineVisioRoomPage() {
           open={crOpen}
           onOpenChange={setCrOpen}
           seanceId={seanceId}
-          initialValue={seance.compteRendu ?? ''}
-          onSaved={async () => { try { setSeance(await getSeance(seanceId)); } catch { /* noop */ } }}
+          initialValue={notes}
+          onSaved={(text) => setNotes(text)}
         />
         <SendDocumentModal open={docOpen} onOpenChange={setDocOpen} seanceId={seanceId} />
       </div>
@@ -584,6 +599,20 @@ export default function KineVisioRoomPage() {
           </div>
         </div>
 
+        {/* Bloc notes de séance (alimente le compte-rendu) */}
+        <div className="rounded-xl border bg-card p-4">
+          <label htmlFor="notes-seance" className="mb-2 block text-sm font-medium">
+            Notes de séance
+          </label>
+          <textarea
+            id="notes-seance"
+            className="min-h-[100px] w-full resize-y rounded-md border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-[#3899aa]/40"
+            placeholder="Prends tes notes pendant la consultation…"
+            value={notes}
+            onChange={(e) => { setNotes(e.target.value); scheduleNotesSave(e.target.value); }}
+          />
+        </div>
+
         {/* Confirmation de fin de consultation */}
         <AlertDialog open={endConfirmOpen} onOpenChange={setEndConfirmOpen}>
           <AlertDialogContent>
@@ -597,8 +626,9 @@ export default function KineVisioRoomPage() {
             <AlertDialogFooter>
               <AlertDialogCancel>Annuler</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => {
+                onClick={async () => {
                   setEndConfirmOpen(false);
+                  await flushNotes();
                   endSession();
                 }}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
