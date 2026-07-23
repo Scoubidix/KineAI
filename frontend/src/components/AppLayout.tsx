@@ -1654,6 +1654,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
                               Module administratif
                             </li>
                           )}
+                          {currentPlan.features.videoTransmission && (
+                            <li className="flex items-center gap-2 text-xs text-foreground">
+                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                              Vidéotransmission
+                            </li>
+                          )}
                         </ul>
                         {headerSubscription.planType === 'PIONNIER' && (
                           <a

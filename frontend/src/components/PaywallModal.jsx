@@ -343,10 +343,22 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                             </div>
                           )}
 
+                          {plan.features.videoTransmission && (
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
+                              <span>Outil de vidéotransmission</span>
+                            </div>
+                          )}
+
                         </div>
 
                         {/* Bouton d'action - poussé vers le bas */}
                         <div className="mt-auto pt-4">
+                          {plan.features.videoTransmission && (
+                            <div className="mb-3 flex items-center justify-center gap-1.5 rounded-lg border border-[#3899aa]/40 bg-[#3899aa]/10 px-2.5 py-2 text-xs font-bold text-[#3899aa]">
+                              Éligible à l'Aide FAMI de 350 €/an
+                            </div>
+                          )}
                           <Button
                             onClick={!isCurrentPlan && isAvailable ? () => handlePlanClick(plan.type) : undefined}
                             disabled={isCurrentPlan || !isAvailable || isLoading}

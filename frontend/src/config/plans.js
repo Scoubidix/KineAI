@@ -34,7 +34,8 @@ const PLANS = {
       // Chat IA unifié : quota quotidien relatif (1 = usage standard)
       chatMultiplier: 1,
       iaBilans: false,             // Génération de bilans par IA
-      moduleAdmin: false           // Module administratif (courriers, templates)
+      moduleAdmin: false,          // Module administratif (courriers, templates)
+      videoTransmission: false     // Outil de vidéotransmission (dès Pratique)
     },
     limits: {
       programmes: 1
@@ -64,7 +65,8 @@ const PLANS = {
       // Chat IA unifié : quota quotidien relatif (1 = usage standard)
       chatMultiplier: 3,
       iaBilans: true,              // Génération de bilans par IA
-      moduleAdmin: false           // Module administratif (courriers, templates)
+      moduleAdmin: false,          // Module administratif (courriers, templates)
+      videoTransmission: true      // Outil de vidéotransmission (télésoin) — dès Pratique
     },
     limits: {
       programmes: 5
@@ -97,7 +99,8 @@ const PLANS = {
       // Chat IA unifié : quota quotidien relatif (1 = usage standard)
       chatMultiplier: 10,
       iaBilans: true,              // Génération de bilans par IA
-      moduleAdmin: true            // Module administratif (courriers, templates)
+      moduleAdmin: true,           // Module administratif (courriers, templates)
+      videoTransmission: true      // Outil de vidéotransmission (télésoin)
     },
     limits: {
       programmes: -1 // illimité
@@ -133,7 +136,8 @@ const PLANS = {
       // Chat IA unifié : quota quotidien relatif (1 = usage standard)
       chatMultiplier: 10,
       iaBilans: true,              // Génération de bilans par IA
-      moduleAdmin: true            // Module administratif (courriers, templates)
+      moduleAdmin: true,           // Module administratif (courriers, templates)
+      videoTransmission: true      // Outil de vidéotransmission (télésoin)
     },
     limits: {
       programmes: -1 // illimité
@@ -164,7 +168,8 @@ const FREE_PLAN = {
     // Chat IA unifié : quota quotidien relatif (0 = usage limité)
     chatMultiplier: 0,
     iaBilans: false,             // Génération de bilans par IA
-    moduleAdmin: false           // Module administratif (courriers, templates)
+    moduleAdmin: false,          // Module administratif (courriers, templates)
+    videoTransmission: false     // Outil de vidéotransmission (dès Pratique)
   },
   limits: {
     programmes: 0
