@@ -12,7 +12,9 @@ const uploadDoc = multer({ storage: multer.memoryStorage(), limits: { fileSize: 
 // ---- Kiné ----
 router.post('/seances', authenticate, crudWriteLimiter, controller.createSeance);
 router.get('/seances', authenticate, controller.listSeances);
+router.post('/seances/archive', authenticate, crudWriteLimiter, controller.archiveSeances);
 router.get('/seances/:id', authenticate, controller.getSeance);
+router.patch('/seances/:id/unarchive', authenticate, crudWriteLimiter, controller.unarchiveSeance);
 router.patch('/seances/:id/consent', authenticate, crudWriteLimiter, controller.setConsent);
 router.patch('/seances/:id/cancel', authenticate, crudWriteLimiter, controller.cancelSeance);
 router.patch('/seances/:id/reschedule', authenticate, crudWriteLimiter, controller.rescheduleSeance);

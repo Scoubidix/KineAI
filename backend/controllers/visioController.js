@@ -38,7 +38,8 @@ async function listSeances(req, res) {
   try {
     const kine = await resolveKine(req);
     if (!kine) return res.status(404).json({ success: false, error: 'Kine introuvable', code: 'KINE_NOT_FOUND' });
-    const seances = await visioService.listSeances(kine.id);
+    const archived = req.query.archived === '1' || req.query.archived === 'true';
+    const seances = await visioService.listSeances(kine.id, { archived });
     // Annoter chaque séance avec la présence live du patient dans la room
     const withPresence = seances.map((s) => ({
       ...s,
@@ -103,6 +104,28 @@ async function resendLink(req, res) {
     return res.status(200).json({ ...seance, patientPresent: isPatientPresent(seance.roomId) });
   } catch (error) {
     return handleError(res, error, 'resendLink');
+  }
+}
+
+async function archiveSeances(req, res) {
+  try {
+    const kine = await resolveKine(req);
+    if (!kine) return res.status(404).json({ success: false, error: 'Kine introuvable', code: 'KINE_NOT_FOUND' });
+    const result = await visioService.archiveSeances(kine.id, req.body.ids);
+    return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    return handleError(res, error, 'archiveSeances');
+  }
+}
+
+async function unarchiveSeance(req, res) {
+  try {
+    const kine = await resolveKine(req);
+    if (!kine) return res.status(404).json({ success: false, error: 'Kine introuvable', code: 'KINE_NOT_FOUND' });
+    const seance = await visioService.unarchiveSeance(kine.id, req.params.id);
+    return res.status(200).json(seance);
+  } catch (error) {
+    return handleError(res, error, 'unarchiveSeance');
   }
 }
 
@@ -204,6 +227,7 @@ async function ackInfo(req, res) {
 
 module.exports = {
   createSeance, listSeances, getSeance, setConsent, cancelSeance, rescheduleSeance, resendLink,
+  archiveSeances, unarchiveSeance,
   saveCompteRendu, compteRenduPdf, sendDocument,
   getSession, ackInfo,
 };

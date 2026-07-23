@@ -13,6 +13,8 @@ export interface VisioSeance {
   deliveryChannel: VisioChannel;
   consentOralAt: string | null;
   compteRendu?: string | null;
+  isArchived?: boolean;
+  archivedAt?: string | null;
   patient?: { id: number; firstName: string; lastName: string };
   patientPresent?: boolean; // patient actuellement connecté à la room (présence live)
 }
@@ -36,8 +38,21 @@ export async function createSeance(input: CreateSeanceInput) {
   const res = await fetchWithAuth(`${BASE}/seances`, { method: 'POST', body: JSON.stringify(input) });
   return json<{ seance: VisioSeance; seanceUrl: string; linkSent: boolean }>(res);
 }
-export async function listSeances() {
-  return json<VisioSeance[]>(await fetchWithAuth(`${BASE}/seances`));
+export async function listSeances(archived = false) {
+  const qs = archived ? '?archived=1' : '';
+  return json<VisioSeance[]>(await fetchWithAuth(`${BASE}/seances${qs}`));
+}
+/** Archive en lot des séances d'historique. Renvoie le nombre effectivement archivé. */
+export async function archiveSeances(ids: number[]) {
+  const res = await fetchWithAuth(`${BASE}/seances/archive`, {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+  return json<{ success: boolean; archived: number }>(res);
+}
+/** Désarchive une séance. */
+export async function unarchiveSeance(id: number) {
+  return json<VisioSeance>(await fetchWithAuth(`${BASE}/seances/${id}/unarchive`, { method: 'PATCH' }));
 }
 export async function getSeance(id: number) {
   return json<VisioSeance>(await fetchWithAuth(`${BASE}/seances/${id}`));

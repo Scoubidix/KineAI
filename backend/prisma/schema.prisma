@@ -1016,12 +1016,18 @@ model VisioSeance {
   isActive  Boolean   @default(true)
   deletedAt DateTime?
 
+  // Archivage (masquage de l'historique, distinct du soft delete).
+  // Aucune purge : le compte-rendu est une donnée de santé à rétention longue.
+  isArchived Boolean   @default(false)
+  archivedAt DateTime?
+
   kineId    Int
   kine      Kine    @relation(fields: [kineId], references: [id])
   patientId Int
   patient   Patient @relation(fields: [patientId], references: [id])
 
   @@index([kineId, scheduledAt])
+  @@index([kineId, isArchived])
   @@index([patientId])
   @@map("visio_seances")
 }

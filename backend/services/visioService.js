@@ -73,10 +73,10 @@ async function createSeance(kineId, { patientId, scheduledAt, deliveryChannel, p
   return { seance: updated, seanceUrl, linkSent: sent.success };
 }
 
-async function listSeances(kineId) {
+async function listSeances(kineId, { archived = false } = {}) {
   const prisma = prismaService.getInstance();
   return prisma.visioSeance.findMany({
-    where: { kineId, isActive: true },
+    where: { kineId, isActive: true, isArchived: archived },
     orderBy: { scheduledAt: 'desc' },
     include: { patient: { select: { id: true, firstName: true, lastName: true } } },
   });
@@ -114,6 +114,48 @@ async function cancelSeance(kineId, seanceId) {
   return prisma.visioSeance.update({
     where: { id: parseInt(seanceId) },
     data: { status: 'CANCELLED' },
+  });
+}
+
+/**
+ * Archive en lot des séances d'historique du kiné.
+ * Sécurité : n'archive que les séances possédées, encore actives, non déjà archivées,
+ * et appartenant à l'historique (terminées/annulées, ou programmées dont le jour est passé).
+ * Un RDV à venir ne peut donc pas être archivé, même via requête forgée.
+ */
+async function archiveSeances(kineId, ids) {
+  const numericIds = (Array.isArray(ids) ? ids : [])
+    .map((x) => parseInt(x, 10))
+    .filter((n) => Number.isInteger(n));
+  if (numericIds.length === 0) {
+    throw new VisioError('Aucune seance a archiver', 'NO_IDS', 400);
+  }
+  const prisma = prismaService.getInstance();
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const result = await prisma.visioSeance.updateMany({
+    where: {
+      id: { in: numericIds },
+      kineId,
+      isActive: true,
+      isArchived: false,
+      OR: [
+        { status: { in: ['ENDED', 'CANCELLED'] } },
+        { status: 'SCHEDULED', scheduledAt: { lt: startOfToday } },
+      ],
+    },
+    data: { isArchived: true, archivedAt: new Date() },
+  });
+  return { archived: result.count };
+}
+
+/** Désarchive une séance (retour dans l'historique récent). */
+async function unarchiveSeance(kineId, seanceId) {
+  await requireOwnedSeance(kineId, seanceId);
+  const prisma = prismaService.getInstance();
+  return prisma.visioSeance.update({
+    where: { id: parseInt(seanceId) },
+    data: { isArchived: false, archivedAt: null },
   });
 }
 
@@ -233,6 +275,8 @@ module.exports = {
   cancelSeance,
   resendLink,
   rescheduleSeance,
+  archiveSeances,
+  unarchiveSeance,
   setCompteRendu,
   getSeanceFull,
 };
