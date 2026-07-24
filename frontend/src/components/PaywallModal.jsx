@@ -235,6 +235,9 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
     && (plans[pendingUpgrade.planType]?.price ?? 0) < (plans[pendingUpgrade.currentPlan]?.price ?? 0);
   const changeIsIntervalDowngrade = currentCycle === 'yearly' && billingCycle === 'monthly';
   const changeIsDeferred = changeIsDowngrade || changeIsIntervalDowngrade;
+  // Passage à la facturation annuelle (immédiat, avec prélèvement du montant annuel proratisé)
+  const changeToAnnual = billingCycle === 'yearly' && currentCycle !== 'yearly';
+  const changeSamePlan = !!pendingUpgrade && pendingUpgrade.planType === pendingUpgrade.currentPlan;
   const currentPlanPriceLabel = currentCycle === 'yearly'
     ? `${plans[pendingUpgrade?.currentPlan]?.priceYearly}€/an`
     : `${plans[pendingUpgrade?.currentPlan]?.price}€/mois`;
@@ -579,6 +582,27 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                             Aucun remboursement du temps déjà payé, aucun prélèvement aujourd'hui.
                           </span>
                         </div>
+                      </div>
+                    ) : changeToAnnual ? (
+                      <div className="text-sm space-y-3">
+                        <div className="flex items-start gap-2">
+                          <CreditCard className="h-4 w-4 text-accent flex-shrink-0 mt-0.5" />
+                          <span className="text-foreground">
+                            Passage à la facturation annuelle : le montant de l'année est prélevé aujourd'hui, avec proratisation du temps déjà payé sur ton abonnement mensuel.
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Calendar className="h-4 w-4 text-accent flex-shrink-0 mt-0.5" />
+                          <span className="text-foreground">Renouvellement ensuite une fois par an.</span>
+                        </div>
+                        {!changeSamePlan && (
+                          <div className="flex items-start gap-2">
+                            <CheckCircle className="h-4 w-4 text-accent flex-shrink-0 mt-0.5" />
+                            <span className="text-foreground">
+                              Accès immédiat aux fonctionnalités du plan {pendingUpgrade.planData.name}.
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-sm space-y-3">
