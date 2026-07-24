@@ -414,13 +414,15 @@ class StripeService {
         };
       }
 
-      // ── Upgrade (plan supérieur) ou passage mensuel→annuel : IMMÉDIAT proraté ──
+      // ── Upgrade (plan supérieur) ou passage mensuel→annuel : IMMÉDIAT ──
+      // 'always_invoice' : Stripe proratise ET facture immédiatement la différence
+      // (l'upgrade / le passage annuel est donc prélevé le jour même).
       const updateData = {
         items: [{
           id: subscription.items.data[0].id,
           price: newPriceId,
         }],
-        proration_behavior: 'create_prorations',
+        proration_behavior: 'always_invoice',
       };
 
       // 🔧 SÉCURISÉ : Réactiver seulement si résiliation programmée

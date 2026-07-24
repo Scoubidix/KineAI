@@ -608,17 +608,17 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                       </div>
                     ) : (
                       <div className="text-sm space-y-3">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
-                          <span className="text-foreground">Accès immédiat aux nouvelles fonctionnalités</span>
+                        <div className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-accent flex-shrink-0 mt-0.5" />
+                          <span className="text-foreground">
+                            Accès immédiat aux fonctionnalités du plan {pendingUpgrade.planData.name}.
+                          </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="h-4 w-4 text-accent flex-shrink-0" />
-                          <span className="text-foreground">Proratisation automatique sur ta prochaine facture</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-accent flex-shrink-0" />
-                          <span className="text-foreground">Aucun prélèvement aujourd'hui</span>
+                        <div className="flex items-start gap-2">
+                          <CreditCard className="h-4 w-4 text-accent flex-shrink-0 mt-0.5" />
+                          <span className="text-foreground">
+                            La différence est prélevée aujourd'hui, au prorata du temps restant sur ta période en cours.
+                          </span>
                         </div>
                       </div>
                     )}
