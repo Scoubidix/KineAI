@@ -202,6 +202,15 @@ async function getStripeSubscriptionStats() {
     PIONNIER: 0,
     EXPERT: 0,
   };
+  // Répartition mensuel / annuel par plan
+  const planCycleCounts = {
+    DECLIC: { monthly: 0, yearly: 0 },
+    PRATIQUE: { monthly: 0, yearly: 0 },
+    PIONNIER: { monthly: 0, yearly: 0 },
+    EXPERT: { monthly: 0, yearly: 0 },
+  };
+  // Total global par cycle
+  const cycleCounts = { monthly: 0, yearly: 0 };
 
   // Récupérer tous les abonnements actifs depuis Stripe
   const subscriptions = await stripeService.stripe.subscriptions.list({
@@ -232,16 +241,22 @@ async function getStripeSubscriptionStats() {
   });
   allSubs = allSubs.concat(trialingSubs.data);
 
-  // Compter par plan et calculer le MRR réel
+  // Compter par plan (et par cycle) et calculer le MRR réel
   let mrr = 0;
   for (const sub of allSubs) {
-    const priceId = sub.items.data[0]?.price?.id;
-    if (priceId && stripeService.planFromPrice[priceId]) {
-      const plan = stripeService.planFromPrice[priceId];
-      planCounts[plan]++;
-    }
-    // MRR = somme des montants récurrents mensuels (en centimes → euros)
     const item = sub.items.data[0];
+    const priceId = item?.price?.id;
+    const plan = stripeService.getPlanTypeFromPriceId(priceId);
+    // Cycle déterminé directement depuis l'intervalle Stripe (robuste, sans dépendre du mapping env)
+    const cycle = item?.price?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
+
+    if (plan && planCounts[plan] !== undefined) {
+      planCounts[plan]++;
+      planCycleCounts[plan][cycle]++;
+    }
+    cycleCounts[cycle]++;
+
+    // MRR = somme des montants récurrents ramenés au mois (en centimes → euros)
     if (item?.price?.recurring?.interval === 'month') {
       mrr += (item.price.unit_amount || 0) / 100;
     } else if (item?.price?.recurring?.interval === 'year') {
@@ -251,7 +266,7 @@ async function getStripeSubscriptionStats() {
 
   const activeSubscriptions = Object.values(planCounts).reduce((sum, c) => sum + c, 0);
 
-  return { planCounts, activeSubscriptions, mrr };
+  return { planCounts, planCycleCounts, cycleCounts, activeSubscriptions, mrr };
 }
 
 /**
@@ -316,8 +331,8 @@ async function getRecentSubscriptionEvents(ranges = getParisPeriodRanges()) {
       if (previous?.items?.data?.[0]?.price?.id) {
         const oldPriceId = previous.items.data[0].price.id;
         const newPriceId = sub.items.data[0]?.price?.id;
-        const oldPlan = stripeService.planFromPrice[oldPriceId] || oldPriceId;
-        const newPlan = stripeService.planFromPrice[newPriceId] || newPriceId;
+        const oldPlan = stripeService.getPlanTypeFromPriceId(oldPriceId) || oldPriceId;
+        const newPlan = stripeService.getPlanTypeFromPriceId(newPriceId) || newPriceId;
 
         if (oldPlan !== newPlan) {
           planChanges.push({
@@ -348,7 +363,7 @@ async function getDashboardStats() {
   const ranges = getParisPeriodRanges(now);
 
   // Abonnements depuis Stripe (source de vérité, pas de faux abonnements)
-  const { planCounts, activeSubscriptions, mrr } = await getStripeSubscriptionStats();
+  const { planCounts, planCycleCounts, cycleCounts, activeSubscriptions, mrr } = await getStripeSubscriptionStats();
 
   // Dernier virement Stripe, événements récents, usage des features (DB) — en parallèle
   const [lastPayout, subscriptionEvents, activity] = await Promise.all([
@@ -365,6 +380,8 @@ async function getDashboardStats() {
 
   return {
     planCounts: { FREE: freeCount, ...planCounts },
+    planCycleCounts,
+    cycleCounts,
     totalKines,
     activeSubscriptions,
     totalPatients: activity.patients.total,

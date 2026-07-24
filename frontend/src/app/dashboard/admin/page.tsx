@@ -65,6 +65,8 @@ interface DashboardStats {
     PIONNIER: number;
     EXPERT: number;
   };
+  planCycleCounts?: Record<string, { monthly: number; yearly: number }>;
+  cycleCounts?: { monthly: number; yearly: number };
   totalKines: number;
   activeSubscriptions: number;
   totalPatients: number;
@@ -636,7 +638,14 @@ export default function AdminDashboardPage() {
                           </Badge>
                           <div className="flex-1">
                             <div className="flex justify-between text-sm mb-1">
-                              <span>{count} kiné{count > 1 ? 's' : ''}</span>
+                              <span>
+                                {count} kiné{count > 1 ? 's' : ''}
+                                {plan !== 'FREE' && count > 0 && stats.planCycleCounts?.[plan] && (
+                                  <span className="text-muted-foreground">
+                                    {' '}· {stats.planCycleCounts[plan].monthly} mens. / {stats.planCycleCounts[plan].yearly} ann.
+                                  </span>
+                                )}
+                              </span>
                               <span className="text-muted-foreground">{percentage}%</span>
                             </div>
                             <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -652,6 +661,13 @@ export default function AdminDashboardPage() {
                         </div>
                       );
                     })}
+                    {stats.cycleCounts && (
+                      <div className="mt-4 flex items-center justify-center gap-4 border-t pt-3 text-sm">
+                        <span><strong>{stats.cycleCounts.monthly}</strong> mensuel{stats.cycleCounts.monthly > 1 ? 's' : ''}</span>
+                        <span className="text-muted-foreground">·</span>
+                        <span><strong>{stats.cycleCounts.yearly}</strong> annuel{stats.cycleCounts.yearly > 1 ? 's' : ''}</span>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
