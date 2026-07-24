@@ -333,11 +333,18 @@ class StripeService {
       const subscription = await this.stripe.subscriptions.retrieve(kine.subscriptionId);
       const currentPriceId = subscription.items.data[0].price.id;
       const currentCycle = this.getCycleFromPriceId(currentPriceId);
+      const currentPlanType = this.getPlanTypeFromPriceId(currentPriceId);
 
-      // ── Downgrade d'intervalle annuel → mensuel : DIFFÉRÉ à l'échéance ──
-      // On ne rembourse jamais l'annuel non consommé : on garde l'annuel jusqu'à la
-      // fin de la période payée, puis on bascule en mensuel via un Subscription Schedule.
-      if (currentCycle === 'yearly' && newCycle === 'monthly') {
+      // Un changement "vers le bas" est différé à la fin de la période payée :
+      //  - downgrade de plan (nouveau plan moins cher, ex: Expert → Pratique), quel que soit le cycle ;
+      //  - passage d'annuel à mensuel (downgrade d'engagement).
+      // On ne rembourse jamais le temps déjà payé : on conserve l'abonnement courant jusqu'à
+      // son terme, puis on bascule sur le nouveau prix via un Subscription Schedule.
+      const isPlanDowngrade = currentPlanType
+        && this.getPlanPriceInCents(newPlanType) < this.getPlanPriceInCents(currentPlanType);
+      const isIntervalDowngrade = currentCycle === 'yearly' && newCycle === 'monthly';
+
+      if (isPlanDowngrade || isIntervalDowngrade) {
         const schedule = await this.stripe.subscriptionSchedules.create({
           from_subscription: subscription.id,
         });
@@ -345,19 +352,19 @@ class StripeService {
         const updated = await this.stripe.subscriptionSchedules.update(schedule.id, {
           end_behavior: 'release',
           phases: [
-            // Phase courante : on conserve l'annuel jusqu'à son terme
+            // Phase courante : on conserve l'abonnement actuel jusqu'à son terme
             {
               items: [{ price: currentPriceId, quantity: 1 }],
               start_date: phase0.start_date,
               end_date: phase0.end_date,
             },
-            // Phase suivante : bascule mensuelle (nouveau plan/cycle)
+            // Phase suivante : bascule sur le nouveau plan/cycle à l'échéance
             {
               items: [{ price: newPriceId, quantity: 1 }],
             },
           ],
         });
-        logger.info(`🗓️ Bascule annuel→mensuel programmée à l'échéance pour l'abonnement ${subscription.id}`);
+        logger.info(`🗓️ Changement différé à l'échéance programmé pour l'abonnement ${subscription.id} (${currentPlanType}/${currentCycle} → ${newPlanType}/${newCycle})`);
         return {
           scheduled: true,
           scheduleId: updated.id,
@@ -365,7 +372,7 @@ class StripeService {
         };
       }
 
-      // ── Autres cas (mensuel→annuel, ou changement de plan même cycle) : IMMÉDIAT proraté ──
+      // ── Upgrade (plan supérieur) ou passage mensuel→annuel : IMMÉDIAT proraté ──
       const updateData = {
         items: [{
           id: subscription.items.data[0].id,

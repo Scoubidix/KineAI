@@ -114,13 +114,15 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
       if (response.ok && data.url) {
         // Vérifier le type de réponse
         if (data.type === 'plan_change') {
-          // Changement de plan instantané → toast amélioré SANS redirection
+          // Changement de plan (immédiat ou différé à l'échéance) → toast SANS redirection
           toast({
             title: "Abonnement modifié",
-            description: `Passage de ${data.subscription.previousPlan} vers ${data.subscription.newPlan} effectué.`,
+            description: data.scheduled
+              ? `Le passage de ${data.subscription.previousPlan} vers ${data.subscription.newPlan} prendra effet à la fin de ta période en cours.`
+              : `Passage de ${data.subscription.previousPlan} vers ${data.subscription.newPlan} effectué.`,
             variant: "default",
             className: "toast-success",
-            duration: 4000
+            duration: 5000
           });
 
           // Fermer la modal - l'utilisateur reste dans l'app
@@ -225,6 +227,17 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
   const currentPlan = subscription?.isTrialing ? null : subscription?.planType;
   const currentCycle = subscription?.billingCycle || 'monthly';
   const recommendedPlan = !subscription || subscription.planType === 'FREE' ? 'PRATIQUE' : 'EXPERT';
+
+  // Nature du changement en cours (pour la modale de récap).
+  // Un changement "vers le bas" (plan moins cher, ou annuel→mensuel) prend effet à l'échéance ;
+  // un upgrade / passage mensuel→annuel est immédiat et proratisé.
+  const changeIsDowngrade = !!pendingUpgrade
+    && (plans[pendingUpgrade.planType]?.price ?? 0) < (plans[pendingUpgrade.currentPlan]?.price ?? 0);
+  const changeIsIntervalDowngrade = currentCycle === 'yearly' && billingCycle === 'monthly';
+  const changeIsDeferred = changeIsDowngrade || changeIsIntervalDowngrade;
+  const currentPlanPriceLabel = currentCycle === 'yearly'
+    ? `${plans[pendingUpgrade?.currentPlan]?.priceYearly}€/an`
+    : `${plans[pendingUpgrade?.currentPlan]?.price}€/mois`;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleModalClose}>
@@ -514,7 +527,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                       <div>
                         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Plan actuel</p>
                         <p className="font-semibold text-foreground">
-                          {plans[pendingUpgrade.currentPlan]?.name} - {plans[pendingUpgrade.currentPlan]?.price}€/mois
+                          {plans[pendingUpgrade.currentPlan]?.name} - {currentPlanPriceLabel}
                         </p>
                       </div>
                     </div>
@@ -534,28 +547,55 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                             : `${pendingUpgrade.planData.price}€/mois`}
                         </p>
                       </div>
-                      <Badge className="bg-accent text-accent-foreground">Upgrade</Badge>
+                      {changeIsDeferred ? (
+                        <Badge className="bg-amber-500 text-white whitespace-nowrap">À l'échéance</Badge>
+                      ) : (
+                        <Badge className="bg-accent text-accent-foreground">Immédiat</Badge>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Informations importantes */}
+                {/* Informations importantes — dépend du sens du changement */}
                 <Card className="card-hover">
                   <CardContent className="pt-5 pb-5">
-                    <div className="text-sm space-y-3">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
-                        <span className="text-foreground">Accès immédiat aux nouvelles fonctionnalités</span>
+                    {changeIsDeferred ? (
+                      <div className="text-sm space-y-3">
+                        <div className="flex items-start gap-2">
+                          <Calendar className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                          <span className="text-foreground">
+                            Le changement prend effet <strong>à la fin de ta période en cours</strong>.
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-accent flex-shrink-0 mt-0.5" />
+                          <span className="text-foreground">
+                            Tu conserves ton plan actuel ({plans[pendingUpgrade.currentPlan]?.name}) jusque-là, sans interruption.
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <CreditCard className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                          <span className="text-foreground">
+                            Aucun remboursement du temps déjà payé, aucun prélèvement aujourd'hui.
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4 text-accent flex-shrink-0" />
-                        <span className="text-foreground">Proratisation automatique sur ta prochaine facture</span>
+                    ) : (
+                      <div className="text-sm space-y-3">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
+                          <span className="text-foreground">Accès immédiat aux nouvelles fonctionnalités</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4 text-accent flex-shrink-0" />
+                          <span className="text-foreground">Proratisation automatique sur ta prochaine facture</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-accent flex-shrink-0" />
+                          <span className="text-foreground">Aucun prélèvement aujourd'hui</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-accent flex-shrink-0" />
-                        <span className="text-foreground">Aucun prélèvement aujourd'hui</span>
-                      </div>
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
 
