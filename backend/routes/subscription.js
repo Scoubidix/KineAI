@@ -22,6 +22,7 @@ router.get('/subscription', authenticate, async (req, res) => {
         subscriptionId: true,
         stripeCustomerId: true,
         planType: true,
+        billingCycle: true,
         trialEndDate: true,
         createdAt: true
       }
@@ -44,6 +45,7 @@ router.get('/subscription', authenticate, async (req, res) => {
       return res.json({
         subscription: {
           planType: getEffectivePlan(kine),
+          billingCycle: kine.billingCycle || 'monthly',
           status: trial.isTrialing ? 'trialing' : 'active',
           currentPeriodEnd: trial.isTrialing ? kine.trialEndDate : null,
           cancelAtPeriodEnd: false,
@@ -80,6 +82,7 @@ router.get('/subscription', authenticate, async (req, res) => {
       res.json({
         subscription: {
           planType: kine.planType,
+          billingCycle: kine.billingCycle || 'monthly',
           status: stripeSub.status,
           currentPeriodEnd: nextPaymentDate,
           cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
@@ -96,6 +99,7 @@ router.get('/subscription', authenticate, async (req, res) => {
       res.json({
         subscription: {
           planType: kine.planType,
+          billingCycle: kine.billingCycle || 'monthly',
           status: 'active',
           currentPeriodEnd: null,
           cancelAtPeriodEnd: false,

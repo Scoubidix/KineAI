@@ -46,6 +46,9 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
   // État pour le code de parrainage
   const [referralCode, setReferralCode] = useState('');
 
+  // Cycle de facturation choisi : 'monthly' | 'yearly'
+  const [billingCycle, setBillingCycle] = useState('monthly');
+
 
   // Récupérer les places restantes pour le plan Pionnier (optimisé)
   const fetchPioneerSlots = useCallback(async () => {
@@ -90,6 +93,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
 
       const payload = {
         planType,
+        billingCycle,
         successUrl: `${window.location.origin}/dashboard/kine/upgrade/success?upgrade=success`,
         cancelUrl: `${window.location.origin}/dashboard/kine/home`,
         ...(referralCode.trim() && { referralCode: referralCode.trim().toUpperCase() })
@@ -141,7 +145,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [referralCode, onClose]);
+  }, [referralCode, billingCycle, onClose]);
 
   // Gérer le clic sur un plan (avec confirmation si nécessaire)
   const handlePlanClick = useCallback((planType) => {
@@ -183,6 +187,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
     setPendingUpgrade(null);
     setCurrentStep('selection');
     setReferralCode('');
+    setBillingCycle('monthly');
     onClose();
   }, [onClose]);
 
@@ -218,6 +223,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
 
   // Pendant l'essai : aucune carte n'est "plan actuel" → toutes sélectionnables (EXPERT inclus).
   const currentPlan = subscription?.isTrialing ? null : subscription?.planType;
+  const currentCycle = subscription?.billingCycle || 'monthly';
   const recommendedPlan = !subscription || subscription.planType === 'FREE' ? 'PRATIQUE' : 'EXPERT';
 
   return (
@@ -246,12 +252,37 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
             {/* Contenu scrollable */}
             <div className="p-3 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6">
 
+              {/* Bascule Mensuel / Annuel */}
+              <div className="flex justify-center">
+                <div className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle('monthly')}
+                    className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                      billingCycle === 'monthly' ? 'bg-background text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Mensuel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle('yearly')}
+                    className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                      billingCycle === 'yearly' ? 'bg-background text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Annuel
+                    <span className="rounded-full bg-[#3899aa]/15 px-2 py-0.5 text-[10px] font-bold text-[#3899aa]">jusqu'à −15 %</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Grid des plans - Style cohérent avec l'app */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 max-w-7xl mx-auto">
                 {Object.values(plans)
                   .filter(plan => isPlanAvailable(plan.type))
                   .map((plan) => {
-                  const isCurrentPlan = currentPlan === plan.type;
+                  const isCurrentPlan = currentPlan === plan.type && currentCycle === billingCycle;
                   const isRecommended = recommendedPlan === plan.type;
                   const isAvailable = isPlanAvailable(plan.type);
 
@@ -299,11 +330,28 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                           }`} />
                         </div>
                         <CardTitle className="text-lg font-semibold text-foreground">{plan.name}</CardTitle>
-                        <div className="text-2xl sm:text-3xl font-bold text-foreground">
-                          {plan.price}€
-                          <span className="text-sm font-normal text-muted-foreground">/mois</span>
-                        </div>
-                        
+                        {billingCycle === 'yearly' ? (
+                          <>
+                            <div className="text-2xl sm:text-3xl font-bold text-foreground">
+                              {plan.priceYearly}€
+                              <span className="text-sm font-normal text-muted-foreground">/an</span>
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              soit {(plan.priceYearly / 12).toFixed(2).replace('.', ',')} €/mois
+                              {plan.price * 12 > plan.priceYearly && (
+                                <span className="ml-1 font-semibold text-[#3899aa]">
+                                  −{Math.round((1 - plan.priceYearly / (plan.price * 12)) * 100)} %
+                                </span>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-2xl sm:text-3xl font-bold text-foreground">
+                            {plan.price}€
+                            <span className="text-sm font-normal text-muted-foreground">/mois</span>
+                          </div>
+                        )}
+
                       </CardHeader>
 
                       <CardContent className="flex flex-col flex-grow px-6 space-y-4">
@@ -481,7 +529,9 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                       <div>
                         <p className="text-xs text-accent font-medium uppercase tracking-wide">Nouveau plan</p>
                         <p className="font-semibold text-foreground">
-                          {pendingUpgrade.planData.name} - {pendingUpgrade.planData.price}€/mois
+                          {pendingUpgrade.planData.name} - {billingCycle === 'yearly'
+                            ? `${pendingUpgrade.planData.priceYearly}€/an`
+                            : `${pendingUpgrade.planData.price}€/mois`}
                         </p>
                       </div>
                       <Badge className="bg-accent text-accent-foreground">Upgrade</Badge>

@@ -39,9 +39,12 @@ async function sendNotification(message) {
 
 /**
  * Notification nouvel abonnement (sans PII)
+ * @param {string} planType - DECLIC | PRATIQUE | PIONNIER | EXPERT
+ * @param {string} billingCycle - 'monthly' | 'yearly'
  */
-async function notifyNewSubscription(planType) {
-  const message = `🎉 <b>Nouvel abonnement !</b>\n\n📋 Plan : <b>${planType}</b>\n🕐 ${new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`;
+async function notifyNewSubscription(planType, billingCycle = 'monthly') {
+  const cycleLabel = billingCycle === 'yearly' ? '📅 Annuel' : '🔁 Mensuel';
+  const message = `🎉 <b>Nouvel abonnement !</b>\n\n📋 Plan : <b>${planType}</b>\n${cycleLabel}\n🕐 ${new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`;
   await sendNotification(message);
 }
 

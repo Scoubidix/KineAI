@@ -14,18 +14,31 @@ class StripeService {
     });
     this.endpointSecret = process.env.STRIPE_ENDPOINT_SECRET;
 
-    // Price IDs Stripe configurés via variables d'environnement
+    // Price IDs Stripe par plan ET par cycle de facturation (variables d'environnement).
+    // Les prix annuels (STRIPE_PRICE_*_ANNUAL) sont optionnels : s'ils sont absents,
+    // l'offre annuelle est simplement indisponible (le checkout renverra une erreur
+    // claire), sans empêcher le démarrage du backend.
     this.priceIds = {
-      'DECLIC': process.env.STRIPE_PRICE_DECLIC,
-      'PRATIQUE': process.env.STRIPE_PRICE_PRATIQUE,
-      'PIONNIER': process.env.STRIPE_PRICE_PIONNIER,
-      'EXPERT': process.env.STRIPE_PRICE_EXPERT,
+      'DECLIC': { monthly: process.env.STRIPE_PRICE_DECLIC, yearly: process.env.STRIPE_PRICE_DECLIC_ANNUAL },
+      'PRATIQUE': { monthly: process.env.STRIPE_PRICE_PRATIQUE, yearly: process.env.STRIPE_PRICE_PRATIQUE_ANNUAL },
+      'PIONNIER': { monthly: process.env.STRIPE_PRICE_PIONNIER, yearly: process.env.STRIPE_PRICE_PIONNIER_ANNUAL },
+      'EXPERT': { monthly: process.env.STRIPE_PRICE_EXPERT, yearly: process.env.STRIPE_PRICE_EXPERT_ANNUAL },
     };
 
-    // Map inversée price → plan (construite dynamiquement)
+    // Map inversée priceId → { planType, cycle } (construite dynamiquement)
     this.planFromPrice = {};
-    for (const [plan, priceId] of Object.entries(this.priceIds)) {
-      if (priceId) this.planFromPrice[priceId] = plan;
+    for (const [plan, byCycle] of Object.entries(this.priceIds)) {
+      for (const [cycle, priceId] of Object.entries(byCycle)) {
+        if (priceId) this.planFromPrice[priceId] = { planType: plan, cycle };
+      }
+    }
+
+    // Avertissement non bloquant si des prix annuels ne sont pas encore configurés
+    const missingAnnual = Object.entries(this.priceIds)
+      .filter(([, byCycle]) => !byCycle.yearly)
+      .map(([plan]) => plan);
+    if (missingAnnual.length) {
+      logger.warn(`⚠️ Prix annuels Stripe non configurés (${missingAnnual.join(', ')}) — offre annuelle indisponible pour ces plans tant que STRIPE_PRICE_*_ANNUAL n'est pas défini.`);
     }
   }
 
@@ -38,7 +51,7 @@ class StripeService {
    * @param {string} referralCode - Code de parrainage (optionnel)
    * @returns {Promise<Object>} - Session de checkout
    */
-  async createCheckoutSession(kineId, planType, successUrl, cancelUrl, referralCode = null) {
+  async createCheckoutSession(kineId, planType, successUrl, cancelUrl, referralCode = null, billingCycle = 'monthly') {
     try {
       // Récupérer le kiné pour créer/récupérer le customer
       const prisma = prismaService.getInstance();
@@ -70,10 +83,10 @@ class StripeService {
         });
       }
 
-      // Obtenir le Price ID selon le plan
-      const priceId = this.getPriceIdFromPlanType(planType);
+      // Obtenir le Price ID selon le plan et le cycle (mensuel/annuel)
+      const priceId = this.getPriceId(planType, billingCycle);
       if (!priceId) {
-        throw new Error(`Plan ${planType} non trouvé`);
+        throw new Error(`Prix introuvable pour ${planType} (${billingCycle}). Vérifie STRIPE_PRICE_${planType}${billingCycle === 'yearly' ? '_ANNUAL' : ''}.`);
       }
 
       // Vérifier disponibilité pour plan limité
@@ -107,11 +120,15 @@ class StripeService {
         custom_text: {
           terms_of_service_acceptance: {
             message: `J'accepte les [Conditions Générales de Vente](${process.env.FRONTEND_URL}/legal/cgv.html) de Mon Assistant Kiné.`
+          },
+          submit: {
+            message: "En validant, vous demandez l'exécution immédiate du service et reconnaissez renoncer à votre droit de rétractation une fois l'accès activé."
           }
         },
         metadata: {
           kineId: kineId.toString(),
           planType: planType,
+          billingCycle: billingCycle,
           source: 'kineai_paywall',
           ...(referralCode && { referralCode: referralCode }) // Code parrainage si présent
         },
@@ -119,6 +136,7 @@ class StripeService {
           metadata: {
             kineId: kineId.toString(),
             planType: planType,
+            billingCycle: billingCycle,
             source: 'kineai_paywall',
             ...(referralCode && { referralCode: referralCode })
           }
@@ -136,21 +154,41 @@ class StripeService {
   }
 
   /**
-   * Obtenir le Price ID Stripe selon le type de plan
+   * Obtenir le Price ID Stripe selon le plan et le cycle de facturation
    * @param {string} planType - Type de plan
-   * @returns {string} - Price ID Stripe
+   * @param {string} cycle - 'monthly' | 'yearly'
+   * @returns {string|null} - Price ID Stripe
    */
-  getPriceIdFromPlanType(planType) {
-    return this.priceIds[planType] || null;
+  getPriceId(planType, cycle = 'monthly') {
+    const key = cycle === 'yearly' ? 'yearly' : 'monthly';
+    return this.priceIds[planType]?.[key] || null;
   }
 
   /**
-   * Extraire le type de plan depuis un price ID Stripe
+   * Rétro-compat : Price ID mensuel d'un plan
+   * @param {string} planType - Type de plan
+   * @returns {string|null} - Price ID Stripe (mensuel)
+   */
+  getPriceIdFromPlanType(planType) {
+    return this.getPriceId(planType, 'monthly');
+  }
+
+  /**
+   * Extraire le type de plan depuis un price ID Stripe (mensuel OU annuel)
    * @param {string} priceId - ID du prix Stripe
-   * @returns {string} - Type de plan (DECLIC, PRATIQUE, PIONNIER, EXPERT)
+   * @returns {string|null} - Type de plan (DECLIC, PRATIQUE, PIONNIER, EXPERT)
    */
   getPlanTypeFromPriceId(priceId) {
-    return this.planFromPrice[priceId] || null;
+    return this.planFromPrice[priceId]?.planType || null;
+  }
+
+  /**
+   * Extraire le cycle de facturation depuis un price ID Stripe
+   * @param {string} priceId - ID du prix Stripe
+   * @returns {string} - 'monthly' | 'yearly' (défaut 'monthly' si inconnu)
+   */
+  getCycleFromPriceId(priceId) {
+    return this.planFromPrice[priceId]?.cycle || 'monthly';
   }
 
   /**
@@ -265,7 +303,7 @@ class StripeService {
    * @param {string} newPlanType - Nouveau type de plan
    * @returns {Promise<Object>} - Abonnement modifié
    */
-  async changePlan(kineId, newPlanType) {
+  async changePlan(kineId, newPlanType, newCycle = 'monthly') {
     try {
       const prisma = prismaService.getInstance();
 
@@ -286,15 +324,48 @@ class StripeService {
         }
       }
 
-      const newPriceId = this.getPriceIdFromPlanType(newPlanType);
+      const newPriceId = this.getPriceId(newPlanType, newCycle);
       if (!newPriceId) {
-        throw new Error(`Plan ${newPlanType} non trouvé`);
+        throw new Error(`Prix introuvable pour ${newPlanType} (${newCycle}). Vérifie STRIPE_PRICE_${newPlanType}${newCycle === 'yearly' ? '_ANNUAL' : ''}.`);
       }
 
       // Récupérer l'abonnement actuel
       const subscription = await this.stripe.subscriptions.retrieve(kine.subscriptionId);
+      const currentPriceId = subscription.items.data[0].price.id;
+      const currentCycle = this.getCycleFromPriceId(currentPriceId);
 
-      // Préparer les données de mise à jour
+      // ── Downgrade d'intervalle annuel → mensuel : DIFFÉRÉ à l'échéance ──
+      // On ne rembourse jamais l'annuel non consommé : on garde l'annuel jusqu'à la
+      // fin de la période payée, puis on bascule en mensuel via un Subscription Schedule.
+      if (currentCycle === 'yearly' && newCycle === 'monthly') {
+        const schedule = await this.stripe.subscriptionSchedules.create({
+          from_subscription: subscription.id,
+        });
+        const phase0 = schedule.phases[0];
+        const updated = await this.stripe.subscriptionSchedules.update(schedule.id, {
+          end_behavior: 'release',
+          phases: [
+            // Phase courante : on conserve l'annuel jusqu'à son terme
+            {
+              items: [{ price: currentPriceId, quantity: 1 }],
+              start_date: phase0.start_date,
+              end_date: phase0.end_date,
+            },
+            // Phase suivante : bascule mensuelle (nouveau plan/cycle)
+            {
+              items: [{ price: newPriceId, quantity: 1 }],
+            },
+          ],
+        });
+        logger.info(`🗓️ Bascule annuel→mensuel programmée à l'échéance pour l'abonnement ${subscription.id}`);
+        return {
+          scheduled: true,
+          scheduleId: updated.id,
+          effectiveDate: phase0.end_date ? new Date(phase0.end_date * 1000) : null,
+        };
+      }
+
+      // ── Autres cas (mensuel→annuel, ou changement de plan même cycle) : IMMÉDIAT proraté ──
       const updateData = {
         items: [{
           id: subscription.items.data[0].id,

@@ -310,10 +310,12 @@ async function handleCheckoutCompleted(session, eventId) {
 
     // Mise à jour avec retry et logging détaillé
     try {
+      const billingCycle = session.metadata?.billingCycle === 'yearly' ? 'yearly' : 'monthly';
       const updateData = {
         stripeCustomerId: session.customer,
         subscriptionId: session.subscription,
         planType: planType,
+        billingCycle: billingCycle,
         subscriptionStatus: 'ACTIVE',
         subscriptionStartDate: new Date(),
       };
@@ -342,7 +344,7 @@ async function handleCheckoutCompleted(session, eventId) {
 
       // ========== NOTIFICATION TELEGRAM ==========
       try {
-        await notifyNewSubscription(planType);
+        await notifyNewSubscription(planType, billingCycle);
       } catch (telegramError) {
         logger.error(`⚠️ [${eventId}] Erreur Telegram (non bloquante):`, telegramError.message);
       }
@@ -463,16 +465,18 @@ async function handleSubscriptionCreated(subscription, eventId) {
       return { success: false, message: error };
     }
     
-    const planType = stripeService.getPlanTypeFromPriceId(subscription.items.data[0].price.id);
+    const priceId = subscription.items.data[0].price.id;
+    const planType = stripeService.getPlanTypeFromPriceId(priceId);
     if (!planType) {
-      const error = `Plan non identifié pour price: ${subscription.items.data[0].price.id}`;
+      const error = `Plan non identifié pour price: ${priceId}`;
       logger.error(`❌ [${eventId}] ${error}`);
       return { success: false, message: error };
     }
-    
+
     // Gestion sécurisée des timestamps Stripe (peuvent être undefined lors de la création)
     const updateData = {
       planType: planType,
+      billingCycle: stripeService.getCycleFromPriceId(priceId),
       subscriptionStatus: stripeService.mapSubscriptionStatus(subscription.status),
       trialEndDate: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
     };
@@ -533,7 +537,9 @@ async function handleSubscriptionUpdated(subscription, eventId) {
       return { success: false, message: error };
     }
     
-    const planType = stripeService.getPlanTypeFromPriceId(subscription.items.data[0].price.id);
+    const priceId = subscription.items.data[0].price.id;
+    const planType = stripeService.getPlanTypeFromPriceId(priceId);
+    const billingCycle = stripeService.getCycleFromPriceId(priceId);
     const newStatus = stripeService.mapSubscriptionStatus(subscription.status);
     
     logger.debug(`🔍 [${eventId}] Debug dates (webhook):`, {
@@ -561,8 +567,9 @@ async function handleSubscriptionUpdated(subscription, eventId) {
       where: { id: kine.id },
       data: {
         planType: planType,
+        billingCycle: billingCycle,
         subscriptionStatus: newStatus,
-        subscriptionStartDate: fullSubscription.items?.data?.[0]?.current_period_start ? 
+        subscriptionStartDate: fullSubscription.items?.data?.[0]?.current_period_start ?
           new Date(fullSubscription.items.data[0].current_period_start * 1000) : null,
         subscriptionEndDate: fullSubscription.items?.data?.[0]?.current_period_end ? 
           new Date(fullSubscription.items.data[0].current_period_end * 1000) : null,

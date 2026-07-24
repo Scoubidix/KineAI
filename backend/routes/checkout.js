@@ -11,15 +11,17 @@ router.post('/create-checkout', authenticate, stripePaymentLimiter, async (req, 
   try {
     const prisma = prismaService.getInstance();
     const { planType, successUrl, cancelUrl, referralCode } = req.body;
+    const billingCycle = req.body.billingCycle === 'yearly' ? 'yearly' : 'monthly';
 
     // Récupérer le kiné avec ses infos d'abonnement
     const kine = await prisma.kine.findUnique({
       where: { uid: req.uid },
-      select: { 
-        id: true, 
-        subscriptionId: true, 
+      select: {
+        id: true,
+        subscriptionId: true,
         planType: true,
-        subscriptionStatus: true 
+        billingCycle: true,
+        subscriptionStatus: true
       }
     });
 
@@ -55,26 +57,30 @@ router.post('/create-checkout', authenticate, stripePaymentLimiter, async (req, 
       // Changement de plan pour abonnement existant
       logger.log(`🔄 Changement de plan détecté: ${kine.planType} → ${planType}`);
       
-      // Vérifier si c'est vraiment un changement (éviter les doublons)
-      if (kine.planType === planType) {
-        return res.status(400).json({ 
+      // Vérifier si c'est vraiment un changement (plan OU cycle différent)
+      const currentCycle = kine.billingCycle || 'monthly';
+      if (kine.planType === planType && currentCycle === billingCycle) {
+        return res.status(400).json({
           error: 'Vous avez déjà ce plan',
-          currentPlan: kine.planType 
+          currentPlan: kine.planType
         });
       }
-      
+
       try {
-        const result = await StripeService.changePlan(kineId, planType);
-        
-        logger.log(`✅ Plan changé avec succès: ${kine.planType} → ${planType}`);
-        
-        // Retourner une URL de succès directement (pas de checkout)
+        const result = await StripeService.changePlan(kineId, planType, billingCycle);
+
+        logger.log(`✅ Plan changé: ${kine.planType}/${currentCycle} → ${planType}/${billingCycle}`);
+
+        // Retourner une URL de succès directement (pas de checkout).
+        // result.scheduled = true quand la bascule est différée à l'échéance (annuel→mensuel).
         return res.json({
           url: `${defaultSuccessUrl}?change=success&from=${kine.planType}&to=${planType}`,
           type: 'plan_change',
+          scheduled: !!result.scheduled,
+          effectiveDate: result.effectiveDate || null,
           subscription: {
-            id: result.id,
-            status: result.status,
+            id: result.id || null,
+            status: result.status || null,
             previousPlan: kine.planType,
             newPlan: planType
           }
@@ -133,7 +139,8 @@ router.post('/create-checkout', authenticate, stripePaymentLimiter, async (req, 
         planType,
         defaultSuccessUrl,
         defaultCancelUrl,
-        validatedReferralCode
+        validatedReferralCode,
+        billingCycle
       );
 
       res.json({
@@ -219,6 +226,7 @@ router.post('/change-plan', authenticate, stripePaymentLimiter, async (req, res)
   try {
     const prisma = prismaService.getInstance();
     const { newPlanType } = req.body;
+    const billingCycle = req.body.billingCycle === 'yearly' ? 'yearly' : 'monthly';
 
     // Récupérer le kiné via son UID Firebase
     const kine = await prisma.kine.findUnique({
@@ -242,11 +250,12 @@ router.post('/change-plan', authenticate, stripePaymentLimiter, async (req, res)
     }
 
     try {
-      const result = await StripeService.changePlan(kineId, newPlanType);
+      const result = await StripeService.changePlan(kineId, newPlanType, billingCycle);
 
       res.json({
         success: true,
-        subscription: result.subscription,
+        scheduled: !!result.scheduled,
+        subscription: result.subscription || result,
         newPlan: newPlanType,
         effectiveDate: result.effectiveDate
       });
