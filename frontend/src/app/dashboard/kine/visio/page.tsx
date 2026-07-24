@@ -7,9 +7,19 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Video, X, Pencil, Send, FileText, Search, Archive, ArchiveRestore } from 'lucide-react';
+import { Plus, Video, X, Pencil, Send, FileText, Search, Archive, ArchiveRestore, Lock } from 'lucide-react';
 import { matchesAllTokens } from '@/utils/textSearch';
 import { useToast } from '@/hooks/use-toast';
+import { usePaywall } from '@/hooks/usePaywall';
+import { PaywallModal } from '@/components/PaywallModal';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import NouveauVisioModal from './components/NouveauVisioModal';
 import RescheduleVisioModal from './components/RescheduleVisioModal';
 import ResendLinkModal from './components/ResendLinkModal';
@@ -96,6 +106,18 @@ export default function VisioPage() {
   const [resendTarget, setResendTarget] = useState<VisioSeance | null>(null);
   const [crTarget, setCrTarget] = useState<VisioSeance | null>(null);
   const { toast } = useToast();
+
+  // Paywall : la vidéotransmission est réservée aux plans Pratique/Pionnier/Expert.
+  // Seule la création d'un nouveau RDV est bloquée ; le reste (liste, historique,
+  // archives, gestion des séances existantes) reste accessible.
+  const { canAccessFeature, isLoading: paywallLoading, subscription } = usePaywall();
+  const [paywallOpen, setPaywallOpen] = useState(false);      // modale de choix des abos
+  const [featureModalOpen, setFeatureModalOpen] = useState(false); // mini-modal d'accès
+  const handleNewRdv = () => {
+    if (paywallLoading) return; // clic ignoré pendant le chargement (bref)
+    if (canAccessFeature('VIDEO_TRANSMISSION')) setModalOpen(true);
+    else setFeatureModalOpen(true);
+  };
 
   // --- Historique : bascule Récentes / Archivées ---
   const [histView, setHistView] = useState<'recent' | 'archived'>('recent');
@@ -385,7 +407,7 @@ export default function VisioPage() {
             </div>
           </div>
           <Button
-            onClick={() => setModalOpen(true)}
+            onClick={handleNewRdv}
             className="gap-2 bg-white font-semibold text-primary hover:bg-white/90"
           >
             <Plus className="h-4 w-4" />
@@ -530,7 +552,7 @@ export default function VisioPage() {
                         {tab === 'a-venir' ? 'Aucune séance sur cette période.' : 'Aucune séance passée.'}
                       </p>
                       {tab === 'a-venir' && (
-                        <Button onClick={() => setModalOpen(true)} className="btn-teal mt-4 gap-2">
+                        <Button onClick={handleNewRdv} className="btn-teal mt-4 gap-2">
                           <Plus className="h-4 w-4" />
                           Nouveau RDV
                         </Button>
@@ -589,6 +611,35 @@ export default function VisioPage() {
           onSaved={() => fetchSeances(true)}
         />
       )}
+
+      {/* Mini-modal d'accès : message + « Voir les plans » → modale de choix des abos */}
+      <Dialog open={featureModalOpen} onOpenChange={setFeatureModalOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-[#3899aa]/10">
+              <Lock className="h-6 w-6 text-[#3899aa]" />
+            </div>
+            <DialogTitle className="text-center">Fonctionnalité non disponible</DialogTitle>
+            <DialogDescription className="text-center">
+              Cette fonctionnalité n'est pas disponible pour votre plan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center">
+            <Button
+              className="btn-teal gap-2"
+              onClick={() => { setFeatureModalOpen(false); setPaywallOpen(true); }}
+            >
+              Voir les plans
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <PaywallModal
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        subscription={subscription}
+      />
     </div>
   );
 }

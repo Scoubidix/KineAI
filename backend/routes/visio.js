@@ -5,12 +5,13 @@ const controller = require('../controllers/visioController');
 const { authenticate } = require('../middleware/authenticate');
 const { authenticateVisioPatient } = require('../middleware/visioPatientAuth');
 const { crudWriteLimiter } = require('../middleware/rateLimiter');
+const { requireFeature } = require('../middleware/authorization');
 
 // Upload en mémoire (pass-through vers Brevo, jamais stocké sur disque/GCS)
 const uploadDoc = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 // ---- Kiné ----
-router.post('/seances', authenticate, crudWriteLimiter, controller.createSeance);
+router.post('/seances', authenticate, crudWriteLimiter, requireFeature('VIDEO_TRANSMISSION'), controller.createSeance);
 router.get('/seances', authenticate, controller.listSeances);
 router.post('/seances/archive', authenticate, crudWriteLimiter, controller.archiveSeances);
 router.get('/seances/:id', authenticate, controller.getSeance);

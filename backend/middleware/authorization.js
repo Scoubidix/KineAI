@@ -22,6 +22,14 @@ const RECOMMENDED_PLAN_BY_ASSISTANT = {
   'TEMPLATES_ADMIN': 'PIONNIER'
 };
 
+// Features non-IA gatées par plan (hors ASSISTANTS_BY_PLAN, qui ne couvre que les IA).
+const FEATURE_ALLOWED_PLANS = {
+  'VIDEO_TRANSMISSION': ['PRATIQUE', 'PIONNIER', 'EXPERT']
+};
+const RECOMMENDED_PLAN_BY_FEATURE = {
+  'VIDEO_TRANSMISSION': 'PRATIQUE'
+};
+
 /**
  * Middleware pour vérifier si le kiné peut créer un nouveau programme
  */
@@ -192,6 +200,49 @@ const requireAssistantOrPreview = (assistantType) => {
 };
 
 /**
+ * Middleware générique pour gater une feature non-IA par plan (ex: vidéotransmission).
+ * S'appuie sur le plan effectif (getEffectivePlan) → l'essai gratuit EXPERT passe.
+ * @param {string} featureKey - Clé dans FEATURE_ALLOWED_PLANS
+ */
+const requireFeature = (featureKey) => {
+  return async (req, res, next) => {
+    try {
+      const prisma = prismaService.getInstance();
+      const kine = await prisma.kine.findUnique({
+        where: { uid: req.uid },
+        select: { id: true, planType: true, trialEndDate: true }
+      });
+
+      if (!kine) {
+        return res.status(404).json({ error: 'Kinésithérapeute non trouvé' });
+      }
+
+      const planType = getEffectivePlan(kine);
+      const allowedPlans = FEATURE_ALLOWED_PLANS[featureKey] || [];
+
+      if (!allowedPlans.includes(planType)) {
+        return res.status(403).json({
+          error: 'Fonctionnalité non autorisée',
+          code: 'PLAN_REQUIRED',
+          message: `Cette fonctionnalité n'est pas disponible avec votre plan ${planType}`,
+          feature: featureKey,
+          currentPlan: planType,
+          recommendedPlan: RECOMMENDED_PLAN_BY_FEATURE[featureKey] || 'PRATIQUE'
+        });
+      }
+
+      req.kineId = kine.id;
+      req.planType = planType;
+      next();
+
+    } catch (error) {
+      logger.error('Erreur vérification feature:', error);
+      res.status(500).json({ error: 'Erreur interne du serveur' });
+    }
+  };
+};
+
+/**
  * Helper pour récupérer les informations du plan actuel
  */
 const getPlanInfo = async (req, res, next) => {
@@ -274,6 +325,7 @@ module.exports = {
   canCreateProgramme,
   requireAssistant,
   requireAssistantOrPreview,
+  requireFeature,
   getPlanInfo,
   requireAdmin
 };

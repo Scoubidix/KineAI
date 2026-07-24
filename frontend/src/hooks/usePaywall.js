@@ -32,6 +32,10 @@ export const usePaywall = () => {
         // Module administratif (courriers, templates)
         return ['PIONNIER', 'EXPERT'].includes(currentPlan);
 
+      case 'VIDEO_TRANSMISSION':
+        // Outil de vidéotransmission (télésoin) — dès le plan Pratique
+        return ['PRATIQUE', 'PIONNIER', 'EXPERT'].includes(currentPlan);
+
       default:
         return false;
     }
