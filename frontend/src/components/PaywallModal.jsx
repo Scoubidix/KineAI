@@ -46,8 +46,8 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
   // État pour le code de parrainage
   const [referralCode, setReferralCode] = useState('');
 
-  // Cycle de facturation choisi : 'monthly' | 'yearly'
-  const [billingCycle, setBillingCycle] = useState('monthly');
+  // Cycle de facturation choisi : 'monthly' | 'yearly' (annuel mis en avant par défaut)
+  const [billingCycle, setBillingCycle] = useState('yearly');
 
 
   // Récupérer les places restantes pour le plan Pionnier (optimisé)
@@ -189,7 +189,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
     setPendingUpgrade(null);
     setCurrentStep('selection');
     setReferralCode('');
-    setBillingCycle('monthly');
+    setBillingCycle('yearly');
     onClose();
   }, [onClose]);
 
@@ -352,14 +352,16 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                               {plan.priceYearly}€
                               <span className="text-sm font-normal text-muted-foreground">/an</span>
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              soit {(plan.priceYearly / 12).toFixed(2).replace('.', ',')} €/mois
-                              {plan.price * 12 > plan.priceYearly && (
-                                <span className="ml-1 font-semibold text-[#3899aa]">
-                                  −{Math.round((1 - plan.priceYearly / (plan.price * 12)) * 100)} %
+                            {plan.price * 12 > plan.priceYearly && (
+                              <div className="mt-2 flex flex-col items-center gap-1">
+                                <span className="inline-flex items-center rounded-full bg-[#3899aa] px-3 py-1 text-sm font-extrabold text-white shadow-sm">
+                                  −{Math.round((1 - plan.priceYearly / (plan.price * 12)) * 100)} % vs mensuel
                                 </span>
-                              )}
-                            </div>
+                                <span className="text-xs text-muted-foreground">
+                                  soit {(plan.priceYearly / 12).toFixed(2).replace('.', ',')} €/mois
+                                </span>
+                              </div>
+                            )}
                           </>
                         ) : (
                           <div className="text-2xl sm:text-3xl font-bold text-foreground">

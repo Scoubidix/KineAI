@@ -1641,7 +1641,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
                           <Crown className="h-4 w-4 text-[#3899aa]" />
                           <p className="text-sm font-bold text-foreground">Plan {currentPlan.name}</p>
                         </div>
-                        <p className="text-xs text-muted-foreground">{currentPlan.price}€/mois</p>
+                        <p className="text-xs text-muted-foreground">
+                          {headerSubscription.billingCycle === 'yearly'
+                            ? `${currentPlan.priceYearly}€/an`
+                            : `${currentPlan.price}€/mois`}
+                        </p>
                       </div>
                       <div className="p-3">
                         <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Inclus dans ton plan</p>
