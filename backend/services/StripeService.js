@@ -192,6 +192,36 @@ class StripeService {
   }
 
   /**
+   * Récupère le changement d'abonnement programmé (downgrade différé) s'il existe.
+   * @param {Object} subscription - Abonnement Stripe déjà récupéré (doit inclure .schedule)
+   * @returns {Promise<{planType: string, billingCycle: string, effectiveDate: Date|null}|null>}
+   */
+  async getScheduledChange(subscription) {
+    if (!subscription?.schedule) return null;
+    try {
+      const scheduleId = typeof subscription.schedule === 'string'
+        ? subscription.schedule
+        : subscription.schedule.id;
+      const schedule = await this.stripe.subscriptionSchedules.retrieve(scheduleId);
+      const phases = schedule.phases || [];
+      if (phases.length < 2) return null;
+      // La dernière phase = plan/cycle cible ; sa date de début = date d'effet du changement.
+      const nextPhase = phases[phases.length - 1];
+      const priceId = nextPhase.items?.[0]?.price;
+      const planType = this.getPlanTypeFromPriceId(priceId);
+      if (!planType) return null;
+      return {
+        planType,
+        billingCycle: this.getCycleFromPriceId(priceId),
+        effectiveDate: nextPhase.start_date ? new Date(nextPhase.start_date * 1000) : null,
+      };
+    } catch (error) {
+      logger.warn('Erreur lecture changement programmé:', error.message);
+      return null;
+    }
+  }
+
+  /**
    * Vérifier la disponibilité d'un plan limité (Plan Pionnier)
    * @param {string} planType - Type de plan à vérifier
    * @returns {Promise<Object>} - {available: boolean, remaining: number}
@@ -330,7 +360,19 @@ class StripeService {
       }
 
       // Récupérer l'abonnement actuel
-      const subscription = await this.stripe.subscriptions.retrieve(kine.subscriptionId);
+      let subscription = await this.stripe.subscriptions.retrieve(kine.subscriptionId);
+
+      // Si un changement est déjà programmé (Subscription Schedule attaché), on le libère
+      // pour repartir d'une base propre. Évite l'erreur Stripe "subscription already has a
+      // schedule" et permet de re-changer d'avis autant de fois que voulu.
+      if (subscription.schedule) {
+        const existingScheduleId = typeof subscription.schedule === 'string'
+          ? subscription.schedule
+          : subscription.schedule.id;
+        await this.stripe.subscriptionSchedules.release(existingScheduleId);
+        subscription = await this.stripe.subscriptions.retrieve(kine.subscriptionId);
+      }
+
       const currentPriceId = subscription.items.data[0].price.id;
       const currentCycle = this.getCycleFromPriceId(currentPriceId);
       const currentPlanType = this.getPlanTypeFromPriceId(currentPriceId);

@@ -79,6 +79,9 @@ router.get('/subscription', authenticate, async (req, res) => {
         }
       }
 
+      // Changement d'abonnement programmé (downgrade différé) le cas échéant
+      const pendingChange = await StripeService.getScheduledChange(stripeSub);
+
       res.json({
         subscription: {
           planType: kine.planType,
@@ -91,6 +94,7 @@ router.get('/subscription', authenticate, async (req, res) => {
           trialEndDate: null,
           daysLeft: 0,
           trialEligible: false,
+          pendingChange,
         },
         kine: kineInfo
       });

@@ -29,6 +29,7 @@ import { plans, getChatQuotaLabel } from '@/config/plans';
 
 interface SubscriptionData {
   planType: string | null;
+  billingCycle?: string;
   status: string;
   currentPeriodEnd: string | null;
   createdAt: string;
@@ -92,6 +93,7 @@ function UpgradeSuccessContent() {
       `Assistant IA — ${getChatQuotaLabel(planType)}`
     ];
     if (plan.features.iaBilans) items.push('Génération de bilans');
+    if (plan.features.videoTransmission) items.push('Outil de vidéotransmission');
     if (plan.features.moduleAdmin) items.push('Module administratif (courriers et templates)');
     return items;
   };
@@ -248,7 +250,11 @@ function UpgradeSuccessContent() {
                   <CreditCard className="h-6 w-6 text-accent" />
                   <div>
                     <p className="font-semibold">Montant facturé</p>
-                    <p className="text-3xl font-bold text-primary">{planDetails.price}€/mois</p>
+                    <p className="text-3xl font-bold text-primary">
+                      {subscription?.billingCycle === 'yearly'
+                        ? `${planDetails.priceYearly}€/an`
+                        : `${planDetails.price}€/mois`}
+                    </p>
                   </div>
                 </div>
                 

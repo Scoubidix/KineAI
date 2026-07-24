@@ -869,7 +869,9 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                             </div>
                             <p className="text-sm text-muted-foreground mt-1">
                               {subscription ?
-                                `${getPlanByType(subscription.planType).price}€/mois` :
+                                (subscription.billingCycle === 'yearly'
+                                  ? `${getPlanByType(subscription.planType).priceYearly}€/an`
+                                  : `${getPlanByType(subscription.planType).price}€/mois`) :
                                 'Plan gratuit limité'
                               }
                             </p>
@@ -879,6 +881,16 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                                   ? `Accès jusqu'au ${new Date(subscription.currentPeriodEnd).toLocaleDateString('fr-FR')}`
                                   : `Prochain paiement : ${new Date(subscription.currentPeriodEnd).toLocaleDateString('fr-FR')}`
                                 }
+                              </p>
+                            )}
+                            {subscription?.pendingChange && (
+                              <p className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">
+                                <Calendar className="h-3.5 w-3.5" />
+                                Changement programmé : {getPlanByType(subscription.pendingChange.planType).name}
+                                {subscription.pendingChange.billingCycle === 'yearly' ? ' (annuel)' : ' (mensuel)'}
+                                {subscription.pendingChange.effectiveDate
+                                  ? ` le ${new Date(subscription.pendingChange.effectiveDate).toLocaleDateString('fr-FR')}`
+                                  : ''}
                               </p>
                             )}
                           </div>
