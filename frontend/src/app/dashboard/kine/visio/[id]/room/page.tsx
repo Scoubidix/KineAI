@@ -116,6 +116,8 @@ function playBeep() {
     gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
     oscillator.start(ctx.currentTime);
     oscillator.stop(ctx.currentTime + 0.3);
+    // Libère le contexte une fois le bip joué (évite l'accumulation d'AudioContext).
+    oscillator.onended = () => ctx.close().catch(() => {});
   } catch {
     // Navigateur sans AudioContext : pas grave
   }
@@ -210,6 +212,26 @@ export default function KineVisioRoomPage() {
     if (notesTimer.current) { clearTimeout(notesTimer.current); notesTimer.current = null; }
     try { await saveCompteRendu(seanceId, notes); } catch { /* noop */ }
   }, [seanceId, notes]);
+  // Dernière valeur des notes, lisible sans figer de closure (pour le flush au démontage).
+  const notesRef = useRef(notes);
+  useEffect(() => { notesRef.current = notes; }, [notes]);
+  // Flush si on quitte la page pendant la fenêtre de debounce (navigation SPA, back, refresh).
+  // On ne sauvegarde que s'il reste un save en attente. beforeunload = best-effort (fermeture
+  // d'onglet : le navigateur peut annuler la requête, mais le refresh passe souvent).
+  useEffect(() => {
+    const saveIfPending = () => {
+      if (notesTimer.current) {
+        clearTimeout(notesTimer.current);
+        notesTimer.current = null;
+        saveCompteRendu(seanceId, notesRef.current).catch(() => {/* noop */});
+      }
+    };
+    window.addEventListener('beforeunload', saveIfPending);
+    return () => {
+      window.removeEventListener('beforeunload', saveIfPending);
+      saveIfPending(); // démontage (navigation SPA) : le contexte JS persiste, le fetch aboutit
+    };
+  }, [seanceId]);
 
   // Programme actif du patient (pour le panneau fin de séance : créer si aucun, sinon modifier)
   // undefined = pas encore chargé ; null = aucun programme actif ; objet = programme à modifier

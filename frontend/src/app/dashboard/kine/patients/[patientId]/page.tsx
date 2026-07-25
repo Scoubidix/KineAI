@@ -668,7 +668,7 @@ export default function PatientDetailPage() {
                           </Button>
                           <ProgrammeModal
                             open={openEditModal && editingProgramme?.id === programme.id}
-                            onOpenChange={setOpenEditModal}
+                            onOpenChange={(o) => { setOpenEditModal(o); if (!o) setEditingProgramme(null); }}
                             patientId={parseInt(patientId as string, 10)}
                             programme={editingProgramme ?? undefined}
                             onCreated={async () => { await refreshProgrammes(); }}

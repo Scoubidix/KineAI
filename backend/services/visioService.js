@@ -15,6 +15,7 @@ class VisioError extends Error {
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
 const RESEND_COOLDOWN_MS = 2 * 60 * 1000; // 2 min entre 2 renvois de lien pour une même séance
+const CLOSED_STATUSES = ['CANCELLED', 'ENDED']; // états terminaux : ne jamais les écraser
 
 async function createSeance(kineId, { patientId, scheduledAt, deliveryChannel, prereqsAttested }) {
   if (prereqsAttested !== true) {
@@ -30,7 +31,7 @@ async function createSeance(kineId, { patientId, scheduledAt, deliveryChannel, p
 
   const prisma = prismaService.getInstance();
   const patient = await prisma.patient.findFirst({
-    where: { id: parseInt(patientId), kineId, isActive: true },
+    where: { id: parseInt(patientId, 10), kineId, isActive: true },
   });
   if (!patient) {
     throw new VisioError('Patient introuvable', 'PATIENT_NOT_FOUND', 404);
@@ -86,7 +87,7 @@ async function listSeances(kineId, { archived = false } = {}) {
 async function getSeanceForKine(kineId, seanceId) {
   const prisma = prismaService.getInstance();
   return prisma.visioSeance.findFirst({
-    where: { id: parseInt(seanceId), kineId, isActive: true },
+    where: { id: parseInt(seanceId, 10), kineId, isActive: true },
     include: { patient: { select: { id: true, firstName: true, lastName: true } } },
   });
 }
@@ -94,7 +95,7 @@ async function getSeanceForKine(kineId, seanceId) {
 async function requireOwnedSeance(kineId, seanceId) {
   const prisma = prismaService.getInstance();
   const seance = await prisma.visioSeance.findFirst({
-    where: { id: parseInt(seanceId), kineId, isActive: true },
+    where: { id: parseInt(seanceId, 10), kineId, isActive: true },
   });
   if (!seance) throw new VisioError('Seance introuvable', 'SEANCE_NOT_FOUND', 404);
   return seance;
@@ -104,7 +105,7 @@ async function setConsent(kineId, seanceId) {
   await requireOwnedSeance(kineId, seanceId);
   const prisma = prismaService.getInstance();
   return prisma.visioSeance.update({
-    where: { id: parseInt(seanceId) },
+    where: { id: parseInt(seanceId, 10) },
     data: { consentOralAt: new Date() },
   });
 }
@@ -113,7 +114,7 @@ async function cancelSeance(kineId, seanceId) {
   await requireOwnedSeance(kineId, seanceId);
   const prisma = prismaService.getInstance();
   return prisma.visioSeance.update({
-    where: { id: parseInt(seanceId) },
+    where: { id: parseInt(seanceId, 10) },
     data: { status: 'CANCELLED' },
   });
 }
@@ -155,7 +156,7 @@ async function unarchiveSeance(kineId, seanceId) {
   await requireOwnedSeance(kineId, seanceId);
   const prisma = prismaService.getInstance();
   return prisma.visioSeance.update({
-    where: { id: parseInt(seanceId) },
+    where: { id: parseInt(seanceId, 10) },
     data: { isArchived: false, archivedAt: null },
   });
 }
@@ -165,7 +166,7 @@ async function setCompteRendu(kineId, seanceId, compteRendu) {
   await requireOwnedSeance(kineId, seanceId);
   const prisma = prismaService.getInstance();
   return prisma.visioSeance.update({
-    where: { id: parseInt(seanceId) },
+    where: { id: parseInt(seanceId, 10) },
     data: { compteRendu: compteRendu ?? '', compteRenduAt: new Date() },
   });
 }
@@ -174,7 +175,7 @@ async function setCompteRendu(kineId, seanceId, compteRendu) {
 async function getSeanceFull(kineId, seanceId) {
   const prisma = prismaService.getInstance();
   const seance = await prisma.visioSeance.findFirst({
-    where: { id: parseInt(seanceId), kineId, isActive: true },
+    where: { id: parseInt(seanceId, 10), kineId, isActive: true },
     include: {
       patient: { select: { id: true, firstName: true, lastName: true, email: true } },
       kine: { select: { id: true, firstName: true, lastName: true, rpps: true, adresseCabinet: true } },
@@ -196,7 +197,7 @@ async function rescheduleSeance(kineId, seanceId, scheduledAt) {
 
   const prisma = prismaService.getInstance();
   const seance = await prisma.visioSeance.findFirst({
-    where: { id: parseInt(seanceId), kineId, isActive: true },
+    where: { id: parseInt(seanceId, 10), kineId, isActive: true },
   });
   if (!seance) throw new VisioError('Seance introuvable', 'SEANCE_NOT_FOUND', 404);
   if (seance.status !== 'SCHEDULED') {
@@ -234,7 +235,7 @@ async function resendLink(kineId, seanceId, deliveryChannel) {
 
   const prisma = prismaService.getInstance();
   const seance = await prisma.visioSeance.findFirst({
-    where: { id: parseInt(seanceId), kineId, isActive: true },
+    where: { id: parseInt(seanceId, 10), kineId, isActive: true },
   });
   if (!seance) throw new VisioError('Seance introuvable', 'SEANCE_NOT_FOUND', 404);
   if (!['SCHEDULED', 'LIVE'].includes(seance.status)) {
@@ -273,6 +274,39 @@ async function resendLink(kineId, seanceId, deliveryChannel) {
   });
 }
 
+/**
+ * Termine une séance (action KINE) : SCHEDULED/LIVE → ENDED.
+ * Transition CONDITIONNELLE : n'écrase jamais un état terminal (ex. CANCELLED posé
+ * en parallèle via HTTP pendant que le socket est ouvert). No-op si déjà terminale.
+ * @returns {Promise<boolean>} true si la transition a eu lieu.
+ */
+async function endSeance(seanceId) {
+  const prisma = prismaService.getInstance();
+  const res = await prisma.visioSeance.updateMany({
+    where: { id: parseInt(seanceId, 10), status: { in: ['SCHEDULED', 'LIVE'] } },
+    data: { status: 'ENDED', endedAt: new Date() },
+  });
+  return res.count > 0;
+}
+
+/**
+ * Démarre une séance (action KINE) : SCHEDULED/LIVE + consentement tracé → LIVE.
+ * Transition CONDITIONNELLE : refuse un état terminal (ne ressuscite pas une séance annulée).
+ * @returns {Promise<{started: boolean, reason?: 'CLOSED'|'CONSENT_REQUIRED'}>}
+ */
+async function startSeance(seanceId) {
+  const prisma = prismaService.getInstance();
+  const id = parseInt(seanceId, 10);
+  const fresh = await prisma.visioSeance.findUnique({ where: { id } });
+  if (!fresh || CLOSED_STATUSES.includes(fresh.status)) return { started: false, reason: 'CLOSED' };
+  if (!fresh.consentOralAt) return { started: false, reason: 'CONSENT_REQUIRED' };
+  const res = await prisma.visioSeance.updateMany({
+    where: { id, status: { in: ['SCHEDULED', 'LIVE'] } },
+    data: { status: 'LIVE', startedAt: fresh.startedAt || new Date() },
+  });
+  return res.count > 0 ? { started: true } : { started: false, reason: 'CLOSED' };
+}
+
 module.exports = {
   VisioError,
   createSeance,
@@ -286,4 +320,6 @@ module.exports = {
   unarchiveSeance,
   setCompteRendu,
   getSeanceFull,
+  endSeance,
+  startSeance,
 };

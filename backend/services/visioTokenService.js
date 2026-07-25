@@ -10,7 +10,10 @@ const TOKEN_TYPE = 'patient_visio';
 const WINDOW_MS = 24 * 60 * 60 * 1000; // lien valide jusqu'a scheduledAt + 24h
 
 /**
- * Génère un JWT dédié à une séance visio. Expire à scheduledAt + 2h.
+ * Génère un JWT dédié à une séance visio. Expire à scheduledAt + 24h (cf. WINDOW_MS).
+ * Plusieurs liens (create/reschedule/resend) coexistent tant qu'ils ne sont pas expirés :
+ * choix UX volontaire (pas de révocation active), l'échappatoire en cas de fuite est
+ * l'annulation de la séance (le socket refuse les séances CANCELLED/ENDED).
  */
 function generateVisioToken(seanceId, patientId, scheduledAt) {
   try {

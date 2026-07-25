@@ -1,4 +1,5 @@
 const { generatePdfBuffer, ERROR_CODES } = require('./contractPdfService');
+const { escapeHtml } = require('../utils/escapeHtml');
 
 /**
  * Génération du PDF de compte-rendu de séance visio.
@@ -6,16 +7,6 @@ const { generatePdfBuffer, ERROR_CODES } = require('./contractPdfService');
  * Le texte du compte-rendu vient de la DB (HDS) ; le PDF est produit à la volée
  * et jamais stocké.
  */
-
-// Échappe le HTML d'une saisie utilisateur avant injection dans le template.
-function escapeHtml(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 function formatDateFr(value) {
   if (!value) return '';

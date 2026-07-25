@@ -539,9 +539,17 @@ async function handleSubscriptionUpdated(subscription, eventId) {
     
     const priceId = subscription.items.data[0].price.id;
     const planType = stripeService.getPlanTypeFromPriceId(priceId);
+    // Garde symétrique de handleSubscriptionCreated : si le price n'est pas mappé
+    // (ex. price annuel présent côté Stripe mais env STRIPE_PRICE_*_ANNUAL absente),
+    // NE PAS écraser le plan existant avec null → mise à jour ignorée, planType préservé.
+    if (!planType) {
+      const error = `Plan non identifié pour price ${priceId} (abo ${subscription.id}) — mise à jour ignorée, planType préservé`;
+      logger.error(`❌ [${eventId}] ${error}`);
+      return { success: false, message: error };
+    }
     const billingCycle = stripeService.getCycleFromPriceId(priceId);
     const newStatus = stripeService.mapSubscriptionStatus(subscription.status);
-    
+
     logger.debug(`🔍 [${eventId}] Debug dates (webhook):`, {
       current_period_start: subscription.current_period_start,
       current_period_end: subscription.current_period_end,
@@ -858,3 +866,6 @@ async function handlePaymentFailed(invoice, eventId) {
 }
 
 module.exports = router;
+// Handlers exposés pour les tests unitaires (le montage reste `app.use(router)`).
+module.exports.handleSubscriptionUpdated = handleSubscriptionUpdated;
+module.exports.handleSubscriptionCreated = handleSubscriptionCreated;

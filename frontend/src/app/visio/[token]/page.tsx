@@ -162,6 +162,8 @@ function VisioRoom({ seanceId, token, scheduledAt, onEnded, onFailed, onLeave }:
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.4);
+        // Libère le contexte une fois le bip joué (évite l'accumulation d'AudioContext).
+        osc.onended = () => ctx.close().catch(() => {});
       } catch {
         // AudioContext non dispo (ex. Safari avec autoplay bloqué) : ignorer
       }

@@ -4,6 +4,7 @@ const visioService = require('../services/visioService');
 const { isPatientPresent } = require('../services/visioSignaling');
 const { generateCompteRenduPdf, ERROR_CODES: PDF_ERRORS } = require('../services/visioComptePdfService');
 const { sendTransactionalEmail } = require('../services/brevoMailService');
+const { escapeHtml } = require('../utils/escapeHtml');
 
 const ALLOWED_DOC_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
 const MAX_DOC_BYTES = 10 * 1024 * 1024; // 10 Mo
@@ -184,7 +185,7 @@ async function sendDocument(req, res) {
     const message = (req.body.message || '').toString().slice(0, 2000);
     const htmlContent = `<p>Bonjour,</p>
 <p>Votre praticien vous transmet un document suite à votre séance de télésoin.</p>
-${message ? `<p>${message.replace(/</g, '&lt;').replace(/\n/g, '<br>')}</p>` : ''}
+${message ? `<p>${escapeHtml(message).replace(/\n/g, '<br>')}</p>` : ''}
 <p>Vous trouverez le document en pièce jointe.</p>`;
 
     await sendTransactionalEmail({

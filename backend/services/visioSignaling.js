@@ -3,6 +3,7 @@ const prismaService = require('../services/prismaService');
 const logger = require('../utils/logger');
 const { sanitizeIP } = require('../utils/logSanitizer');
 const { validateVisioToken } = require('./visioTokenService');
+const visioService = require('./visioService');
 
 const CLOSED_STATUSES = ['CANCELLED', 'ENDED'];
 
@@ -62,7 +63,7 @@ async function authenticateSocket(handshake) {
     throw authError('Handshake invalide', 'BAD_HANDSHAKE');
   }
   const prisma = prismaService.getInstance();
-  const seance = await prisma.visioSeance.findUnique({ where: { id: parseInt(seanceId) } });
+  const seance = await prisma.visioSeance.findUnique({ where: { id: parseInt(seanceId, 10) } });
   if (!seance || !seance.isActive || CLOSED_STATUSES.includes(seance.status)) {
     throw authError('Seance indisponible', 'SEANCE_INVALID');
   }
@@ -156,22 +157,17 @@ function registerVisioNamespace(io) {
     // Le kiné annonce qu'il est prêt / présent
     socket.on('peer-ready', () => socket.to(roomId).emit('peer-ready', { role }));
 
-    // Le kiné lance la vidéo — exige le consentement tracé
+    // Le kiné lance la vidéo — exige le consentement tracé et un statut non terminal
     socket.on('host-start', async () => {
       if (role !== 'KINE') return;
-      const prisma = prismaService.getInstance();
-      const fresh = await prisma.visioSeance.findUnique({ where: { id: socket.data.seance.id } });
-      if (!fresh || !canHostStart(fresh)) {
-        return socket.emit('host-start-refused', { code: 'CONSENT_REQUIRED' });
-      }
       try {
-        await prisma.visioSeance.update({
-          where: { id: fresh.id },
-          data: { status: 'LIVE', startedAt: fresh.startedAt || new Date() },
-        });
+        const result = await visioService.startSeance(socket.data.seance.id);
+        if (!result.started) {
+          return socket.emit('host-start-refused', { code: result.reason || 'CONSENT_REQUIRED' });
+        }
         socket.to(roomId).emit('host-start');
       } catch (e) {
-        logger.error('host-start update:', e.message);
+        logger.error('host-start:', e.message);
       }
     });
 
@@ -185,12 +181,9 @@ function registerVisioNamespace(io) {
     // la séance reste ouverte et il peut re-rejoindre tant qu'elle n'est pas terminée.
     socket.on('end-session', async () => {
       if (role !== 'KINE') return;
-      const prisma = prismaService.getInstance();
-      await prisma.visioSeance.update({
-        where: { id: socket.data.seance.id },
-        data: { status: 'ENDED', endedAt: new Date() },
-      }).catch((e) => logger.error('end-session update:', e.message));
-      // Notifie toute la room (kiné inclus) → état terminé des deux côtés.
+      // Transition conditionnelle : n'écrase pas un état terminal (ex. CANCELLED concurrent).
+      await visioService.endSeance(socket.data.seance.id).catch((e) => logger.error('end-session:', e.message));
+      // Notifie toute la room (kiné inclus) → état terminé des deux côtés, quoi qu'il arrive.
       ns.to(roomId).emit('session-ended');
     });
 

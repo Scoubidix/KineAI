@@ -234,12 +234,26 @@ async function getStripeSubscriptionStats() {
     lastId = next.data.length > 0 ? next.data[next.data.length - 1].id : null;
   }
 
-  // Aussi récupérer les trialing
+  // Aussi récupérer les trialing (paginés comme les active pour ne rien tronquer).
+  // Ils comptent dans les répartitions (abonnés) mais PAS dans le MRR (ne paient pas encore).
   const trialingSubs = await stripeService.stripe.subscriptions.list({
     status: 'trialing',
     limit: 100,
   });
   allSubs = allSubs.concat(trialingSubs.data);
+  let trialHasMore = trialingSubs.has_more;
+  let trialLastId = trialingSubs.data.length > 0 ? trialingSubs.data[trialingSubs.data.length - 1].id : null;
+
+  while (trialHasMore) {
+    const next = await stripeService.stripe.subscriptions.list({
+      status: 'trialing',
+      limit: 100,
+      starting_after: trialLastId,
+    });
+    allSubs = allSubs.concat(next.data);
+    trialHasMore = next.has_more;
+    trialLastId = next.data.length > 0 ? next.data[next.data.length - 1].id : null;
+  }
 
   // Compter par plan (et par cycle) et calculer le MRR réel
   let mrr = 0;
@@ -256,11 +270,14 @@ async function getStripeSubscriptionStats() {
     }
     cycleCounts[cycle]++;
 
-    // MRR = somme des montants récurrents ramenés au mois (en centimes → euros)
-    if (item?.price?.recurring?.interval === 'month') {
-      mrr += (item.price.unit_amount || 0) / 100;
-    } else if (item?.price?.recurring?.interval === 'year') {
-      mrr += (item.price.unit_amount || 0) / 100 / 12;
+    // MRR = revenu récurrent RÉEL ramené au mois → on EXCLUT les essais (trialing),
+    // qui ne paient rien encore. Les comptages ci-dessus, eux, les incluent.
+    if (sub.status !== 'trialing') {
+      if (item?.price?.recurring?.interval === 'month') {
+        mrr += (item.price.unit_amount || 0) / 100;
+      } else if (item?.price?.recurring?.interval === 'year') {
+        mrr += (item.price.unit_amount || 0) / 100 / 12;
+      }
     }
   }
 
@@ -405,4 +422,5 @@ module.exports = {
   getParisPeriodRanges,
   computeDeltaPct,
   buildMetric,
+  getStripeSubscriptionStats, // exposé pour les tests unitaires
 };
