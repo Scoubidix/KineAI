@@ -14,6 +14,7 @@ class VisioError extends Error {
 }
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
+const RESEND_COOLDOWN_MS = 2 * 60 * 1000; // 2 min entre 2 renvois de lien pour une même séance
 
 async function createSeance(kineId, { patientId, scheduledAt, deliveryChannel, prereqsAttested }) {
   if (prereqsAttested !== true) {
@@ -238,6 +239,12 @@ async function resendLink(kineId, seanceId, deliveryChannel) {
   if (!seance) throw new VisioError('Seance introuvable', 'SEANCE_NOT_FOUND', 404);
   if (!['SCHEDULED', 'LIVE'].includes(seance.status)) {
     throw new VisioError('Lien non renvoyable', 'NOT_RESENDABLE', 409);
+  }
+
+  // Cooldown anti-spam par séance/patient : pas de renvoi si le dernier envoi
+  // date de moins de RESEND_COOLDOWN_MS (le plafond horaire par kiné vit côté route).
+  if (seance.linkSentAt && Date.now() - new Date(seance.linkSentAt).getTime() < RESEND_COOLDOWN_MS) {
+    throw new VisioError('Lien déjà envoyé récemment, patiente quelques minutes', 'RESEND_COOLDOWN', 429);
   }
 
   const patient = await prisma.patient.findFirst({

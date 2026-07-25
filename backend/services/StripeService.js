@@ -377,16 +377,12 @@ class StripeService {
       const currentCycle = this.getCycleFromPriceId(currentPriceId);
       const currentPlanType = this.getPlanTypeFromPriceId(currentPriceId);
 
-      // Un changement "vers le bas" est différé à la fin de la période payée :
-      //  - downgrade de plan (nouveau plan moins cher, ex: Expert → Pratique), quel que soit le cycle ;
-      //  - passage d'annuel à mensuel (downgrade d'engagement).
-      // On ne rembourse jamais le temps déjà payé : on conserve l'abonnement courant jusqu'à
-      // son terme, puis on bascule sur le nouveau prix via un Subscription Schedule.
-      const isPlanDowngrade = currentPlanType
-        && this.getPlanPriceInCents(newPlanType) < this.getPlanPriceInCents(currentPlanType);
-      const isIntervalDowngrade = currentCycle === 'yearly' && newCycle === 'monthly';
+      // Décision immédiat vs différé (voir shouldDeferPlanChange). En résumé :
+      // downgrade de plan ou passage annuel→mensuel = différé (on ne rembourse jamais le
+      // temps payé) ; MAIS un upgrade de plan reste immédiat même en passant au mensuel.
+      const deferToRenewal = this.shouldDeferPlanChange(currentPlanType, currentCycle, newPlanType, newCycle);
 
-      if (isPlanDowngrade || isIntervalDowngrade) {
+      if (deferToRenewal) {
         const schedule = await this.stripe.subscriptionSchedules.create({
           from_subscription: subscription.id,
         });
@@ -553,6 +549,37 @@ class StripeService {
       logger.error('Erreur récupération abonnement:', error.message);
       throw new Error('Impossible de récupérer l\'abonnement');
     }
+  }
+
+  /**
+   * Ordre de gamme des plans (prix croissant : DECLIC < PIONNIER < PRATIQUE < EXPERT).
+   * Sert uniquement à comparer "monte / descend de gamme" pour décider immédiat vs différé.
+   * Aucun montant en euros ici (les vrais montants vivent dans Stripe) → pas de prix hardcodé.
+   * @param {string} planType
+   * @returns {number} rang (0 si inconnu)
+   */
+  getPlanRank(planType) {
+    const rank = { DECLIC: 1, PIONNIER: 2, PRATIQUE: 3, EXPERT: 4 };
+    return rank[planType] || 0;
+  }
+
+  /**
+   * Décide si un changement d'abonnement est DIFFÉRÉ à l'échéance (true) ou IMMÉDIAT (false).
+   * Règles :
+   *   - downgrade de plan (gamme inférieure) → différé (on ne rembourse jamais le temps payé) ;
+   *   - passage annuel → mensuel → différé, SAUF si c'est aussi un upgrade de plan ;
+   *   - tout upgrade de plan, et tout passage mensuel → annuel → immédiat.
+   * Ainsi un upgrade de plan est TOUJOURS immédiat (accès aux fonctions tout de suite), même
+   * en passant au mensuel : Stripe proratise en crédit, sans remboursement cash.
+   * @returns {boolean}
+   */
+  shouldDeferPlanChange(currentPlanType, currentCycle, newPlanType, newCycle) {
+    const currentRank = this.getPlanRank(currentPlanType);
+    const newRank = this.getPlanRank(newPlanType);
+    const isPlanDowngrade = currentRank > 0 && newRank < currentRank;
+    const isPlanUpgrade = currentRank > 0 && newRank > currentRank;
+    const isIntervalDowngrade = currentCycle === 'yearly' && newCycle === 'monthly';
+    return isPlanDowngrade || (isIntervalDowngrade && !isPlanUpgrade);
   }
 
   // ========== MÉTHODES PARRAINAGE ==========

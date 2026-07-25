@@ -572,6 +572,53 @@ const magicLinkSignLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter pour les routes publiques d'accès à une séance visio via token
+ * (GET /session/:token, POST /ack-info/:token).
+ * 30 requêtes/minute par IP — protège la DB d'un flood/DoS applicatif.
+ * Le token JWT reste infalsifiable : ceci écrête le débit, ce n'est pas un
+ * anti-brute-force du token (impossible sans JWT_SECRET_PATIENT).
+ */
+const visioPatientLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'visio_patient'),
+  handler: (req, res) => {
+    logger.warn(`🚫 Rate limit dépassé - Visio patient - IP: ${sanitizeIP(req.ip)}`);
+    res.status(429).json({
+      success: false,
+      error: 'Trop de tentatives, réessaie dans un instant',
+      code: 'RATE_LIMITED'
+    });
+  }
+});
+
+/**
+ * Rate limiter pour les ENVOIS de la visio (email/WhatsApp au patient) :
+ * création de séance, renvoi de lien, envoi de document.
+ * 20 envois/heure par kiné — borne le coût (Brevo/WhatsApp) et protège les
+ * patients du spam, cohérent avec whatsappTemplatesKineLimiter (10/h).
+ * À monter APRÈS authenticate pour clé-er sur req.uid (pas l'IP partagée).
+ */
+const visioSendLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'visio_send'),
+  handler: (req, res) => {
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Visio envoi - User: ${safeUser}`);
+    res.status(429).json({
+      success: false,
+      error: 'Limite d\'envois visio atteinte (20/heure). Réessaie plus tard.',
+      code: 'VISIO_SEND_LIMIT'
+    });
+  }
+});
+
+/**
  * Middleware pour afficher les informations de rate limiting
  * Utile pour le debugging
  */
@@ -612,5 +659,7 @@ module.exports = {
   supportMessageLimiter,
   magicLinkAccessLimiter,
   magicLinkSignLimiter,
+  visioPatientLimiter,
+  visioSendLimiter,
   rateLimitLogger
 };

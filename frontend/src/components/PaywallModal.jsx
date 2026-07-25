@@ -228,13 +228,16 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
   const currentCycle = subscription?.billingCycle || 'monthly';
   const recommendedPlan = !subscription || subscription.planType === 'FREE' ? 'PRATIQUE' : 'EXPERT';
 
-  // Nature du changement en cours (pour la modale de récap).
-  // Un changement "vers le bas" (plan moins cher, ou annuel→mensuel) prend effet à l'échéance ;
-  // un upgrade / passage mensuel→annuel est immédiat et proratisé.
+  // Nature du changement en cours (pour la modale de récap). Doit rester aligné avec
+  // StripeService.shouldDeferPlanChange côté back :
+  // - downgrade de plan, ou annuel→mensuel, → différé à l'échéance ;
+  // - MAIS un upgrade de plan reste immédiat même en passant au mensuel.
+  const changeIsUpgrade = !!pendingUpgrade
+    && (plans[pendingUpgrade.planType]?.price ?? 0) > (plans[pendingUpgrade.currentPlan]?.price ?? 0);
   const changeIsDowngrade = !!pendingUpgrade
     && (plans[pendingUpgrade.planType]?.price ?? 0) < (plans[pendingUpgrade.currentPlan]?.price ?? 0);
   const changeIsIntervalDowngrade = currentCycle === 'yearly' && billingCycle === 'monthly';
-  const changeIsDeferred = changeIsDowngrade || changeIsIntervalDowngrade;
+  const changeIsDeferred = changeIsDowngrade || (changeIsIntervalDowngrade && !changeIsUpgrade);
   // Passage à la facturation annuelle (immédiat, avec prélèvement du montant annuel proratisé)
   const changeToAnnual = billingCycle === 'yearly' && currentCycle !== 'yearly';
   const changeSamePlan = !!pendingUpgrade && pendingUpgrade.planType === pendingUpgrade.currentPlan;

@@ -1,9 +1,49 @@
 const admin = require('../firebase/firebase');
 const prismaService = require('../services/prismaService');
 const logger = require('../utils/logger');
+const { sanitizeIP } = require('../utils/logSanitizer');
 const { validateVisioToken } = require('./visioTokenService');
 
 const CLOSED_STATUSES = ['CANCELLED', 'ENDED'];
+
+// ── Garde-fou anti-flood sur le handshake du namespace /visio ──
+// express-rate-limit ne couvre pas le canal Socket.IO (le handshake court-circuite
+// la pile de routes Express). On compte donc à la main les handshakes par IP sur une
+// fenêtre courte. Défense en profondeur contre les floods naïfs ; per-instance (non
+// partagé entre instances Clever Cloud) et l'IP dépend de X-Forwarded-For (cf. MED-06).
+const HANDSHAKE_WINDOW_MS = 60 * 1000; // 1 minute
+const HANDSHAKE_MAX = 20; // 20 handshakes/min/IP — large : la reconnexion auto du client rouvre le socket
+const handshakeHits = new Map(); // ip -> { count, resetAt }
+
+function handshakeIp(handshake) {
+  // Derrière le proxy Clever Cloud, la vraie IP est le 1er élément de X-Forwarded-For.
+  // socket.handshake.address donnerait l'IP du load-balancer (= une seule pour tous).
+  const xff = handshake.headers && handshake.headers['x-forwarded-for'];
+  if (xff) return xff.split(',')[0].trim();
+  return handshake.address || 'unknown';
+}
+
+function allowHandshake(handshake) {
+  const ip = handshakeIp(handshake);
+  const now = Date.now();
+  const entry = handshakeHits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    handshakeHits.set(ip, { count: 1, resetAt: now + HANDSHAKE_WINDOW_MS });
+    return true;
+  }
+  entry.count += 1;
+  return entry.count <= HANDSHAKE_MAX;
+}
+
+// Balayage périodique des entrées expirées (évite la croissance mémoire).
+// .unref() : ne maintient pas le process en vie à l'arrêt.
+const handshakeSweep = setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of handshakeHits) {
+    if (now > entry.resetAt) handshakeHits.delete(ip);
+  }
+}, 5 * 60 * 1000);
+handshakeSweep.unref();
 
 function authError(message, code) {
   const err = new Error(message);
@@ -72,6 +112,15 @@ function isPatientPresent(roomId) {
 function registerVisioNamespace(io) {
   const ns = io.of('/visio');
   visioNamespace = ns;
+
+  // Garde-fou anti-flood AVANT l'auth : rejette le handshake avant tout appel DB/Firebase.
+  ns.use((socket, next) => {
+    if (!allowHandshake(socket.handshake)) {
+      logger.warn(`🚫 Visio handshake rate limit - IP: ${sanitizeIP(handshakeIp(socket.handshake))}`);
+      return next(authError('Trop de tentatives de connexion', 'RATE_LIMITED'));
+    }
+    next();
+  });
 
   ns.use(async (socket, next) => {
     try {

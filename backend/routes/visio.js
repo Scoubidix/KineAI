@@ -4,14 +4,15 @@ const router = express.Router();
 const controller = require('../controllers/visioController');
 const { authenticate } = require('../middleware/authenticate');
 const { authenticateVisioPatient } = require('../middleware/visioPatientAuth');
-const { crudWriteLimiter } = require('../middleware/rateLimiter');
+const { crudWriteLimiter, visioPatientLimiter, visioSendLimiter } = require('../middleware/rateLimiter');
 const { requireFeature } = require('../middleware/authorization');
 
 // Upload en mémoire (pass-through vers Brevo, jamais stocké sur disque/GCS)
 const uploadDoc = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 // ---- Kiné ----
-router.post('/seances', authenticate, crudWriteLimiter, requireFeature('VIDEO_TRANSMISSION'), controller.createSeance);
+// visioSendLimiter (20/h/kiné) sur les 3 routes qui envoient un mail/WhatsApp au patient.
+router.post('/seances', authenticate, crudWriteLimiter, visioSendLimiter, requireFeature('VIDEO_TRANSMISSION'), controller.createSeance);
 router.get('/seances', authenticate, controller.listSeances);
 router.post('/seances/archive', authenticate, crudWriteLimiter, controller.archiveSeances);
 router.get('/seances/:id', authenticate, controller.getSeance);
@@ -19,13 +20,14 @@ router.patch('/seances/:id/unarchive', authenticate, crudWriteLimiter, controlle
 router.patch('/seances/:id/consent', authenticate, crudWriteLimiter, controller.setConsent);
 router.patch('/seances/:id/cancel', authenticate, crudWriteLimiter, controller.cancelSeance);
 router.patch('/seances/:id/reschedule', authenticate, crudWriteLimiter, controller.rescheduleSeance);
-router.post('/seances/:id/resend-link', authenticate, crudWriteLimiter, controller.resendLink);
+router.post('/seances/:id/resend-link', authenticate, crudWriteLimiter, visioSendLimiter, controller.resendLink);
 router.patch('/seances/:id/compte-rendu', authenticate, crudWriteLimiter, controller.saveCompteRendu);
 router.get('/seances/:id/compte-rendu/pdf', authenticate, controller.compteRenduPdf);
-router.post('/seances/:id/send-document', authenticate, crudWriteLimiter, uploadDoc.single('document'), controller.sendDocument);
+router.post('/seances/:id/send-document', authenticate, crudWriteLimiter, visioSendLimiter, uploadDoc.single('document'), controller.sendDocument);
 
 // ---- Patient (token de séance) ----
-router.get('/session/:token', authenticateVisioPatient, controller.getSession);
-router.post('/ack-info/:token', authenticateVisioPatient, controller.ackInfo);
+// visioPatientLimiter AVANT l'auth : on rejette le flood avant de toucher la DB.
+router.get('/session/:token', visioPatientLimiter, authenticateVisioPatient, controller.getSession);
+router.post('/ack-info/:token', visioPatientLimiter, authenticateVisioPatient, controller.ackInfo);
 
 module.exports = router;
