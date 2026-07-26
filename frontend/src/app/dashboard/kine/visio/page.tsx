@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { listSeances, cancelSeance, archiveSeances, unarchiveSeance, VisioSeance, VisioStatus } from '@/lib/visioApi';
 import { Button } from '@/components/ui/button';
@@ -131,13 +131,27 @@ export default function VisioPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [archiving, setArchiving] = useState(false);
 
+  // Compteur de requêtes : seule la réponse de la DERNIÈRE requête émise est appliquée
+  // (évite qu'une réponse lente écrase des données plus fraîches lors du polling 10s).
+  const fetchSeqRef = useRef(0);
   const fetchSeances = useCallback((silent = false) => {
-    if (!silent) setLoading(true);
-    setError(null);
+    if (!silent) { setLoading(true); setError(null); }
+    const seq = ++fetchSeqRef.current;
     listSeances()
-      .then(setSeances)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .then((rows) => {
+        if (seq !== fetchSeqRef.current) return;
+        setSeances(rows);
+        setError(null); // succès → on efface une éventuelle erreur précédente
+      })
+      .catch((e) => {
+        // En polling silencieux on garde la liste précédente au lieu de la masquer.
+        if (seq === fetchSeqRef.current && !silent) setError(e.message);
+      })
+      .finally(() => {
+        // On libère le spinner pour la dernière requête, même si un poll silencieux a
+        // superséé un chargement manuel (sinon loading pourrait rester bloqué à true).
+        if (seq === fetchSeqRef.current) setLoading(false);
+      });
   }, []);
 
   const fetchArchived = useCallback(() => {

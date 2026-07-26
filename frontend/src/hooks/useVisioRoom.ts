@@ -96,6 +96,7 @@ export function useVisioRoom(opts: {
   const iceCandidateQueue = useRef<RTCIceCandidateInit[]>([]); // buffer avant remoteDesc
   const retryCountRef = useRef(0);
   const mountedRef = useRef(true); // garde contre setState après unmount
+  const hostStartedRef = useRef(false); // KINE : la session a-t-elle été démarrée (hostStart) ?
 
   // --------------------------------------------------------------------------
   // Helpers
@@ -161,6 +162,10 @@ export function useVisioRoom(opts: {
       const iceState = pc.iceConnectionState;
 
       if (iceState === 'connected' || iceState === 'completed') {
+        // Reconnexion réussie → on remet le budget de retries à zéro, sinon des
+        // micro-coupures cumulées au fil d'un long appel finiraient par l'épuiser.
+        retryCountRef.current = 0;
+        setRetryCount(0);
         setState('connected');
       } else if (iceState === 'failed') {
         handleIceFailure();
@@ -251,11 +256,29 @@ export function useVisioRoom(opts: {
       // ---- Événements serveur → client ----
 
       // Un peer est présent dans la salle
-      socket.on('peer-ready', () => {
+      socket.on('peer-ready', async () => {
         if (!mountedRef.current) return;
         setPeerPresent(true);
         // Si on était en idle et que le peer arrive → waiting
         setState((prev) => (prev === 'idle' ? 'waiting' : prev));
+        // KINE : si la session a déjà démarré et que le peer (ré)apparaît — typiquement
+        // le patient qui recharge / reprend le réseau — on renvoie une offer (iceRestart).
+        // Sans ça, le patient reconnecté attend une offer qui ne vient jamais et reste
+        // bloqué en salle d'attente. Le guard signalingState évite un double envoi si une
+        // négociation est déjà en cours.
+        if (role === 'KINE' && hostStartedRef.current) {
+          if (pcRef.current && pcRef.current.signalingState !== 'stable') return;
+          try {
+            const pc = createPc();
+            setState('connecting');
+            const offer = await pc.createOffer({ iceRestart: true });
+            await pc.setLocalDescription(offer);
+            socketRef.current?.emit('offer', { sdp: offer });
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('[visio] échec renégociation sur peer-ready:', (e as Error)?.message);
+          }
+        }
       });
 
       // room-full : impossible de rejoindre
@@ -318,14 +341,20 @@ export function useVisioRoom(opts: {
       // Le kiné a terminé la consultation → état terminal des deux côtés
       socket.on('session-ended', () => {
         if (!mountedRef.current) return;
+        hostStartedRef.current = false;
         cleanupCall();
         setState('ended');
       });
 
-      // Peer parti
+      // Peer parti (déconnexion — potentiellement temporaire, ≠ fin de séance)
       socket.on('peer-left', () => {
         if (!mountedRef.current) return;
         setPeerPresent(false);
+        // Le pair s'est déconnecté en cours d'appel : on ferme la connexion média (sinon
+        // image gelée) et on repasse en attente. Le KINE renverra une offer au retour du
+        // pair (cf. peer-ready). On ne touche jamais à un état terminal (ended/failed).
+        cleanupCall();
+        setState((prev) => (prev === 'connected' || prev === 'connecting' ? 'waiting' : prev));
       });
 
       // ---- Logique de retry (closure capturant socket + createPc) ----
@@ -405,6 +434,7 @@ export function useVisioRoom(opts: {
     const socket = socketRef.current;
     if (!socket) return;
 
+    hostStartedRef.current = true;
     socket.emit('host-start');
 
     const pc = createPc();
@@ -417,6 +447,7 @@ export function useVisioRoom(opts: {
 
   /** KINE uniquement : termine la consultation (séance → ENDED). */
   const endSession = useCallback(() => {
+    hostStartedRef.current = false;
     const socket = socketRef.current;
     if (socket) {
       socket.emit('end-session');

@@ -2,6 +2,19 @@ import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 const BASE = `${process.env.NEXT_PUBLIC_API_URL}/api/visio`;
 
+/**
+ * Appel réseau authentifié + normalisation des erreurs de connexion en message FR.
+ * fetch() rejette avec un TypeError (« Failed to fetch ») en cas de coupure réseau /
+ * serveur injoignable / CORS — on le remplace par un message clair pour l'UI.
+ */
+async function req(input: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetchWithAuth(input, init);
+  } catch {
+    throw new Error('Connexion au serveur impossible. Vérifie ta connexion internet et réessaie.');
+  }
+}
+
 export type VisioStatus = 'SCHEDULED' | 'LIVE' | 'ENDED' | 'CANCELLED';
 export type VisioChannel = 'EMAIL' | 'WHATSAPP';
 
@@ -35,16 +48,16 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export async function createSeance(input: CreateSeanceInput) {
-  const res = await fetchWithAuth(`${BASE}/seances`, { method: 'POST', body: JSON.stringify(input) });
+  const res = await req(`${BASE}/seances`, { method: 'POST', body: JSON.stringify(input) });
   return json<{ seance: VisioSeance; seanceUrl: string; linkSent: boolean }>(res);
 }
 export async function listSeances(archived = false) {
   const qs = archived ? '?archived=1' : '';
-  return json<VisioSeance[]>(await fetchWithAuth(`${BASE}/seances${qs}`));
+  return json<VisioSeance[]>(await req(`${BASE}/seances${qs}`));
 }
 /** Archive en lot des séances d'historique. Renvoie le nombre effectivement archivé. */
 export async function archiveSeances(ids: number[]) {
-  const res = await fetchWithAuth(`${BASE}/seances/archive`, {
+  const res = await req(`${BASE}/seances/archive`, {
     method: 'POST',
     body: JSON.stringify({ ids }),
   });
@@ -52,33 +65,33 @@ export async function archiveSeances(ids: number[]) {
 }
 /** Désarchive une séance. */
 export async function unarchiveSeance(id: number) {
-  return json<VisioSeance>(await fetchWithAuth(`${BASE}/seances/${id}/unarchive`, { method: 'PATCH' }));
+  return json<VisioSeance>(await req(`${BASE}/seances/${id}/unarchive`, { method: 'PATCH' }));
 }
 export async function getSeance(id: number) {
-  return json<VisioSeance>(await fetchWithAuth(`${BASE}/seances/${id}`));
+  return json<VisioSeance>(await req(`${BASE}/seances/${id}`));
 }
 export async function setConsent(id: number) {
-  return json<VisioSeance>(await fetchWithAuth(`${BASE}/seances/${id}/consent`, { method: 'PATCH' }));
+  return json<VisioSeance>(await req(`${BASE}/seances/${id}/consent`, { method: 'PATCH' }));
 }
 export async function cancelSeance(id: number) {
-  return json<VisioSeance>(await fetchWithAuth(`${BASE}/seances/${id}/cancel`, { method: 'PATCH' }));
+  return json<VisioSeance>(await req(`${BASE}/seances/${id}/cancel`, { method: 'PATCH' }));
 }
 export async function rescheduleSeance(id: number, scheduledAt: string) {
-  const res = await fetchWithAuth(`${BASE}/seances/${id}/reschedule`, {
+  const res = await req(`${BASE}/seances/${id}/reschedule`, {
     method: 'PATCH',
     body: JSON.stringify({ scheduledAt }),
   });
   return json<VisioSeance>(res);
 }
 export async function resendLink(id: number, deliveryChannel: VisioChannel) {
-  const res = await fetchWithAuth(`${BASE}/seances/${id}/resend-link`, {
+  const res = await req(`${BASE}/seances/${id}/resend-link`, {
     method: 'POST',
     body: JSON.stringify({ deliveryChannel }),
   });
   return json<VisioSeance>(res);
 }
 export async function saveCompteRendu(id: number, compteRendu: string) {
-  const res = await fetchWithAuth(`${BASE}/seances/${id}/compte-rendu`, {
+  const res = await req(`${BASE}/seances/${id}/compte-rendu`, {
     method: 'PATCH',
     body: JSON.stringify({ compteRendu }),
   });
@@ -86,7 +99,7 @@ export async function saveCompteRendu(id: number, compteRendu: string) {
 }
 /** Télécharge le PDF du compte-rendu (généré à la volée, jamais stocké). */
 export async function downloadCompteRenduPdf(id: number) {
-  const res = await fetchWithAuth(`${BASE}/seances/${id}/compte-rendu/pdf`);
+  const res = await req(`${BASE}/seances/${id}/compte-rendu/pdf`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Erreur ${res.status}`);
@@ -107,7 +120,7 @@ export async function sendDocument(id: number, file: File, message: string) {
   form.append('document', file);
   if (message) form.append('message', message);
   // fetchWithAuth ajoute le Bearer ; ne pas fixer Content-Type (le navigateur pose le boundary)
-  const res = await fetchWithAuth(`${BASE}/seances/${id}/send-document`, {
+  const res = await req(`${BASE}/seances/${id}/send-document`, {
     method: 'POST',
     body: form,
   });

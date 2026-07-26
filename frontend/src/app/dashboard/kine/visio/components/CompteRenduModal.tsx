@@ -90,7 +90,7 @@ export default function CompteRenduModal({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-3">
-          <Button variant="outline" onClick={handlePdf} disabled={pdfLoading || saving} className="gap-2">
+          <Button variant="outline" onClick={handlePdf} disabled={pdfLoading || saving || !text.trim()} className="gap-2">
             {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
             Exporter en PDF
           </Button>

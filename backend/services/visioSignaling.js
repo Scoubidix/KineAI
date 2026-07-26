@@ -140,9 +140,17 @@ function registerVisioNamespace(io) {
     const room = ns.adapter.rooms.get(roomId);
     // IDs déjà présents AVANT que ce socket rejoigne
     const existingIds = room ? [...room] : [];
-    if (existingIds.length >= 2) {
-      socket.emit('room-full');
-      return socket.disconnect(true);
+    // Une seule place par rôle : si un socket du MÊME rôle est déjà présent (reconnexion,
+    // 2e onglet, ancien socket pas encore expiré), on l'évince. Comme il n'existe que 2
+    // rôles (KINE/PATIENT), la room reste de facto plafonnée à 2. Empêche surtout qu'un
+    // patient occupe les 2 places et verrouille l'accès du kiné à sa propre séance.
+    // NB : disconnect() côté serveur = pas de reconnexion auto du client évincé.
+    for (const id of existingIds) {
+      const other = ns.sockets.get(id);
+      if (other && other.data.role === role) {
+        other.emit('replaced');
+        other.disconnect(true);
+      }
     }
     socket.join(roomId);
     // Prévenir les pairs déjà présents de l'arrivée de ce socket

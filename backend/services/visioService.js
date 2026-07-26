@@ -208,6 +208,14 @@ async function rescheduleSeance(kineId, seanceId, scheduledAt) {
     where: { id: seance.patientId, kineId, isActive: true },
   });
   if (!patient) throw new VisioError('Patient introuvable', 'PATIENT_NOT_FOUND', 404);
+  // Revalider le canal avant l'envoi (aligné sur resendLink) : pas de reprogrammation
+  // silencieuse si le patient n'a plus d'email / de mobile.
+  if (seance.deliveryChannel === 'EMAIL' && !patient.email) {
+    throw new VisioError('Le patient n\'a pas d\'email', 'NO_EMAIL', 400);
+  }
+  if (seance.deliveryChannel === 'WHATSAPP' && !isMobileFR(patient.phone)) {
+    throw new VisioError('Le numero n\'est pas un mobile', 'NOT_MOBILE', 400);
+  }
 
   const gen = generateVisioToken(seance.id, patient.id, when);
   if (!gen.success) throw new VisioError('Erreur generation du lien', 'TOKEN_ERROR', 500);
@@ -216,10 +224,13 @@ async function rescheduleSeance(kineId, seanceId, scheduledAt) {
   const sent = await sendSeanceLink({
     channel: seance.deliveryChannel, patient, token: gen.token, seanceUrl, scheduledAt: when,
   });
+  // Échec d'envoi : on ne modifie PAS l'horaire (reprogrammation atomique) et on remonte
+  // une erreur claire, comme resendLink — évite un reschedule « réussi » sans notification.
+  if (!sent.success) throw new VisioError('Echec de l\'envoi du lien', 'SEND_FAILED', 502);
 
   return prisma.visioSeance.update({
     where: { id: seance.id },
-    data: { scheduledAt: when, linkSentAt: sent.success ? new Date() : null },
+    data: { scheduledAt: when, linkSentAt: new Date() },
   });
 }
 

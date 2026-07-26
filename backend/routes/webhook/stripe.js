@@ -832,25 +832,29 @@ async function handleReferralCreditOnRenewal(refereeKineId, refereeStripeCustome
 async function handlePaymentFailed(invoice, eventId) {
   try {
     logger.debug(`[${eventId}] invoice.payment_failed: ${invoice.id}`);
-    
-    if (invoice.subscription) {
+
+    // Support ancien et nouveau format API Stripe (aligné sur handlePaymentSucceeded) :
+    // depuis Basil, invoice.subscription peut être absent au profit de invoice.parent.
+    const subscriptionId = invoice.subscription || invoice.parent?.subscription_details?.subscription;
+
+    if (subscriptionId) {
       const kine = await prisma.kine.findFirst({
-        where: { subscriptionId: invoice.subscription }
+        where: { subscriptionId: subscriptionId }
       });
-      
+
       if (kine) {
         await prisma.kine.update({
           where: { id: kine.id },
           data: { subscriptionStatus: 'PAST_DUE' }
         });
-        
+
         const message = `Échec paiement pour kiné ${kine.id} - statut PAST_DUE`;
         logger.info(`❌ ${message}`);
         logger.debug(`📧 [${eventId}] TODO: Notification à envoyer au kiné ${kine.id}`);
-        
+
         return { success: true, message };
       } else {
-        const message = `Kiné non trouvé pour subscription: ${invoice.subscription}`;
+        const message = `Kiné non trouvé pour subscription: ${subscriptionId}`;
         logger.warn(`⚠️ [${eventId}] ${message}`);
         return { success: true, message };
       }
