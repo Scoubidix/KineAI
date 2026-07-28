@@ -13,6 +13,7 @@ import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, Tr
 import BilanFieldsTab from './components/BilanFieldsTab';
 import BilanTemplatesTab from './components/BilanTemplatesTab';
 import TokenUsageTab from './components/TokenUsageTab';
+import NouveautesTab from './components/NouveautesTab';
 import { Button } from '@/components/ui/button';
 
 interface LastPayout {
@@ -507,6 +508,10 @@ export default function AdminDashboardPage() {
                 <Zap className="h-3.5 w-3.5" />
                 Tokens IA
               </TabsTrigger>
+              <TabsTrigger value="nouveautes" className="gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                Nouveautés
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard" className="space-y-6 mt-4">
@@ -993,6 +998,10 @@ export default function AdminDashboardPage() {
 
             <TabsContent value="tokens" className="space-y-4 mt-4">
               <TokenUsageTab />
+            </TabsContent>
+
+            <TabsContent value="nouveautes" className="space-y-4 mt-4">
+              <NouveautesTab />
             </TabsContent>
           </Tabs>
         </div>
