@@ -4,7 +4,7 @@
 // Le middleware de vérification compare ces versions avec les acceptations en base
 
 module.exports = {
-  CGU: '3.2',
+  CGU: '3.3',
   POLITIQUE_CONFIDENTIALITE: '3.4',
   DPA: '1.2'
 };
