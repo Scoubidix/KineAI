@@ -17,6 +17,7 @@ const EXERCICES_FOLDER = 'exercices/';
 const AVATARS_FOLDER = 'avatars/';
 const CONTRACTS_FOLDER = 'contracts/';
 const SUPPORT_FOLDER = 'support/';
+const NOUVEAUTES_FOLDER = 'nouveautes/';
 const DEFAULT_SIGNED_URL_EXPIRATION = 60 * 60 * 1000; // 1 heure en ms
 const CONTRACT_PDF_SIGNED_URL_EXPIRATION = 7 * 24 * 60 * 60 * 1000; // 7 jours en ms
 
@@ -25,6 +26,7 @@ const IMAGE_MAGIC_BYTES = {
   'image/jpeg': [Buffer.from([0xFF, 0xD8, 0xFF])],
   'image/png': [Buffer.from([0x89, 0x50, 0x4E, 0x47])],
   'image/webp': [Buffer.from('RIFF')], // RIFF....WEBP
+  'image/gif': [Buffer.from([0x47, 0x49, 0x46, 0x38])], // "GIF8" (GIF87a / GIF89a)
 };
 
 // Initialisation GCS avec les credentials Firebase existants
@@ -456,6 +458,63 @@ async function deleteContractPdf(path) {
   logger.info(`PDF contrat supprimé de GCS: ${path}`);
 }
 
+/**
+ * Upload une image/GIF de nouveauté vers GCS (fichier PRIVE par défaut).
+ * @param {Buffer} fileBuffer - Buffer de l'image/GIF
+ * @param {string} fileName - Nom du fichier
+ * @param {string} contentType - MIME type (image/gif|png|jpeg|webp)
+ * @returns {Promise<string>} Le chemin du fichier (imagePath)
+ */
+async function uploadNouveauteImage(fileBuffer, fileName, contentType) {
+  try {
+    const timestamp = Date.now();
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const imagePath = `${NOUVEAUTES_FOLDER}${timestamp}_${sanitizedFileName}`;
+
+    const file = bucket.file(imagePath);
+    await file.save(fileBuffer, {
+      metadata: {
+        contentType,
+        cacheControl: 'private, max-age=3600',
+        metadata: { uploadedAt: new Date().toISOString() },
+      },
+      resumable: false,
+    });
+
+    logger.info(`Image nouveaute uploadee sur GCS (privee): ${imagePath}`);
+    return imagePath;
+  } catch (error) {
+    logger.error('Erreur upload image nouveaute sur GCS:', error);
+    throw new Error(`Echec de l'upload de l'image de nouveaute: ${error.message}`);
+  }
+}
+
+/**
+ * Supprimer une image de nouveauté de GCS.
+ * @param {string} imagePath - Chemin du fichier (ex: "nouveautes/123_visio.gif")
+ * @returns {Promise<void>}
+ */
+async function deleteNouveauteImage(imagePath) {
+  try {
+    if (!imagePath) return;
+    if (!imagePath.startsWith(NOUVEAUTES_FOLDER)) {
+      logger.error('Tentative de suppression hors du dossier nouveautes:', imagePath);
+      throw new Error('Chemin de fichier non autorise');
+    }
+    const file = bucket.file(imagePath);
+    const [exists] = await file.exists();
+    if (!exists) {
+      logger.warn(`Image nouveaute absente (deja supprimee?): ${imagePath}`);
+      return;
+    }
+    await file.delete();
+    logger.info(`Image nouveaute supprimee de GCS: ${imagePath}`);
+  } catch (error) {
+    logger.error('Erreur suppression image nouveaute sur GCS:', error);
+    throw new Error(`Echec de la suppression de l'image de nouveaute: ${error.message}`);
+  }
+}
+
 module.exports = {
   uploadGif,
   generateSignedUrl,
@@ -471,9 +530,12 @@ module.exports = {
   uploadContractPdf,
   generateContractPdfSignedUrl,
   deleteContractPdf,
+  uploadNouveauteImage,
+  deleteNouveauteImage,
   BUCKET_NAME,
   EXERCICES_FOLDER,
   AVATARS_FOLDER,
   CONTRACTS_FOLDER,
   SUPPORT_FOLDER,
+  NOUVEAUTES_FOLDER,
 };

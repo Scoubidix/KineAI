@@ -61,6 +61,7 @@ model Kine {
   exercicesModeles  ExerciceModele[]
   exerciceTemplates ExerciceTemplate[]
   notifications     Notification[]
+  nouveauteVues     NouveauteVue[]
 
   // ========== NOUVELLES RELATIONS IA ==========
   chatIaBasique        ChatIaBasique[]
@@ -389,6 +390,53 @@ model Notification {
   @@index([kineId, createdAt]) // Pour trier par date
   @@index([type]) // Pour filtrer par type
   @@map("notifications")
+}
+
+// ========== NOUVEAUTÉS (annonces produit in-app) ==========
+
+enum NouveauteCategorie {
+  NOUVEAUTE // Nouvelle fonctionnalité
+  AMELIORATION // Amélioration d'une fonctionnalité existante
+  OFFRE // Offre commerciale / promo
+
+  @@map("nouveaute_categorie")
+}
+
+/// Contenu global partagé d'une nouveauté (géré depuis l'admin).
+/// L'état lu/non-lu vit dans NouveauteVue (par kiné), pas ici.
+model Nouveaute {
+  id          Int                @id @default(autoincrement())
+  titre       String
+  description String
+  imagePaths  String[] @default([]) // Chemins GCS (dossier nouveautes/) — carrousel, pas les URLs signées
+  categorie   NouveauteCategorie @default(NOUVEAUTE)
+  ctaLabel    String? // Libellé du bouton (optionnel)
+  ctaHref     String? // Lien du bouton (optionnel)
+  ciblePlans  PlanType[] // Plans ciblés — vide = visible par tous
+  publishedAt DateTime           @default(now())
+  expiresAt   DateTime? // Masquée automatiquement au-delà
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  vues NouveauteVue[]
+
+  @@index([isActive, publishedAt])
+  @@map("nouveautes")
+}
+
+/// Accusé de lecture : quel kiné a vu quelle nouveauté.
+model NouveauteVue {
+  id          Int       @id @default(autoincrement())
+  kineId      Int
+  kine        Kine      @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  nouveauteId Int
+  nouveaute   Nouveaute @relation(fields: [nouveauteId], references: [id], onDelete: Cascade)
+  vueAt       DateTime  @default(now())
+
+  @@unique([kineId, nouveauteId])
+  @@index([kineId])
+  @@map("nouveaute_vues")
 }
 
 // ========== NOUVEAUX ENUMS STRIPE ==========
