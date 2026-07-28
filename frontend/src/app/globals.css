@@ -170,3 +170,15 @@ body {
 .animate-slide-from-right { animation: slide-from-right 250ms ease-out; }
 .animate-slide-from-left  { animation: slide-from-left  250ms ease-out; }
 
+/* Scintillement de l'icône Nouveautés (uniquement quand il y a du non-lu) */
+@keyframes twinkle {
+  0%, 55%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  65% { transform: scale(1.28) rotate(9deg); opacity: 0.9; }
+  75% { transform: scale(0.94) rotate(-7deg); opacity: 1; }
+  85% { transform: scale(1.12) rotate(4deg); opacity: 0.95; }
+}
+.animate-twinkle {
+  transform-origin: center;
+  animation: twinkle 3.5s ease-in-out infinite;
+}
+

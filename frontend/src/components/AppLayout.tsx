@@ -106,9 +106,9 @@ import { SupportModal } from './SupportModal';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import LegalAcceptanceModal from './LegalAcceptanceModal';
 import { useLegalAcceptance } from '@/hooks/useLegalAcceptance';
-import AnnouncementBanner from './AnnouncementBanner';
 import TrialWelcomeModal from '@/components/TrialWelcomeModal';
 import TrialOptInBanner from '@/components/TrialOptInBanner';
+import NouveautesButton from '@/components/nouveautes/NouveautesButton';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -1704,6 +1704,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   </Popover>
                 );
               })()}
+              {role === 'kine' && <NouveautesButton />}
               {role === 'kine' && <NotificationsDropdown />}
               <Popover>
                 <PopoverTrigger asChild>
@@ -1794,7 +1795,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
           />
           <div className="relative z-10">
             {role === 'kine' && <TrialWelcomeModal />}
-            <AnnouncementBanner />
             {role === 'kine' && <TrialOptInBanner />}
             {children}
           </div>
