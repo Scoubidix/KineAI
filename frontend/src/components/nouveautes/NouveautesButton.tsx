@@ -223,13 +223,14 @@ export default function NouveautesButton() {
       <button
         type="button"
         onClick={() => handleOpenChange(true)}
-        className="relative rounded-full p-2 transition-colors hover:bg-[#3899aa]/10"
+        className="relative inline-flex items-center gap-1.5 rounded-full border border-[#3899aa]/30 bg-[#3899aa]/5 px-2.5 py-1.5 text-sm font-medium text-[#3899aa] transition-colors hover:bg-[#3899aa]/10 sm:px-3"
         title="Nouveautés"
         aria-label="Nouveautés"
       >
-        <Sparkles className={`h-5 w-5 text-foreground ${unreadCount > 0 ? 'animate-twinkle' : ''}`} />
+        <Sparkles className={`h-4 w-4 ${unreadCount > 0 ? 'animate-twinkle' : ''}`} />
+        <span className="hidden sm:inline">Nouveautés</span>
         {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5">
+          <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#3899aa] opacity-90" />
             <span className="absolute inline-flex h-full w-full animate-pulse rounded-full bg-[#3899aa]/60" />
             <span className="relative m-auto inline-flex h-3 w-3 rounded-full bg-[#3899aa] ring-2 ring-white dark:ring-gray-900" />
