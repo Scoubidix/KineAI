@@ -8,6 +8,7 @@ const logger = require('../../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../../utils/logSanitizer');
 const { notifyNewSubscription, notifyTrialStarted, notifyTrialConverted, notifyCancellation } = require('../../services/telegramService');
 const { addToPionnierList } = require('../../services/brevoTrialService');
+const { sendTrialWillEndMail } = require('../../services/trialMailService');
 
 const router = express.Router();
 const prisma = prismaService.getInstance();
@@ -177,7 +178,11 @@ router.post('/stripe', verifyStripeIP, async (req, res) => {
         case 'invoice.payment_failed':
           handlerResult = await handlePaymentFailed(event.data.object, event.id);
           break;
-          
+
+        case 'customer.subscription.trial_will_end':
+          handlerResult = await handleTrialWillEnd(event.data.object, event.id);
+          break;
+
         default:
           logger.info(`⚠️ Type d'événement non géré: ${event.type}`);
           handlerResult = { success: true, message: 'Événement ignoré' };
@@ -914,8 +919,47 @@ async function handlePaymentFailed(invoice, eventId) {
   }
 }
 
+/**
+ * Essai Stripe bientôt terminé (~J-3) : mail de prévenance au kiné avant 1er débit.
+ * Calcule DATE_DEBIT (FR), MONTANT (€) et PLAN (mensuel/annuel) depuis l'abo complet.
+ */
+async function handleTrialWillEnd(subscription, eventId) {
+  try {
+    const kine = await prisma.kine.findFirst({
+      where: { subscriptionId: subscription.id },
+      select: { id: true, email: true, firstName: true },
+    });
+    if (!kine) {
+      return { success: false, message: `Kiné non trouvé pour subscription: ${subscription.id}` };
+    }
+
+    // Récupère l'abo complet (trial_end + prix fiables), fallback sur l'objet du webhook.
+    let sub = subscription;
+    try { sub = await stripeService.getSubscription(subscription.id); } catch (_) { /* fallback */ }
+
+    const price = sub.items?.data?.[0]?.price;
+    const montant = price?.unit_amount != null ? price.unit_amount / 100 : null;
+    const plan = price?.recurring?.interval === 'year' ? 'annuel' : 'mensuel';
+    const dateDebit = sub.trial_end
+      ? new Date(sub.trial_end * 1000).toLocaleDateString('fr-FR', {
+          day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris',
+        })
+      : '';
+
+    try {
+      await sendTrialWillEndMail({ email: kine.email, firstName: kine.firstName, dateDebit, montant, plan });
+    } catch (mailErr) {
+      logger.error(`⚠️ [${eventId}] Mail J-3 échoué (non bloquant):`, mailErr.message);
+    }
+    return { success: true, message: `Mail J-3 traité pour kiné ${kine.id}` };
+  } catch (error) {
+    return { success: false, message: `Erreur handleTrialWillEnd: ${error.message}` };
+  }
+}
+
 module.exports = router;
 // Handlers exposés pour les tests unitaires (le montage reste `app.use(router)`).
 module.exports.handleSubscriptionUpdated = handleSubscriptionUpdated;
 module.exports.handleSubscriptionDeleted = handleSubscriptionDeleted;
 module.exports.handleCheckoutCompleted = handleCheckoutCompleted;
+module.exports.handleTrialWillEnd = handleTrialWillEnd;
