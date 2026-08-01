@@ -734,10 +734,16 @@ async function handlePaymentSucceeded(invoice, eventId) {
       });
 
       if (kine) {
-        await prisma.kine.update({
-          where: { id: kine.id },
-          data: { subscriptionStatus: 'ACTIVE' }
-        });
+        // Ne marquer ACTIVE que sur un VRAI paiement (montant encaissé > 0). La facture à 0€
+        // émise au DÉMARRAGE d'un essai (billing_reason 'subscription_create') est "payée"
+        // mais ne doit pas écraser le statut TRIALING. Le passage à ACTIVE à la conversion
+        // (fin d'essai, facture > 0) reste géré ici ET par customer.subscription.updated.
+        if (invoice.amount_paid > 0) {
+          await prisma.kine.update({
+            where: { id: kine.id },
+            data: { subscriptionStatus: 'ACTIVE' }
+          });
+        }
 
         // Log business : renouvellement vs premier paiement
         if (invoice.billing_reason === 'subscription_cycle') {
@@ -965,3 +971,4 @@ module.exports.handleSubscriptionDeleted = handleSubscriptionDeleted;
 module.exports.handleCheckoutCompleted = handleCheckoutCompleted;
 module.exports.handleSubscriptionCreated = handleSubscriptionCreated;
 module.exports.handleTrialWillEnd = handleTrialWillEnd;
+module.exports.handlePaymentSucceeded = handlePaymentSucceeded;
