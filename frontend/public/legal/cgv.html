@@ -110,8 +110,8 @@
 <div class="header">
     <h1>Conditions Générales de Vente</h1>
     <div class="version-info">
-        <strong>Version 1.3</strong><br>
-        Dernière mise à jour : 24 juillet 2026<br>
+        <strong>Version 1.4</strong><br>
+        Dernière mise à jour : 1er août 2026<br>
         Lien permanent : <a href="https://app.monassistantkine.fr/legal/cgv.html">https://app.monassistantkine.fr/legal/cgv.html</a>
     </div>
 </div>
@@ -204,6 +204,10 @@ TVA intracommunautaire : FR33389360599</p>
     <strong>Plan Pionnier - Offre Limitée :</strong> Le plan Pionnier est une offre promotionnelle limitée aux 100 premiers souscripteurs. Une fois cette limite atteinte, seuls les plans Déclic, Pratique et Expert resteront disponibles.
 </div>
 
+<div class="highlight-box">
+    <strong>14 jours d'essai gratuit :</strong> toute première souscription débute par une période d'essai gratuite de 14 jours au niveau du plan choisi, sans aucun prélèvement pendant l'essai. Les modalités sont détaillées à l'<strong>article 4</strong>.
+</div>
+
 <h3>2.3 Fonctionnalités Communes</h3>
 <p>Tous les plans incluent :</p>
 <ul>
@@ -224,7 +228,9 @@ TVA intracommunautaire : FR33389360599</p>
 
 <p>Chaque plan est proposé au choix avec une facturation <strong>mensuelle</strong> ou <strong>annuelle</strong> (la formule annuelle bénéficie d'un tarif réduit).</p>
 
-<p><strong>Tarifs mensuels en vigueur au 24 juillet 2026 :</strong></p>
+<p>En cas de période d'essai gratuite (article 4), ces tarifs ne sont prélevés qu'à l'<strong>issue de l'essai de 14 jours</strong>.</p>
+
+<p><strong>Tarifs mensuels en vigueur au 1er août 2026 :</strong></p>
 <ul>
     <li>Plan Déclic : 9€ TTC par mois</li>
     <li>Plan Pratique : 29€ TTC par mois</li>
@@ -232,7 +238,7 @@ TVA intracommunautaire : FR33389360599</p>
     <li>Plan Expert : 49€ TTC par mois</li>
 </ul>
 
-<p><strong>Tarifs annuels en vigueur au 24 juillet 2026 (facturés en une fois pour 12 mois) :</strong></p>
+<p><strong>Tarifs annuels en vigueur au 1er août 2026 (facturés en une fois pour 12 mois) :</strong></p>
 <ul>
     <li>Plan Déclic : 99€ TTC par an</li>
     <li>Plan Pratique : 299€ TTC par an</li>
@@ -251,36 +257,58 @@ TVA intracommunautaire : FR33389360599</p>
     <li>Résilier son abonnement sans frais avant la date d'application des nouveaux tarifs</li>
 </ul>
 
-<h2>4. Commande et Souscription</h2>
+<h2>4. Période d'Essai Gratuite</h2>
 
-<h3>4.1 Processus de Souscription</h3>
+<h3>4.1 Principe</h3>
+<p>Toute première souscription à un plan payant débute par une <strong>période d'essai gratuite de 14 jours calendaires</strong>, donnant accès au niveau du plan choisi. L'enregistrement d'un moyen de paiement (carte bancaire) via Stripe est <strong>obligatoire</strong> à la souscription, mais <strong>aucun montant n'est prélevé pendant la période d'essai</strong>.</p>
+
+<h3>4.2 Éligibilité — un seul essai par client</h3>
+<p>La période d'essai est réservée à la <strong>première souscription</strong> du client. Un client ayant déjà bénéficié d'une période d'essai ou d'un abonnement, même résilié, n'y est plus éligible : sa souscription est alors facturée immédiatement, sans essai. Mon Assistant Kiné se réserve le droit de modifier ou de retirer l'offre d'essai pour les nouvelles souscriptions à tout moment, sans incidence sur les essais en cours.</p>
+
+<h3>4.3 Conversion automatique en abonnement payant</h3>
+<p>À l'issue des 14 jours, et <strong>sauf résiliation par le client avant le terme de l'essai</strong>, l'abonnement se poursuit automatiquement en formule payante : le moyen de paiement enregistré est débité du montant correspondant au plan et à la périodicité choisis (mensuelle ou annuelle), selon les tarifs de l'article 3. Les prélèvements suivants interviennent ensuite à chaque date anniversaire.</p>
+
+<div class="warning-box">
+    <strong>Montant du premier prélèvement :</strong> si vous avez choisi une formule <strong>annuelle</strong>, le premier prélèvement à l'issue de l'essai correspond au <strong>montant annuel intégral</strong> (de 99€ à 499€ TTC selon le plan). Le montant exact et la date du premier prélèvement vous sont indiqués lors de la souscription et rappelés par email environ 3 jours avant l'échéance.
+</div>
+
+<h3>4.4 Résiliation pendant l'essai</h3>
+<p>Le client peut résilier à tout moment pendant la période d'essai, sans frais ni justification, depuis son espace client (portail Stripe) ou par email à monassistantkine.team@gmail.com. Une résiliation avant le terme de l'essai <strong>n'entraîne aucun prélèvement</strong> ; l'accès aux fonctionnalités payantes prend fin à l'issue de la période d'essai.</p>
+
+<h3>4.5 Rappel avant prélèvement</h3>
+<p>Un email de rappel est adressé au client <strong>environ 3 jours avant la fin de la période d'essai</strong>, précisant la date et le montant du premier prélèvement à venir.</p>
+
+<h2>5. Commande et Souscription</h2>
+
+<h3>5.1 Processus de Souscription</h3>
 <ol>
     <li>Création d'un compte professionnel sur la plateforme</li>
-    <li>Sélection du plan d'abonnement souhaité</li>
+    <li>Sélection du plan d'abonnement et de la périodicité (mensuelle ou annuelle) souhaités</li>
     <li>Acceptation des présentes CGV via case à cocher obligatoire</li>
-    <li>Paiement sécurisé via Stripe</li>
-    <li>Activation immédiate du service</li>
+    <li>Enregistrement du moyen de paiement via Stripe (sans prélèvement immédiat en cas de période d'essai)</li>
+    <li>Activation immédiate de la période d'essai de 14 jours — ou du service payant si le client n'est pas éligible à l'essai (article 4.2)</li>
 </ol>
 
-<h3>4.2 Validation de Commande</h3>
-<p>La commande n'est définitivement acceptée qu'après validation du paiement par Stripe. L'activation du service est immédiate.</p>
+<h3>5.2 Validation de Commande</h3>
+<p>La commande est enregistrée après acceptation des CGV et enregistrement d'un moyen de paiement valide via Stripe. En cas de période d'essai, l'accès au service est activé immédiatement et le premier prélèvement intervient à l'issue de l'essai (article 4). À défaut d'essai, la commande est définitivement acceptée après validation du paiement et le service est activé immédiatement.</p>
 
-<h2>5. Modalités de Paiement</h2>
+<h2>6. Modalités de Paiement</h2>
 
-<h3>5.1 Mode de Paiement</h3>
+<h3>6.1 Mode de Paiement</h3>
 <p>Le paiement s'effectue exclusivement par carte bancaire via la plateforme sécurisée Stripe, certifiée PCI DSS niveau 1.</p>
 
 <p>Cartes acceptées : Visa, Mastercard, American Express, cartes bancaires françaises.</p>
 
-<h3>5.2 Facturation et Prélèvement</h3>
+<h3>6.2 Facturation et Prélèvement</h3>
 <ul>
+    <li><strong>Premier prélèvement :</strong> à l'issue de la période d'essai gratuite de 14 jours (article 4) ; pour un client non éligible à l'essai, immédiatement à la souscription</li>
     <li><strong>Périodicité :</strong> Mensuelle ou annuelle, selon la formule choisie à la souscription</li>
-    <li><strong>Date de prélèvement :</strong> À la date anniversaire de la souscription (chaque mois pour la formule mensuelle, chaque année pour la formule annuelle)</li>
+    <li><strong>Date de prélèvement :</strong> À la date anniversaire de la souscription — le point de départ étant, le cas échéant, la fin de la période d'essai</li>
     <li><strong>Prélèvement automatique :</strong> Autorisation de prélèvement accordée lors de la souscription</li>
     <li><strong>Facture :</strong> Disponible directement sur la plateforme après chaque prélèvement</li>
 </ul>
 
-<h3>5.3 Changement de Plan</h3>
+<h3>6.3 Changement de Plan</h3>
 <p>Le client peut modifier son plan d'abonnement à tout moment depuis son espace client ou en contactant le support.</p>
 
 <div class="highlight-box">
@@ -293,33 +321,33 @@ TVA intracommunautaire : FR33389360599</p>
     <li><strong>Passage d'annuel à mensuel :</strong> prend effet à l'échéance de la période annuelle en cours ; l'abonnement annuel reste actif jusqu'à son terme et aucun remboursement du reliquat n'est effectué.</li>
 </ul>
 
-<h2>6. Échec de Paiement et Suspension</h2>
+<h2>7. Échec de Paiement et Suspension</h2>
 
-<h3>6.1 Procédure en Cas d'Échec</h3>
-<p>En cas d'échec de paiement (mensuel ou annuel) :</p>
+<h3>7.1 Procédure en Cas d'Échec</h3>
+<p>En cas d'échec de paiement (y compris le premier prélèvement à l'issue de l'essai, mensuel ou annuel) :</p>
 
 <ol>
     <li><strong>Nouvelle tentative :</strong> Stripe effectue automatiquement une nouvelle tentative de prélèvement après 7 jours</li>
     <li><strong>Suspension du service :</strong> En cas d'échec définitif, suspension automatique de l'accès aux fonctionnalités premium</li>
 </ol>
 
-<h3>6.2 Conséquences de la Suspension</h3>
+<h3>7.2 Conséquences de la Suspension</h3>
 <ul>
     <li>Perte de l'accès aux fonctionnalités liées à l'abonnement (assistant IA au-delà de l'usage découverte, programmes avec IA, rédaction de bilans, module administratif)</li>
     <li>Maintien de l'accès aux fonctionnalités de base (gestion patients)</li>
     <li>Conservation de l'intégralité des données</li>
 </ul>
 
-<h2>7. Droit de Rétractation et Résiliation</h2>
+<h2>8. Droit de Rétractation et Résiliation</h2>
 
-<h3>7.1 Droit de Rétractation</h3>
-<p class="legal-ref">Conformément à l'article L221-28 du Code de la consommation</p>
+<h3>8.1 Période d'Essai et Droit de Rétractation</h3>
+<p class="legal-ref">Articles L221-3 et L221-28 du Code de la consommation</p>
 
 <div class="warning-box">
-    Le service Mon Assistant Kiné étant un service numérique à exécution immédiate, le droit de rétractation de 14 jours ne s'applique que si le client n'a pas commencé à utiliser le service. En acceptant l'activation immédiate lors de la souscription, le client renonce expressément à son droit de rétractation. Cette renonciation s'applique quelle que soit la formule choisie, mensuelle ou annuelle.
+    La période d'essai gratuite de 14 jours (article 4) permet au client d'évaluer le service <strong>sans aucun paiement</strong> : il peut y mettre fin à tout moment avant son terme sans être débité. Le client étant un professionnel souscrivant dans le cadre de son activité de kinésithérapeute, la souscription ne relève pas du droit de rétractation prévu au bénéfice des consommateurs. En tout état de cause, à l'issue de l'essai, l'abonnement payant emporte exécution immédiate du service, et le client conserve la faculté de résilier à tout moment (article 8.2), sans remboursement de la période déjà entamée.
 </div>
 
-<h3>7.2 Résiliation par le Client</h3>
+<h3>8.2 Résiliation par le Client</h3>
 <p>Le client peut résilier son abonnement à tout moment, sans frais ni justification :</p>
 <ul>
     <li>Depuis son espace client (portail Stripe)</li>
@@ -329,34 +357,35 @@ TVA intracommunautaire : FR33389360599</p>
 
 <p><strong>Effets de la résiliation :</strong></p>
 <ul>
-    <li>Arrêt du renouvellement automatique</li>
+    <li>Pendant la période d'essai : arrêt de l'essai, aucun prélèvement, accès payant interrompu à l'issue de l'essai</li>
+    <li>Après conversion en abonnement payant : arrêt du renouvellement automatique</li>
     <li>Service maintenu jusqu'à la fin de la période déjà payée</li>
     <li>Aucun remboursement au prorata de la période non utilisée</li>
     <li>Les programmes patients actifs restent accessibles jusqu'à leur terme naturel</li>
 </ul>
 
-<h3>7.3 Résiliation par Mon Assistant Kiné</h3>
+<h3>8.3 Résiliation par Mon Assistant Kiné</h3>
 <p>Mon Assistant Kiné peut résilier l'abonnement avec préavis de 30 jours en cas de :</p>
 <ul>
     <li>Non-paiement persistant après mise en demeure</li>
     <li>Violation grave des CGU</li>
-    <li>Usage frauduleux du service</li>
+    <li>Usage frauduleux du service, notamment le contournement de la règle d'un seul essai gratuit par client (article 4.2)</li>
     <li>Cessation d'activité</li>
 </ul>
 
-<h2>8. Remboursements</h2>
+<h2>9. Remboursements</h2>
 
-<h3>8.1 Principe Général</h3>
-<p>Aucun remboursement n'est accordé pour les périodes d'abonnement déjà entamées, sauf dans les cas prévus par la loi ou en cas de dysfonctionnement majeur du service imputable à Mon Assistant Kiné.</p>
+<h3>9.1 Principe Général</h3>
+<p>Aucun remboursement n'est accordé pour les périodes d'abonnement déjà entamées, sauf dans les cas prévus par la loi ou en cas de dysfonctionnement majeur du service imputable à Mon Assistant Kiné. La période d'essai étant gratuite, elle ne donne lieu à aucun remboursement.</p>
 
-<h3>8.2 Exceptions</h3>
+<h3>9.2 Exceptions</h3>
 <ul>
     <li><strong>Dysfonctionnement majeur :</strong> Indisponibilité du service supérieure à 7 jours consécutifs</li>
     <li><strong>Erreur de facturation :</strong> Remboursement du trop-perçu</li>
     <li><strong>Résiliation par Mon Assistant Kiné :</strong> Remboursement au prorata de la période restante</li>
 </ul>
 
-<h3>8.3 Modalités de Remboursement</h3>
+<h3>9.3 Modalités de Remboursement</h3>
 <p>Le cas échéant, les remboursements s'effectuent :</p>
 <ul>
     <li>Par virement bancaire ou crédit sur carte bancaire</li>
@@ -364,24 +393,24 @@ TVA intracommunautaire : FR33389360599</p>
     <li>Sur le même moyen de paiement que celui utilisé pour l'achat initial</li>
 </ul>
 
-<h2>9. Disponibilité et Performance du Service</h2>
+<h2>10. Disponibilité et Performance du Service</h2>
 
-<h3>9.1 Objectif de Disponibilité</h3>
+<h3>10.1 Objectif de Disponibilité</h3>
 <p>Mon Assistant Kiné s'efforce d'assurer une disponibilité du service de 99% sur une base mensuelle, hors maintenances programmées.</p>
 
-<h3>9.2 Maintenance</h3>
+<h3>10.2 Maintenance</h3>
 <ul>
     <li><strong>Maintenance programmée :</strong> Notification par email 24h à l'avance</li>
     <li><strong>Maintenance d'urgence :</strong> Intervention immédiate en cas de problème de sécurité</li>
     <li><strong>Fenêtre de maintenance :</strong> De préférence entre 2h et 6h du matin (heure française)</li>
 </ul>
 
-<h3>9.3 Limitation de Responsabilité</h3>
+<h3>10.3 Limitation de Responsabilité</h3>
 <p>La responsabilité de Mon Assistant Kiné en cas d'indisponibilité est limitée au remboursement au prorata de la période d'indisponibilité, sans que ce montant puisse excéder le montant de l'abonnement mensuel.</p>
 
-<h2>10. Support Client et Service Après-Vente</h2>
+<h2>11. Support Client et Service Après-Vente</h2>
 
-<h3>10.1 Support Standard</h3>
+<h3>11.1 Support Standard</h3>
 <ul>
     <li><strong>Email :</strong> monassistantkine.team@gmail.com</li>
     <li><strong>Délai de réponse :</strong> 48h ouvrées maximum</li>
@@ -389,18 +418,18 @@ TVA intracommunautaire : FR33389360599</p>
     <li><strong>Horaires :</strong> Lundi au vendredi, 9h-18h</li>
 </ul>
 
-<h3>10.2 Support Prioritaire</h3>
+<h3>11.2 Support Prioritaire</h3>
 <p>Pour les plans Pratique, Pionnier et Expert :</p>
 <ul>
     <li>Traitement prioritaire des demandes</li>
     <li>Délai de réponse : 24h ouvrées maximum</li>
 </ul>
 
-<h2>11. Propriété Intellectuelle et Données</h2>
+<h2>12. Propriété Intellectuelle et Données</h2>
 
 <p>Les dispositions relatives à la propriété intellectuelle et au traitement des données personnelles sont détaillées dans les <a href="cgu.html">Conditions Générales d'Utilisation</a>, la <a href="politique-confidentialite.html">Politique de Confidentialité</a> et le <a href="dpa.html">Contrat de Sous-traitance (DPA)</a>.</p>
 
-<h2>12. Force Majeure</h2>
+<h2>13. Force Majeure</h2>
 
 <p>Mon Assistant Kiné ne pourra être tenue responsable de l'inexécution ou des retards dans l'exécution de ses obligations résultant de cas de force majeure au sens de l'article 1218 du Code civil.</p>
 
@@ -413,38 +442,38 @@ TVA intracommunautaire : FR33389360599</p>
     <li>Défaillance des prestataires tiers essentiels (Stripe, Clever Cloud)</li>
 </ul>
 
-<h2>13. Modification des CGV</h2>
+<h2>14. Modification des CGV</h2>
 
-<h3>13.1 Évolution des Conditions</h3>
+<h3>14.1 Évolution des Conditions</h3>
 <p>Mon Assistant Kiné se réserve le droit de modifier les présentes CGV à tout moment pour s'adapter aux évolutions légales, réglementaires ou techniques.</p>
 
-<h3>13.2 Notification</h3>
+<h3>14.2 Notification</h3>
 <p>Toute modification substantielle sera notifiée par email 30 jours avant son entrée en vigueur. La poursuite de l'utilisation du service vaut acceptation des nouvelles conditions.</p>
 
 <p>En cas de refus des nouvelles conditions, le client pourra résilier son abonnement sans frais.</p>
 
-<h2>14. Droit Applicable et Juridiction</h2>
+<h2>15. Droit Applicable et Juridiction</h2>
 
-<h3>14.1 Droit Applicable</h3>
+<h3>15.1 Droit Applicable</h3>
 <p>Les présentes CGV sont soumises au droit français.</p>
 
-<h3>14.2 Juridiction Compétente</h3>
+<h3>15.2 Juridiction Compétente</h3>
 <p>En cas de litige relatif à l'interprétation ou à l'exécution des présentes CGV, les tribunaux de Coutances (50200) seront seuls compétents.</p>
 
 <p>Toutefois, conformément aux articles L611-1 et suivants du Code de la consommation, le client professionnel peut également saisir les tribunaux du lieu de son domicile.</p>
 
-<h3>14.3 Médiation</h3>
+<h3>15.3 Médiation</h3>
 <p>Avant tout recours contentieux, les parties s'efforcent de résoudre le litige à l'amiable. À défaut, le client peut saisir le médiateur de la consommation compétent.</p>
 
-<h2>15. Dispositions Diverses</h2>
+<h2>16. Dispositions Diverses</h2>
 
-<h3>15.1 Nullité Partielle</h3>
+<h3>16.1 Nullité Partielle</h3>
 <p>Si une clause des présentes CGV était déclarée nulle ou non avenue, cela n'affecterait pas la validité des autres dispositions.</p>
 
-<h3>15.2 Intégralité de l'Accord</h3>
+<h3>16.2 Intégralité de l'Accord</h3>
 <p>Les présentes CGV, les <a href="cgu.html">CGU</a>, la <a href="politique-confidentialite.html">Politique de Confidentialité</a> et le <a href="dpa.html">Contrat de Sous-traitance (DPA)</a> constituent l'intégralité de l'accord entre les parties.</p>
 
-<h3>15.3 Contact Fiscal</h3>
+<h3>16.3 Contact Fiscal</h3>
 <p>Pour toute question relative à la facturation ou à la TVA :</p>
 <ul>
     <li>Email : monassistantkine.team@gmail.com</li>
