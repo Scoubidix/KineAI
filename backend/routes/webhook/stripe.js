@@ -673,6 +673,7 @@ async function handleSubscriptionDeleted(subscription, eventId) {
         subscriptionStatus: 'CANCELED',
         subscriptionEndDate: subscription.ended_at ? new Date(subscription.ended_at * 1000) : new Date(),
         planType: 'FREE', // Reset vers plan gratuit
+        trialEndDate: null,
       }
     });
 
