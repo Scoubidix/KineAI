@@ -166,4 +166,21 @@ async function updateTrialContactName({ email, firstName }) {
   }, 'maj prénom');
 }
 
-module.exports = { ERROR_CODES, upsertTrialContact, addToPionnierList, updateTrialContactName };
+/**
+ * Ajoute le kiné à la liste « Inscrits » (déclenche l'automation onboarding J0→J13,
+ * cadencée sur la date d'inscription côté Brevo). Appelé au signup, avec ou sans carte.
+ * @param {Object} params
+ * @param {string} params.email
+ * @param {string} [params.firstName]
+ * @returns {Promise<void>}
+ */
+async function upsertSignupContact({ email, firstName }) {
+  return postContactToList({
+    email,
+    listId: process.env.BREVO_SIGNUP_LIST_ID,
+    attributes: { PRENOM: firstName || '' },
+    context: 'inscrit',
+  });
+}
+
+module.exports = { ERROR_CODES, upsertTrialContact, addToPionnierList, updateTrialContactName, upsertSignupContact };
