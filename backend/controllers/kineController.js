@@ -10,7 +10,6 @@ const { normalizeFirstName, normalizeLastName } = require('../utils/nameNormaliz
 const LEGAL_VERSIONS = require('../config/legalVersions');
 const stripeService = require('../services/StripeService');
 const { updateTrialContactName, upsertSignupContact } = require('../services/brevoTrialService');
-const { isTrialActive } = require('../services/planService');
 const { sumMinutes } = require('../config/timeSaved');
 const fs = require('fs');
 
@@ -72,13 +71,9 @@ const createKine = async (req, res) => {
 
     logger.warn("✅ Kiné créé - ID:", sanitizeId(newKine.id), "Email:", sanitizeEmail(newKine.email), "Legal accepté:", !!legalDate);
 
-    // Onboarding : ajout à la liste Brevo « Inscrits » (déclenche la séquence J0→J13).
-    // Non bloquant : une erreur ici ne doit jamais empêcher la création du compte.
-    try {
-      await upsertSignupContact({ email: newKine.email, firstName: newKine.firstName });
-    } catch (brevoErr) {
-      logger.error('[signup] Ajout contact Inscrits échoué (non bloquant):', brevoErr.message);
-    }
+    // Onboarding Brevo : la séquence J0→J13 est déclenchée plus tard, à la SAISIE du prénom
+    // (updateKineProfile), pour que les mails soient personnalisés — pas ici au signup où le
+    // prénom n'est pas encore connu (rempli via le wizard d'onboarding).
 
     return res.status(201).json(newKine);
   } catch (err) {
@@ -218,14 +213,21 @@ const updateKineProfile = async (req, res) => {
       }
     }
 
-    // Essai : le prénom est saisi à l'onboarding, APRÈS le démarrage de l'essai. Si l'essai
-    // est encore actif, re-synchroniser l'attribut PRENOM du contact Brevo pour que les mails
-    // de la séquence (J3+) l'affichent. Non bloquant, sans re-déclencher l'automation.
-    if (firstName !== undefined && updatedKine.firstName && isTrialActive(existingKine)) {
+    // Onboarding Brevo. Le prénom est saisi ici (wizard), après le signup.
+    //  - 1re saisie du prénom  → ajout à la liste « Inscrits » AVEC le prénom : déclenche la
+    //    séquence J0→J13 personnalisée (upsertSignupContact).
+    //  - modif ultérieure       → simple mise à jour de l'attribut PRENOM, sans re-déclencher
+    //    l'automation (updateTrialContactName).
+    // Non bloquant : un échec Brevo ne doit jamais faire échouer la mise à jour du profil.
+    if (firstName !== undefined && updatedKine.firstName) {
       try {
-        await updateTrialContactName({ email: updatedKine.email, firstName: updatedKine.firstName });
+        if (!existingKine.firstName) {
+          await upsertSignupContact({ email: updatedKine.email, firstName: updatedKine.firstName });
+        } else {
+          await updateTrialContactName({ email: updatedKine.email, firstName: updatedKine.firstName });
+        }
       } catch (e) {
-        logger.warn("⚠️ Re-synchro prénom Brevo échouée (non-bloquant):", e.message);
+        logger.warn("⚠️ Sync onboarding/prénom Brevo échouée (non-bloquant):", e.message);
       }
     }
 
