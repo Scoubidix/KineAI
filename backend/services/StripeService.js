@@ -4,6 +4,7 @@
 const Stripe = require('stripe');
 const logger = require('../utils/logger');
 const prismaService = require('./prismaService');
+const { TRIAL_DURATION_DAYS } = require('./planService');
 
 class StripeService {
   constructor() {
@@ -97,6 +98,16 @@ class StripeService {
         }
       }
 
+      // Essai Stripe uniquement au 1er abonnement (anti-abus). Pendant l'essai,
+      // Stripe ne facture rien pendant TRIAL_DURATION_DAYS puis débite la carte.
+      const grantTrial = !kine.hasHadTrial;
+      const trialSubData = grantTrial
+        ? {
+            trial_period_days: TRIAL_DURATION_DAYS,
+            trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
+          }
+        : {};
+
       // Créer la session Stripe AVEC correction pour les taxes
       const session = await this.stripe.checkout.sessions.create({
         customer: customerId,
@@ -108,6 +119,7 @@ class StripeService {
         mode: 'subscription',
         success_url: successUrl,
         cancel_url: cancelUrl,
+        payment_method_collection: 'always',
         // ✅ CORRECTION : Permettre à Stripe de récupérer l'adresse automatiquement
         customer_update: {
           address: 'auto',  // Stripe récupère l'adresse du client automatiquement
@@ -122,7 +134,10 @@ class StripeService {
             message: `J'accepte les [Conditions Générales de Vente](${process.env.FRONTEND_URL}/legal/cgv.html) de Mon Assistant Kiné.`
           },
           submit: {
-            message: "En validant, vous demandez l'exécution immédiate du service et reconnaissez renoncer à votre droit de rétractation une fois l'accès activé."
+            // ⚠️ Wording essai à faire valider juridiquement avant prod (spec §7)
+            message: grantTrial
+              ? "Votre abonnement démarre par 14 jours d'essai : aucun débit avant la fin de l'essai, résiliable à tout moment."
+              : "En validant, vous demandez l'exécution immédiate du service et reconnaissez renoncer à votre droit de rétractation une fois l'accès activé."
           }
         },
         metadata: {
@@ -133,6 +148,7 @@ class StripeService {
           ...(referralCode && { referralCode: referralCode }) // Code parrainage si présent
         },
         subscription_data: {
+          ...trialSubData,
           metadata: {
             kineId: kineId.toString(),
             planType: planType,
