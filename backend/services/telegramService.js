@@ -82,4 +82,4 @@ async function notifyCancellation({ planType, kineId, feedback, comment, endDate
   await sendNotification(message);
 }
 
-module.exports = { sendNotification, notifyNewSubscription, notifyTrialStarted, notifyTrialConverted, notifyCancellation };
+module.exports = { sendNotification, notifyNewSubscription, notifyTrialStarted, notifyTrialConverted, notifyCancellation, FEEDBACK_LABELS_FR };
