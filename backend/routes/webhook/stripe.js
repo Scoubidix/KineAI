@@ -500,6 +500,7 @@ async function handleSubscriptionCreated(subscription, eventId) {
       billingCycle: stripeService.getCycleFromPriceId(priceId),
       subscriptionStatus: stripeService.mapSubscriptionStatus(subscription.status),
       trialEndDate: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+      hasHadTrial: true,
     };
     
     // Depuis l'API Basil, current_period_start/end vivent sur les items, plus au top level
@@ -962,4 +963,5 @@ module.exports = router;
 module.exports.handleSubscriptionUpdated = handleSubscriptionUpdated;
 module.exports.handleSubscriptionDeleted = handleSubscriptionDeleted;
 module.exports.handleCheckoutCompleted = handleCheckoutCompleted;
+module.exports.handleSubscriptionCreated = handleSubscriptionCreated;
 module.exports.handleTrialWillEnd = handleTrialWillEnd;
