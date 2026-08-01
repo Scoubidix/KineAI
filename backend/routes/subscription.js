@@ -23,6 +23,7 @@ router.get('/subscription', authenticate, async (req, res) => {
         planType: true,
         billingCycle: true,
         trialEndDate: true,
+        hasHadTrial: true,
         createdAt: true
       }
     });
