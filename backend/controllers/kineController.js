@@ -9,8 +9,7 @@ const { uploadAvatar, deleteAvatar, generateSignedUrl, validateImageBuffer } = r
 const { normalizeFirstName, normalizeLastName } = require('../utils/nameNormalization');
 const LEGAL_VERSIONS = require('../config/legalVersions');
 const stripeService = require('../services/StripeService');
-const trialService = require('../services/trialService');
-const { updateTrialContactName } = require('../services/brevoTrialService');
+const { updateTrialContactName, upsertSignupContact } = require('../services/brevoTrialService');
 const { isTrialActive } = require('../services/planService');
 const { sumMinutes } = require('../config/timeSaved');
 const fs = require('fs');
@@ -73,12 +72,12 @@ const createKine = async (req, res) => {
 
     logger.warn("✅ Kiné créé - ID:", sanitizeId(newKine.id), "Email:", sanitizeEmail(newKine.email), "Legal accepté:", !!legalDate);
 
-    // Démarrer l'essai gratuit 14 jours. Non bloquant : une erreur ici ne doit
-    // jamais empêcher la création du compte.
+    // Onboarding : ajout à la liste Brevo « Inscrits » (déclenche la séquence J0→J13).
+    // Non bloquant : une erreur ici ne doit jamais empêcher la création du compte.
     try {
-      await trialService.startTrial(newKine.id);
-    } catch (trialErr) {
-      logger.error('[signup] Démarrage essai échoué (non bloquant):', trialErr.message);
+      await upsertSignupContact({ email: newKine.email, firstName: newKine.firstName });
+    } catch (brevoErr) {
+      logger.error('[signup] Ajout contact Inscrits échoué (non bloquant):', brevoErr.message);
     }
 
     return res.status(201).json(newKine);
