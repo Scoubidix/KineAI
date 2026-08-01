@@ -6,7 +6,7 @@ const prismaService = require('../../services/prismaService');
 const stripeService = require('../../services/StripeService');
 const logger = require('../../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../../utils/logSanitizer');
-const { notifyNewSubscription } = require('../../services/telegramService');
+const { notifyNewSubscription, notifyTrialStarted } = require('../../services/telegramService');
 const { addToPionnierList } = require('../../services/brevoTrialService');
 
 const router = express.Router();
@@ -311,12 +311,19 @@ async function handleCheckoutCompleted(session, eventId) {
     // Mise à jour avec retry et logging détaillé
     try {
       const billingCycle = session.metadata?.billingCycle === 'yearly' ? 'yearly' : 'monthly';
+
+      // Récupérer le statut réel de l'abonnement depuis Stripe
+      const sub = await stripeService.getSubscription(session.subscription);
+      const isTrialing = sub?.status === 'trialing';
+      const realStatus = stripeService.mapSubscriptionStatus(sub?.status || 'active');
+
       const updateData = {
         stripeCustomerId: session.customer,
         subscriptionId: session.subscription,
         planType: planType,
         billingCycle: billingCycle,
-        subscriptionStatus: 'ACTIVE',
+        subscriptionStatus: realStatus,
+        hasHadTrial: true,
         subscriptionStartDate: new Date(),
       };
       
@@ -344,7 +351,11 @@ async function handleCheckoutCompleted(session, eventId) {
 
       // ========== NOTIFICATION TELEGRAM ==========
       try {
-        await notifyNewSubscription(planType, billingCycle);
+        if (isTrialing) {
+          await notifyTrialStarted(planType, billingCycle);
+        } else {
+          await notifyNewSubscription(planType, billingCycle);
+        }
       } catch (telegramError) {
         logger.error(`⚠️ [${eventId}] Erreur Telegram (non bloquante):`, telegramError.message);
       }
