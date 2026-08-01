@@ -2,7 +2,7 @@
 const prismaService = require('./prismaService');
 const stripeService = require('./StripeService');
 const logger = require('../utils/logger');
-const { TRIAL_DURATION_DAYS } = require('./planService');
+// planService n'est plus nécessaire : les essais Stripe (TRIALING) n'utilisent plus TRIAL_DURATION_DAYS
 
 const PARIS_TZ = 'Europe/Paris';
 
@@ -130,24 +130,20 @@ async function getActivityStats(now = new Date(), ranges = getParisPeriodRanges(
     ]).then(([wc, wp, mc, mp]) =>
       buildMetric({ total: null, weekCurrent: wc, weekPrevious: wp, monthCurrent: mc, monthPrevious: mp }));
 
-  // Essais gratuits : total = actuellement EN COURS (trialEndDate > now, non convertis) ;
-  // comparatif semaine/mois = essais DÉMARRÉS sur la période. Un essai démarré dans une
-  // période P équivaut à trialEndDate dans P décalée de la durée d'essai (fin = début + N jours).
-  const TRIAL_MS = TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000;
-  const shiftFwd = (range) => {
-    const r = {};
-    if (range.gte) r.gte = new Date(range.gte.getTime() + TRIAL_MS);
-    if (range.lt) r.lt = new Date(range.lt.getTime() + TRIAL_MS);
-    return r;
-  };
-  const trialActiveWhere = { trialEndDate: { gt: now }, OR: [{ planType: null }, { planType: 'FREE' }] };
+  // Essais en cours = abonnés Stripe actuellement en période d'essai (subscriptionStatus TRIALING).
+  // Total : count direct sur le statut TRIALING.
+  // Comparatifs semaine/mois : essais DÉMARRÉS dans la fenêtre, identifiés par subscriptionStartDate
+  // combiné au statut TRIALING (pour ne compter que ceux encore actifs en essai).
+  // Choix retenu : subscriptionStartDate est déjà utilisé dans countSubscriptions() pour les
+  // comparatifs abonnements — même pattern, cohérent. On ne peut plus se baser sur trialEndDate
+  // puisque les essais Stripe n'ont pas ce champ en DB (c'est Stripe qui gère l'échéance).
   const countTrials = () =>
     Promise.all([
-      prisma.kine.count({ where: trialActiveWhere }),
-      prisma.kine.count({ where: { trialEndDate: shiftFwd(inWeek) } }),
-      prisma.kine.count({ where: { trialEndDate: shiftFwd(inPrevWeek) } }),
-      prisma.kine.count({ where: { trialEndDate: shiftFwd(inMonth) } }),
-      prisma.kine.count({ where: { trialEndDate: shiftFwd(inPrevMonth) } }),
+      prisma.kine.count({ where: { subscriptionStatus: 'TRIALING' } }),
+      prisma.kine.count({ where: { subscriptionStatus: 'TRIALING', subscriptionStartDate: inWeek } }),
+      prisma.kine.count({ where: { subscriptionStatus: 'TRIALING', subscriptionStartDate: inPrevWeek } }),
+      prisma.kine.count({ where: { subscriptionStatus: 'TRIALING', subscriptionStartDate: inMonth } }),
+      prisma.kine.count({ where: { subscriptionStatus: 'TRIALING', subscriptionStartDate: inPrevMonth } }),
     ]).then(([total, wc, wp, mc, mp]) =>
       buildMetric({ total, weekCurrent: wc, weekPrevious: wp, monthCurrent: mc, monthPrevious: mp }));
 
