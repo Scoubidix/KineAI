@@ -79,13 +79,12 @@ router.get('/subscription', authenticate, async (req, res) => {
         }
       }
 
-      // Pendant l'essai Stripe : le 1er prélèvement a lieu à la fin de l'essai (trial_end).
-      const isStripeTrialing = stripeSub.status === 'trialing';
-      const stripeTrialEnd = isStripeTrialing && stripeSub.trial_end
-        ? new Date(stripeSub.trial_end * 1000)
-        : null;
-      if (stripeTrialEnd) {
-        nextPaymentDate = stripeTrialEnd;
+      // Pendant l'essai Stripe : on affiche le badge du PLAN souscrit (pas de badge "essai"
+      // → isTrialing reste false pour le header). Le 1er prélèvement a lieu à la fin de l'essai
+      // (trial_end) : on l'expose comme prochaine facturation (utilisé par la page success via
+      // le champ `status === 'trialing'`, indépendant de isTrialing).
+      if (stripeSub.status === 'trialing' && stripeSub.trial_end) {
+        nextPaymentDate = new Date(stripeSub.trial_end * 1000);
       }
 
       // Changement d'abonnement programmé (downgrade différé) le cas échéant
@@ -99,8 +98,8 @@ router.get('/subscription', authenticate, async (req, res) => {
           currentPeriodEnd: nextPaymentDate,
           cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
           createdAt: new Date(stripeSub.start_date * 1000),
-          isTrialing: isStripeTrialing,
-          trialEndDate: stripeTrialEnd,
+          isTrialing: false,
+          trialEndDate: null,
           daysLeft: 0,
           trialEligible: false,
           canStartTrial: false,
