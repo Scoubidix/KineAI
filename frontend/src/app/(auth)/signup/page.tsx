@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import Image from "next/image";
-import { Eye, EyeOff, Check, X, RefreshCw, Gift } from "lucide-react";
+import { Eye, EyeOff, Check, X, RefreshCw } from "lucide-react";
 import { sendEmailVerification } from "@/lib/auth-utils";
 
 export default function SignupPage() {
@@ -232,14 +232,6 @@ export default function SignupPage() {
         <h1 className="text-2xl font-bold text-center" style={{ color: '#1f5c6a' }}>
           Mon Assistant Kiné
         </h1>
-
-        {/* Bandeau essai gratuit */}
-        <div className="flex items-center gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3">
-          <Gift className="h-5 w-5 shrink-0 text-[#3899aa]" />
-          <p className="text-sm text-[#1f5c6a]">
-            <span className="font-semibold">14 jours d&apos;essai Premium offerts</span> à l&apos;inscription.
-          </p>
-        </div>
 
         <form onSubmit={handleSignup} className="space-y-5">
 

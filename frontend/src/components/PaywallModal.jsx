@@ -39,6 +39,9 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [pioneerSlotsRemaining, setPioneerSlotsRemaining] = useState(null);
 
+  // canStartTrial : true si le kiné n'a jamais eu d'essai ni d'abonnement (= !hasHadTrial)
+  const canStartTrial = subscription?.canStartTrial ?? false;
+
   // États pour le système d'étapes
   const [currentStep, setCurrentStep] = useState('selection'); // 'selection' | 'confirmation'
   const [pendingUpgrade, setPendingUpgrade] = useState(null); // {planType, planData, currentPlan}
@@ -223,8 +226,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
     return colors[planType] || colors['DECLIC'];
   };
 
-  // Pendant l'essai : aucune carte n'est "plan actuel" → toutes sélectionnables (EXPERT inclus).
-  const currentPlan = subscription?.isTrialing ? null : subscription?.planType;
+  const currentPlan = subscription?.planType ?? null;
   const currentCycle = subscription?.billingCycle || 'monthly';
   const recommendedPlan = !subscription || subscription.planType === 'FREE' ? 'PRATIQUE' : 'EXPERT';
 
@@ -266,6 +268,16 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
               <DialogDescription className="text-muted-foreground text-sm sm:text-base">
                 Choisis ton plan d'abonnement professionnel
               </DialogDescription>
+
+              {/* Encart essai gratuit — barre pleine largeur, visible uniquement si le kiné
+                  peut encore démarrer un essai. */}
+              {canStartTrial && (
+                <div className="mt-3 rounded-lg bg-teal-500 px-4 py-2.5 text-center shadow-sm">
+                  <p className="text-sm sm:text-base font-bold text-white">
+                    🎁 14 Jours d'essai gratuits
+                  </p>
+                </div>
+              )}
             </DialogHeader>
 
             {/* Contenu scrollable */}

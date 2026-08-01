@@ -71,11 +71,15 @@ export const useSubscription = () => {
     }
   };
 
+  // canStartTrial est renvoyé par GET /kine/subscription (= !hasHadTrial)
+  const canStartTrial = subscription?.canStartTrial ?? false;
+
   return {
     subscription,
     usage,
     isLoading,
     error,
-    refreshSubscription
+    refreshSubscription,
+    canStartTrial
   };
 };

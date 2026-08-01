@@ -106,8 +106,6 @@ import { SupportModal } from './SupportModal';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import LegalAcceptanceModal from './LegalAcceptanceModal';
 import { useLegalAcceptance } from '@/hooks/useLegalAcceptance';
-import TrialWelcomeModal from '@/components/TrialWelcomeModal';
-import TrialOptInBanner from '@/components/TrialOptInBanner';
 import NouveautesButton from '@/components/nouveautes/NouveautesButton';
 
 interface AppLayoutProps {
@@ -1332,7 +1330,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const displayInitials = role === 'kine' ? 'DK' : role === 'patient' ? 'PA' : 'U';
 
   // Subscription pour le bouton Upgrade dans le header
-  const { subscription: headerSubscription } = useSubscription();
+  const { subscription: headerSubscription, canStartTrial: headerCanStartTrial } = useSubscription();
   const [isPaywallHeaderOpen, setIsPaywallHeaderOpen] = useState(false);
 
   // Vérification acceptations légales
@@ -1597,13 +1595,24 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </button>
               )}
               {role === 'kine' && headerSubscription && !headerSubscription.isTrialing && headerSubscription.planType === 'FREE' && (
-                <button
-                  onClick={() => setIsPaywallHeaderOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sky-400 hover:bg-sky-300 text-white text-xs font-bold shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg"
-                >
-                  <Crown className="h-3.5 w-3.5" />
-                  Passer à Premium
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setIsPaywallHeaderOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sky-400 hover:bg-sky-300 text-white text-xs font-bold shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg"
+                  >
+                    <Crown className="h-3.5 w-3.5" />
+                    Passer à Premium
+                  </button>
+                  {headerCanStartTrial && (
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-20 pointer-events-none">
+                      <div className="relative whitespace-nowrap rounded-lg bg-teal-500 px-2.5 py-1 text-[11px] font-bold text-white shadow-lg">
+                        {/* flèche pointant vers le bouton "Passer à Premium" */}
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-1 h-2.5 w-2.5 rotate-45 rounded-[2px] bg-teal-500"></span>
+                        Essai de 14J gratuit
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
               {role === 'kine' && headerSubscription && !headerSubscription.isTrialing && headerSubscription.planType && headerSubscription.planType !== 'FREE' && (() => {
                 const currentPlan = getPlanByType(headerSubscription.planType);
@@ -1794,8 +1803,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
             style={{ background: 'radial-gradient(circle, #3899aa, transparent 70%)' }}
           />
           <div className="relative z-10">
-            {role === 'kine' && <TrialWelcomeModal />}
-            {role === 'kine' && <TrialOptInBanner />}
             {children}
           </div>
         </div>
