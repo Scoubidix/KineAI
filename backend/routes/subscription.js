@@ -52,7 +52,8 @@ router.get('/subscription', authenticate, async (req, res) => {
           isTrialing: trial.isTrialing,
           trialEndDate: trial.trialEndDate,
           daysLeft: trial.daysLeft,
-          trialEligible: trial.trialEligible
+          trialEligible: trial.trialEligible,
+          canStartTrial: trial.canStartTrial
         },
         kine: kineInfo
       });
@@ -93,6 +94,7 @@ router.get('/subscription', authenticate, async (req, res) => {
           trialEndDate: null,
           daysLeft: 0,
           trialEligible: false,
+          canStartTrial: false,
           pendingChange,
         },
         kine: kineInfo
@@ -111,6 +113,7 @@ router.get('/subscription', authenticate, async (req, res) => {
           trialEndDate: null,
           daysLeft: 0,
           trialEligible: false,
+          canStartTrial: false,
         },
         kine: kineInfo
       });
