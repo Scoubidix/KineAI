@@ -312,8 +312,13 @@ async function handleCheckoutCompleted(session, eventId) {
     try {
       const billingCycle = session.metadata?.billingCycle === 'yearly' ? 'yearly' : 'monthly';
 
-      // Récupérer le statut réel de l'abonnement depuis Stripe
-      const sub = await stripeService.getSubscription(session.subscription);
+      // Récupérer le statut réel de l'abonnement depuis Stripe (non bloquant)
+      let sub = null;
+      try {
+        sub = await stripeService.getSubscription(session.subscription);
+      } catch (subErr) {
+        logger.warn(`[${eventId}] getSubscription échoué, fallback statut 'active': ${subErr.message}`);
+      }
       const isTrialing = sub?.status === 'trialing';
       const realStatus = stripeService.mapSubscriptionStatus(sub?.status || 'active');
 
