@@ -79,6 +79,15 @@ router.get('/subscription', authenticate, async (req, res) => {
         }
       }
 
+      // Pendant l'essai Stripe : le 1er prélèvement a lieu à la fin de l'essai (trial_end).
+      const isStripeTrialing = stripeSub.status === 'trialing';
+      const stripeTrialEnd = isStripeTrialing && stripeSub.trial_end
+        ? new Date(stripeSub.trial_end * 1000)
+        : null;
+      if (stripeTrialEnd) {
+        nextPaymentDate = stripeTrialEnd;
+      }
+
       // Changement d'abonnement programmé (downgrade différé) le cas échéant
       const pendingChange = await StripeService.getScheduledChange(stripeSub);
 
@@ -90,8 +99,8 @@ router.get('/subscription', authenticate, async (req, res) => {
           currentPeriodEnd: nextPaymentDate,
           cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
           createdAt: new Date(stripeSub.start_date * 1000),
-          isTrialing: false,
-          trialEndDate: null,
+          isTrialing: isStripeTrialing,
+          trialEndDate: stripeTrialEnd,
           daysLeft: 0,
           trialEligible: false,
           canStartTrial: false,

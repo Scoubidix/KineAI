@@ -158,6 +158,7 @@ function UpgradeSuccessContent() {
 
   const currentPlan = subscription?.planType || null;
   const planDetails = currentPlan ? getPlanDetails(currentPlan) : null;
+  const isTrial = subscription?.status === 'trialing';
 
   return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -171,7 +172,7 @@ function UpgradeSuccessContent() {
           </div>
           
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary mb-4">
-            🎉 Paiement réussi !
+            {isTrial ? '🎁 Ton essai a démarré !' : '🎉 Paiement réussi !'}
           </h1>
         </div>
 
@@ -236,10 +237,12 @@ function UpgradeSuccessContent() {
               </div>
               <CardTitle className="text-xl sm:text-2xl font-bold flex flex-col sm:flex-row items-center justify-center gap-2">
                 Plan {planDetails.name}
-                <Badge className="bg-accent text-accent-foreground">Actif</Badge>
+                <Badge className="bg-accent text-accent-foreground">{isTrial ? 'Essai 14 jours' : 'Actif'}</Badge>
               </CardTitle>
               <CardDescription className="text-base sm:text-lg">
-                Tu as maintenant accès à toutes les fonctionnalités du plan {planDetails.name}
+                {isTrial
+                  ? `Ton essai gratuit de 14 jours est lancé — tu as accès à toutes les fonctionnalités du plan ${planDetails.name}.`
+                  : `Tu as maintenant accès à toutes les fonctionnalités du plan ${planDetails.name}`}
               </CardDescription>
             </CardHeader>
             
@@ -249,19 +252,30 @@ function UpgradeSuccessContent() {
                 <div className="w-full flex flex-col items-center text-center gap-3 p-4 sm:p-6 bg-white/50 dark:bg-gray-800/50 rounded-lg">
                   <CreditCard className="h-6 w-6 text-accent" />
                   <div>
-                    <p className="font-semibold">Montant facturé</p>
-                    <p className="text-3xl font-bold text-primary">
-                      {subscription?.billingCycle === 'yearly'
-                        ? `${planDetails.priceYearly}€/an`
-                        : `${planDetails.price}€/mois`}
-                    </p>
+                    <p className="font-semibold">{isTrial ? "Débité aujourd'hui" : 'Montant facturé'}</p>
+                    {isTrial ? (
+                      <>
+                        <p className="text-3xl font-bold text-primary">0€</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          puis {subscription?.billingCycle === 'yearly'
+                            ? `${planDetails.priceYearly}€/an`
+                            : `${planDetails.price}€/mois`} à la fin de l'essai
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-3xl font-bold text-primary">
+                        {subscription?.billingCycle === 'yearly'
+                          ? `${planDetails.priceYearly}€/an`
+                          : `${planDetails.price}€/mois`}
+                      </p>
+                    )}
                   </div>
                 </div>
-                
+
                 <div className="w-full flex items-center justify-center gap-3 p-4 bg-white/50 dark:bg-gray-800/50 rounded-lg">
                   <Calendar className="h-6 w-6 text-accent" />
                   <div>
-                    <p className="font-semibold">Prochaine facturation</p>
+                    <p className="font-semibold">{isTrial ? "1er prélèvement (fin de l'essai)" : 'Prochaine facturation'}</p>
                     <p className="text-lg font-medium">
                       {subscription?.currentPeriodEnd
                         ? format(new Date(subscription.currentPeriodEnd), 'd MMMM yyyy', { locale: fr })
