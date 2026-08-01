@@ -6,7 +6,7 @@ const prismaService = require('../../services/prismaService');
 const stripeService = require('../../services/StripeService');
 const logger = require('../../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../../utils/logSanitizer');
-const { notifyNewSubscription, notifyTrialStarted } = require('../../services/telegramService');
+const { notifyNewSubscription, notifyTrialStarted, notifyTrialConverted, notifyCancellation } = require('../../services/telegramService');
 const { addToPionnierList } = require('../../services/brevoTrialService');
 
 const router = express.Router();
@@ -611,6 +611,34 @@ async function handleSubscriptionUpdated(subscription, eventId, previousAttribut
       message = `Abonnement mis à jour pour kiné ${kine.id}: ${planType || oldPlan} (${newStatus})`;
       logger.debug(`[${eventId}] ${message}`);
     }
+
+    // Notif Telegram : conversion essai → payant (trialing → active).
+    if (previousAttributes.status === 'trialing' && subscription.status === 'active') {
+      try {
+        await notifyTrialConverted(planType, billingCycle);
+      } catch (e) {
+        logger.error(`⚠️ [${eventId}] Telegram conversion (non bloquant):`, e.message);
+      }
+    }
+
+    // Notif Telegram : résiliation demandée (clic « résilier »).
+    if ('cancel_at_period_end' in previousAttributes && subscription.cancel_at_period_end === true) {
+      try {
+        const details = subscription.cancellation_details || {};
+        const endDate = fullSubscription.items?.data?.[0]?.current_period_end
+          ? new Date(fullSubscription.items.data[0].current_period_end * 1000) : null;
+        await notifyCancellation({
+          planType: kine.planType,
+          kineId: kine.id,
+          feedback: details.feedback || null,
+          comment: details.comment || null,
+          endDate,
+        });
+      } catch (e) {
+        logger.error(`⚠️ [${eventId}] Telegram résiliation (non bloquant):`, e.message);
+      }
+    }
+
     return { success: true, message };
     
   } catch (error) {
