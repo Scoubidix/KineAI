@@ -49,6 +49,7 @@ model Kine {
   trialEndDate          DateTime? // Date fin période d'essai (si applicable)
   trialBilanMailSentAt  DateTime? // Essai : date d'envoi du mail "1er bilan" (idempotence)
   trialRecapMailSentAt  DateTime? // Essai : date d'envoi du mail récap de fin (idempotence)
+  hasHadTrial           Boolean   @default(false)
   // ===============================================
 
   // ========== PARRAINAGE ==========
