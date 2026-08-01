@@ -8,9 +8,11 @@ const TRIAL_DURATION_DAYS = 14;
 const PAID_PLANS = ['DECLIC', 'PRATIQUE', 'PIONNIER', 'EXPERT'];
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/** L'essai est actif si une date de fin existe et n'est pas dépassée. */
+/** L'essai no-CB est actif si une date de fin future existe ET qu'aucun abo Stripe
+ * n'est rattaché (un abo — même annulé — fait foi via planType, pas via trialEndDate). */
 function isTrialActive(kine, now = new Date()) {
   if (!kine || !kine.trialEndDate) return false;
+  if (kine.subscriptionId) return false;
   return new Date(kine.trialEndDate).getTime() > now.getTime();
 }
 
@@ -46,6 +48,7 @@ function getTrialInfo(kine, now = new Date()) {
     trialEndDate: kine && kine.trialEndDate ? kine.trialEndDate : null,
     daysLeft,
     trialEligible: isTrialEligible(kine),
+    canStartTrial: kine ? !kine.hasHadTrial : false,
   };
 }
 
