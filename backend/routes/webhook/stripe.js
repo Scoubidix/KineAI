@@ -163,7 +163,7 @@ router.post('/stripe', verifyStripeIP, async (req, res) => {
           break;
           
         case 'customer.subscription.updated':
-          handlerResult = await handleSubscriptionUpdated(event.data.object, event.id);
+          handlerResult = await handleSubscriptionUpdated(event.data.object, event.id, event.data.previous_attributes || {});
           break;
           
         case 'customer.subscription.deleted':
@@ -522,7 +522,7 @@ async function handleSubscriptionCreated(subscription, eventId) {
 /**
  * Gestion mise à jour d'abonnement
  */
-async function handleSubscriptionUpdated(subscription, eventId) {
+async function handleSubscriptionUpdated(subscription, eventId, previousAttributes = {}) {
   try {
     logger.debug(`[${eventId}] subscription.updated reçu: ${subscription.id}`);
 
@@ -872,4 +872,5 @@ async function handlePaymentFailed(invoice, eventId) {
 module.exports = router;
 // Handlers exposés pour les tests unitaires (le montage reste `app.use(router)`).
 module.exports.handleSubscriptionUpdated = handleSubscriptionUpdated;
-module.exports.handleSubscriptionCreated = handleSubscriptionCreated;
+module.exports.handleSubscriptionDeleted = handleSubscriptionDeleted;
+module.exports.handleCheckoutCompleted = handleCheckoutCompleted;
