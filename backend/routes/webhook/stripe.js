@@ -630,7 +630,10 @@ async function handleSubscriptionUpdated(subscription, eventId, previousAttribut
     // Notif Telegram : résiliation demandée (clic « résilier »).
     if ('cancel_at_period_end' in previousAttributes && subscription.cancel_at_period_end === true) {
       try {
-        const details = subscription.cancellation_details || {};
+        // Lire le motif sur l'abo complet (fraîchement récupéré) en priorité : l'objet du
+        // webhook peut être partiel ou ne pas encore porter cancellation_details.
+        const details = fullSubscription.cancellation_details || subscription.cancellation_details || {};
+        logger.debug(`[${eventId}] cancellation_details:`, { feedback: details.feedback || null, hasComment: !!details.comment });
         const endDate = fullSubscription.items?.data?.[0]?.current_period_end
           ? new Date(fullSubscription.items.data[0].current_period_end * 1000) : null;
         await notifyCancellation({
