@@ -21,7 +21,7 @@ router.use((req, res, next) => {
 
 // POST /api/test/set-plan — force le plan d'un kiné de test (lookup par email).
 router.post('/set-plan', async (req, res) => {
-  const { email, planType, cancelStripeSub = false } = req.body || {};
+  const { email, planType, cancelStripeSub = false, hasHadTrial } = req.body || {};
 
   if (!email) {
     return res.status(400).json({ success: false, error: 'email requis', code: 'BAD_REQUEST' });
@@ -45,6 +45,9 @@ router.post('/set-plan', async (req, res) => {
   const data = cancelStripeSub
     ? { planType, subscriptionId: null, subscriptionStatus: null }
     : { planType };
+  // Permet aux e2e de simuler un nouveau kiné (false → éligible essai) ou un
+  // ré-abonné (true → pas d'essai au checkout).
+  if (typeof hasHadTrial === 'boolean') data.hasHadTrial = hasHadTrial;
 
   const updated = await prisma.kine.update({ where: { email }, data });
 
@@ -133,6 +136,7 @@ router.get('/kine-subscription', async (req, res) => {
     planType: kine.planType,
     subscriptionStatus: kine.subscriptionStatus,
     subscriptionEndDate: kine.subscriptionEndDate,
+    hasHadTrial: kine.hasHadTrial,
   });
 });
 

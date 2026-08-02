@@ -22,8 +22,9 @@ export class SuccessPage {
       await this.page.reload({ waitUntil: 'domcontentloaded' });
     }
 
+    // Titre tolérant aux deux parcours : paiement immédiat (ré-abonné) OU essai (nouveau kiné).
     await expect(
-      this.page.getByRole('heading', { name: /Paiement réussi/ })
+      this.page.getByRole('heading', { name: /Paiement réussi|Ton essai a démarré/ })
     ).toBeVisible({ timeout: 30_000 });
   }
 
@@ -38,6 +39,20 @@ export class SuccessPage {
       // Évite le strict mode violation : getByText('Plan Pratique') matcherait aussi le paragraphe descriptif.
       await expect(
         this.page.getByRole('heading', { name: `Plan ${planName} Actif` })
+      ).toBeVisible({ timeout: 3000 });
+    }).toPass({ timeout: 45_000, intervals: [2000, 3000, 5000] });
+  }
+
+  // Parcours essai : le badge "Essai 14 jours" fait partie du heading "Plan <Nom> Essai 14 jours".
+  // Même logique de retry que expectPlanActive (le webhook checkout.session.completed peut tarder).
+  async expectTrialStarted(planName: string) {
+    await expect(async () => {
+      const refresh = this.page.getByRole('button', { name: /Actualiser/ }).first();
+      if (await refresh.isVisible().catch(() => false)) {
+        await refresh.click();
+      }
+      await expect(
+        this.page.getByRole('heading', { name: `Plan ${planName} Essai 14 jours` })
       ).toBeVisible({ timeout: 3000 });
     }).toPass({ timeout: 45_000, intervals: [2000, 3000, 5000] });
   }

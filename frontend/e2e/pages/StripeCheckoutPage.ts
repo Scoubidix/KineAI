@@ -8,7 +8,18 @@ export class StripeCheckoutPage {
 
   async waitForLoaded() {
     await this.page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
-    await expect(this.page.locator('#cardNumber')).toBeVisible({ timeout: 30_000 });
+
+    // Stripe Link peut intercepter le paiement (écran "Confirm it's you" / OTP) quand l'email
+    // est reconnu comme compte Link. On attend soit le formulaire carte, soit l'écran Link,
+    // et si Link a pris la main on clique "Pay without Link" pour revenir au paiement carte.
+    const cardNumber = this.page.locator('#cardNumber');
+    const payWithoutLink = this.page.getByText(/Pay without Link|Payer sans Link/i);
+    await expect(cardNumber.or(payWithoutLink).first()).toBeVisible({ timeout: 30_000 });
+    if (await payWithoutLink.isVisible().catch(() => false)) {
+      await payWithoutLink.click();
+    }
+
+    await expect(cardNumber).toBeVisible({ timeout: 30_000 });
   }
 
   async fillAndPay() {
