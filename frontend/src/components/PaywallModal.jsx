@@ -343,16 +343,17 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                         </div>
                       )}
 
-                      {/* Badge places restantes Pionnier */}
+                      {/* Badge fondateur Pionnier — identité + rareté fixe (100 places) */}
                       {plan.type === 'PIONNIER' && pioneerSlotsRemaining !== null && pioneerSlotsRemaining > 0 && (
-                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10">
-                          <Badge className="bg-purple-600 text-white text-xs px-3 py-1 rounded-full shadow-md whitespace-nowrap">
-                            🔥 {pioneerSlotsRemaining} places restantes
-                          </Badge>
+                        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 z-10 w-[92%]">
+                          <div className="rounded-2xl bg-purple-600 text-white px-3 py-1.5 shadow-md text-center leading-tight">
+                            <span className="block text-xs font-bold">🔥 Rejoins la communauté des Pionniers</span>
+                            <span className="block text-[11px] font-semibold text-purple-100">seulement 100 places</span>
+                          </div>
                         </div>
                       )}
 
-                      <CardHeader className="text-center pb-4">
+                      <CardHeader className="text-center pb-1 md:pb-1">
                         <div className={`mx-auto p-3 rounded-full mb-3 ${
                           isCurrentPlan ? 'bg-primary/10' : isRecommended ? 'bg-accent/10' : 'bg-muted/30'
                         }`}>
@@ -387,7 +388,32 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
 
                       </CardHeader>
 
-                      <CardContent className="flex flex-col flex-grow px-6 space-y-4">
+                      <CardContent className="flex flex-col flex-grow px-6 pt-0 md:pt-0 space-y-4">
+                        {/* Bandeau aide FAMI — pastille or centrée, entre le prix (au-dessus) et le
+                            bandeau programmes (en-dessous). TOUJOURS rendu (note grisée si non éligible)
+                            pour aligner les cartes entre elles. */}
+                        <div className="flex justify-center">
+                          {plan.features.videoTransmission ? (() => {
+                            // Aide FAMI : 350€/an. Gain net si l'aide dépasse le coût, sinon reste à charge.
+                            const annualCost = billingCycle === 'yearly' ? plan.priceYearly : plan.price * 12;
+                            const famiGain = 350 - annualCost;
+                            const text = famiGain > 0
+                              ? `Tu gagnes +${famiGain}€/an avec l'aide FAMI`
+                              : `Coût net ${annualCost - 350}€/an avec l'aide FAMI`;
+                            return (
+                              <span className="inline-flex items-center whitespace-nowrap rounded-full bg-amber-400 px-3 py-1.5 text-xs font-bold text-orange-600 shadow-sm">
+                                {text}
+                              </span>
+                            );
+                          })() : (
+                            // Placeholder invisible : même hauteur que la pastille or, pour que le
+                            // bandeau programmes reste aligné sur les cartes non éligibles (Déclic).
+                            <span className="inline-flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold invisible" aria-hidden="true">
+                              placeholder
+                            </span>
+                          )}
+                        </div>
+
                         {/* Programmes limit */}
                         <div className="text-center py-3 bg-muted/20 rounded-lg border">
                           <span className="text-sm font-semibold text-foreground">
@@ -435,9 +461,13 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
 
                         {/* Bouton d'action - poussé vers le bas */}
                         <div className="mt-auto pt-4">
-                          {plan.features.videoTransmission && (
+                          {plan.features.videoTransmission ? (
                             <div className="mb-3 flex items-center justify-center gap-1.5 rounded-lg border border-[#3899aa]/40 bg-[#3899aa]/10 px-2.5 py-2 text-xs font-bold text-[#3899aa]">
                               Éligible à l'Aide FAMI de 350 €/an
+                            </div>
+                          ) : (
+                            <div className="mb-3 flex items-center justify-center gap-1.5 rounded-lg border border-border bg-muted/30 px-2.5 py-2 text-xs font-medium text-muted-foreground">
+                              Non éligible à l'aide FAMI
                             </div>
                           )}
                           <Button
