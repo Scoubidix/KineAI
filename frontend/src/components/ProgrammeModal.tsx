@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { PaywallModal } from '@/components/PaywallModal';
+import { useSubscription } from '@/hooks/useSubscription';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import {
   Search,
@@ -16,6 +18,7 @@ import {
   Plus,
   X,
   Eye,
+  Lock,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -168,6 +171,11 @@ export function ProgrammeModal({
   const [createDescription, setCreateDescription] = useState('');
   const [createDuration, setCreateDuration] = useState(1);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // --- Paywall : mini-modal d'accès (plan requis / limite atteinte) + modale d'abo ---
+  const { subscription } = useSubscription();
+  const [gateContent, setGateContent] = useState<{ title: string; description: string } | null>(null);
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
 
   // --- États exercices ---
   const [allExercises, setAllExercises] = useState<ExerciseOption[]>([]);
@@ -527,16 +535,18 @@ export function ProgrammeModal({
       if (res.status === 403) {
         const errorData = await res.json();
         if (errorData?.code === 'PLAN_REQUIRED') {
-          setCreateError(
-            "Un abonnement est requis pour créer un programme. Clique sur 'Upgrade' en haut à droite."
-          );
+          setGateContent({
+            title: 'Un abonnement est requis',
+            description: 'Créer des programmes fait partie des fonctionnalités payantes. Découvre nos plans pour débloquer la création de programmes.',
+          });
           return;
         }
         if (errorData?.code === 'PROGRAMME_LIMIT_REACHED') {
-          setCreateError(
-            errorData.message ||
-              "Tu as atteint la limite de programmes de ton plan. Clique sur 'Upgrade' pour augmenter ta limite."
-          );
+          setGateContent({
+            title: 'Limite de programmes atteinte',
+            description: errorData.message ||
+              'Tu as atteint la limite de programmes de ton plan. Passe à un plan supérieur pour en créer davantage.',
+          });
           return;
         }
         setCreateError(errorData.message || "Accès refusé.");
@@ -568,6 +578,7 @@ export function ProgrammeModal({
   const isTemplateMode = typeFilters.includes('templates');
 
   return (
+    <>
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
@@ -1043,5 +1054,38 @@ export function ProgrammeModal({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Mini-modal d'accès (plan requis / limite atteinte) : message + « Voir les plans »
+        → ferme la modal programme et ouvre la modale de choix des abonnements. */}
+    <Dialog open={gateContent !== null} onOpenChange={(o) => { if (!o) setGateContent(null); }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-[#3899aa]/10">
+            <Lock className="h-6 w-6 text-[#3899aa]" />
+          </div>
+          <DialogTitle className="text-center">{gateContent?.title}</DialogTitle>
+          <DialogDescription className="text-center">{gateContent?.description}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="sm:justify-center">
+          <Button
+            className="btn-teal gap-2"
+            onClick={() => {
+              setGateContent(null);
+              onOpenChange(false);
+              setIsPaywallOpen(true);
+            }}
+          >
+            Voir les plans
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <PaywallModal
+      isOpen={isPaywallOpen}
+      onClose={() => setIsPaywallOpen(false)}
+      subscription={subscription}
+    />
+    </>
   );
 }
