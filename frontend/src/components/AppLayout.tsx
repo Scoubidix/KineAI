@@ -16,6 +16,7 @@ import {
   SidebarInset,
   SidebarTrigger,
   SidebarFooter,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import {
   Dialog,
@@ -1215,6 +1216,19 @@ function NotificationsDropdown() {
   );
 }
 
+// Standard « modal navigation drawer » (Material Design) : sur mobile, le tiroir se ferme
+// automatiquement à la sélection d'une destination. Ce composant vit DANS le SidebarProvider
+// (accès à useSidebar) et referme le drawer à chaque changement de route — mobile uniquement,
+// aucun effet sur desktop/tablette où la sidebar est persistante.
+function MobileSidebarAutoClose() {
+  const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+  useEffect(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [pathname, isMobile, setOpenMobile]);
+  return null;
+}
+
 export default function AppLayout({ children }: AppLayoutProps) {
   const currentPathname = usePathname();
   const router = useRouter();
@@ -1345,6 +1359,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [isAvatarUploading, setIsAvatarUploading] = useState(false);
   const [isPlanPopoverOpen, setIsPlanPopoverOpen] = useState(false);
   const planPopoverTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isFamiPopoverOpen, setIsFamiPopoverOpen] = useState(false);
+  const famiPopoverTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const avatarInputRef = React.useRef<HTMLInputElement>(null);
@@ -1502,6 +1518,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <SidebarProvider defaultOpen={true}>
+      <MobileSidebarAutoClose />
       {/* Fond uni */}
       <div className="fixed inset-0 z-0 bg-white dark:bg-[#141414]" />
       <Sidebar collapsible="icon" side="left" variant="sidebar" className="text-sm text-foreground border-r border-[#3899aa]/15 bg-[#eef7f6] dark:bg-[#0f1c1b]">
@@ -1582,6 +1599,76 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <span className="hidden sm:flex items-center text-muted-foreground text-sm font-medium ml-2 capitalize">
               {format(new Date(), 'EEEE d MMMM yyyy', { locale: fr })}
             </span>
+
+            {/* Bouton non cliquable « aide FAMI » (users FREE uniquement) — pop-up d'explication au survol */}
+            {role === 'kine' && headerSubscription && !headerSubscription.isTrialing && headerSubscription.planType === 'FREE' && (
+              <Popover open={isFamiPopoverOpen} onOpenChange={setIsFamiPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-400 px-3 py-1.5 text-xs font-bold text-amber-500 cursor-default ml-1 sm:ml-3"
+                    onMouseEnter={() => {
+                      if (famiPopoverTimeout.current) clearTimeout(famiPopoverTimeout.current);
+                      setIsFamiPopoverOpen(true);
+                    }}
+                    onMouseLeave={() => {
+                      famiPopoverTimeout.current = setTimeout(() => setIsFamiPopoverOpen(false), 150);
+                    }}
+                  >
+                    <HelpCircle className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Deviens éligible à l'aide FAMI de 350€</span>
+                    <span className="sm:hidden">Aide FAMI</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-80 p-0"
+                  align="start"
+                  sideOffset={8}
+                  onMouseEnter={() => {
+                    if (famiPopoverTimeout.current) clearTimeout(famiPopoverTimeout.current);
+                  }}
+                  onMouseLeave={() => {
+                    famiPopoverTimeout.current = setTimeout(() => setIsFamiPopoverOpen(false), 150);
+                  }}
+                >
+                  <div className="flex items-center gap-2 border-b bg-amber-50 px-4 py-3">
+                    <HelpCircle className="h-4 w-4 text-amber-500" />
+                    <p className="text-sm font-bold text-foreground">L'aide FAMI, comment ça marche ?</p>
+                  </div>
+                  <ol className="space-y-3 p-4">
+                    {[
+                      {
+                        title: "Tu t'abonnes en 2026",
+                        text: "Tu accèdes au module vidéotransmission sécurisée dès le premier jour.",
+                      },
+                      {
+                        title: "Tu l'utilises normalement",
+                        text: "Consultations à distance, suivi post-op, directement intégré à ta pratique.",
+                      },
+                      {
+                        title: "Tu déclares sur Amelipro (janv. – mars 2027)",
+                        text: "Une case à cocher sur Amelipro, au titre de l'année 2026. 5 minutes, une fois par an. Mon Assistant Kiné te fournit l'attestation d'équipement à joindre à ta déclaration.",
+                      },
+                      {
+                        title: "Tu touches l'aide au printemps 2027",
+                        text: "350 € versés directement par ta CPAM. Pas de remboursement à demander, pas de facture.",
+                      },
+                    ].map((step, i) => (
+                      <li key={i} className="flex gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-400 text-xs font-bold text-white">
+                          {i + 1}
+                        </span>
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">{step.title}</p>
+                          <p className="text-xs text-muted-foreground">{step.text}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </PopoverContent>
+              </Popover>
+            )}
+
             <div className="flex-1" />
             <div className="flex items-center gap-1">
               {role === 'kine' && headerSubscription?.isTrialing && (

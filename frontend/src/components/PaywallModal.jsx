@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -6,6 +6,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from './ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -28,7 +29,8 @@ import {
   Calendar,
   Shield,
   Loader2,
-  Gift
+  Gift,
+  HelpCircle
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { plans, getChatQuotaLabel } from '../config/plans';
@@ -51,6 +53,10 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
 
   // Cycle de facturation choisi : 'monthly' | 'yearly' (annuel mis en avant par défaut)
   const [billingCycle, setBillingCycle] = useState('yearly');
+
+  // Pop-up « aide FAMI » (ouverture au survol, même principe que le badge plan du header)
+  const [isFamiPopoverOpen, setIsFamiPopoverOpen] = useState(false);
+  const famiPopoverTimeout = useRef(null);
 
 
   // Récupérer les places restantes pour le plan Pionnier (optimisé)
@@ -228,7 +234,23 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
 
   const currentPlan = subscription?.planType ?? null;
   const currentCycle = subscription?.billingCycle || 'monthly';
-  const recommendedPlan = !subscription || subscription.planType === 'FREE' ? 'PRATIQUE' : 'EXPERT';
+
+  // Plan mis en avant (anneau teal + badge « Recommandé »), selon le plan actuel du kiné.
+  // Pousse toujours vers plus de valeur ; le recommandé n'est jamais le plan actuel.
+  // Pionnier (illimité, 19€, 100 places) est privilégié à Expert quand il reste des places.
+  const recommendedPlan = (() => {
+    const pionnierAvailable = pioneerSlotsRemaining > 0;
+    switch (currentPlan ?? 'FREE') {
+      case 'FREE':
+        return pionnierAvailable ? 'PIONNIER' : 'PRATIQUE';
+      case 'DECLIC':
+        return pionnierAvailable ? 'PIONNIER' : 'PRATIQUE';
+      case 'PRATIQUE':
+        return pionnierAvailable ? 'PIONNIER' : 'EXPERT';
+      default: // PIONNIER, EXPERT → aucune recommandation
+        return null;
+    }
+  })();
 
   // Nature du changement en cours (pour la modale de récap). Doit rester aligné avec
   // StripeService.shouldDeferPlanChange côté back :
@@ -261,30 +283,25 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
           <>
             {/* Header - Style cohérent avec l'app */}
             <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
-              <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl font-semibold text-foreground">
-                <Shield className="h-5 w-5 text-accent" />
-                Mon Assistant Kiné
-              </DialogTitle>
-              <DialogDescription className="text-muted-foreground text-sm sm:text-base">
-                Choisis ton plan d'abonnement professionnel
-              </DialogDescription>
-
-              {/* Encart essai gratuit — barre pleine largeur, visible uniquement si le kiné
-                  peut encore démarrer un essai. */}
-              {canStartTrial && (
-                <div className="mt-3 rounded-lg bg-teal-500 px-4 py-2.5 text-center shadow-sm">
-                  <p className="text-sm sm:text-base font-bold text-white">
-                    🎁 14 Jours d'essai gratuits
-                  </p>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <DialogTitle className="flex items-center gap-2.5 text-lg sm:text-xl font-semibold text-foreground">
+                    <img
+                      src="/logo.jpg"
+                      alt="Mon Assistant Kiné"
+                      className="h-8 w-8 rounded-md object-contain flex-shrink-0 bg-white/15 p-0.5"
+                    />
+                    <span>
+                      <span className="text-[#3899aa]">M</span>on <span className="text-[#3899aa]">A</span>ssistant <span className="text-[#3899aa]">K</span>iné
+                    </span>
+                  </DialogTitle>
+                  {/* Conservée en sr-only pour l'accessibilité (aria-describedby Radix), masquée visuellement */}
+                  <DialogDescription className="sr-only">
+                    Choisis ton plan d'abonnement professionnel
+                  </DialogDescription>
                 </div>
-              )}
-            </DialogHeader>
 
-            {/* Contenu scrollable */}
-            <div className="p-3 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6">
-
-              {/* Bascule Mensuel / Annuel */}
-              <div className="flex justify-center">
+                {/* Bascule Mensuel / Annuel — centrée dans le header */}
                 <div className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 p-1">
                   <button
                     type="button"
@@ -306,7 +323,77 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                     <span className="rounded-full bg-[#3899aa]/15 px-2 py-0.5 text-[10px] font-bold text-[#3899aa]">jusqu'à −15 %</span>
                   </button>
                 </div>
+
+                {/* Bouton non cliquable « aide FAMI » — pop-up d'explication au survol */}
+                <Popover open={isFamiPopoverOpen} onOpenChange={setIsFamiPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="hidden sm:inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-400 px-3 py-1.5 text-xs font-bold text-amber-500 cursor-default justify-self-end mr-8"
+                      onMouseEnter={() => {
+                        if (famiPopoverTimeout.current) clearTimeout(famiPopoverTimeout.current);
+                        setIsFamiPopoverOpen(true);
+                      }}
+                      onMouseLeave={() => {
+                        famiPopoverTimeout.current = setTimeout(() => setIsFamiPopoverOpen(false), 150);
+                      }}
+                    >
+                      <HelpCircle className="h-3.5 w-3.5" />
+                      L'aide FAMI, comment ça marche ?
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-80 p-0"
+                    align="end"
+                    sideOffset={8}
+                    onMouseEnter={() => {
+                      if (famiPopoverTimeout.current) clearTimeout(famiPopoverTimeout.current);
+                    }}
+                    onMouseLeave={() => {
+                      famiPopoverTimeout.current = setTimeout(() => setIsFamiPopoverOpen(false), 150);
+                    }}
+                  >
+                    <div className="flex items-center gap-2 border-b bg-amber-50 px-4 py-3">
+                      <HelpCircle className="h-4 w-4 text-amber-500" />
+                      <p className="text-sm font-bold text-foreground">L'aide FAMI, comment ça marche ?</p>
+                    </div>
+                    <ol className="space-y-3 p-4">
+                      {[
+                        {
+                          title: "Tu t'abonnes en 2026",
+                          text: "Tu accèdes au module vidéotransmission sécurisée dès le premier jour.",
+                        },
+                        {
+                          title: "Tu l'utilises normalement",
+                          text: "Consultations à distance, suivi post-op, directement intégré à ta pratique.",
+                        },
+                        {
+                          title: "Tu déclares sur Amelipro (janv. – mars 2027)",
+                          text: "Une case à cocher sur Amelipro, au titre de l'année 2026. 5 minutes, une fois par an. Mon Assistant Kiné te fournit l'attestation d'équipement à joindre à ta déclaration.",
+                        },
+                        {
+                          title: "Tu touches l'aide au printemps 2027",
+                          text: "350 € versés directement par ta CPAM. Pas de remboursement à demander, pas de facture.",
+                        },
+                      ].map((step, i) => (
+                        <li key={i} className="flex gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-400 text-xs font-bold text-white">
+                            {i + 1}
+                          </span>
+                          <div>
+                            <p className="text-xs font-semibold text-foreground">{step.title}</p>
+                            <p className="text-xs text-muted-foreground">{step.text}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </PopoverContent>
+                </Popover>
               </div>
+            </DialogHeader>
+
+            {/* Contenu scrollable */}
+            <div className="p-3 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6">
 
               {/* Grid des plans - Style cohérent avec l'app */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 max-w-7xl mx-auto">
@@ -354,37 +441,32 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                       )}
 
                       <CardHeader className="text-center pb-1 md:pb-1">
-                        <div className={`mx-auto p-3 rounded-full mb-3 ${
-                          isCurrentPlan ? 'bg-primary/10' : isRecommended ? 'bg-accent/10' : 'bg-muted/30'
-                        }`}>
-                          <Shield className={`h-6 w-6 ${
-                            isCurrentPlan ? 'text-primary' : isRecommended ? 'text-accent' : 'text-muted-foreground'
-                          }`} />
-                        </div>
                         <CardTitle className="text-lg font-semibold text-foreground">{plan.name}</CardTitle>
-                        {billingCycle === 'yearly' ? (
-                          <>
-                            <div className="text-2xl sm:text-3xl font-bold text-foreground">
-                              {plan.priceYearly}€
-                              <span className="text-sm font-normal text-muted-foreground">/an</span>
-                            </div>
-                            {plan.price * 12 > plan.priceYearly && (
-                              <div className="mt-2 flex flex-col items-center gap-1">
-                                <span className="inline-flex items-center rounded-full bg-[#3899aa] px-3 py-1 text-sm font-extrabold text-white shadow-sm">
-                                  −{Math.round((1 - plan.priceYearly / (plan.price * 12)) * 100)} % vs mensuel
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  soit {(plan.priceYearly / 12).toFixed(2).replace('.', ',')} €/mois
-                                </span>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="text-2xl sm:text-3xl font-bold text-foreground">
-                            {plan.price}€
-                            <span className="text-sm font-normal text-muted-foreground">/mois</span>
+                        <div className="text-2xl sm:text-3xl font-bold text-foreground">
+                          {billingCycle === 'yearly' ? plan.priceYearly : plan.price}€
+                          <span className="text-sm font-normal text-muted-foreground">
+                            {billingCycle === 'yearly' ? '/an' : '/mois'}
+                          </span>
+                        </div>
+
+                        {/* Bloc remise annuelle — déplié/replié en douceur selon le cycle
+                            (grid-rows 0fr→1fr) pour lisser le changement de hauteur de la modal. */}
+                        <div
+                          className={`grid transition-all duration-300 ease-out ${
+                            billingCycle === 'yearly' && plan.price * 12 > plan.priceYearly
+                              ? 'grid-rows-[1fr] opacity-100 mt-2'
+                              : 'grid-rows-[0fr] opacity-0 mt-0'
+                          }`}
+                        >
+                          <div className="overflow-hidden flex flex-col items-center gap-1">
+                            <span className="inline-flex items-center rounded-full border border-[#3899aa] px-3 py-1 text-sm font-extrabold text-[#3899aa]">
+                              −{Math.round((1 - plan.priceYearly / (plan.price * 12)) * 100)} % vs mensuel
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              soit {(plan.priceYearly / 12).toFixed(2).replace('.', ',')} €/mois
+                            </span>
                           </div>
-                        )}
+                        </div>
 
                       </CardHeader>
 
@@ -401,7 +483,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                               ? `Tu gagnes +${famiGain}€/an avec l'aide FAMI`
                               : `Coût net ${annualCost - 350}€/an avec l'aide FAMI`;
                             return (
-                              <span className="inline-flex items-center whitespace-nowrap rounded-full bg-amber-400 px-3 py-1.5 text-xs font-bold text-orange-600 shadow-sm">
+                              <span className="inline-flex items-center whitespace-nowrap px-3 py-1.5 text-xs font-bold text-amber-500">
                                 {text}
                               </span>
                             );
@@ -414,18 +496,18 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                           )}
                         </div>
 
-                        {/* Programmes limit */}
-                        <div className="text-center py-3 bg-muted/20 rounded-lg border">
-                          <span className="text-sm font-semibold text-foreground">
-                            {plan.limits.programmes === -1
-                              ? '♾️ Programmes illimités'
-                              : `${plan.limits.programmes} programme${plan.limits.programmes > 1 ? 's' : ''} max`
-                            }
-                          </span>
-                        </div>
-
                         {/* Fonctionnalités principales */}
                         <div className="space-y-2 flex-grow text-sm">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
+                            <span>
+                              {plan.limits.programmes === -1
+                                ? 'Programmes illimités'
+                                : `${plan.limits.programmes} programme${plan.limits.programmes > 1 ? 's' : ''} max`
+                              }
+                            </span>
+                          </div>
+
                           <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
                             <span>Gestion patients</span>
@@ -433,7 +515,7 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                           
                           <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
-                            <span>Assistant IA — {getChatQuotaLabel(plan.type)}</span>
+                            <span>Assistant IA - {getChatQuotaLabel(plan.type)}</span>
                           </div>
 
                           {plan.features.iaBilans && (
@@ -520,27 +602,33 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                 </Card>
               )}
 
+              {/* Encart essai gratuit — barre pleine largeur, sous les choix d'abonnements
+                  et au-dessus du parrainage. Visible uniquement si le kiné peut encore
+                  démarrer un essai. */}
+              {canStartTrial && (
+                <div className="rounded-lg border border-teal-500 bg-white px-4 py-2.5 text-center shadow-sm">
+                  <p className="text-sm sm:text-base font-bold text-teal-600">
+                    🎁 14 Jours d'essai gratuits
+                  </p>
+                </div>
+              )}
+
               {/* Champ Code de parrainage - Seulement pour nouveaux abonnements */}
               {!isUpgrade && (
                 <Card className="border-dashed border-primary/30 bg-primary/5">
                   <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Gift className="h-5 w-5 text-primary" />
-                      <Label htmlFor="referralCode" className="font-medium">Code de parrainage (optionnel)</Label>
-                    </div>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-3">
+                      <Gift className="h-5 w-5 text-primary flex-shrink-0" />
+                      <Label htmlFor="referralCode" className="font-medium whitespace-nowrap">Code de parrainage</Label>
                       <Input
                         id="referralCode"
                         placeholder="Ex: ABC123"
                         value={referralCode}
                         onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                        className="font-mono tracking-wider uppercase"
+                        className="font-mono tracking-wider uppercase flex-1"
                         maxLength={10}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Tu as un code de parrainage ? Entre-le pour recevoir 1 mois offert après ton premier renouvellement.
-                    </p>
                   </CardContent>
                 </Card>
               )}
