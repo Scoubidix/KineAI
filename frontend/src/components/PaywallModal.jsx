@@ -30,7 +30,8 @@ import {
   Shield,
   Loader2,
   Gift,
-  HelpCircle
+  HelpCircle,
+  ChevronDown
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { plans, getChatQuotaLabel } from '../config/plans';
@@ -54,9 +55,14 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
   // Cycle de facturation choisi : 'monthly' | 'yearly' (annuel mis en avant par défaut)
   const [billingCycle, setBillingCycle] = useState('yearly');
 
-  // Pop-up « aide FAMI » (ouverture au survol, même principe que le badge plan du header)
+  // Pop-up « aide FAMI » : au survol sur desktop (Popover), en accordéon tap-to-open sur mobile
+  // (le hover n'existe pas sur tactile — standard « disclosure »).
   const [isFamiPopoverOpen, setIsFamiPopoverOpen] = useState(false);
+  const [isFamiMobileOpen, setIsFamiMobileOpen] = useState(false);
   const famiPopoverTimeout = useRef(null);
+  // Conteneur de la modal : à l'ouverture on y place le focus (a11y WAI-ARIA) au lieu de
+  // le laisser sur le bouton déclencheur, qui passe en aria-hidden.
+  const contentRef = useRef(null);
 
 
   // Récupérer les places restantes pour le plan Pionnier (optimisé)
@@ -269,21 +275,85 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
     ? `${plans[pendingUpgrade?.currentPlan]?.priceYearly}€/an`
     : `${plans[pendingUpgrade?.currentPlan]?.price}€/mois`;
 
+  // --- Éléments réutilisés desktop / mobile (source unique) ---
+
+  // Bascule Mensuel / Annuel : pleine largeur sur mobile (segmented control), auto sur desktop.
+  const billingToggle = (
+    <div className="flex w-full sm:w-auto items-center gap-1 rounded-full border border-border bg-muted/40 p-1">
+      <button
+        type="button"
+        onClick={() => setBillingCycle('monthly')}
+        className={`flex-1 sm:flex-none rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+          billingCycle === 'monthly' ? 'bg-background text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+        }`}
+      >
+        Mensuel
+      </button>
+      <button
+        type="button"
+        onClick={() => setBillingCycle('yearly')}
+        className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+          billingCycle === 'yearly' ? 'bg-background text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+        }`}
+      >
+        Annuel
+        <span className="rounded-full bg-[#3899aa]/15 px-2 py-0.5 text-[10px] font-bold text-[#3899aa]">jusqu'à −15 %</span>
+      </button>
+    </div>
+  );
+
+  // Contenu explicatif « aide FAMI » (identique dans le Popover desktop et l'accordéon mobile).
+  const famiSteps = [
+    { title: "Tu t'abonnes en 2026", text: "Tu accèdes au module vidéotransmission sécurisée dès le premier jour." },
+    { title: "Tu l'utilises normalement", text: "Consultations à distance, suivi post-op, directement intégré à ta pratique." },
+    { title: "Tu déclares sur Amelipro (janv. – mars 2027)", text: "Une case à cocher sur Amelipro, au titre de l'année 2026. 5 minutes, une fois par an. Mon Assistant Kiné te fournit l'attestation d'équipement à joindre à ta déclaration." },
+    { title: "Tu touches l'aide au printemps 2027", text: "350 € versés directement par ta CPAM. Pas de remboursement à demander, pas de facture." },
+  ];
+  const famiPanel = (
+    <>
+      <div className="flex items-center gap-2 border-b bg-amber-50 px-4 py-3">
+        <HelpCircle className="h-4 w-4 text-amber-500" />
+        <p className="text-sm font-bold text-foreground">L'aide FAMI, comment ça marche ?</p>
+      </div>
+      <ol className="space-y-3 p-4">
+        {famiSteps.map((step, i) => (
+          <li key={i} className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-400 text-xs font-bold text-white">
+              {i + 1}
+            </span>
+            <div>
+              <p className="text-xs font-semibold text-foreground">{step.title}</p>
+              <p className="text-xs text-muted-foreground">{step.text}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </>
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={handleModalClose}>
       <DialogContent
-        className={`p-0 top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%] ${
+        ref={contentRef}
+        className={
           currentStep === 'confirmation'
-            ? 'w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto'
-            : 'w-[95vw] sm:max-w-7xl max-h-[90vh] overflow-y-auto'
-        }`}
-        onOpenAutoFocus={(e) => e.preventDefault()}
+            ? 'p-0 top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%] w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto'
+            // Selection : plein écran sur mobile (standard modal pricing), dialog centré sur desktop (inchangé)
+            : 'p-0 flex flex-col gap-0 top-0 left-0 translate-x-0 translate-y-0 w-screen max-w-none h-[100dvh] max-h-[100dvh] rounded-none border-0 overflow-hidden sm:grid sm:gap-4 sm:top-[50%] sm:left-[50%] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-7xl sm:h-auto sm:max-h-[90vh] sm:rounded-lg sm:border sm:overflow-y-auto'
+        }
+        onOpenAutoFocus={(e) => {
+          // On évite l'autofocus sur un contrôle précis, mais on déplace le focus DANS la modal
+          // (sinon il reste sur le déclencheur, qui est en aria-hidden -> warning a11y).
+          e.preventDefault();
+          contentRef.current?.focus();
+        }}
       >
         {currentStep === 'selection' ? (
           <>
-            {/* Header - Style cohérent avec l'app */}
-            <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
-              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+            {/* Header - Style cohérent avec l'app.
+                Mobile : titre seul (1 colonne) → plus de wrap. Desktop : grille 3 colonnes inchangée. */}
+            <DialogHeader className="shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-3">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <DialogTitle className="flex items-center gap-2.5 text-lg sm:text-xl font-semibold text-foreground">
                     <img
@@ -301,30 +371,12 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                   </DialogDescription>
                 </div>
 
-                {/* Bascule Mensuel / Annuel — centrée dans le header */}
-                <div className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 p-1">
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle('monthly')}
-                    className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                      billingCycle === 'monthly' ? 'bg-background text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Mensuel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle('yearly')}
-                    className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                      billingCycle === 'yearly' ? 'bg-background text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Annuel
-                    <span className="rounded-full bg-[#3899aa]/15 px-2 py-0.5 text-[10px] font-bold text-[#3899aa]">jusqu'à −15 %</span>
-                  </button>
+                {/* Bascule Mensuel / Annuel — centrée dans le header (desktop uniquement) */}
+                <div className="hidden sm:flex justify-center">
+                  {billingToggle}
                 </div>
 
-                {/* Bouton non cliquable « aide FAMI » — pop-up d'explication au survol */}
+                {/* Bouton non cliquable « aide FAMI » — pop-up au survol (desktop uniquement) */}
                 <Popover open={isFamiPopoverOpen} onOpenChange={setIsFamiPopoverOpen}>
                   <PopoverTrigger asChild>
                     <button
@@ -353,47 +405,45 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                       famiPopoverTimeout.current = setTimeout(() => setIsFamiPopoverOpen(false), 150);
                     }}
                   >
-                    <div className="flex items-center gap-2 border-b bg-amber-50 px-4 py-3">
-                      <HelpCircle className="h-4 w-4 text-amber-500" />
-                      <p className="text-sm font-bold text-foreground">L'aide FAMI, comment ça marche ?</p>
-                    </div>
-                    <ol className="space-y-3 p-4">
-                      {[
-                        {
-                          title: "Tu t'abonnes en 2026",
-                          text: "Tu accèdes au module vidéotransmission sécurisée dès le premier jour.",
-                        },
-                        {
-                          title: "Tu l'utilises normalement",
-                          text: "Consultations à distance, suivi post-op, directement intégré à ta pratique.",
-                        },
-                        {
-                          title: "Tu déclares sur Amelipro (janv. – mars 2027)",
-                          text: "Une case à cocher sur Amelipro, au titre de l'année 2026. 5 minutes, une fois par an. Mon Assistant Kiné te fournit l'attestation d'équipement à joindre à ta déclaration.",
-                        },
-                        {
-                          title: "Tu touches l'aide au printemps 2027",
-                          text: "350 € versés directement par ta CPAM. Pas de remboursement à demander, pas de facture.",
-                        },
-                      ].map((step, i) => (
-                        <li key={i} className="flex gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-400 text-xs font-bold text-white">
-                            {i + 1}
-                          </span>
-                          <div>
-                            <p className="text-xs font-semibold text-foreground">{step.title}</p>
-                            <p className="text-xs text-muted-foreground">{step.text}</p>
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
+                    {famiPanel}
                   </PopoverContent>
                 </Popover>
               </div>
             </DialogHeader>
 
-            {/* Contenu scrollable */}
-            <div className="p-3 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6">
+            {/* Contenu scrollable (flex-1 min-h-0 => scroll interne en plein écran mobile) */}
+            <div className="flex-1 min-h-0 p-3 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6">
+
+              {/* Contrôles mobile : bascule pleine largeur + aide FAMI en accordéon (desktop = dans le header) */}
+              <div className="sm:hidden space-y-3">
+                {billingToggle}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setIsFamiMobileOpen((v) => !v)}
+                    aria-expanded={isFamiMobileOpen}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-amber-400 px-3 py-2.5 text-sm font-bold text-amber-500"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <HelpCircle className="h-4 w-4" />
+                      L'aide FAMI, comment ça marche ?
+                    </span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isFamiMobileOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {/* Accordéon : anime la hauteur via grid-rows 0fr→1fr (même pattern que la remise annuelle) */}
+                  <div
+                    className={`grid transition-all duration-300 ease-out ${
+                      isFamiMobileOpen ? 'grid-rows-[1fr] opacity-100 mt-2' : 'grid-rows-[0fr] opacity-0'
+                    }`}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="rounded-lg border border-border">
+                        {famiPanel}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Grid des plans - Style cohérent avec l'app */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 max-w-7xl mx-auto">
@@ -408,8 +458,10 @@ export const PaywallModal = ({ isOpen, onClose, subscription }) => {
                     <Card 
                       key={plan.type}
                       className={`relative flex flex-col w-full shadow-lg border-border transition-all duration-200 hover:shadow-xl cursor-pointer ${
-                        isRecommended ? 'ring-2 ring-accent shadow-accent/20' : ''
-                      } ${!isAvailable ? 'opacity-60 cursor-not-allowed' : ''} ${isCurrentPlan ? 'ring-2 ring-primary shadow-primary/20' : 'hover:border-muted-foreground/30'}`}
+                        isRecommended ? 'ring-2 ring-accent shadow-accent/20 order-first sm:order-none' : ''
+                      } ${!isAvailable ? 'opacity-60 cursor-not-allowed' : ''} ${isCurrentPlan ? 'ring-2 ring-primary shadow-primary/20' : 'hover:border-muted-foreground/30'} ${
+                        plan.type === 'PIONNIER' && pioneerSlotsRemaining !== null && pioneerSlotsRemaining > 0 ? 'mb-6 sm:mb-0' : ''
+                      }`}
                       onClick={!isCurrentPlan && isAvailable ? () => handlePlanClick(plan.type) : undefined}
                     >
                       {/* Badge recommandé */}
