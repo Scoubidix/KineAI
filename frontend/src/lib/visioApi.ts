@@ -39,10 +39,23 @@ export interface CreateSeanceInput {
   prereqsAttested: boolean;
 }
 
+/** Erreur API visio typée : conserve le `code` backend (ex: NO_EMAIL, NOT_MOBILE) et le status HTTP. */
+export class VisioApiError extends Error {
+  code?: string;
+  status: number;
+  constructor(message: string, code: string | undefined, status: number) {
+    super(message);
+    this.name = 'VisioApiError';
+    this.code = code;
+    this.status = status;
+  }
+}
+
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error || `Erreur ${res.status}`);
+    const b = body as { error?: string; code?: string };
+    throw new VisioApiError(b.error || `Erreur ${res.status}`, b.code, res.status);
   }
   return res.json();
 }

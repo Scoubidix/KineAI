@@ -14,6 +14,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { matchesAllTokens } from '@/utils/textSearch';
 import DOMPurify from 'dompurify';
+import QuickContactModal from '@/components/QuickContactModal';
+import { updatePatientContact } from '@/lib/patientApi';
 
 
 interface Template {
@@ -94,10 +96,8 @@ export default function NouveauCourrierModal({
   const [emailSent, setEmailSent] = useState(false);
   const [whatsappSent, setWhatsappSent] = useState(false);
 
-  // Modal rapide : saisie de l'email manquant du destinataire
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [quickEmail, setQuickEmail] = useState('');
-  const [isSavingEmail, setIsSavingEmail] = useState(false);
+  // Mini-modal partagée : saisie de l'email manquant du destinataire (patient ou contact)
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   // Variable popover
   const [activeVariable, setActiveVariable] = useState<string | null>(null);
@@ -133,8 +133,7 @@ export default function NouveauCourrierModal({
     setIsGenerating(false);
     setEmailSent(false);
     setWhatsappSent(false);
-    setShowEmailModal(false);
-    setQuickEmail('');
+    setContactModalOpen(false);
   };
 
   const loadData = async () => {
@@ -380,11 +379,10 @@ export default function NouveauCourrierModal({
   };
 
   const handleSendEmail = async (emailOverride?: string) => {
-    // Email absent : on demande au kiné de le saisir via la modal rapide
+    // Email absent : on demande au kiné de le saisir via la mini-modal partagée
     const targetEmail = emailOverride || recipientEmail;
     if (!targetEmail) {
-      setQuickEmail('');
-      setShowEmailModal(true);
+      setContactModalOpen(true);
       return;
     }
 
@@ -437,46 +435,26 @@ export default function NouveauCourrierModal({
     }
   };
 
-  // Enregistre l'email saisi sur la fiche du destinataire (patient ou contact), puis lance l'envoi
-  const handleSaveQuickEmail = async () => {
-    const email = quickEmail.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast({ title: 'Email invalide', description: 'Saisis une adresse email valide.', variant: 'destructive' });
-      return;
-    }
-
-    try {
-      setIsSavingEmail(true);
+  // Enregistre l'email saisi sur la fiche du destinataire (patient ou contact), puis lance l'envoi.
+  // Fournie à QuickContactModal : elle gère validation/loading/erreurs, on lève en cas d'échec.
+  const saveContactEmail = async (email: string) => {
+    if (selectedPatient) {
+      await updatePatientContact(selectedPatient.id, { email });
+      setSelectedPatient({ ...selectedPatient, email });
+      setPatients(prev => prev.map(p => (p.id === selectedPatient.id ? { ...p, email } : p)));
+    } else if (selectedContact) {
       const token = await getAuthToken();
-
-      if (selectedPatient) {
-        const res = await fetch(`${apiBase}/patients/${selectedPatient.id}/email`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ email })
-        });
-        if (!res.ok) throw new Error('save failed');
-        setSelectedPatient({ ...selectedPatient, email });
-        setPatients(prev => prev.map(p => (p.id === selectedPatient.id ? { ...p, email } : p)));
-      } else if (selectedContact) {
-        const res = await fetch(`${apiBase}/api/contacts/${selectedContact.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ email })
-        });
-        if (!res.ok) throw new Error('save failed');
-        setSelectedContact({ ...selectedContact, email });
-        setContacts(prev => prev.map(c => (c.id === selectedContact.id ? { ...c, email } : c)));
-      }
-
-      setShowEmailModal(false);
-      await handleSendEmail(email);
-    } catch (error) {
-      console.error('Erreur enregistrement email:', error);
-      toast({ title: 'Erreur', description: "Impossible d'enregistrer l'adresse email.", variant: 'destructive' });
-    } finally {
-      setIsSavingEmail(false);
+      const res = await fetch(`${apiBase}/api/contacts/${selectedContact.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email })
+      });
+      if (!res.ok) throw new Error("Impossible d'enregistrer l'adresse email.");
+      setSelectedContact({ ...selectedContact, email });
+      setContacts(prev => prev.map(c => (c.id === selectedContact.id ? { ...c, email } : c)));
     }
+    // Reprise auto de l'envoi
+    await handleSendEmail(email);
   };
 
   const handleSendWhatsApp = async () => {
@@ -847,12 +825,6 @@ export default function NouveauCourrierModal({
 
                 {/* Consent info */}
                 <div className="text-xs text-muted-foreground space-y-1">
-                  {(selectedPatient || selectedContact) && !recipientEmail && (
-                    <p>Aucune adresse email renseignée — clique sur « Envoyer par Email » pour l'ajouter.</p>
-                  )}
-                  {selectedPatient && !canSendWhatsApp() && (
-                    <p className="text-orange-600">WhatsApp non disponible : consentement manquant ou téléphone absent</p>
-                  )}
                   {!selectedPatient && !selectedContact && (
                     <p>Aucun destinataire sélectionné — le client mail s'ouvrira sans destinataire pré-rempli</p>
                   )}
@@ -865,40 +837,14 @@ export default function NouveauCourrierModal({
       </DialogContent>
     </Dialog>
 
-    {/* Modal rapide : saisie de l'email manquant du destinataire */}
-    <Dialog open={showEmailModal} onOpenChange={(o) => { if (!isSavingEmail) setShowEmailModal(o); }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5 text-[#3899aa]" />
-            Ajouter une adresse email
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          <p className="text-sm text-muted-foreground">
-            {(selectedPatient ? `${selectedPatient.firstName} ${selectedPatient.lastName}` : recipientName) || 'Ce destinataire'} n'a pas d'adresse email.
-            Saisis-la pour l'enregistrer{selectedPatient ? ' sur la fiche patient' : ''} et envoyer le courrier.
-          </p>
-          <Input
-            type="email"
-            value={quickEmail}
-            onChange={(e) => setQuickEmail(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !isSavingEmail) handleSaveQuickEmail(); }}
-            placeholder="exemple@email.com"
-            autoFocus
-          />
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setShowEmailModal(false)} disabled={isSavingEmail}>
-              Annuler
-            </Button>
-            <Button onClick={handleSaveQuickEmail} disabled={isSavingEmail || !quickEmail.trim()} className="btn-teal">
-              {isSavingEmail ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-              Enregistrer et envoyer
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+    {/* Mini-modal partagée : saisie de l'email manquant du destinataire, puis envoi */}
+    <QuickContactModal
+      open={contactModalOpen}
+      onOpenChange={setContactModalOpen}
+      field="email"
+      description={`${(selectedPatient ? `${selectedPatient.firstName} ${selectedPatient.lastName}` : recipientName) || 'Ce destinataire'} n'a pas d'adresse email. Saisis-la${selectedPatient ? ' (enregistrée sur la fiche patient)' : ''} pour envoyer le courrier.`}
+      onSave={saveContactEmail}
+    />
     </>
   );
 }

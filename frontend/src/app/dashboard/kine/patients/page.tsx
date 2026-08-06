@@ -70,6 +70,40 @@ export default function PatientsPage() {
     return `${day}/${month}/${year}`;
   };
 
+  // Saisie de la date de naissance en texte JJ/MM/AAAA (pas de calendrier natif).
+  // Insertion automatique des « / » au fil de la frappe.
+  const formatBirthDateInput = (raw: string): string => {
+    const digits = raw.replace(/\D/g, '').slice(0, 8); // JJMMAAAA
+    if (digits.length >= 5) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    if (digits.length >= 3) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return digits;
+  };
+
+  // JJ/MM/AAAA → AAAA-MM-JJ (ISO). Renvoie '' si la date n'est pas une date calendaire valide.
+  const frToIso = (value: string): string => {
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
+    if (!m) return '';
+    const [, dd, mm, yyyy] = m;
+    const d = Number(dd), mo = Number(mm), y = Number(yyyy);
+    const date = new Date(y, mo - 1, d);
+    if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return '';
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // ISO / date backend → JJ/MM/AAAA pour pré-remplir le champ en édition.
+  const isoToFr = (value: string): string => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${day}/${month}/${date.getFullYear()}`;
+  };
+
+  const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({ ...form, birthDate: formatBirthDateInput(e.target.value) });
+  };
+
   // Fonction pour trier les patients : ceux avec programme en cours d'abord, puis ordre alphabétique
   const sortPatients = (patientsList: UserProfileData[]) => {
     return patientsList.sort((a, b) => {
@@ -139,6 +173,7 @@ export default function PatientsPage() {
 
     const patientData = {
       ...form,
+      birthDate: frToIso(form.birthDate), // JJ/MM/AAAA → ISO attendu par le backend
       kineId: user.uid,
     };
 
@@ -172,7 +207,7 @@ export default function PatientsPage() {
 
   const handleEditPatient = (patient: UserProfileData) => {
     // email peut être null en base : on coerce en '' pour l'input contrôlé
-    setForm({ ...patient, email: patient.email ?? '' });
+    setForm({ ...patient, email: patient.email ?? '', birthDate: isoToFr(patient.birthDate) });
     setDialogOpen(true);
   };
 
@@ -276,12 +311,15 @@ export default function PatientsPage() {
                       <Label htmlFor="birthDate" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                         Date de naissance *
                       </Label>
-                      <Input 
+                      <Input
                         id="birthDate"
-                        type="date" 
-                        name="birthDate" 
-                        value={form.birthDate} 
-                        onChange={handleInputChange}
+                        type="text"
+                        inputMode="numeric"
+                        name="birthDate"
+                        value={form.birthDate}
+                        onChange={handleBirthDateChange}
+                        placeholder="JJ/MM/AAAA"
+                        maxLength={10}
                         className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
@@ -289,23 +327,22 @@ export default function PatientsPage() {
                     
                     <div className="space-y-2">
                       <Label htmlFor="phone" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Téléphone *
+                        Téléphone
                       </Label>
-                      <Input 
+                      <Input
                         id="phone"
-                        name="phone" 
-                        value={form.phone} 
+                        name="phone"
+                        value={form.phone}
                         onChange={handleInputChange}
                         placeholder="06 12 34 56 78"
                         className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
                       />
                     </div>
                   </div>
                   
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Adresse email <span className="text-gray-400 font-normal">(optionnel)</span>
+                      Adresse email
                     </Label>
                     <Input
                       id="email"
@@ -388,7 +425,7 @@ export default function PatientsPage() {
                     <Button
                       onClick={handleAddOrUpdatePatient}
                       className="btn-teal flex-1 text-sm sm:text-base"
-                      disabled={!form.firstName || !form.lastName || !form.birthDate || !form.phone || (!form.id && !consentChecked)}
+                      disabled={!form.firstName || !form.lastName || !frToIso(form.birthDate) || (!form.id && !consentChecked)}
                     >
                       {form.id ? 'Mettre à jour' : 'Créer le patient'}
                     </Button>

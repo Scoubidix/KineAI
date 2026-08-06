@@ -96,7 +96,7 @@ exports.createPatient = async (req, res) => {
         lastName,
         birthDate: new Date(birthDate),
         email: email || null, // Email optionnel : '' ou undefined → null
-        phone,
+        phone: phone || null, // Optionnel : '' ou undefined → null (canal WhatsApp)
         goals,
         kineId: kine.id,
         // Consentements activés par défaut (formulaire signé)
@@ -157,7 +157,7 @@ exports.updatePatient = async (req, res) => {
         lastName,
         birthDate: new Date(birthDate),
         email: email || null, // Email optionnel : '' ou undefined → null
-        phone,
+        phone: phone || null, // Optionnel : '' ou undefined → null (canal WhatsApp)
         goals,
       },
     });
@@ -169,11 +169,12 @@ exports.updatePatient = async (req, res) => {
   }
 };
 
-// PATCH /patients/:id/email — Mise à jour ciblée de l'email seul (modal rapide du module Courrier)
-exports.updatePatientEmail = async (req, res) => {
+// PATCH /patients/:id/contact — Mise à jour ciblée du contact (email et/ou phone)
+// Modal rapide "compléter le contact manquant", partagée par Courrier / Programme / Visio.
+exports.updatePatientContact = async (req, res) => {
   const { id } = req.params;
   const firebaseUid = req.uid;
-  const { email } = req.body;
+  const { email, phone } = req.body;
 
   try {
     const prisma = prismaService.getInstance();
@@ -199,16 +200,21 @@ exports.updatePatientEmail = async (req, res) => {
       return res.status(404).json({ error: "Patient non trouvé ou accès refusé" });
     }
 
+    // On ne met à jour que les champs fournis ; vide → null
+    const data = {};
+    if (email !== undefined) data.email = email || null;
+    if (phone !== undefined) data.phone = phone || null;
+
     const updatedPatient = await prisma.patient.update({
       where: { id: parseInt(id) },
-      data: { email },
+      data,
     });
 
-    logger.info(`✅ Email patient mis à jour (ID: ${sanitizeId(updatedPatient.id)})`);
+    logger.info(`✅ Contact patient mis à jour (ID: ${sanitizeId(updatedPatient.id)})`);
     res.json(updatedPatient);
   } catch (err) {
-    logger.error("Erreur update email patient :", err);
-    res.status(500).json({ error: "Erreur modification email patient" });
+    logger.error("Erreur update contact patient :", err);
+    res.status(500).json({ error: "Erreur modification contact patient" });
   }
 };
 

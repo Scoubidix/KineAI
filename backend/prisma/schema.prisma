@@ -124,7 +124,7 @@ model Patient {
   firstName String
   lastName  String
   birthDate DateTime
-  phone     String
+  phone     String?  // Optionnel : sert uniquement au canal WhatsApp (email par défaut)
   email     String?  // Optionnel : le kiné peut créer un patient sans email
   goals     String
   createdAt DateTime @default(now())

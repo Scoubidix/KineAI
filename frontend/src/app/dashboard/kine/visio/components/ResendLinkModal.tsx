@@ -10,7 +10,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader2, Mail, Phone, AlertCircle, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { resendLink, VisioChannel, VisioSeance } from '@/lib/visioApi';
+import { resendLink, VisioApiError, VisioChannel, VisioSeance } from '@/lib/visioApi';
+import QuickContactModal from '@/components/QuickContactModal';
+import { updatePatientContact } from '@/lib/patientApi';
 
 interface ResendLinkModalProps {
   open: boolean;
@@ -24,11 +26,14 @@ export default function ResendLinkModal({ open, onOpenChange, seance, onResent }
   const [channel, setChannel] = useState<VisioChannel | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Mini-modal "compléter le contact manquant" (déclenchée sur NO_EMAIL / NOT_MOBILE)
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   useEffect(() => {
     if (open && seance) setChannel(seance.deliveryChannel);
     setError(null);
     setSending(false);
+    setContactModalOpen(false);
   }, [open, seance]);
 
   if (!seance) return null;
@@ -50,7 +55,12 @@ export default function ResendLinkModal({ open, onOpenChange, seance, onResent }
       onResent();
       onOpenChange(false);
     } catch (e) {
-      setError((e as Error).message);
+      // Contact manquant → on ouvre la mini-modal de saisie (option 1) au lieu d'un cul-de-sac
+      if (e instanceof VisioApiError && (e.code === 'NO_EMAIL' || e.code === 'NOT_MOBILE')) {
+        setContactModalOpen(true);
+      } else {
+        setError((e as Error).message);
+      }
     } finally {
       setSending(false);
     }
@@ -112,6 +122,20 @@ export default function ResendLinkModal({ open, onOpenChange, seance, onResent }
           </div>
         </div>
       </DialogContent>
+
+      {/* Mini-modal : compléter le contact manquant puis relancer le renvoi */}
+      <QuickContactModal
+        open={contactModalOpen}
+        onOpenChange={setContactModalOpen}
+        field={channel === 'WHATSAPP' ? 'phone' : 'email'}
+        requireMobileFR={channel === 'WHATSAPP'}
+        onSave={async (value) => {
+          if (!seance.patient) return;
+          const patch = channel === 'WHATSAPP' ? { phone: value } : { email: value };
+          await updatePatientContact(seance.patient.id, patch);
+          await handleSend(); // reprise auto du renvoi
+        }}
+      />
     </Dialog>
   );
 }

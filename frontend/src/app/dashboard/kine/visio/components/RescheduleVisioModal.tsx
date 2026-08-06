@@ -11,8 +11,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader2, Mail, MessageCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { rescheduleSeance, VisioSeance } from '@/lib/visioApi';
+import { rescheduleSeance, VisioApiError, VisioSeance } from '@/lib/visioApi';
 import VisioDateTimePicker from './VisioDateTimePicker';
+import QuickContactModal from '@/components/QuickContactModal';
+import { updatePatientContact } from '@/lib/patientApi';
 
 // Convertit un ISO en valeur pour <input type="datetime-local"> (heure locale)
 function toLocalInput(iso: string): string {
@@ -38,10 +40,13 @@ export default function RescheduleVisioModal({
   const [value, setValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Mini-modal "compléter le contact manquant" (déclenchée sur NO_EMAIL / NOT_MOBILE)
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   useEffect(() => {
     if (seance) setValue(toLocalInput(seance.scheduledAt));
     setError(null);
+    setContactModalOpen(false);
   }, [seance, open]);
 
   if (!seance) return null;
@@ -66,7 +71,12 @@ export default function RescheduleVisioModal({
       onRescheduled();
       onOpenChange(false);
     } catch (e) {
-      setError((e as Error).message);
+      // Contact manquant → on ouvre la mini-modal de saisie (option 1) au lieu d'un cul-de-sac
+      if (e instanceof VisioApiError && (e.code === 'NO_EMAIL' || e.code === 'NOT_MOBILE')) {
+        setContactModalOpen(true);
+      } else {
+        setError((e as Error).message);
+      }
     } finally {
       setSaving(false);
     }
@@ -120,6 +130,20 @@ export default function RescheduleVisioModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Mini-modal : compléter le contact manquant puis relancer la reprogrammation */}
+      <QuickContactModal
+        open={contactModalOpen}
+        onOpenChange={setContactModalOpen}
+        field={seance.deliveryChannel === 'WHATSAPP' ? 'phone' : 'email'}
+        requireMobileFR={seance.deliveryChannel === 'WHATSAPP'}
+        onSave={async (contactValue) => {
+          if (!seance.patient) return;
+          const patch = seance.deliveryChannel === 'WHATSAPP' ? { phone: contactValue } : { email: contactValue };
+          await updatePatientContact(seance.patient.id, patch);
+          await handleSave(); // reprise auto de la reprogrammation
+        }}
+      />
     </Dialog>
   );
 }

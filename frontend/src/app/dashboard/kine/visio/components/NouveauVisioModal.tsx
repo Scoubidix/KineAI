@@ -11,6 +11,9 @@ import { getAuth } from 'firebase/auth';
 import { ArrowLeft, Loader2, User, Check, Mail, Phone, Video, AlertCircle, Search, Calendar } from 'lucide-react';
 import { createSeance, VisioChannel, VisioSeance } from '@/lib/visioApi';
 import VisioDateTimePicker from './VisioDateTimePicker';
+import QuickContactModal from '@/components/QuickContactModal';
+import { isMobileFR } from '@/lib/phone';
+import { updatePatientContact } from '@/lib/patientApi';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,19 +34,6 @@ interface NouveauVisioModalProps {
 }
 
 type StepKey = 'PATIENT' | 'SCHEDULE' | 'CHANNEL' | 'PREREQS' | 'CONFIRM';
-
-// ---------------------------------------------------------------------------
-// Helper : validation mobile français (même règle que le backend)
-// ---------------------------------------------------------------------------
-function isMobileFR(phone: string | null | undefined): boolean {
-  if (!phone) return false;
-  // Supprimer espaces, points, tirets
-  let n = phone.replace(/[\s.\-]/g, '');
-  // Normaliser +33 → 0 et 0033 → 0
-  if (n.startsWith('+33')) n = '0' + n.slice(3);
-  if (n.startsWith('0033')) n = '0' + n.slice(4);
-  return /^0[67]\d{8}$/.test(n);
-}
 
 // ---------------------------------------------------------------------------
 // Les 5 conditions préalables
@@ -83,6 +73,8 @@ export default function NouveauVisioModal({ open, onOpenChange, onCreated, exist
   // ----- Étape CHANNEL -----
   const [channel, setChannel] = useState<VisioChannel | null>(null);
   const [channelError, setChannelError] = useState<string | null>(null);
+  // Mini-modal "compléter le contact manquant" (email ou mobile selon le canal choisi)
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   // ----- Étape PREREQS -----
   const [prereqsChecked, setPrereqsChecked] = useState(false);
@@ -108,6 +100,7 @@ export default function NouveauVisioModal({ open, onOpenChange, onCreated, exist
     setScheduleError(null);
     setChannel(null);
     setChannelError(null);
+    setContactModalOpen(false);
     setPrereqsChecked(false);
   }, [open]);
 
@@ -182,9 +175,14 @@ export default function NouveauVisioModal({ open, onOpenChange, onCreated, exist
   const pickChannel = useCallback((ch: VisioChannel) => {
     setChannel(ch);
     const err = getChannelError(ch);
-    setChannelError(err);
-    // Canal valide → on avance direct (sinon on reste pour afficher l'erreur)
-    if (!err) goForwardTo('PREREQS');
+    if (err) {
+      // Contact manquant → on ouvre la mini-modal de saisie (option 1) au lieu du cul-de-sac
+      setChannelError(null);
+      setContactModalOpen(true);
+      return;
+    }
+    setChannelError(null);
+    goForwardTo('PREREQS');
   }, [getChannelError, goForwardTo]);
 
   // Sélection d'un patient → passe directement à l'étape suivante (évite un clic)
@@ -424,10 +422,9 @@ export default function NouveauVisioModal({ open, onOpenChange, onCreated, exist
                   >
                     <Mail className="h-5 w-5 text-[#3899aa] mb-2" />
                     <div className="font-semibold">Email</div>
-                    {selectedPatient?.email
-                      ? <p className="text-xs text-muted-foreground mt-1 truncate">{selectedPatient.email}</p>
-                      : <p className="text-xs text-amber-600 mt-1">Pas d'email renseigné</p>
-                    }
+                    {selectedPatient?.email && (
+                      <p className="text-xs text-muted-foreground mt-1 truncate">{selectedPatient.email}</p>
+                    )}
                   </button>
                   <button
                     type="button"
@@ -440,10 +437,9 @@ export default function NouveauVisioModal({ open, onOpenChange, onCreated, exist
                   >
                     <Phone className="h-5 w-5 text-[#3899aa] mb-2" />
                     <div className="font-semibold">WhatsApp</div>
-                    {selectedPatient?.phone
-                      ? <p className="text-xs text-muted-foreground mt-1">{selectedPatient.phone}</p>
-                      : <p className="text-xs text-amber-600 mt-1">Pas de téléphone renseigné</p>
-                    }
+                    {selectedPatient?.phone && (
+                      <p className="text-xs text-muted-foreground mt-1">{selectedPatient.phone}</p>
+                    )}
                   </button>
                 </div>
                 {channelError && (
@@ -557,6 +553,25 @@ export default function NouveauVisioModal({ open, onOpenChange, onCreated, exist
           </Button>
         </div>
       </DialogContent>
+
+      {/* Mini-modal : compléter le contact manquant (email/mobile) puis avancer */}
+      <QuickContactModal
+        open={contactModalOpen}
+        onOpenChange={setContactModalOpen}
+        field={channel === 'EMAIL' ? 'email' : 'phone'}
+        requireMobileFR={channel === 'WHATSAPP'}
+        initialValue={channel === 'EMAIL' ? (selectedPatient?.email ?? '') : (selectedPatient?.phone ?? '')}
+        onSave={async (value) => {
+          if (!selectedPatient) return;
+          const patch = channel === 'EMAIL' ? { email: value } : { phone: value };
+          await updatePatientContact(selectedPatient.id, patch);
+          const updated = { ...selectedPatient, ...patch };
+          setSelectedPatient(updated);
+          setPatients((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+          // Canal désormais valide → on reprend le flow
+          goForwardTo('PREREQS');
+        }}
+      />
     </Dialog>
   );
 }

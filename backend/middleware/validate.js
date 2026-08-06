@@ -31,7 +31,7 @@ const createPatientSchema = z.object({
   lastName: trimmedString(100),
   birthDate: z.string().min(1),
   email: z.string().email().optional().or(z.literal('')), // Optionnel : vide ou email valide
-  phone: z.string().max(20),
+  phone: z.string().max(20).optional().or(z.literal('')), // Optionnel : sert au canal WhatsApp
   goals: z.string().max(2000),
 });
 
@@ -40,13 +40,17 @@ const updatePatientSchema = z.object({
   lastName: trimmedString(100),
   birthDate: z.string().min(1),
   email: z.string().email().optional().or(z.literal('')), // Optionnel : vide ou email valide
-  phone: z.string().max(20),
+  phone: z.string().max(20).optional().or(z.literal('')), // Optionnel : sert au canal WhatsApp
   goals: z.string().max(2000),
 });
 
-// Mise à jour ciblée de l'email seul (modal rapide du module Courrier) : email requis et valide
-const updatePatientEmailSchema = z.object({
-  email: z.string().email(),
+// Mise à jour ciblée du contact (email et/ou phone) : modal rapide "compléter le contact manquant"
+// partagée par les flux Courrier / Programme / Visio. Au moins un des deux champs doit être fourni.
+const updatePatientContactSchema = z.object({
+  email: z.string().email().optional().or(z.literal('')),
+  phone: z.string().max(20).optional().or(z.literal('')),
+}).refine((d) => d.email !== undefined || d.phone !== undefined, {
+  message: 'Au moins un champ (email ou phone) doit être fourni',
 });
 
 // ========== KINE ==========
@@ -169,7 +173,7 @@ module.exports = {
   validate,
   createPatientSchema,
   updatePatientSchema,
-  updatePatientEmailSchema,
+  updatePatientContactSchema,
   createKineSchema,
   updateKineProfileSchema,
   createProgrammeSchema,

@@ -16,6 +16,9 @@ import DOMPurify from 'dompurify';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
+import QuickContactModal from '@/components/QuickContactModal';
+import { isMobileFR } from '@/lib/phone';
+import { updatePatientContact } from '@/lib/patientApi';
 
 interface PatientData {
   id: number;
@@ -23,7 +26,7 @@ interface PatientData {
   lastName: string;
   birthDate: string;
   email: string | null;
-  phone: string;
+  phone: string | null;
   goals?: string;
 }
 
@@ -118,6 +121,8 @@ export default function PatientDetailPage() {
   const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus>('idle');
   const [whatsappError, setWhatsappError] = useState<string | null>(null);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  // Modal "compléter le contact manquant" (mobile requis pour WhatsApp)
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   // États programmes archivés
   const [showArchivedModal, setShowArchivedModal] = useState(false);
@@ -402,9 +407,9 @@ export default function PatientDetailPage() {
     }
   };
 
-  // NOUVELLE FONCTION : Envoyer le lien par WhatsApp
-  const handleSendWhatsApp = async () => {
-    if (!currentProgrammeId || !generatedLink || !patient) return;
+  // Envoi effectif du lien par WhatsApp (le backend revalide le numéro)
+  const performSendWhatsApp = async () => {
+    if (!currentProgrammeId || !generatedLink) return;
 
     setSendingWhatsApp(true);
     setWhatsappStatus('sending');
@@ -436,6 +441,17 @@ export default function PatientDetailPage() {
     } finally {
       setSendingWhatsApp(false);
     }
+  };
+
+  // Envoyer le lien par WhatsApp : si le patient n'a pas de mobile valide, on ouvre la
+  // mini-modal de saisie (option 1 : compléter sur place + reprise auto de l'envoi).
+  const handleSendWhatsApp = async () => {
+    if (!currentProgrammeId || !generatedLink || !patient) return;
+    if (!isMobileFR(patient.phone)) {
+      setContactModalOpen(true);
+      return;
+    }
+    await performSendWhatsApp();
   };
 
   const copyLinkToClipboard = () => {
@@ -525,10 +541,12 @@ export default function PatientDetailPage() {
                                 <span className="truncate">{patient.email}</span>
                               </span>
                             )}
-                            <span className="flex items-center gap-1 shrink-0">
-                              <Phone className="w-3 h-3 text-[#3899aa]" />
-                              {patient.phone}
-                            </span>
+                            {patient.phone && (
+                              <span className="flex items-center gap-1 shrink-0">
+                                <Phone className="w-3 h-3 text-[#3899aa]" />
+                                {patient.phone}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-1 text-muted-foreground">
@@ -932,13 +950,16 @@ export default function PatientDetailPage() {
                   <Label className="text-sm font-medium">Envoi WhatsApp</Label>
                 </div>
                 
-                {/* Statut WhatsApp */}
-                {whatsappStatus === 'idle' && patient?.phone && (
+                {/* Statut WhatsApp — le CTA est toujours affiché ; si aucun mobile valide,
+                    le clic ouvre la mini-modal de saisie puis relance l'envoi (option 1). */}
+                {whatsappStatus === 'idle' && (
                   <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
-                    <p className="text-sm text-blue-800 dark:text-blue-300 mb-2">
-                      📱 Prêt à envoyer à : <strong>{patient.phone}</strong>
-                    </p>
-                    <Button 
+                    {isMobileFR(patient?.phone) && (
+                      <p className="text-sm text-blue-800 dark:text-blue-300 mb-2">
+                        📱 Prêt à envoyer à : <strong>{patient?.phone}</strong>
+                      </p>
+                    )}
+                    <Button
                       onClick={handleSendWhatsApp}
                       disabled={sendingWhatsApp}
                       className="w-full bg-green-600 hover:bg-green-700 text-white"
@@ -1007,16 +1028,6 @@ export default function PatientDetailPage() {
                   </div>
                 )}
                 
-                {!patient?.phone && (
-                  <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-700 rounded-lg p-3">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                      <p className="text-sm text-orange-800 dark:text-orange-300">
-                        Numéro de téléphone manquant - WhatsApp indisponible
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
               
               {/* Section lien manuel */}
@@ -1060,6 +1071,22 @@ export default function PatientDetailPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Mini-modal : compléter le mobile manquant puis relancer l'envoi WhatsApp */}
+        <QuickContactModal
+          open={contactModalOpen}
+          onOpenChange={setContactModalOpen}
+          field="phone"
+          requireMobileFR
+          initialValue={patient?.phone ?? ''}
+          onSave={async (phone) => {
+            if (!patient) return;
+            await updatePatientContact(patient.id, { phone });
+            setPatient({ ...patient, phone });
+            await performSendWhatsApp();
+          }}
+        />
+
         {/* Modal programmes archivés */}
         <Dialog open={showArchivedModal} onOpenChange={(open) => {
           setShowArchivedModal(open);
