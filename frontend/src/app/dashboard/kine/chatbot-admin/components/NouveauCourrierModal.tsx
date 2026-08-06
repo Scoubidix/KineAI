@@ -96,8 +96,9 @@ export default function NouveauCourrierModal({
   const [emailSent, setEmailSent] = useState(false);
   const [whatsappSent, setWhatsappSent] = useState(false);
 
-  // Mini-modal partagée : saisie de l'email manquant du destinataire (patient ou contact)
+  // Mini-modal partagée : saisie du contact manquant (email destinataire, ou mobile pour WhatsApp)
   const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [contactModalField, setContactModalField] = useState<'email' | 'phone'>('email');
 
   // Variable popover
   const [activeVariable, setActiveVariable] = useState<string | null>(null);
@@ -373,15 +374,11 @@ export default function NouveauCourrierModal({
 
   const recipientEmail = selectedPatient?.email || selectedContact?.email || '';
 
-  const canSendWhatsApp = () => {
-    if (!selectedPatient) return false;
-    return selectedPatient.whatsappConsent && !!selectedPatient.phone;
-  };
-
   const handleSendEmail = async (emailOverride?: string) => {
     // Email absent : on demande au kiné de le saisir via la mini-modal partagée
     const targetEmail = emailOverride || recipientEmail;
     if (!targetEmail) {
+      setContactModalField('email');
       setContactModalOpen(true);
       return;
     }
@@ -457,8 +454,9 @@ export default function NouveauCourrierModal({
     await handleSendEmail(email);
   };
 
-  const handleSendWhatsApp = async () => {
-    if (!canSendWhatsApp() || !selectedPatient) return;
+  // Envoi effectif du WhatsApp (le backend revalide consentement + téléphone)
+  const performSendWhatsApp = async () => {
+    if (!selectedPatient) return;
 
     try {
       setIsSending(true);
@@ -494,6 +492,18 @@ export default function NouveauCourrierModal({
     } finally {
       setIsSending(false);
     }
+  };
+
+  // Envoyer par WhatsApp : si le patient n'a pas de mobile, on ouvre la mini-modal de saisie
+  // (option 1 : compléter sur place + reprise auto). Le consentement, lui, n'est pas "réparable" ici.
+  const handleSendWhatsApp = async () => {
+    if (!selectedPatient || !selectedPatient.whatsappConsent) return;
+    if (!selectedPatient.phone) {
+      setContactModalField('phone');
+      setContactModalOpen(true);
+      return;
+    }
+    await performSendWhatsApp();
   };
 
   return (
@@ -799,9 +809,9 @@ export default function NouveauCourrierModal({
                   {selectedPatient && (
                     <Button
                       onClick={handleSendWhatsApp}
-                      disabled={!canSendWhatsApp() || isSending || !editedBody.trim()}
-                      className={`w-full sm:flex-1 ${canSendWhatsApp() && editedBody.trim() ? 'btn-teal' : ''}`}
-                      variant={canSendWhatsApp() && editedBody.trim() ? 'default' : 'secondary'}
+                      disabled={isSending || !editedBody.trim() || !selectedPatient.whatsappConsent}
+                      className={`w-full sm:flex-1 ${selectedPatient.whatsappConsent && editedBody.trim() ? 'btn-teal' : ''}`}
+                      variant={selectedPatient.whatsappConsent && editedBody.trim() ? 'default' : 'secondary'}
                     >
                       {isSending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-2" />}
                       Envoyer par WhatsApp
@@ -837,13 +847,28 @@ export default function NouveauCourrierModal({
       </DialogContent>
     </Dialog>
 
-    {/* Mini-modal partagée : saisie de l'email manquant du destinataire, puis envoi */}
+    {/* Mini-modal partagée : saisie du contact manquant (email ou mobile), puis envoi */}
     <QuickContactModal
       open={contactModalOpen}
       onOpenChange={setContactModalOpen}
-      field="email"
-      description={`${(selectedPatient ? `${selectedPatient.firstName} ${selectedPatient.lastName}` : recipientName) || 'Ce destinataire'} n'a pas d'adresse email. Saisis-la${selectedPatient ? ' (enregistrée sur la fiche patient)' : ''} pour envoyer le courrier.`}
-      onSave={saveContactEmail}
+      field={contactModalField}
+      requireMobileFR={contactModalField === 'phone'}
+      description={
+        contactModalField === 'phone'
+          ? `${recipientName || 'Ce patient'} n'a pas de mobile enregistré. Saisis-le (fiche patient) pour l'envoi WhatsApp.`
+          : `${(selectedPatient ? `${selectedPatient.firstName} ${selectedPatient.lastName}` : recipientName) || 'Ce destinataire'} n'a pas d'adresse email. Saisis-la${selectedPatient ? ' (enregistrée sur la fiche patient)' : ''} pour envoyer le courrier.`
+      }
+      onSave={async (value) => {
+        if (contactModalField === 'phone') {
+          if (!selectedPatient) return;
+          await updatePatientContact(selectedPatient.id, { phone: value });
+          setSelectedPatient({ ...selectedPatient, phone: value });
+          setPatients(prev => prev.map(p => (p.id === selectedPatient.id ? { ...p, phone: value } : p)));
+          await performSendWhatsApp();
+        } else {
+          await saveContactEmail(value);
+        }
+      }}
     />
     </>
   );
