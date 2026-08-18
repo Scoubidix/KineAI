@@ -1,11 +1,11 @@
 /**
- * Service Brevo — gestion des contacts d'essai (listes marketing + attributs).
+ * Service Brevo — gestion des contacts sur les listes marketing (+ attributs).
  *
  * Distinct de brevoMailService (transactionnel /v3/smtp/email). Ici on utilise
  * l'API Contacts (/v3/contacts) pour ajouter le kiné à une liste ; l'entrée dans
  * la liste déclenche l'automation mail construite dans Brevo (côté Sylvain).
- *  - Liste « Essai en cours » : séquence J0…J13 (via TRIAL_END_DATE).
- *  - Liste « 1er bilan » : mail événement quand le kiné génère son 1er bilan.
+ *  - Liste « Inscrits » : séquence onboarding J0…J13 (déclenchée au signup / 1re saisie prénom).
+ *  - Liste « Pionniers » : abonnés au plan PIONNIER.
  *
  * Logs sans PII : on ne log que le statut HTTP.
  */
@@ -27,11 +27,6 @@ function throwErr(message, code) {
   const err = new Error(message);
   err.code = code;
   throw err;
-}
-
-/** Format YYYY-MM-DD attendu par les attributs date Brevo. */
-function toBrevoDate(date) {
-  return new Date(date).toISOString().slice(0, 10);
 }
 
 /**
@@ -106,28 +101,6 @@ async function postContactToList({ email, listId, attributes, context }) {
 }
 
 /**
- * Ajoute le kiné à la liste « Essai en cours » (séquence J0…J13) avec ses attributs.
- * @param {Object} params
- * @param {string} params.email
- * @param {string} [params.firstName]
- * @param {Date} params.trialStartDate
- * @param {Date} params.trialEndDate
- * @returns {Promise<void>}
- */
-async function upsertTrialContact({ email, firstName, trialStartDate, trialEndDate }) {
-  return postContactToList({
-    email,
-    listId: process.env.BREVO_TRIAL_LIST_ID,
-    attributes: {
-      PRENOM: firstName || '',
-      TRIAL_START_DATE: toBrevoDate(trialStartDate),
-      TRIAL_END_DATE: toBrevoDate(trialEndDate),
-    },
-    context: 'essai',
-  });
-}
-
-/**
  * Ajoute le kiné à la liste « Pionniers » (abonnés au plan PIONNIER).
  * @param {Object} params
  * @param {string} params.email
@@ -141,29 +114,6 @@ async function addToPionnierList({ email, firstName }) {
     attributes: { PRENOM: firstName || '' },
     context: 'pionnier',
   });
-}
-
-/**
- * Met à jour l'attribut PRENOM d'un contact Brevo SANS toucher à ses listes
- * (donc sans re-déclencher la séquence d'automation). Utilisé quand le prénom est
- * saisi à l'onboarding, après le démarrage de l'essai.
- * @param {Object} params
- * @param {string} params.email
- * @param {string} [params.firstName]
- * @returns {Promise<void>}
- */
-async function updateTrialContactName({ email, firstName }) {
-  if (!process.env.BREVO_API_KEY) {
-    throwErr('Configuration Brevo manquante', ERROR_CODES.CONFIG_MISSING);
-  }
-  if (!email) {
-    throwErr('Email requis pour le contact Brevo', ERROR_CODES.VALIDATION);
-  }
-  return postContact({
-    email,
-    updateEnabled: true,
-    attributes: { PRENOM: firstName || '' },
-  }, 'maj prénom');
 }
 
 /**
@@ -183,4 +133,4 @@ async function upsertSignupContact({ email, firstName }) {
   });
 }
 
-module.exports = { ERROR_CODES, upsertTrialContact, addToPionnierList, updateTrialContactName, upsertSignupContact };
+module.exports = { ERROR_CODES, addToPionnierList, upsertSignupContact };

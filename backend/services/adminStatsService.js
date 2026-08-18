@@ -130,22 +130,19 @@ async function getActivityStats(now = new Date(), ranges = getParisPeriodRanges(
     ]).then(([wc, wp, mc, mp]) =>
       buildMetric({ total: null, weekCurrent: wc, weekPrevious: wp, monthCurrent: mc, monthPrevious: mp }));
 
-  // Essais en cours = abonnés Stripe actuellement en période d'essai (subscriptionStatus TRIALING).
-  // Total : count direct sur le statut TRIALING.
-  // Comparatifs semaine/mois : essais DÉMARRÉS dans la fenêtre, identifiés par subscriptionStartDate
-  // combiné au statut TRIALING (pour ne compter que ceux encore actifs en essai).
-  // Choix retenu : subscriptionStartDate est déjà utilisé dans countSubscriptions() pour les
-  // comparatifs abonnements — même pattern, cohérent. On ne peut plus se baser sur trialEndDate
-  // puisque les essais Stripe n'ont pas ce champ en DB (c'est Stripe qui gère l'échéance).
+  // Essais en cours : le TOTAL vient de Stripe (statut trialing, vérité absolue) — renseigné dans
+  // getDashboardStats via activity.trials.total. Ici on ne calcule QUE les comparatifs semaine/mois :
+  // essais DÉMARRÉS dans la fenêtre, identifiés par subscriptionStartDate + statut TRIALING (même
+  // pattern que countSubscriptions, cohérent). On ne peut pas se baser sur trialEndDate car les
+  // essais Stripe n'ont pas ce champ en DB (c'est Stripe qui gère l'échéance).
   const countTrials = () =>
     Promise.all([
-      prisma.kine.count({ where: { subscriptionStatus: 'TRIALING' } }),
       prisma.kine.count({ where: { subscriptionStatus: 'TRIALING', subscriptionStartDate: inWeek } }),
       prisma.kine.count({ where: { subscriptionStatus: 'TRIALING', subscriptionStartDate: inPrevWeek } }),
       prisma.kine.count({ where: { subscriptionStatus: 'TRIALING', subscriptionStartDate: inMonth } }),
       prisma.kine.count({ where: { subscriptionStatus: 'TRIALING', subscriptionStartDate: inPrevMonth } }),
-    ]).then(([total, wc, wp, mc, mp]) =>
-      buildMetric({ total, weekCurrent: wc, weekPrevious: wp, monthCurrent: mc, monthPrevious: mp }));
+    ]).then(([wc, wp, mc, mp]) =>
+      buildMetric({ total: null, weekCurrent: wc, weekPrevious: wp, monthCurrent: mc, monthPrevious: mp }));
 
   // Courriers : groupBy method sur chaque période (EMAIL / WHATSAPP).
   const lettersGroup = (sentAt) =>
@@ -253,6 +250,7 @@ async function getStripeSubscriptionStats() {
 
   // Compter par plan (et par cycle) et calculer le MRR réel
   let mrr = 0;
+  let trialingSubscriptions = 0; // essais Stripe en cours = source de vérité du compteur "Essais en cours"
   for (const sub of allSubs) {
     const item = sub.items.data[0];
     const priceId = item?.price?.id;
@@ -265,6 +263,8 @@ async function getStripeSubscriptionStats() {
       planCycleCounts[plan][cycle]++;
     }
     cycleCounts[cycle]++;
+
+    if (sub.status === 'trialing') trialingSubscriptions++;
 
     // MRR = revenu récurrent RÉEL ramené au mois → on EXCLUT les essais (trialing),
     // qui ne paient rien encore. Les comptages ci-dessus, eux, les incluent.
@@ -279,7 +279,7 @@ async function getStripeSubscriptionStats() {
 
   const activeSubscriptions = Object.values(planCounts).reduce((sum, c) => sum + c, 0);
 
-  return { planCounts, planCycleCounts, cycleCounts, activeSubscriptions, mrr };
+  return { planCounts, planCycleCounts, cycleCounts, activeSubscriptions, trialingSubscriptions, mrr };
 }
 
 /**
@@ -376,7 +376,7 @@ async function getDashboardStats() {
   const ranges = getParisPeriodRanges(now);
 
   // Abonnements depuis Stripe (source de vérité, pas de faux abonnements)
-  const { planCounts, planCycleCounts, cycleCounts, activeSubscriptions, mrr } = await getStripeSubscriptionStats();
+  const { planCounts, planCycleCounts, cycleCounts, activeSubscriptions, trialingSubscriptions, mrr } = await getStripeSubscriptionStats();
 
   // Dernier virement Stripe, événements récents, usage des features (DB) — en parallèle
   const [lastPayout, subscriptionEvents, activity] = await Promise.all([
@@ -387,6 +387,10 @@ async function getDashboardStats() {
 
   // Le total abonnements actifs vient de Stripe
   activity.subscriptions.total = activeSubscriptions;
+  // Idem pour les essais en cours : Stripe (statut trialing) est la vérité absolue. Évite de
+  // compter des lignes DB au statut TRIALING resté « collé » (ex. anciens essais no-CB expirés
+  // sans abonnement Stripe). Les comparatifs semaine/mois restent basés sur la DB (subscriptionStartDate).
+  activity.trials.total = trialingSubscriptions;
 
   const totalKines = activity.kines.total;
   const freeCount = Math.max(0, totalKines - activeSubscriptions);

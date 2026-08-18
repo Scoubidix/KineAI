@@ -9,7 +9,7 @@ const { uploadAvatar, deleteAvatar, generateSignedUrl, validateImageBuffer } = r
 const { normalizeFirstName, normalizeLastName } = require('../utils/nameNormalization');
 const LEGAL_VERSIONS = require('../config/legalVersions');
 const stripeService = require('../services/StripeService');
-const { updateTrialContactName, upsertSignupContact } = require('../services/brevoTrialService');
+const { upsertSignupContact } = require('../services/brevoTrialService');
 const { sumMinutes } = require('../config/timeSaved');
 const fs = require('fs');
 
@@ -213,21 +213,14 @@ const updateKineProfile = async (req, res) => {
       }
     }
 
-    // Onboarding Brevo. Le prénom est saisi ici (wizard), après le signup.
-    //  - 1re saisie du prénom  → ajout à la liste « Inscrits » AVEC le prénom : déclenche la
-    //    séquence J0→J13 personnalisée (upsertSignupContact).
-    //  - modif ultérieure       → simple mise à jour de l'attribut PRENOM, sans re-déclencher
-    //    l'automation (updateTrialContactName).
+    // Onboarding Brevo : à la 1re saisie du prénom (wizard, après le signup) → ajout à la liste
+    // « Inscrits » AVEC le prénom, ce qui déclenche la séquence onboarding J0→J13 personnalisée.
     // Non bloquant : un échec Brevo ne doit jamais faire échouer la mise à jour du profil.
-    if (firstName !== undefined && updatedKine.firstName) {
+    if (firstName !== undefined && updatedKine.firstName && !existingKine.firstName) {
       try {
-        if (!existingKine.firstName) {
-          await upsertSignupContact({ email: updatedKine.email, firstName: updatedKine.firstName });
-        } else {
-          await updateTrialContactName({ email: updatedKine.email, firstName: updatedKine.firstName });
-        }
+        await upsertSignupContact({ email: updatedKine.email, firstName: updatedKine.firstName });
       } catch (e) {
-        logger.warn("⚠️ Sync onboarding/prénom Brevo échouée (non-bloquant):", e.message);
+        logger.warn("⚠️ Sync onboarding Brevo échouée (non-bloquant):", e.message);
       }
     }
 

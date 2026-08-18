@@ -1,63 +1,38 @@
 // services/planService.js
 // Résolveur de plan effectif : source de vérité UNIQUE du plan appliqué à un kiné.
-// Ordre de priorité : abonnement payé actif > essai gratuit actif > FREE.
+// Ordre de priorité : abonnement payé actif > FREE.
 // Pur (aucune I/O) → utilisé par les middlewares, le quota et l'endpoint subscription.
+// L'essai gratuit est désormais géré par Stripe (subscriptionStatus TRIALING + planType du plan
+// choisi) : plus d'essai « no-CB » à résoudre ici.
 
-const TRIAL_PLAN = 'EXPERT';
 const TRIAL_DURATION_DAYS = 14;
 const PAID_PLANS = ['DECLIC', 'PRATIQUE', 'PIONNIER', 'EXPERT'];
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/** L'essai no-CB est actif si une date de fin future existe ET qu'aucun abo Stripe
- * n'est rattaché (un abo — même annulé — fait foi via planType, pas via trialEndDate). */
-function isTrialActive(kine, now = new Date()) {
-  if (!kine || !kine.trialEndDate) return false;
-  if (kine.subscriptionId) return false;
-  return new Date(kine.trialEndDate).getTime() > now.getTime();
-}
-
-/** Plan effectif : abo payé > essai actif (EXPERT) > FREE.
- * On se base sur planType seul (pas de subscriptionId) : pendant l'essai
- * planType reste FREE, donc planType ∈ PAID_PLANS signifie un vrai plan payé
- * ou accordé manuellement — cohérent avec le gating historique. */
-function getEffectivePlan(kine, now = new Date()) {
+/** Plan effectif : abo payé (ou essai Stripe, où planType = plan choisi) > FREE.
+ * On se base sur planType seul : planType ∈ PAID_PLANS signifie un vrai plan payé,
+ * un essai Stripe en cours, ou un plan accordé manuellement. */
+function getEffectivePlan(kine) {
   if (!kine) return 'FREE';
   if (PAID_PLANS.includes(kine.planType)) {
     return kine.planType;
   }
-  if (isTrialActive(kine, now)) return TRIAL_PLAN;
   return 'FREE';
 }
 
-/** Éligible à démarrer un essai : jamais d'essai ET jamais passé par un checkout Stripe. */
-function isTrialEligible(kine) {
-  if (!kine) return false;
-  return kine.trialEndDate == null && kine.stripeCustomerId == null;
-}
-
-/** Infos essai pour le frontend (bandeau, badge, opt-in). */
-function getTrialInfo(kine, now = new Date()) {
-  const active = isTrialActive(kine, now);
-  let daysLeft = 0;
-  if (active) {
-    const diffMs = new Date(kine.trialEndDate).getTime() - now.getTime();
-    daysLeft = Math.max(0, Math.ceil(diffMs / MS_PER_DAY));
-  }
+/** Infos essai pour le frontend. L'essai étant géré par Stripe, seul canStartTrial
+ * (= !hasHadTrial) pilote encore les affichages (badge « 14 J », bandeau paywall). */
+function getTrialInfo(kine) {
   return {
-    isTrialing: active,
-    trialEndDate: kine && kine.trialEndDate ? kine.trialEndDate : null,
-    daysLeft,
-    trialEligible: isTrialEligible(kine),
+    isTrialing: false,
+    trialEndDate: null,
+    daysLeft: 0,
     canStartTrial: kine ? !kine.hasHadTrial : false,
   };
 }
 
 module.exports = {
   getEffectivePlan,
-  isTrialActive,
-  isTrialEligible,
   getTrialInfo,
-  TRIAL_PLAN,
   TRIAL_DURATION_DAYS,
   PAID_PLANS,
 };

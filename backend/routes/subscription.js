@@ -53,7 +53,6 @@ router.get('/subscription', authenticate, async (req, res) => {
           isTrialing: trial.isTrialing,
           trialEndDate: trial.trialEndDate,
           daysLeft: trial.daysLeft,
-          trialEligible: trial.trialEligible,
           canStartTrial: trial.canStartTrial
         },
         kine: kineInfo
@@ -102,7 +101,6 @@ router.get('/subscription', authenticate, async (req, res) => {
           isTrialing: false,
           trialEndDate: null,
           daysLeft: 0,
-          trialEligible: false,
           canStartTrial: false,
           pendingChange,
         },
@@ -121,7 +119,6 @@ router.get('/subscription', authenticate, async (req, res) => {
           isTrialing: false,
           trialEndDate: null,
           daysLeft: 0,
-          trialEligible: false,
           canStartTrial: false,
         },
         kine: kineInfo
@@ -276,15 +273,6 @@ router.post('/usage/refresh', authenticate, async (req, res) => {
     logger.error('Erreur refresh usage:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
-});
-
-// POST /kine/trial/start — DÉSACTIVÉ : l'essai naît désormais au Checkout Stripe (carte requise).
-router.post('/trial/start', authenticate, (req, res) => {
-  return res.status(410).json({
-    success: false,
-    error: "L'essai gratuit démarre désormais lors de l'abonnement.",
-    code: 'TRIAL_DISCONTINUED',
-  });
 });
 
 module.exports = router;

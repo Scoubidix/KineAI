@@ -46,7 +46,6 @@ const { registerVisioNamespace } = require('./services/visioSignaling');
 
 // Import du nouveau système d'archivage
 const { startProgramCleanupCron } = require('./utils/chatCleanup');
-const { startTrialMailCron } = require('./utils/trialMailCron');
 const { runBilanSeed } = require('./services/bilanSeedService');
 
 // 🚦 Rate limiters utilisés au niveau app.use (le reste est déplacé dans les routeurs après authenticate)
@@ -686,7 +685,6 @@ app.get('/api/cron/pubmed-pipeline', cronAuth, async (req, res) => {
 
 // Démarrage du système d'archivage automatique
 startProgramCleanupCron();
-startTrialMailCron();
 
 // Gestion gracieuse de l'arrêt (SIGINT = Ctrl+C local, SIGTERM = Cloud Run)
 const gracefulShutdown = async (signal) => {
