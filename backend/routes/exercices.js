@@ -9,6 +9,7 @@ const exercicesController = require('../controllers/exercicesController');
 const { authenticate } = require('../middleware/authenticate');
 const { videoUploadLimiter, crudWriteLimiter } = require('../middleware/rateLimiter');
 const { validate, createExerciceSchema, updateExerciceSchema } = require('../middleware/validate');
+const { requireAdmin } = require('../middleware/authorization');
 
 // Configuration de multer pour l'upload de vidéos
 const uploadDir = path.join(__dirname, '../uploads/videos');
@@ -49,6 +50,13 @@ router.get('/private', authenticate, exercicesController.getPrivateExercices);
 
 // NOUVELLE ROUTE : Récupérer tous les tags disponibles
 router.get('/tags', authenticate, exercicesController.getAllTags);
+
+// ===== ROUTES ADMIN (gestion de la bibliothèque publique) =====
+router.get('/admin/public', authenticate, requireAdmin, exercicesController.getAdminPublicExercices);
+router.patch('/admin/:id/publish', authenticate, requireAdmin, exercicesController.publishExercice);
+router.patch('/admin/:id/unpublish', authenticate, requireAdmin, exercicesController.unpublishExercice);
+router.put('/admin/:id', authenticate, requireAdmin, validate(updateExerciceSchema), exercicesController.adminUpdateExercice);
+router.delete('/admin/:id', authenticate, requireAdmin, exercicesController.adminDeleteExercice);
 
 router.post('/', authenticate, crudWriteLimiter, validate(createExerciceSchema), exercicesController.createExercice);
 router.put('/:id', authenticate, crudWriteLimiter, validate(updateExerciceSchema), exercicesController.updateExercice);

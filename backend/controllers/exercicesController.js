@@ -50,6 +50,176 @@ exports.getPublicExercices = async (req, res) => {
   }
 };
 
+// ADMIN : liste tous les exos publics enrichis (créateur + nombre de programmes)
+exports.getAdminPublicExercices = async (req, res) => {
+  try {
+    const prisma = prismaService.getInstance();
+
+    const exercices = await prisma.exerciceModele.findMany({
+      where: { isPublic: true },
+      include: { kine: { select: { firstName: true, lastName: true, email: true } } },
+    });
+
+    // Compter les usages en un seul groupBy (évite le N+1)
+    const ids = exercices.map((e) => e.id);
+    const counts = ids.length
+      ? await prisma.exerciceProgramme.groupBy({
+          by: ['exerciceModeleId'],
+          where: { exerciceModeleId: { in: ids } },
+          _count: { _all: true },
+        })
+      : [];
+    const countMap = {};
+    for (const c of counts) countMap[c.exerciceModeleId] = c._count._all;
+
+    const withUsage = exercices.map((e) => ({ ...e, usageCount: countMap[e.id] || 0 }));
+    const sorted = sortExercicesAlphabetically(withUsage);
+    const enriched = await gcsStorageService.enrichExercicesWithSignedUrls(sorted);
+
+    res.json(enriched);
+  } catch (err) {
+    logger.error('Erreur récupération exercices publics (admin) :', err);
+    res.status(500).json({ error: 'Erreur récupération exercices publics' });
+  }
+};
+
+// ADMIN : promouvoir un de SES exos privés en public
+exports.publishExercice = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const prisma = prismaService.getInstance();
+    const exercice = await prisma.exerciceModele.findUnique({ where: { id: parseInt(id) } });
+
+    if (!exercice) {
+      return res.status(404).json({ error: 'Exercice introuvable' });
+    }
+    if (exercice.kineId !== req.kineId) {
+      return res.status(403).json({ error: 'Seul le créateur peut rendre cet exercice public' });
+    }
+    if (exercice.isPublic) {
+      return res.status(403).json({ error: 'Cet exercice est déjà public' });
+    }
+
+    const updated = await prisma.exerciceModele.update({
+      where: { id: parseInt(id) },
+      data: { isPublic: true },
+    });
+    res.json(updated);
+  } catch (err) {
+    logger.error('Erreur publication exercice :', err);
+    res.status(500).json({ error: 'Erreur publication exercice' });
+  }
+};
+
+// ADMIN : dé-publier n'importe quel exo public (le repasse en privé)
+exports.unpublishExercice = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const prisma = prismaService.getInstance();
+    const exercice = await prisma.exerciceModele.findUnique({ where: { id: parseInt(id) } });
+
+    if (!exercice || !exercice.isPublic) {
+      return res.status(404).json({ error: 'Exercice public introuvable' });
+    }
+
+    const updated = await prisma.exerciceModele.update({
+      where: { id: parseInt(id) },
+      data: { isPublic: false },
+    });
+    res.json(updated);
+  } catch (err) {
+    logger.error('Erreur dé-publication exercice :', err);
+    res.status(500).json({ error: 'Erreur dé-publication exercice' });
+  }
+};
+
+// ADMIN : éditer n'importe quel exo public
+exports.adminUpdateExercice = async (req, res) => {
+  const { id } = req.params;
+  const { nom, description, tags, gifPath } = req.body;
+  try {
+    const prisma = prismaService.getInstance();
+    const exercice = await prisma.exerciceModele.findUnique({ where: { id: parseInt(id) } });
+
+    if (!exercice || !exercice.isPublic) {
+      return res.status(404).json({ error: 'Exercice public introuvable' });
+    }
+
+    // Si un nouveau gifPath remplace l'ancien, supprimer l'ancien GIF de GCS
+    if (gifPath !== undefined && exercice.gifPath && gifPath !== exercice.gifPath) {
+      try {
+        await gcsStorageService.deleteGif(exercice.gifPath);
+        logger.info(`Ancien GIF supprimé de GCS: ${exercice.gifPath}`);
+      } catch (error) {
+        logger.warn('Erreur suppression ancien GIF:', error);
+      }
+    }
+
+    const updated = await prisma.exerciceModele.update({
+      where: { id: parseInt(id) },
+      data: {
+        nom: nom !== undefined ? nom : exercice.nom,
+        description: description !== undefined ? description : exercice.description,
+        tags: tags !== undefined ? (tags || null) : exercice.tags,
+        gifPath: gifPath !== undefined ? (gifPath || null) : exercice.gifPath,
+      },
+    });
+
+    if (updated.gifPath) {
+      updated.gifUrl = await gcsStorageService.generateSignedUrl(updated.gifPath);
+    }
+    res.json(updated);
+  } catch (err) {
+    logger.error('Erreur édition exercice public :', err);
+    res.status(500).json({ error: 'Erreur édition exercice' });
+  }
+};
+
+// ADMIN : supprimer un exo public (refus si utilisé dans un programme)
+exports.adminDeleteExercice = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const prisma = prismaService.getInstance();
+    const exercice = await prisma.exerciceModele.findUnique({ where: { id: parseInt(id) } });
+
+    if (!exercice || !exercice.isPublic) {
+      return res.status(404).json({ error: 'Exercice public introuvable' });
+    }
+
+    const exercicesEnCours = await prisma.exerciceProgramme.findMany({
+      where: { exerciceModeleId: parseInt(id) },
+      include: {
+        programme: { select: { titre: true, patient: { select: { firstName: true, lastName: true } } } },
+      },
+    });
+
+    if (exercicesEnCours.length > 0) {
+      return res.status(400).json({
+        error: 'Impossible de supprimer cet exercice',
+        message: 'Cet exercice est utilisé dans des programmes actifs',
+        programmes: exercicesEnCours.map((ex) => ({
+          programme: ex.programme.titre,
+          patient: `${ex.programme.patient.firstName} ${ex.programme.patient.lastName}`,
+        })),
+      });
+    }
+
+    if (exercice.gifPath) {
+      try {
+        await gcsStorageService.deleteGif(exercice.gifPath);
+      } catch (error) {
+        logger.warn('Erreur suppression GIF GCS:', error);
+      }
+    }
+
+    await prisma.exerciceModele.delete({ where: { id: parseInt(id) } });
+    res.status(204).send();
+  } catch (err) {
+    logger.error('Erreur suppression exercice public :', err);
+    res.status(500).json({ error: 'Erreur suppression exercice' });
+  }
+};
+
 exports.getPrivateExercices = async (req, res) => {
   try {
     const firebaseUid = req.uid;

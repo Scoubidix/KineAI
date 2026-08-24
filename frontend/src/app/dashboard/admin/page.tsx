@@ -9,11 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, TrendingDown, Minus, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, FileSignature, Gift, Activity, Layers, Zap, ImagePlus, X, Pencil, Trash2, Sparkles } from 'lucide-react';
+import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, TrendingDown, Minus, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, FileSignature, Gift, Activity, Layers, Zap, ImagePlus, X, Pencil, Trash2, Sparkles, Dumbbell } from 'lucide-react';
 import BilanFieldsTab from './components/BilanFieldsTab';
 import BilanTemplatesTab from './components/BilanTemplatesTab';
 import TokenUsageTab from './components/TokenUsageTab';
 import NouveautesTab from './components/NouveautesTab';
+import ExercicesPublicsTab from './components/ExercicesPublicsTab';
 import { Button } from '@/components/ui/button';
 
 interface LastPayout {
@@ -512,6 +513,10 @@ export default function AdminDashboardPage() {
                 <Sparkles className="h-3.5 w-3.5" />
                 Nouveautés
               </TabsTrigger>
+              <TabsTrigger value="exercices-publics" className="gap-1.5">
+                <Dumbbell className="h-3.5 w-3.5" />
+                Exos publics
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard" className="space-y-6 mt-4">
@@ -1002,6 +1007,10 @@ export default function AdminDashboardPage() {
 
             <TabsContent value="nouveautes" className="space-y-4 mt-4">
               <NouveautesTab />
+            </TabsContent>
+
+            <TabsContent value="exercices-publics" className="mt-4">
+              <ExercicesPublicsTab />
             </TabsContent>
           </Tabs>
         </div>
