@@ -54,6 +54,12 @@ const nextConfig: NextConfig = {
         destination: '/dashboard/kine/home',
         permanent: true,
       },
+      {
+        // La page "Mes Exercices" a fusionne dans la page Programmes (onglet Exercices).
+        source: '/dashboard/kine/create-exercise',
+        destination: '/dashboard/kine/programmes?tab=exercices',
+        permanent: true,
+      },
     ];
   },
   typescript: {

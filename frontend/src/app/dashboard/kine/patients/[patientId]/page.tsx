@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams } from 'next/navigation';
-import { ProgrammeModal } from '@/components/ProgrammeModal';
+import { useParams, useRouter } from 'next/navigation';
 
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -99,17 +98,19 @@ function formatDate(birthDateStr: string): string {
 
 export default function PatientDetailPage() {
   const { patientId } = useParams();
+  const router = useRouter();
   const { toast } = useToast();
+
+  // La création part de la bibliothèque en mode sélection, avec le patient
+  // déjà retenu : « Continuer » ouvre ensuite le builder pré-rempli.
+  const handleNouveauProgramme = () => {
+    router.push(
+      `/dashboard/kine/programmes?tab=exercices&select=1&patientId=${patientId as string}`,
+    );
+  };
   const [patient, setPatient] = useState<PatientData | null>(null);
   const [programmesData, setProgrammesData] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // États pour la création
-  const [openCreateModal, setOpenCreateModal] = useState(false);
-  
-  // États pour la modification
-  const [openEditModal, setOpenEditModal] = useState(false);
-  const [editingProgramme, setEditingProgramme] = useState<Programme | null>(null);
   
   // États pour génération de lien et WhatsApp
   const [generatingLink, setGeneratingLink] = useState<number | null>(null);
@@ -360,9 +361,9 @@ export default function PatientDetailPage() {
     }
   };
 
+  // L'édition d'un programme se fait désormais sur sa page dédiée (builder).
   const handleEditProgramme = (programme: Programme) => {
-    setEditingProgramme(programme);
-    setOpenEditModal(true);
+    router.push(`/dashboard/kine/programmes/${programme.id}/edition`);
   };
 
   const handleDeleteProgramme = async (programmeId: number) => {
@@ -406,6 +407,7 @@ export default function PatientDetailPage() {
       setGeneratingLink(null);
     }
   };
+
 
   // Envoi effectif du lien par WhatsApp (le backend revalide le numéro)
   const performSendWhatsApp = async () => {
@@ -602,21 +604,13 @@ export default function PatientDetailPage() {
               </p>
             </div>
             {programmesData.length === 0 && (
-              <>
-                <Button
-                  className="btn-teal w-full sm:w-auto"
-                  onClick={() => setOpenCreateModal(true)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nouveau programme
-                </Button>
-                <ProgrammeModal
-                  open={openCreateModal}
-                  onOpenChange={setOpenCreateModal}
-                  patientId={parseInt(patientId as string, 10)}
-                  onCreated={async () => { await refreshProgrammes(); }}
-                />
-              </>
+              <Button
+                className="btn-teal w-full sm:w-auto"
+                onClick={() => handleNouveauProgramme()}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nouveau programme
+              </Button>
             )}
           </CardHeader>
           
@@ -684,14 +678,6 @@ export default function PatientDetailPage() {
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <ProgrammeModal
-                            open={openEditModal && editingProgramme?.id === programme.id}
-                            onOpenChange={(o) => { setOpenEditModal(o); if (!o) setEditingProgramme(null); }}
-                            patientId={parseInt(patientId as string, 10)}
-                            programme={editingProgramme ?? undefined}
-                            onCreated={async () => { await refreshProgrammes(); }}
-                          />
-
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button size="sm" variant="outline" className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-200 dark:hover:border-red-700">

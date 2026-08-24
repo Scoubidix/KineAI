@@ -49,8 +49,11 @@ const authenticatePatient = async (req, res, next) => {
     // 3. Vérifier que le patient existe en base
     const prisma = prismaService.getInstance();
     
-    const patient = await prisma.patient.findUnique({
-      where: { id: tokenValidation.patientId },
+    // `findFirst` + `isActive` et non `findUnique` : un patient supprimé (soft
+    // delete) ne doit plus pouvoir ouvrir son lien, même si son jeton est encore
+    // valide.
+    const patient = await prisma.patient.findFirst({
+      where: { id: tokenValidation.patientId, isActive: true },
       select: {
         id: true,
         firstName: true,
@@ -71,10 +74,15 @@ const authenticatePatient = async (req, res, next) => {
     }
 
     // 4. Récupérer le programme associé au token
+    // Pas de filtre `isActive` ici : le programme supprimé est bien récupéré,
+    // pour que l'étape 6 puisse répondre un 410 « Programme supprimé » explicite
+    // plutôt qu'un 404 générique.
     const programme = await prisma.programme.findUnique({
       where: { id: tokenValidation.programmeId },
       include: {
+        // Même ordre que celui défini par le kiné dans le builder.
         exercices: {
+          orderBy: { ordre: 'asc' },
           include: { exerciceModele: true }
         }
       }

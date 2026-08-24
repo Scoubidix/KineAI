@@ -86,6 +86,7 @@ const updateKineProfileSchema = z.object({
 
 const exerciceItemSchema = z.object({
   exerciceId: positiveInt(),
+  ordre: z.number().int().min(0).optional(),
   series: positiveInt(),
   repetitions: positiveInt(),
   tempsRepos: z.number().int().min(0),
@@ -93,19 +94,33 @@ const exerciceItemSchema = z.object({
   instructions: z.string().max(1000).optional(),
 });
 
+// Un programme est une prescription entre deux reevaluations, pas un abonnement :
+// au-dela d'un mois, il faut le renouveler plutot que l'etirer.
+const PROGRAMME_DUREE_MAX = 30;
+
 const createProgrammeSchema = z.object({
   titre: trimmedString(255),
   description: z.string().max(5000),
-  duree: positiveInt(),
+  duree: z.number().int().min(1).max(PROGRAMME_DUREE_MAX),
   patientId: positiveInt(),
-  dateFin: z.string().min(1),
+  // Ni dateDebut ni dateFin : le programme demarre le jour de sa creation et la
+  // date de fin est derivee de la duree cote serveur. Les accepter du client
+  // rendrait le plafond de duree contournable, puisque c'est dateFin qui pilote
+  // l'expiration du jeton patient.
   exercises: z.array(exerciceItemSchema).min(1),
 });
 
 const updateProgrammeSchema = z.object({
   titre: trimmedString(255),
   description: z.string().max(5000),
-  duree: positiveInt(),
+  // Accepte pour compatibilite avec les clients existants, mais NON ecrit par le
+  // controleur : les dates d'un programme sont figees a sa creation et la duree
+  // les pilote. La modifier apres coup desynchroniserait la periode affichee et
+  // l'expiration du jeton patient, deja emis.
+  // Volontairement SANS plafond, contrairement a la creation : les programmes
+  // anterieurs au plafond peuvent depasser 30 jours, et le valider ici les
+  // rendrait definitivement ineditables alors que la valeur est ignoree.
+  duree: positiveInt().optional(),
   exercises: z.array(exerciceItemSchema),
 });
 

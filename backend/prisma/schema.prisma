@@ -242,6 +242,7 @@ model ExerciceProgramme {
   exerciceModele   ExerciceModele @relation(fields: [exerciceModeleId], references: [id])
   exerciceModeleId Int
 
+  ordre        Int    @default(0) // position de l'exercice dans le programme
   series       Int
   repetitions  Int
   pause        Int // en secondes

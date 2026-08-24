@@ -57,7 +57,6 @@ import {
   ClipboardList,
   LogOut, 
   Library, 
-  Dumbbell, 
   Briefcase, 
   Share2, 
   Wand2,
@@ -1263,7 +1262,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { href: '/dashboard/kine/chat', label: 'Assistant IA', icon: Wand2, disabled: false, highlight: true },
         { href: '/dashboard/kine/home', label: 'Accueil Kiné', icon: Home, disabled: false },
         { href: '/dashboard/kine/patients', label: 'Patients', icon: Users, disabled: false },
-        { href: '/dashboard/kine/create-exercise', label: 'Mes Exercices', icon: Dumbbell, disabled: false },
         { href: '/dashboard/kine/programmes', label: 'Programmes', icon: Calendar, disabled: false },
         { href: '/dashboard/kine/bilan-kine', label: 'Bilan Kiné', icon: ClipboardCheck, disabled: false },
         { href: '/dashboard/kine/chatbot-admin', label: 'Module administratif', icon: FileText, disabled: false },
@@ -1323,7 +1321,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
       label: 'Mon activité',
       items: [
         { href: '/dashboard/kine/patients', label: 'Patients', icon: Users, emoji: '👥', highlight: false },
-        { href: '/dashboard/kine/create-exercise', label: 'Mes Exercices', icon: Dumbbell, emoji: '🏋️', highlight: false },
         { href: '/dashboard/kine/programmes', label: 'Programmes', icon: Calendar, emoji: '📋', highlight: false },
         { href: '/dashboard/kine/bilan-kine', label: 'Bilan Kiné', icon: ClipboardCheck, emoji: '📝', highlight: false },
         { href: '/dashboard/kine/chatbot-admin', label: 'Module administratif', icon: FileText, emoji: '📁', highlight: false },

@@ -1,599 +1,435 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useEffect } from 'react';
-
-import { AuthGuard } from '@/components/AuthGuard';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import Link from 'next/link';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { matchesAllTokens } from '@/utils/textSearch';
-import {
-  Search,
-  Calendar,
-  User,
-  Clock,
-  MessageSquare,
-  Dumbbell,
-  AlertCircle,
-  Filter,
-  Plus,
-  X,
-} from 'lucide-react';
-import { format, differenceInDays, isAfter, isBefore, addDays, isSameDay } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { AuthGuard } from '@/components/AuthGuard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Search } from 'lucide-react';
+import { usePaywall } from '@/hooks/usePaywall';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
-import { ProgrammeModal } from '@/components/ProgrammeModal';
+import type { ExerciceModele, ExerciceTemplate } from '@/types/exercice';
+import { useProgrammesList } from '@/hooks/useProgrammesList';
+import {
+  DEFAULT_DUREE,
+  draftKey,
+  flattenSelection,
+  readDraft,
+  todayIso,
+  writeDraft,
+  type BuilderDraft,
+  type BuilderKind,
+} from '@/hooks/useBuilderDraft';
+import { QuickActions } from './components/QuickActions';
+import { ExercicesTab } from './components/ExercicesTab';
+import { TemplatesTab } from './components/TemplatesTab';
+import { ProgrammesTab } from './components/ProgrammesTab';
+import { SelectionActionBar } from './components/SelectionActionBar';
+import { ProgrammeQuotaGate } from './components/ProgrammeQuotaGate';
 
-interface Programme {
-  id: number;
-  titre: string;
-  description: string;
-  duree: number;
-  dateDebut: string;
-  dateFin: string;
-  isArchived: boolean;
-  patient: {
-    id: number;
-    firstName: string;
-    lastName: string;
-    phone: string;
-  };
-  sessionValidations: {
-    date: string;
-    isValidated: boolean;
-    painLevel: number | null;
-    difficultyLevel: number | null;
-  }[];
-  _count: {
-    exercices: number;
-    chatSessions: number;
-  };
-}
+const TABS = ['exercices', 'templates', 'programmes'] as const;
+type TabKey = (typeof TABS)[number];
 
-interface Patient {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string | null;
-  phone: string;
-  hasActiveProgram?: boolean;
-}
-
-
-const getStatusInfo = (programme: Programme) => {
-  const now = new Date();
-  const dateFin = new Date(programme.dateFin);
-  const dateDebut = new Date(programme.dateDebut);
-  const daysRemaining = differenceInDays(dateFin, now);
-  
-  if (isBefore(dateFin, now)) {
-    return {
-      status: 'expired',
-      label: 'Expiré',
-      variant: 'destructive' as const,
-      daysText: `Expiré depuis ${Math.abs(daysRemaining)} jour(s)`
-    };
-  }
-  
-  if (isBefore(now, dateDebut)) {
-    const daysUntilStart = differenceInDays(dateDebut, now);
-    return {
-      status: 'future',
-      label: 'À venir',
-      variant: 'secondary' as const,
-      daysText: `Débute dans ${daysUntilStart} jour(s)`
-    };
-  }
-  
-  if (daysRemaining <= 3) {
-    return {
-      status: 'ending',
-      label: 'Fin proche',
-      variant: 'default' as const,
-      daysText: `${daysRemaining} jour(s) restant(s)`
-    };
-  }
-  
-  return {
-    status: 'active',
-    label: 'Actif',
-    variant: 'default' as const,
-    daysText: `${daysRemaining} jour(s) restant(s)`
-  };
+const SEARCH_PLACEHOLDERS: Record<TabKey, string> = {
+  exercices: 'Rechercher un exercice…',
+  templates: 'Rechercher un template…',
+  programmes: 'Rechercher un programme ou un patient…',
 };
 
-const getInitials = (firstName: string, lastName: string): string => {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-};
+function isTabKey(value: string | null): value is TabKey {
+  return value !== null && (TABS as readonly string[]).includes(value);
+}
+
+/** `create` ou `edit:12` — indique qu'on complète un brouillon existant. */
+function parseDraftParam(value: string | null): { mode: 'create' | 'edit'; id?: number } | null {
+  if (!value) return null;
+  if (value === 'create') return { mode: 'create' };
+  const match = /^edit:(\d+)$/.exec(value);
+  return match ? { mode: 'edit', id: Number(match[1]) } : null;
+}
 
 export default function ProgrammesPage() {
   const router = useRouter();
-  const { toast } = useToast();
-  const [programmes, setProgrammes] = useState<Programme[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'ending'>('all');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // États pour la sélection de patient
-  const [showPatientSelector, setShowPatientSelector] = useState(false);
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [patientSearchQuery, setPatientSearchQuery] = useState('');
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [loadingPatients, setLoadingPatients] = useState(false);
-
-  // État pour la modal de création de programme
-  const [showCreateModal, setShowCreateModal] = useState(false);
-
-  const fetchData = async (token: string) => {
-    try {
-      const programmesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/programmes/kine/all`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (programmesRes.ok) {
-        const programmesData = await programmesRes.json();
-        setProgrammes(programmesData);
-      } else {
-        throw new Error('Erreur lors du chargement des programmes');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Charger la liste des patients
-  const fetchPatients = async () => {
-    setLoadingPatients(true);
-    try {
-      const auth = getAuth();
-      const user = auth.currentUser;
-      if (!user) return;
-      
-      // Récupérer d'abord les infos du kiné pour avoir son ID
-      const kineProfileRes = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile`);
-      if (!kineProfileRes.ok) return;
-      
-      const kineData = await kineProfileRes.json();
-      
-      // Puis récupérer ses patients
-      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/patients/kine/${kineData.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        
-        // Enrichir chaque patient avec l'info s'il a un programme actif
-        const patientsWithProgramStatus = data.map((patient: Patient) => ({
-          ...patient,
-          hasActiveProgram: programmes.some(prog => prog.patient.id === patient.id)
-        }));
-        
-        setPatients(patientsWithProgramStatus);
-      }
-    } catch (err) {
-      console.error('Erreur chargement patients:', err);
-    } finally {
-      setLoadingPatients(false);
-    }
-  };
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(getAuth(), async (user) => {
-      if (user) {
-        const token = await user.getIdToken();
-        fetchData(token);
-      } else {
-        setLoading(false);
-        setError('Non authentifié');
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Filtrage des programmes
-  const filteredProgrammes = programmes.filter(programme => {
-    const matchesSearch = matchesAllTokens(
-      `${programme.titre} ${programme.patient.firstName} ${programme.patient.lastName}`,
-      searchQuery
-    );
-
-    if (!matchesSearch) return false;
-    
-    if (statusFilter === 'all') return true;
-    
-    const statusInfo = getStatusInfo(programme);
-    return statusInfo.status === statusFilter;
-  });
-
-  // Filtrage des patients pour la sélection
-  const filteredPatients = patients.filter(patient =>
-    matchesAllTokens(`${patient.lastName} ${patient.firstName} ${patient.email ?? ''}`, patientSearchQuery)
-  );
-
-  // Ouvrir la sélection de patient
-  const handleOpenPatientSelector = () => {
-    setShowPatientSelector(true);
-    fetchPatients();
-  };
-
-  // Ouverture auto du sélecteur si redirigé depuis l'accueil (?new=1)
   const searchParams = useSearchParams();
+  const { canAccessFeature, subscription, isLoading: paywallLoading } = usePaywall();
+
+  const [tab, setTab] = useState<TabKey>('exercices');
+  // Recherche partagee par les onglets Exercices et Templates, saisie dans l'en-tete.
+  const [search, setSearch] = useState('');
+  const [onlyMine, setOnlyMine] = useState(false);
+  const [createExerciceSignal, setCreateExerciceSignal] = useState(0);
+
+  // --- Mode sélection ---
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedExercices, setSelectedExercices] = useState<ExerciceModele[]>([]);
+  const [selectedTemplates, setSelectedTemplates] = useState<ExerciceTemplate[]>([]);
+  const [patientId, setPatientId] = useState<number | null>(null);
+  const [patientName, setPatientName] = useState<string | null>(null);
+  const [draftTarget, setDraftTarget] = useState<{ mode: 'create' | 'edit'; id?: number } | null>(
+    null,
+  );
+  // Ce que la sélection en cours alimente : un programme, ou un template.
+  const [selectKind, setSelectKind] = useState<BuilderKind>('programme');
+
+  // --- Paywall ---
+  const [gateOpen, setGateOpen] = useState(false);
+
+  const programmesList = useProgrammesList({ enabled: tab === 'programmes' });
+
+  // Lecture de l'URL au montage : onglet, mode sélection, patient, brouillon cible.
   useEffect(() => {
+    const requested = searchParams.get('tab');
+    const wantsSelect = searchParams.get('select') === '1' || searchParams.get('new') === '1';
+
+    setTab(wantsSelect ? 'exercices' : isTabKey(requested) ? requested : 'exercices');
+    setSelectMode(wantsSelect);
+    setDraftTarget(parseDraftParam(searchParams.get('draft')));
+    setSelectKind(searchParams.get('kind') === 'template' ? 'template' : 'programme');
+
+    const rawPatientId = searchParams.get('patientId');
+    if (rawPatientId) setPatientId(Number(rawPatientId));
+
     if (searchParams.get('new') === '1') {
-      handleOpenPatientSelector();
       const params = new URLSearchParams(searchParams.toString());
       params.delete('new');
-      router.replace(`/dashboard/kine/programmes${params.toString() ? `?${params.toString()}` : ''}`);
+      params.set('tab', 'exercices');
+      params.set('select', '1');
+      router.replace(`/dashboard/kine/programmes?${params.toString()}`, { scroll: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, []);
 
-  // Sélectionner un patient et ouvrir le modal de création
-  const handleSelectPatient = (patient: Patient) => {
-    setSelectedPatient(patient);
-    setShowPatientSelector(false);
-    setShowCreateModal(true);
+  // Nom du patient pré-sélectionné, pour l'afficher dans la barre de sélection.
+  useEffect(() => {
+    if (!patientId || patientName) return;
+    const loadPatient = async () => {
+      try {
+        const profileRes = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile`);
+        if (!profileRes.ok) return;
+        const kine = await profileRes.json();
+        const res = await fetchWithAuth(
+          `${process.env.NEXT_PUBLIC_API_URL}/patients/kine/${kine.id}`,
+        );
+        if (!res.ok) return;
+        const patients: Array<{ id: number; firstName: string; lastName: string }> =
+          await res.json();
+        const found = patients.find((p) => p.id === patientId);
+        if (found) setPatientName(`${found.firstName} ${found.lastName}`);
+      } catch (err) {
+        console.error('Erreur chargement patient:', err);
+      }
+    };
+    void loadPatient();
+  }, [patientId, patientName]);
+
+  const updateUrl = useCallback(
+    (mutate: (params: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParams.toString());
+      mutate(params);
+      const qs = params.toString();
+      router.replace(`/dashboard/kine/programmes${qs ? `?${qs}` : ''}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  const handleTabChange = (value: string) => {
+    if (!isTabKey(value)) return;
+    setTab(value);
+    updateUrl((params) => params.set('tab', value));
   };
 
-  if (loading) {
-    return (
-      <>
-        <AuthGuard role="kine" />
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Chargement des programmes...</p>
-          </div>
-        </div>
-      </>
-    );
-  }
+  const enterSelection = (kind: BuilderKind) => {
+    // On ne bascule d'onglet que si celui en cours devient indisponible pendant
+    // la sélection : Programmes dans tous les cas, et Templates quand c'est un
+    // template qu'on construit (un template ne contient pas de templates).
+    // Sinon on reste où le kiné se trouve — s'il est sur Templates pour un
+    // programme, c'est justement qu'il compte y piocher.
+    const mustLeaveTab = tab === 'programmes' || (kind === 'template' && tab === 'templates');
+    const nextTab: TabKey = mustLeaveTab ? 'exercices' : tab;
 
-  if (error) {
-    return (
-      <>
-        <AuthGuard role="kine" />
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Erreur de chargement</h2>
-            <p className="text-muted-foreground mb-4">{error}</p>
-            <Button onClick={() => window.location.reload()}>Réessayer</Button>
-          </div>
-        </div>
-      </>
+    setSelectKind(kind);
+    setSelectMode(true);
+    setTab(nextTab);
+    updateUrl((params) => {
+      params.set('tab', nextTab);
+      params.set('select', '1');
+      if (kind === 'template') params.set('kind', 'template');
+      else params.delete('kind');
+    });
+  };
+
+  /** Entrée en mode sélection pour un programme, précédée du contrôle de quota. */
+  const handleCreateProgramme = () => {
+    // Tant que l'abonnement n'est pas chargé, canAccessFeature renvoie false :
+    // on laisse entrer, l'effet ci-dessous fera sortir si l'accès est refusé.
+    if (!paywallLoading && !canAccessFeature('CREATE_PROGRAMME')) {
+      setGateOpen(true);
+      return;
+    }
+    enterSelection('programme');
+  };
+
+  /** Un template n'est soumis à aucun quota : pas de contrôle d'accès ici. */
+  const handleCreateTemplate = () => enterSelection('template');
+
+  const exitSelection = () => {
+    setSelectMode(false);
+    setSelectedExercices([]);
+    setSelectedTemplates([]);
+    setDraftTarget(null);
+    setSelectKind('programme');
+    setPatientId(null);
+    setPatientName(null);
+    updateUrl((params) => {
+      params.delete('select');
+      params.delete('draft');
+      params.delete('kind');
+      params.delete('patientId');
+    });
+  };
+
+  // Garde-fou : le mode sélection peut aussi être atteint par `?select=1` ou par
+  // `?new=1` depuis l'accueil, sans passer par handleCreateProgramme. On revérifie
+  // le quota dès que l'abonnement est connu — mais seulement pour un programme,
+  // la création de template n'étant limitée par aucun plan.
+  useEffect(() => {
+    if (!selectMode || paywallLoading || selectKind !== 'programme') return;
+    if (!canAccessFeature('CREATE_PROGRAMME')) {
+      exitSelection();
+      setGateOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectMode, paywallLoading, selectKind]);
+
+  const toggleExercice = (exercice: ExerciceModele) =>
+    setSelectedExercices((prev) =>
+      prev.some((ex) => ex.id === exercice.id)
+        ? prev.filter((ex) => ex.id !== exercice.id)
+        : [...prev, exercice],
     );
-  }
+
+  const toggleTemplate = (template: ExerciceTemplate) =>
+    setSelectedTemplates((prev) =>
+      prev.some((tpl) => tpl.id === template.id)
+        ? prev.filter((tpl) => tpl.id !== template.id)
+        : [...prev, template],
+    );
+
+  // Exercices déjà couverts : soit par un template coché, soit déjà présents
+  // dans le brouillon qu'on est en train de compléter. Dans les deux cas ils
+  // sont signalés « déjà ajouté » et non cochables : aucun doublon possible.
+  const coveredByTemplateIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const template of selectedTemplates) {
+      for (const item of template.items) ids.add(item.exerciceModele.id);
+    }
+    if (draftTarget) {
+      const existing = readDraft(draftKey(selectKind, draftTarget.mode, draftTarget.id));
+      for (const ex of existing?.exercices ?? []) ids.add(ex.exerciceId);
+    }
+    return [...ids];
+  }, [selectedTemplates, draftTarget, selectKind]);
+
+  /** Route du builder correspondant à la cible de la sélection. */
+  const builderHref = (mode: 'create' | 'edit', id?: number, fresh = true) => {
+    const base =
+      selectKind === 'template'
+        ? mode === 'edit'
+          ? `/dashboard/kine/programmes/templates/${id}/edition`
+          : '/dashboard/kine/programmes/templates/nouveau'
+        : mode === 'edit'
+          ? `/dashboard/kine/programmes/${id}/edition`
+          : '/dashboard/kine/programmes/nouveau';
+    return fresh ? `${base}?fresh=1` : base;
+  };
+
+  /** Construit ou complète le brouillon, puis ouvre le builder. */
+  const handleContinue = () => {
+    const newLines = flattenSelection(selectedExercices, selectedTemplates);
+
+    if (draftTarget) {
+      const key = draftKey(selectKind, draftTarget.mode, draftTarget.id);
+      const existing = readDraft(key);
+      if (existing) {
+        const known = new Set(existing.exercices.map((ex) => ex.exerciceId));
+        writeDraft(key, {
+          ...existing,
+          exercices: [...existing.exercices, ...newLines.filter((ex) => !known.has(ex.exerciceId))],
+        });
+        router.push(builderHref(draftTarget.mode, draftTarget.id));
+        return;
+      }
+
+      // Brouillon d'édition introuvable (session vidée entre-temps) : on revient
+      // sur la page d'édition, qui rechargera l'objet depuis l'API. Mieux vaut
+      // perdre la sélection que basculer silencieusement en création.
+      if (draftTarget.mode === 'edit') {
+        router.push(builderHref('edit', draftTarget.id, false));
+        return;
+      }
+    }
+
+    const draft: BuilderDraft =
+      selectKind === 'template'
+        ? {
+            kind: 'template',
+            mode: 'create',
+            nom: '',
+            description: '',
+            exercices: newLines,
+          }
+        : {
+            kind: 'programme',
+            mode: 'create',
+            patientId,
+            patientName,
+            nom: '',
+            description: '',
+            dateDebut: todayIso(),
+            duree: DEFAULT_DUREE,
+            exercices: newLines,
+          };
+
+    writeDraft(draftKey(selectKind, 'create'), draft);
+    router.push(builderHref('create'));
+  };
 
   return (
     <>
       <AuthGuard role="kine" />
-      <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
-        {/* En-tête */}
-        <div className="pb-4 border-b border-border flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-[#3899aa]">Gestion des Programmes</h1>
-            <p className="flex items-center gap-2 text-md md:text-lg text-muted-foreground mt-1">
-              <Calendar className="h-5 w-5 text-accent" />
-              Vue d'ensemble de tous tes programmes de rééducation
-            </p>
-          </div>
-          <Button onClick={handleOpenPatientSelector} className="btn-teal flex items-center gap-2 w-full sm:w-auto">
-            <Plus className="h-4 w-4" />
-            Créer un programme
-          </Button>
-        </div>
-
-        {/* Barre de recherche et filtres */}
-        <Card className="card-hover">
-          <CardContent className="pt-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher par titre ou nom du patient..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => setStatusFilter('all')}
-                  className={`flex items-center gap-1 ${statusFilter === 'all' ? 'btn-teal' : ''}`}
-                  variant={statusFilter === 'all' ? 'default' : 'outline'}
+      <div className={`space-y-4 sm:space-y-6 overflow-x-hidden ${selectMode ? 'pb-28' : ''}`}>
+        <Tabs value={tab} onValueChange={handleTabChange}>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <TabsList className="h-auto w-full sm:w-auto gap-1 rounded-xl bg-muted/60 p-1.5">
+              {TABS.map((key) => (
+                <TabsTrigger
+                  key={key}
+                  value={key}
+                  disabled={
+                    (key === 'programmes' && selectMode) ||
+                    (key === 'templates' && selectMode && selectKind === 'template')
+                  }
+                  className="flex-1 sm:flex-none rounded-lg px-4 sm:px-6 py-2.5 text-sm sm:text-base font-semibold capitalize data-[state=active]:bg-[#3899aa] data-[state=active]:text-white data-[state=active]:shadow-sm"
                 >
-                  <Filter className="h-4 w-4" />
-                  Tous ({programmes.length})
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setStatusFilter('active')}
-                  className={statusFilter === 'active' ? 'btn-teal' : ''}
-                  variant={statusFilter === 'active' ? 'default' : 'outline'}
-                >
-                  Actifs
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setStatusFilter('ending')}
-                  className={statusFilter === 'ending' ? 'btn-teal' : ''}
-                  variant={statusFilter === 'ending' ? 'default' : 'outline'}
-                >
-                  Fin proche
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  {key}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-        {/* Liste des programmes */}
-        {filteredProgrammes.length === 0 ? (
-          <Card className="card-hover">
-            <CardContent className="text-center py-12">
-              <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2 text-foreground">Aucun programme trouvé</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery || statusFilter !== 'all' 
-                  ? 'Aucun programme ne correspond à tes critères de recherche.'
-                  : 'Tu n\'as pas encore créé de programmes.'
-                }
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4">
-            {filteredProgrammes.map((programme) => {
-              const statusInfo = getStatusInfo(programme);
-
-              return (
-                <Card key={programme.id} className="card-hover group">
-                  <CardContent className="p-6">
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                      {/* Infos principales */}
-                      <div className="flex-1 space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="text-lg font-semibold text-primary group-hover:text-accent transition-colors">
-                              {programme.titre}
-                            </h3>
-                            <p className="text-sm text-foreground line-clamp-1">
-                              {programme.description}
-                            </p>
-                          </div>
-                          <Badge variant={statusInfo.variant} className="ml-4">
-                            {statusInfo.label}
-                          </Badge>
-                        </div>
-
-                        {/* Patient */}
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-secondary text-secondary-foreground text-sm font-medium">
-                            {getInitials(programme.patient.firstName, programme.patient.lastName)}
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm text-foreground">
-                              {programme.patient.firstName} {programme.patient.lastName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {programme.patient.phone}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Progression basée sur les validations */}
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-foreground">Progression</span>
-                            <span className={`font-medium ${
-                              statusInfo.status === 'expired' ? 'text-destructive' : 'text-[#3899aa]'
-                            }`}>{statusInfo.daysText}</span>
-                          </div>
-                          <TooltipProvider delayDuration={200}>
-                            <div className="flex gap-1.5">
-                              {Array.from({ length: Math.min(programme.duree, 30) }).map((_, i) => {
-                                const dayDate = addDays(new Date(programme.dateDebut), i);
-                                const now = new Date();
-                                const isPastDay = isBefore(dayDate, new Date(now.getFullYear(), now.getMonth(), now.getDate()));
-                                const isToday = isSameDay(dayDate, now);
-                                const validation = (programme.sessionValidations ?? []).find(v =>
-                                  isSameDay(new Date(v.date), dayDate)
-                                );
-
-                                const isFutureDay = !isPastDay && !isToday;
-                                const segmentClass = isFutureDay
-                                  ? 'bg-muted/60'
-                                  : (isToday && !validation?.isValidated)
-                                    ? 'bg-muted/60'
-                                    : validation?.isValidated
-                                      ? 'bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] shadow-[0_0_6px_rgba(56,153,170,0.4)]'
-                                      : 'bg-destructive shadow-[0_0_6px_rgba(220,38,38,0.4)]';
-
-                                const showTooltip = isPastDay || (isToday && validation?.isValidated);
-                                if (showTooltip) {
-                                  return (
-                                    <Tooltip key={i}>
-                                      <TooltipTrigger asChild>
-                                        <div className={`h-2.5 flex-1 rounded-full transition-all duration-300 cursor-pointer ${segmentClass}`} />
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top" className="text-xs">
-                                        <p className="font-medium">{format(dayDate, 'dd/MM/yyyy', { locale: fr })}</p>
-                                        {validation?.isValidated ? (
-                                          <>
-                                            <p>Douleur : {validation.painLevel ?? '—'}/10</p>
-                                            <p>Difficulté : {validation.difficultyLevel ?? '—'}/10</p>
-                                          </>
-                                        ) : (
-                                          <p className="text-destructive">Pas de validation</p>
-                                        )}
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  );
-                                }
-
-                                return (
-                                  <div
-                                    key={i}
-                                    className={`h-2.5 flex-1 rounded-full transition-all duration-300 ${segmentClass}`}
-                                  />
-                                );
-                              })}
-                            </div>
-                          </TooltipProvider>
-                        </div>
-                      </div>
-
-                      {/* Métriques */}
-                      <div className="flex flex-row lg:flex-col gap-4 lg:gap-2 lg:items-end">
-                        <div className="flex items-center gap-2 text-sm text-foreground">
-                          <Dumbbell className="h-4 w-4" />
-                          <span>{programme._count.exercices} exercices</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-foreground">
-                          <MessageSquare className="h-4 w-4" />
-                          <span>{programme._count.chatSessions} messages</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-foreground">
-                          <Clock className="h-4 w-4" />
-                          <span>{programme.duree} jours</span>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex flex-row lg:flex-col gap-2">
-                        <Button asChild size="sm" className="btn-teal flex-1 lg:flex-none">
-                          <Link href={`/dashboard/kine/patients/${programme.patient.id}`}>
-                            <User className="h-4 w-4 mr-2" />
-                            Voir Patient
-                          </Link>
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Résumé en bas */}
-        {filteredProgrammes.length > 0 && (
-          <Card className="card-hover">
-            <CardContent className="pt-6">
-              <div className="text-center text-sm text-foreground">
-                Affichage de <span className="font-medium text-[#3899aa]">{filteredProgrammes.length}</span> programme(s) 
-                {searchQuery && <span> correspondant à "{searchQuery}"</span>}
-                {programmes.length > 0 && <span> sur un total de {programmes.length}</span>}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Modal de sélection de patient */}
-      <Dialog open={showPatientSelector} onOpenChange={setShowPatientSelector}>
-        <DialogContent className="w-[95vw] sm:max-w-md top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>Choisir un patient</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
-                placeholder="Rechercher un patient..."
-                value={patientSearchQuery}
-                onChange={(e) => setPatientSearchQuery(e.target.value)}
                 className="pl-10"
+                placeholder={SEARCH_PLACEHOLDERS[tab]}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            
-            <div className="max-h-64 overflow-y-auto space-y-2">
-              {loadingPatients ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
-                </div>
-              ) : filteredPatients.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground">
-                  {patientSearchQuery ? 'Aucun patient trouvé' : 'Aucun patient disponible'}
-                </div>
-              ) : (
-                filteredPatients.map(patient => {
-                  const hasActiveProgram = patient.hasActiveProgram;
-                  
-                  return (
-                    <Card
-                      key={patient.id}
-                      className={`p-3 transition-all duration-300 ${
-                        hasActiveProgram
-                          ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60'
-                          : 'cursor-pointer hover:border-[#3899aa]/50 hover:shadow-[0_0_12px_rgba(56,153,170,0.3)] hover:bg-[#3899aa]/10'
-                      }`}
-                      onClick={() => !hasActiveProgram && handleSelectPatient(patient)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-secondary text-secondary-foreground text-sm font-medium">
-                          {getInitials(patient.firstName, patient.lastName)}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className={`font-medium text-sm ${hasActiveProgram ? 'text-gray-500 dark:text-gray-400' : ''}`}>
-                              {patient.lastName.toUpperCase()} {patient.firstName}
-                            </p>
-                            {hasActiveProgram && (
-                              <Badge variant="secondary" className="text-xs bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300">
-                                Programme en cours
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
-      {/* Modal de création de programme */}
-      {selectedPatient && (
-        <ProgrammeModal
-          open={showCreateModal}
-          onOpenChange={setShowCreateModal}
-          patientId={selectedPatient.id}
-          patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
-          onCreated={() => {
-            // Toast de succès + redirection vers la fiche patient (comportement original)
-            toast({
-              title: "✅ Programme créé avec succès !",
-              description: `Un nouveau programme a été créé pour ${selectedPatient.firstName} ${selectedPatient.lastName}.`,
-              duration: 4000,
-            });
-            const patientId = selectedPatient.id;
-            setSelectedPatient(null);
-            setTimeout(() => {
-              router.push(`/dashboard/kine/patients/${patientId}`);
-            }, 1000);
+            {/* La propriété privé/public n'a de sens que pour la bibliothèque. */}
+            {tab !== 'programmes' && (
+              <div className="flex items-center gap-2">
+                <Switch id="only-mine" checked={onlyMine} onCheckedChange={setOnlyMine} />
+                <Label htmlFor="only-mine" className="text-sm cursor-pointer whitespace-nowrap">
+                  {tab === 'templates' ? 'Ne voir que mes templates' : 'Ne voir que mes exercices'}
+                </Label>
+              </div>
+            )}
+          </div>
+
+          {selectMode && (
+            <p className="mt-4 text-sm text-muted-foreground">
+              {selectKind === 'template'
+                ? 'Coche les exercices à mettre dans le template.'
+                : 'Coche les exercices et les templates à mettre dans le programme.'}
+            </p>
+          )}
+
+          {/* Les actions rapides disparaissent en mode sélection : la seule
+              action possible est alors celle de la barre contextuelle. */}
+          {!selectMode && (
+            <div className="mt-6">
+              <QuickActions
+                tab={tab}
+                onCreateExercice={() => {
+                  // handleTabChange et non setTab : sinon l'URL resterait sur
+                  // l'onglet précédent, et un rafraîchissement y renverrait.
+                  if (tab !== 'exercices') handleTabChange('exercices');
+                  setCreateExerciceSignal((n) => n + 1);
+                }}
+                onCreateTemplate={handleCreateTemplate}
+                onCreateProgramme={handleCreateProgramme}
+              />
+            </div>
+          )}
+
+          {/* Deux mécanismes complémentaires :
+              - `forceMount` garde les trois onglets montés (sans lui, Radix
+                démonte l'inactif et les listes déjà chargées seraient perdues) ;
+              - mais `forceMount` met aussi `hidden` à false, donc les trois
+                panneaux s'afficheraient à la suite : c'est
+                `data-[state=inactive]:hidden` qui masque les inactifs.
+              Le chargement, lui, reste piloté par `enabled`. */}
+          <TabsContent value="exercices" className="mt-6 data-[state=inactive]:hidden" forceMount>
+            <ExercicesTab
+              enabled={tab === 'exercices'}
+              search={search}
+              onlyMine={onlyMine}
+              createSignal={createExerciceSignal}
+              selectable={selectMode}
+              selectedIds={selectedExercices.map((ex) => ex.id)}
+              onToggleSelect={toggleExercice}
+              coveredByTemplateIds={coveredByTemplateIds}
+            />
+          </TabsContent>
+
+          <TabsContent value="templates" className="mt-6 data-[state=inactive]:hidden" forceMount>
+            <TemplatesTab
+              enabled={tab === 'templates'}
+              search={search}
+              onlyMine={onlyMine}
+              selectable={selectMode && selectKind === 'programme'}
+              selectedIds={selectedTemplates.map((tpl) => tpl.id)}
+              onToggleSelect={toggleTemplate}
+            />
+          </TabsContent>
+
+          <TabsContent value="programmes" className="mt-6 data-[state=inactive]:hidden" forceMount>
+            <ProgrammesTab
+              programmes={programmesList.programmes}
+              search={search}
+              isLoading={programmesList.isLoading}
+              error={programmesList.error}
+              onReload={() => void programmesList.reload()}
+              onCreateProgramme={handleCreateProgramme}
+            />
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {selectMode && (
+        <SelectionActionBar
+          exercicesCount={selectedExercices.length}
+          templatesCount={selectedTemplates.length}
+          patientName={patientName}
+          onClearPatient={() => {
+            setPatientId(null);
+            setPatientName(null);
+            updateUrl((params) => params.delete('patientId'));
           }}
+          onCancel={exitSelection}
+          onContinue={handleContinue}
         />
       )}
 
+      <ProgrammeQuotaGate
+        open={gateOpen}
+        onOpenChange={setGateOpen}
+        subscription={subscription}
+      />
     </>
   );
 }

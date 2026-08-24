@@ -34,12 +34,13 @@ exports.getAllProgrammesByKine = async (req, res) => {
         }
       },
       include: {
+        // Pas de téléphone : la liste ne propose aucune action d'appel, inutile
+        // de faire descendre une donnée personnelle de plus.
         patient: {
           select: {
             id: true,
             firstName: true,
-            lastName: true,
-            phone: true
+            lastName: true
           }
         },
         sessionValidations: {
@@ -104,6 +105,7 @@ exports.getArchivedProgrammesByPatient = async (req, res) => {
       },
       include: {
         exercices: {
+          orderBy: { ordre: 'asc' },
           include: { exerciceModele: true }
         },
         sessionValidations: {
@@ -160,11 +162,37 @@ exports.getProgrammesByPatient = async (req, res) => {
       },
       include: {
         exercices: {
+          orderBy: { ordre: 'asc' },
           include: { exerciceModele: true }
         }
       }
     });
-    res.json(programmes);
+
+    // Signer une URL coûte un aller-retour GCS par exercice (`file.exists()`).
+    // La fiche patient n'affiche aucune démo : on ne paie ce coût que pour les
+    // appelants qui le demandent — le carrousel du détail et le builder.
+    if (req.query.withMedia !== '1') {
+      return res.json(programmes);
+    }
+
+    const enriched = await Promise.all(
+      programmes.map(async (programme) => ({
+        ...programme,
+        exercices: await Promise.all(
+          (programme.exercices ?? []).map(async (ex) => ({
+            ...ex,
+            exerciceModele: {
+              ...ex.exerciceModele,
+              gifUrl: ex.exerciceModele?.gifPath
+                ? await gcsStorageService.generateSignedUrl(ex.exerciceModele.gifPath)
+                : null
+            }
+          }))
+        )
+      }))
+    );
+
+    res.json(enriched);
   } catch (error) {
     logger.error("Erreur récupération programmes :", error);
     res.status(500).json({ error: "Erreur récupération programmes" });
@@ -173,7 +201,7 @@ exports.getProgrammesByPatient = async (req, res) => {
 
 // 🔽 POST création programme
 exports.createProgramme = async (req, res) => {
-  const { titre, description, duree, patientId, dateFin, exercises } = req.body;
+  const { titre, description, duree, patientId, exercises } = req.body;
   const firebaseUid = req.uid;
 
   try {
@@ -196,16 +224,27 @@ exports.createProgramme = async (req, res) => {
       return res.status(403).json({ error: "Patient non trouvé ou accès refusé." });
     }
 
+    // Le programme demarre aujourd'hui et la date de fin est derivee de la duree.
+    // C'est le serveur qui la calcule : dateFin pilote l'expiration du jeton
+    // patient, la laisser au client rendrait le plafond de duree contournable.
+    const dateDebut = new Date();
+    const dateFin = new Date(dateDebut);
+    dateFin.setDate(dateFin.getDate() + duree);
+
     const newProgramme = await prisma.programme.create({
       data: {
         titre,
         description,
         duree,
         patientId,
+        dateDebut,
         dateFin,
         exercices: {
-          create: exercises.map(ex => ({
+          create: exercises.map((ex, index) => ({
             exerciceModele: { connect: { id: ex.exerciceId } },
+            // L'ordre explicite du client fait foi ; sinon on retombe sur la
+            // position dans le tableau reçu.
+            ordre: Number.isInteger(ex.ordre) ? ex.ordre : index,
             series: ex.series,
             repetitions: ex.repetitions,
             pause: ex.tempsRepos,
@@ -216,6 +255,7 @@ exports.createProgramme = async (req, res) => {
       },
       include: {
         exercices: {
+          orderBy: { ordre: 'asc' },
           include: { exerciceModele: true }
         }
       }
@@ -339,7 +379,10 @@ exports.generateProgrammeLink = async (req, res) => {
 exports.updateProgramme = async (req, res) => {
   const programmeId = parseInt(req.params.id);
   const firebaseUid = req.uid;
-  const { titre, description, duree, exercises } = req.body;
+  // Ni duree ni dates : elles sont figees a la creation. Le kine modifie le
+  // titre, la description et les exercices ; pour changer la periode il cree un
+  // nouveau programme.
+  const { titre, description, exercises } = req.body;
 
   try {
     const prisma = prismaService.getInstance();
@@ -378,10 +421,10 @@ exports.updateProgramme = async (req, res) => {
       data: {
         titre,
         description,
-        duree,
         exercices: {
-          create: exercises.map(ex => ({
+          create: exercises.map((ex, index) => ({
             exerciceModele: { connect: { id: ex.exerciceId } },
+            ordre: Number.isInteger(ex.ordre) ? ex.ordre : index,
             series: ex.series,
             repetitions: ex.repetitions,
             pause: ex.tempsRepos,
@@ -392,6 +435,7 @@ exports.updateProgramme = async (req, res) => {
       },
       include: {
         exercices: {
+          orderBy: { ordre: 'asc' },
           include: { exerciceModele: true }
         }
       }
@@ -534,6 +578,7 @@ exports.archiveProgramme = async (req, res) => {
       data: { isArchived: true },
       include: {
         exercices: {
+          orderBy: { ordre: 'asc' },
           include: { exerciceModele: true }
         }
       }
