@@ -6,6 +6,7 @@ import { Check, Info } from 'lucide-react';
 import type { ExerciceModele } from '@/types/exercice';
 import { ExerciceMedia } from '@/components/ExerciceMedia';
 import { ExerciceDetailDialog } from './ExerciceDetailDialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface ExerciceCardProps {
   exercice: ExerciceModele;
@@ -39,6 +40,13 @@ export function ExerciceCard({
     if (!selectable || alreadyIncluded) return;
     onSelectChange?.(exercice);
   };
+
+  // On se base sur les chemins et non sur les URLs : une URL signée peut être
+  // nulle parce que le fichier a disparu du bucket, ce qui n'est pas la même
+  // chose qu'un exercice à refilmer.
+  // Uniquement sur ses propres exercices : un kiné ne peut pas refilmer un
+  // exercice de la bibliothèque publique, qu'il ne peut pas modifier.
+  const needsRefilm = !exercice.isPublic && !exercice.videoPath && Boolean(exercice.gifPath);
 
   return (
     <>
@@ -115,6 +123,33 @@ export function ExerciceCard({
           >
             <Info className="h-5 w-5" />
           </Button>
+
+          {/* Sa propre cible de clic, comme le « i » : sur mobile le survol
+              n'existe pas, et en mode sélection un clic sur la card coche
+              l'exercice. */}
+          {needsRefilm && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  aria-label={`Pourquoi refilmer ${exercice.nom} ?`}
+                  className="absolute top-2 right-2 rounded-full bg-red-600 px-2 py-1 text-[10px] font-medium text-white shadow"
+                >
+                  À refilmer
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                className="w-64 text-xs leading-relaxed"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Cet exercice date du format GIF : 320 px, saccadé, et lourd à charger
+                pour tes patients. Refilme-le depuis « Modifier » — la vidéo remplace
+                le GIF et tes patients voient un mouvement net.
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
         {/* Nom, sous la vignette. Il passe à la ligne plutôt que d'être tronqué :
