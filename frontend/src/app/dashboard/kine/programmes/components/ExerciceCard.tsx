@@ -133,15 +133,30 @@ export function ExerciceCard({
                 <button
                   type="button"
                   onClick={(e) => e.stopPropagation()}
-                  aria-label={`Pourquoi refilmer ${exercice.nom} ?`}
-                  className="absolute top-2 right-2 rounded-full bg-red-600 px-2 py-1 text-[10px] font-medium text-white shadow"
+                  // Le nom accessible DOIT commencer par le texte visible :
+                  // sinon un utilisateur au pilotage vocal qui dit « cliquer sur
+                  // À refilmer » ne trouve pas la cible (WCAG 2.5.3, niveau A).
+                  // Le « pourquoi » est porté par le contenu du popover.
+                  aria-label={`À refilmer : ${exercice.nom}`}
+                  // En bas à gauche, et non en haut à droite : le haut-gauche
+                  // accueille déjà la pastille « déjà ajouté », large elle aussi,
+                  // et sur une card de 165 px les deux se chevauchent. Le bas
+                  // gauche est le seul coin libre en toutes circonstances — le
+                  // « i » est en bas à droite, et le bouton de lecture, centré,
+                  // ne coexiste jamais avec ce badge (il n'apparaît qu'avec une
+                  // vidéo, que ce badge exclut par construction).
+                  className="absolute bottom-2 left-2 rounded-full bg-red-600 px-2 py-1 text-[10px] font-medium text-white shadow"
                 >
                   À refilmer
                 </button>
               </PopoverTrigger>
               <PopoverContent
-                align="end"
+                // Aligné sur le bord gauche du badge, qui vit en bas à gauche.
+                align="start"
                 className="w-64 text-xs leading-relaxed"
+                // Radix rend ce contenu dans un Portal, mais React propage les
+                // événements dans l'arbre REACT, pas dans le DOM : sans ce
+                // stopPropagation, un clic dans l'explication cocherait la card.
                 onClick={(e) => e.stopPropagation()}
               >
                 Cet exercice date du format GIF : 320 px, saccadé, et lourd à charger
