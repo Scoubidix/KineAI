@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Send, Loader2, AlertCircle, CheckCircle, Trophy, X, Check, MessageCircle, Play } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -35,6 +35,83 @@ const isVideoUrl = (src?: string): boolean => {
  */
 const withFirstFrameHint = (src: string): string =>
   src.includes('#') ? src : `${src}#t=0.1`;
+
+/**
+ * Vignette vidéo d'une démonstration dans l'historique du chat patient.
+ * L'historique entier est monté d'un coup (pas de virtualisation, pas
+ * d'équivalent à `loading="lazy"` sur `<video>`) : sans ce composant, chaque
+ * vignette hors écran amorcerait quand même son premier GOP au chargement de
+ * la page (`#t=0.1` impose de décoder la première image, pas seulement de lire
+ * l'atome `moov`) — env. 400-750 Ko par vignette, soit 10-18 Mo pour un
+ * historique de plusieurs programmes. Régression par rapport au
+ * `loading="lazy"` du <img> GIF qu'elle remplace.
+ *
+ * Ni `src` ni `preload` ne sont posés sur la vidéo avant l'entrée dans le
+ * viewport (observée une seule fois, avec une marge de 200px) : le bouton
+ * d'agrandissement reste cliquable immédiatement, lui, puisqu'il ferme sur
+ * `src` indépendamment de l'état d'affichage de la vignette.
+ *
+ * Composant à part (et non une fonction inline dans `components.img` plus
+ * bas) pour deux raisons : les Rules of Hooks l'exigent (useState/useEffect),
+ * et une identité de fonction stable évite à React de démonter/remonter la
+ * vignette — donc de relancer l'observation — à chaque frappe dans le champ de
+ * saisie (qui vit dans le même composant que l'historique des messages).
+ */
+function DemoVideoThumbnail({
+  src,
+  alt,
+  onExpand,
+}: {
+  src: string;
+  alt?: string;
+  onExpand: (src: string) => void;
+}) {
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (visible) return;
+    const el = buttonRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      // Pas d'IO disponible : on affiche plutôt que de ne jamais charger la vignette.
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisible(true);
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [visible]);
+
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      onClick={() => onExpand(src)}
+      className="relative my-2 block cursor-pointer transition-opacity hover:opacity-80"
+      aria-label={alt || 'Voir la démonstration'}
+    >
+      <video
+        aria-hidden="true"
+        src={visible ? withFirstFrameHint(src) : undefined}
+        className="max-w-[150px] rounded-lg shadow-sm"
+        muted
+        loop
+        playsInline
+        preload={visible ? 'metadata' : 'none'}
+      />
+      <span aria-hidden="true" className="absolute inset-0 m-auto flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white shadow">
+        <Play className="h-4 w-4 translate-x-[1px]" fill="currentColor" />
+      </span>
+    </button>
+  );
+}
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -445,6 +522,30 @@ export default function PatientChatPage() {
     });
   };
 
+  // Rendu markdown des images/démos. Stabilisé par useCallback (deps vides :
+  // setExpandedMedia est un setter useState, garanti stable) : sans ça, cette
+  // fonction serait recréée à chaque frappe dans le champ de saisie (même
+  // composant que l'historique), ce que react-markdown/hast-util-to-jsx-runtime
+  // utilise TEL QUEL comme type d'élément React — une identité instable
+  // démonterait/remonterait DemoVideoThumbnail à chaque frappe, annulant son
+  // IntersectionObserver avant même qu'il ait pu s'exécuter.
+  const renderMarkdownImage = useCallback(
+    ({ src, alt }: { src?: string; alt?: string }) =>
+      src && isVideoUrl(src) ? (
+        <DemoVideoThumbnail src={src} alt={alt} onExpand={setExpandedMedia} />
+      ) : (
+        <img
+          src={src}
+          alt={alt || 'Image'}
+          className="max-w-[150px] rounded-lg my-2 shadow-sm cursor-pointer hover:opacity-80 transition-opacity"
+          loading="lazy"
+          style={{ height: 'auto' }}
+          onClick={() => setExpandedMedia(src || null)}
+        />
+      ),
+    [],
+  );
+
   // Écran de chargement initial
   if (isValidating) {
     return (
@@ -699,37 +800,7 @@ export default function PatientChatPage() {
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
-                        img: ({ src, alt }) =>
-                          src && isVideoUrl(src) ? (
-                            <button
-                              type="button"
-                              onClick={() => setExpandedMedia(src || null)}
-                              className="relative my-2 block cursor-pointer transition-opacity hover:opacity-80"
-                              aria-label={alt || 'Voir la démonstration'}
-                            >
-                              <video
-                                aria-hidden="true"
-                                src={withFirstFrameHint(src)}
-                                className="max-w-[150px] rounded-lg shadow-sm"
-                                muted
-                                loop
-                                playsInline
-                                preload="metadata"
-                              />
-                              <span aria-hidden="true" className="absolute inset-0 m-auto flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white shadow">
-                                <Play className="h-4 w-4 translate-x-[1px]" fill="currentColor" />
-                              </span>
-                            </button>
-                          ) : (
-                            <img
-                              src={src}
-                              alt={alt || 'Image'}
-                              className="max-w-[150px] rounded-lg my-2 shadow-sm cursor-pointer hover:opacity-80 transition-opacity"
-                              loading="lazy"
-                              style={{ height: 'auto' }}
-                              onClick={() => setExpandedMedia(src || null)}
-                            />
-                          ),
+                        img: renderMarkdownImage,
                         p: ({ children }) => (
                           <p className="whitespace-pre-wrap mb-2 last:mb-0">{children}</p>
                         ),
