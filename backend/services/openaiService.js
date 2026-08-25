@@ -19,7 +19,7 @@ const anonymizePatientData = async (patient, programmes, options = {}) => {
   const demoUrlMap = {};
   let demoIndex = 0;
 
-  // Traiter les programmes avec génération d'URLs pour les GIFs
+  // Traiter les programmes avec génération d'URLs pour les démos
   const programmesWithSignedUrls = await Promise.all(
     programmes.map(async (prog) => {
       // Traiter les exercices de ce programme
@@ -237,7 +237,7 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
 
     let message = response.choices[0].message.content.trim();
 
-    // Remplacer les placeholders GIF par les vraies URLs signées
+    // Remplacer les placeholders de démo par les vraies URLs signées
     if (anonymizedData.demoUrlMap) {
       for (const [placeholder, url] of Object.entries(anonymizedData.demoUrlMap)) {
         message = message.replaceAll(placeholder, url);
@@ -310,10 +310,10 @@ Puis : "Je suis votre assistant kinésithérapeute virtuel, ici pour vous accomp
 Format : "📋 Programme du jour :"
 Pour CHAQUE exercice du programme :
 • Nom de l'exercice : séries × répétitions (+ temps de travail si > 0)
-• Immédiatement après : le GIF de démonstration si disponible (syntaxe markdown ![](url))
+• Immédiatement après : la démonstration si disponible (syntaxe markdown ![](url))
 Afficher TOUS les exercices du programme, sans exception et dans l'ordre fourni
 IMPORTANT: Si un exercice a un temps de travail > 0 secondes, l'afficher après les répétitions
-IMPORTANT: Chaque GIF doit être placé JUSTE APRÈS son exercice correspondant, pas à la fin
+IMPORTANT: Chaque démo doit être placée JUSTE APRÈS son exercice correspondant, pas à la fin
 
 3️⃣ RAPPEL DE VALIDATION
 Format exact : "✅ Pensez à valider vos exercices une fois terminés - cela aide votre kinésithérapeute à suivre vos progrès !"
@@ -336,13 +336,13 @@ Je suis votre assistant kinésithérapeute virtuel, ici pour vous accompagner da
 📋 Programme du jour :
 
 • Étirement des ischio-jambiers : 3 séries × 30 secondes (maintien 20s)
-![Démonstration](url_gif_etirement)
+![Démonstration](url_demo_etirement)
 
 • Renforcement quadriceps : 3 séries × 12 répétitions
-![Démonstration](url_gif_quadriceps)
+![Démonstration](url_demo_quadriceps)
 
 • Gainage : 3 séries × 1 répétition (maintien 45s)
-![Démonstration](url_gif_gainage)
+![Démonstration](url_demo_gainage)
 
 (... et ainsi de suite pour TOUS les exercices restants du programme)
 
@@ -366,13 +366,13 @@ IMPORTANT - AFFICHAGE DES DÉMOS :
         { role: 'system', content: systemPrompt },
         { role: 'user', content: welcomePrompt }
       ],
-      max_tokens: 1500, // Le modèle génère des pseudo-URLs courtes (https://demo/0) remplacées après.
+      max_tokens: 1500, // Le modèle génère des pseudo-URLs courtes (https://demo/0) remplacées après. 1500 couvre ~20 exos.
       temperature: 0.5
     });
 
     let message = response.choices[0].message.content.trim();
 
-    // Remplacer les placeholders GIF par les vraies URLs signées
+    // Remplacer les placeholders de démo par les vraies URLs signées
     if (anonymizedData.demoUrlMap) {
       for (const [placeholder, url] of Object.entries(anonymizedData.demoUrlMap)) {
         message = message.replaceAll(placeholder, url);
@@ -407,7 +407,7 @@ IMPORTANT - AFFICHAGE DES DÉMOS :
           }
           exerciceLine += `\n`;
           fallbackMessage += exerciceLine;
-          // Note: GIFs non affichés dans le fallback (URLs signées GCS nécessitent async)
+          // Note: démos non affichées dans le fallback (URLs signées GCS nécessitent async)
         });
       } else {
         fallbackMessage += '• Exercices de rééducation personnalisés\n';
