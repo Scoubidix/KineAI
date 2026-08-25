@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -42,6 +42,17 @@ export function ExerciceMedia({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const isMobile = useIsMobile();
 
+  // Les URLs signées sont régénérées à chaque chargement de la liste : le même
+  // composant (la grille est clée sur l'id de l'exercice, pas sur l'URL) reçoit
+  // une nouvelle URL pour le même exercice. Sans cette remise à zéro, un échec
+  // de chargement passager — wifi, hoquet GCS, signature refusée pour dérive
+  // d'horloge — laisserait la vignette grise définitivement, alors que l'URL
+  // suivante est parfaitement valide.
+  useEffect(() => {
+    setFailed(false);
+    setPlaying(false);
+  }, [videoUrl, gifUrl]);
+
   // Une URL signée peut avoir expiré (brouillon repris longtemps après) : on
   // retombe alors sur le bloc vide plutôt que sur une image cassée.
   if (videoUrl && !failed) {
@@ -57,7 +68,7 @@ export function ExerciceMedia({
     };
 
     return (
-      <div className={`relative overflow-hidden ${className}`}>
+      <div className={`group relative overflow-hidden ${className}`}>
         <video
           ref={videoRef}
           // `#t=0.1` force iOS à peindre une image plutôt qu'un cadre noir quand
@@ -78,27 +89,35 @@ export function ExerciceMedia({
           className={mediaClassName}
         />
 
-        {/* Sur mobile le survol n'existe pas, et le tap sur le média sert à
-            cocher la card en mode sélection : la lecture a sa propre cible de
-            clic, avec stopPropagation. */}
-        {isMobile && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (playing) stop();
-              else play();
-            }}
-            aria-label={playing ? `Arrêter la démonstration${alt ? ` de ${alt}` : ''}` : `Lire la démonstration${alt ? ` de ${alt}` : ''}`}
-            className="absolute inset-0 m-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white shadow-lg backdrop-blur-sm"
-          >
-            {playing ? (
-              <Pause className="h-5 w-5" fill="currentColor" />
-            ) : (
-              <Play className="h-5 w-5 translate-x-[1px]" fill="currentColor" />
-            )}
-          </button>
-        )}
+        {/* Bouton de lecture, TOUJOURS monté — c'est ce qui le rend atteignable
+            au clavier. Une démonstration d'exercice n'est pas décorative : sans
+            ce bouton, un kiné qui navigue au clavier ne voit jamais le mouvement,
+            seulement une image figée (WCAG 2.1.1, niveau A).
+            Sur mobile le survol n'existe pas : il reste visible en permanence.
+            Sur desktop il apparaît au survol ou à la prise de focus, et il est
+            neutralisé au pointeur tant qu'il est invisible — sinon il capterait
+            le clic au centre de la card, qui sert à cocher en mode sélection.
+            `stopPropagation` : lancer la lecture ne coche jamais l'exercice. */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (playing) stop();
+            else play();
+          }}
+          aria-label={playing ? `Arrêter la démonstration${alt ? ` de ${alt}` : ''}` : `Lire la démonstration${alt ? ` de ${alt}` : ''}`}
+          className={`absolute inset-0 m-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white shadow-lg backdrop-blur-sm transition-opacity ${
+            isMobile
+              ? ''
+              : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto'
+          }`}
+        >
+          {playing ? (
+            <Pause className="h-5 w-5" fill="currentColor" />
+          ) : (
+            <Play className="h-5 w-5 translate-x-[1px]" fill="currentColor" />
+          )}
+        </button>
       </div>
     );
   }

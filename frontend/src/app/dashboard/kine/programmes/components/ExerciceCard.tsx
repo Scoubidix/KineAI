@@ -60,7 +60,9 @@ export function ExerciceCard({
             videoUrl={exercice.videoUrl}
             posterUrl={exercice.posterUrl}
             gifUrl={exercice.gifUrl}
-            alt={exercice.nom}
+            // Décoratif : le nom est déjà affiché en texte juste sous la
+            // vignette, le répéter le ferait annoncer deux fois.
+            alt=""
             className="aspect-video w-full bg-muted"
             // Pas de lecture au survol pendant une sélection : le geste sert à cocher.
             autoPlayOnHover={!selectable}
