@@ -70,6 +70,7 @@ router.get('/private', authenticate, exercicesController.getPrivateExercices);
 router.get('/tags', authenticate, exercicesController.getAllTags);
 
 // ===== ROUTES ADMIN (gestion de la bibliothèque publique) =====
+router.get('/admin/legacy-gif-count', authenticate, requireAdmin, exercicesController.getLegacyGifCount);
 router.get('/admin/public', authenticate, requireAdmin, exercicesController.getAdminPublicExercices);
 router.patch('/admin/:id/publish', authenticate, requireAdmin, exercicesController.publishExercice);
 router.patch('/admin/:id/unpublish', authenticate, requireAdmin, exercicesController.unpublishExercice);

@@ -64,6 +64,15 @@ export default function ExercicesPublicsTab() {
   const [privates, setPrivates] = useState<PrivateExercice[]>([]);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<EditState | null>(null);
+  const [legacyGifCount, setLegacyGifCount] = useState<number | null>(null);
+
+  const loadLegacyGifCount = async () => {
+    const res = await fetchWithAuth(`${API_BASE}/exercices/admin/legacy-gif-count`);
+    if (res.ok) {
+      const data = await res.json();
+      setLegacyGifCount(data.count);
+    }
+  };
 
   const loadPublics = async () => {
     const res = await fetchWithAuth(`${API_BASE}/exercices/admin/public`);
@@ -149,12 +158,32 @@ export default function ExercicesPublicsTab() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadPublics(), loadPrivates()]).finally(() => setLoading(false));
+    Promise.all([loadPublics(), loadPrivates(), loadLegacyGifCount()]).finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="space-y-8 mt-4">
+      {/* Compteur de convergence de la transition GIF → vidéo. Il descend quand
+          les kinés refilment ; c'est lui, et non le calendrier, qui déclenchera
+          le retrait du chemin GIF. */}
+      <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+        <span className="font-medium">Transition GIF → vidéo</span>
+        {' · '}
+        {legacyGifCount === null ? (
+          <span className="text-muted-foreground">chargement…</span>
+        ) : legacyGifCount === 0 ? (
+          <span className="text-green-700 dark:text-green-400">
+            plus aucun exercice privé en GIF — la phase de sortie peut être engagée
+          </span>
+        ) : (
+          <span className="text-muted-foreground">
+            {legacyGifCount} exercice{legacyGifCount > 1 ? 's' : ''} privé
+            {legacyGifCount > 1 ? 's' : ''} encore en GIF
+          </span>
+        )}
+      </div>
+
       <section>
         <h3 className="text-lg font-semibold mb-3">Bibliothèque publique</h3>
         {loading ? (

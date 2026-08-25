@@ -124,6 +124,25 @@ exports.getAdminPublicExercices = async (req, res) => {
   }
 };
 
+// ADMIN : nombre d'exercices PRIVÉS encore en GIF (aucune vidéo).
+// Les exercices publics sont maîtrisés en interne, ils n'ont pas besoin d'être
+// comptés. Donnée strictement agrégée — un nombre — donc aucune donnée
+// personnelle exposée, même en portant sur les exercices d'autres kinés.
+// C'est ce compteur qui rend la fin de la transition constatable plutôt
+// qu'espérée, et qui déclenchera la phase de sortie.
+exports.getLegacyGifCount = async (req, res) => {
+  try {
+    const prisma = prismaService.getInstance();
+    const count = await prisma.exerciceModele.count({
+      where: { isPublic: false, gifPath: { not: null }, videoPath: null },
+    });
+    res.json({ count });
+  } catch (err) {
+    logger.error('Erreur comptage des exercices encore en GIF :', err);
+    res.status(500).json({ error: 'Erreur comptage des exercices encore en GIF' });
+  }
+};
+
 // ADMIN : promouvoir un de SES exos privés en public
 exports.publishExercice = async (req, res) => {
   const { id } = req.params;
