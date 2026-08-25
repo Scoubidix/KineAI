@@ -178,17 +178,9 @@ exports.getProgrammesByPatient = async (req, res) => {
     const enriched = await Promise.all(
       programmes.map(async (programme) => ({
         ...programme,
-        exercices: await Promise.all(
-          (programme.exercices ?? []).map(async (ex) => ({
-            ...ex,
-            exerciceModele: {
-              ...ex.exerciceModele,
-              gifUrl: ex.exerciceModele?.gifPath
-                ? await gcsStorageService.generateSignedUrl(ex.exerciceModele.gifPath)
-                : null
-            }
-          }))
-        )
+        // Point de passage unique : la même fonction que les exercices et les
+        // templates, donc les trois URLs sans duplication de règle.
+        exercices: await gcsStorageService.enrichExercicesWithSignedUrls(programme.exercices ?? []),
       }))
     );
 
@@ -459,13 +451,16 @@ exports.updateProgramme = async (req, res) => {
           line += `\n  _${ex.consigne}_`;
         }
 
-        // URL signée v2 (expire à dateFin du programme)
-        const gifPath = ex.exerciceModele?.gifPath;
-        if (gifPath) {
-          const signedUrl = await gcsStorageService.generateSignedUrl(gifPath, expirationMs, 'v2');
-          if (signedUrl) {
-            line += `\n![Démonstration](${signedUrl})`;
-          }
+        // URL signée v2 (expire à dateFin du programme, v4 est plafonné à 7 j
+        // par GCS). Le type de média est porté par l'extension de l'URL : rien
+        // à changer au protocole markdown, ni à migrer dans les messages déjà
+        // en base.
+        const demoUrl = await gcsStorageService.generateDemoSignedUrl(
+          ex.exerciceModele,
+          expirationMs,
+        );
+        if (demoUrl) {
+          line += `\n![Démonstration](${demoUrl})`;
         }
 
         return line;

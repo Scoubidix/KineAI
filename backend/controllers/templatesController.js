@@ -4,62 +4,20 @@ const gcsStorageService = require('../services/gcsStorageService');
 
 // 🔐 Toutes les routes supposent que req.uid est défini par le middleware authenticate
 
-// Helper pour enrichir les exercices des templates avec URLs signées GCS
-const enrichTemplatesWithSignedUrls = async (templates) => {
-  if (!templates || !Array.isArray(templates)) return templates;
-
-  return await Promise.all(templates.map(async (template) => {
-    if (!template.items) return template;
-
-    const enrichedItems = await Promise.all(template.items.map(async (item) => {
-      if (item.exerciceModele?.gifPath) {
-        const gifUrl = await gcsStorageService.generateSignedUrl(item.exerciceModele.gifPath);
-        return {
-          ...item,
-          exerciceModele: {
-            ...item.exerciceModele,
-            gifUrl
-          }
-        };
-      }
-      return {
-        ...item,
-        exerciceModele: {
-          ...item.exerciceModele,
-          gifUrl: null
-        }
-      };
-    }));
-
-    return { ...template, items: enrichedItems };
-  }));
-};
-
-// Helper pour enrichir un seul template
+// Enrichit les exercices d'un template avec les URLs signées GCS (vidéo, poster,
+// GIF legacy). Délègue au service : la règle de cohabitation vit à un seul
+// endroit.
 const enrichTemplateWithSignedUrls = async (template) => {
   if (!template || !template.items) return template;
+  return {
+    ...template,
+    items: await gcsStorageService.enrichExercicesWithSignedUrls(template.items),
+  };
+};
 
-  const enrichedItems = await Promise.all(template.items.map(async (item) => {
-    if (item.exerciceModele?.gifPath) {
-      const gifUrl = await gcsStorageService.generateSignedUrl(item.exerciceModele.gifPath);
-      return {
-        ...item,
-        exerciceModele: {
-          ...item.exerciceModele,
-          gifUrl
-        }
-      };
-    }
-    return {
-      ...item,
-      exerciceModele: {
-        ...item.exerciceModele,
-        gifUrl: null
-      }
-    };
-  }));
-
-  return { ...template, items: enrichedItems };
+const enrichTemplatesWithSignedUrls = async (templates) => {
+  if (!templates || !Array.isArray(templates)) return templates;
+  return Promise.all(templates.map(enrichTemplateWithSignedUrls));
 };
 
 // Récupérer tous les templates (publics + privés du kiné)
@@ -94,6 +52,8 @@ exports.getAllTemplates = async (req, res) => {
                 description: true,
                 tags: true,
                 gifPath: true,
+                videoPath: true,
+                posterPath: true,
                 isPublic: true
               }
             }
@@ -134,6 +94,8 @@ exports.getPublicTemplates = async (req, res) => {
                 description: true,
                 tags: true,
                 gifPath: true,
+                videoPath: true,
+                posterPath: true,
                 isPublic: true
               }
             }
@@ -186,6 +148,8 @@ exports.getPrivateTemplates = async (req, res) => {
                 description: true,
                 tags: true,
                 gifPath: true,
+                videoPath: true,
+                posterPath: true,
                 isPublic: true
               }
             }
@@ -237,6 +201,8 @@ exports.getTemplateById = async (req, res) => {
                 description: true,
                 tags: true,
                 gifPath: true,
+                videoPath: true,
+                posterPath: true,
                 isPublic: true
               }
             }
@@ -316,6 +282,8 @@ exports.createTemplate = async (req, res) => {
                 description: true,
                 tags: true,
                 gifPath: true,
+                videoPath: true,
+                posterPath: true,
                 isPublic: true
               }
             }
@@ -402,6 +370,8 @@ exports.updateTemplate = async (req, res) => {
                   description: true,
                   tags: true,
                   gifPath: true,
+                  videoPath: true,
+                  posterPath: true,
                   isPublic: true
                 }
               }
