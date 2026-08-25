@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Pause } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -21,6 +21,11 @@ export interface ExerciceMediaProps {
   /** À passer à `false` là où le tap a déjà un rôle (carrousel : avancer d'une
       vignette). Sans ça, le bouton centré capterait le geste. */
   showPlayButton?: boolean;
+  /** Lecture pilotée par le parent : `true` lance, `false` arrête et rembobine.
+      Le carrousel s'en sert pour animer la seule vignette visible — le survol ne
+      peut pas suffire là-bas, car une diapositive amenée sous le curseur par la
+      transition CSS ne reçoit jamais de `mouseenter`. */
+  autoPlay?: boolean;
 }
 
 /**
@@ -40,6 +45,7 @@ export function ExerciceMedia({
   mediaClassName = 'block h-full w-full object-cover',
   autoPlayOnHover = false,
   showPlayButton = true,
+  autoPlay,
 }: ExerciceMediaProps) {
   const [failed, setFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -57,20 +63,29 @@ export function ExerciceMedia({
     setPlaying(false);
   }, [videoUrl, gifUrl]);
 
+  const play = useCallback(() => {
+    videoRef.current?.play().then(() => setPlaying(true)).catch(() => {});
+  }, []);
+
+  const stop = useCallback(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    el.pause();
+    el.currentTime = 0;
+    setPlaying(false);
+  }, []);
+
+  // Pilotage externe. `undefined` = personne ne pilote, on laisse le survol et
+  // le bouton faire leur travail.
+  useEffect(() => {
+    if (autoPlay === undefined) return;
+    if (autoPlay) play();
+    else stop();
+  }, [autoPlay, play, stop]);
+
   // Une URL signée peut avoir expiré (brouillon repris longtemps après) : on
   // retombe alors sur le bloc vide plutôt que sur une image cassée.
   if (videoUrl && !failed) {
-    const play = () => {
-      videoRef.current?.play().then(() => setPlaying(true)).catch(() => {});
-    };
-    const stop = () => {
-      const el = videoRef.current;
-      if (!el) return;
-      el.pause();
-      el.currentTime = 0;
-      setPlaying(false);
-    };
-
     return (
       <div className={`relative overflow-hidden ${className}`}>
         <video

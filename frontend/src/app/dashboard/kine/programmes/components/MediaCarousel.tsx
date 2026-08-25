@@ -96,22 +96,28 @@ export function MediaCarousel({
         className="flex transition-transform duration-700 ease-out"
         style={{ transform: `translateX(-${Math.min(index, slides.length - 1) * 100}%)` }}
       >
-        {slides.map((slide) => (
+        {slides.map((slide, i) => (
           <div key={slide.id} className="w-full shrink-0">
             <ExerciceMedia
               videoUrl={slide.videoUrl}
               posterUrl={slide.posterUrl}
               gifUrl={slide.gifUrl}
-              alt={slide.nom}
+              // Décoratif : le nom de la vignette courante est déjà affiché en
+              // surimpression juste en dessous. Sans ça, les diapositives hors
+              // écran — montées en permanence, seulement décalées en CSS —
+              // gagneraient toutes un nom accessible qu'elles n'avaient pas.
+              alt=""
               className="aspect-video w-full bg-muted"
-              // Le survol du carrousel place aussi le pointeur sur la vignette :
-              // la vidéo courante s'anime donc au survol, comme le faisait le
-              // GIF. Sans ça, une card de template qui bougeait deviendrait une
-              // image figée.
-              autoPlayOnHover
-              // Mais pas de bouton centré : ici le tap sert à avancer d'une
-              // vignette. Sur mobile les vignettes restent donc figées, et c'est
-              // le panneau de détail qui sert à regarder un exercice.
+              // Le carrousel pilote la lecture lui-même. Le survol ne peut pas
+              // le faire : une diapositive amenée sous un curseur immobile par
+              // la transition CSS ne reçoit pas de `mouseenter`, donc seule la
+              // toute première vignette s'animerait. En pilotant, on retrouve le
+              // comportement du GIF — la vignette visible bouge dès que le
+              // carrousel est actif, au survol sur desktop comme au premier
+              // appui sur mobile — et on n'anime que celle-là.
+              autoPlay={active && i === index}
+              // Pas de bouton centré : ici le tap sert à avancer d'une vignette,
+              // et il le capterait.
               showPlayButton={false}
             />
           </div>
