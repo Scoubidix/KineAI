@@ -68,7 +68,7 @@ export function ExerciceMedia({
     };
 
     return (
-      <div className={`group relative overflow-hidden ${className}`}>
+      <div className={`relative overflow-hidden ${className}`}>
         <video
           ref={videoRef}
           // `#t=0.1` force iOS à peindre une image plutôt qu'un cadre noir quand
@@ -93,10 +93,17 @@ export function ExerciceMedia({
             au clavier. Une démonstration d'exercice n'est pas décorative : sans
             ce bouton, un kiné qui navigue au clavier ne voit jamais le mouvement,
             seulement une image figée (WCAG 2.1.1, niveau A).
-            Sur mobile le survol n'existe pas : il reste visible en permanence.
-            Sur desktop il apparaît au survol ou à la prise de focus, et il est
-            neutralisé au pointeur tant qu'il est invisible — sinon il capterait
-            le clic au centre de la card, qui sert à cocher en mode sélection.
+
+            Sur mobile le survol n'existe pas : le bouton reste visible en
+            permanence, comme aujourd'hui.
+
+            Sur desktop il n'apparaît QU'À la prise de focus clavier, et reste
+            `pointer-events-none` le reste du temps. C'est délibéré : le révéler
+            au survol placerait une cible de clic de 44 px au centre de la card,
+            qui avalerait le clic servant à cocher l'exercice en mode sélection.
+            Le comportement souris existant est donc strictement inchangé — le
+            survol continue de lancer l'aperçu, et rien d'autre ne bouge.
+
             `stopPropagation` : lancer la lecture ne coche jamais l'exercice. */}
         <button
           type="button"
@@ -109,7 +116,7 @@ export function ExerciceMedia({
           className={`absolute inset-0 m-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white shadow-lg backdrop-blur-sm transition-opacity ${
             isMobile
               ? ''
-              : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto'
+              : 'opacity-0 pointer-events-none focus-visible:opacity-100 focus-visible:pointer-events-auto'
           }`}
         >
           {playing ? (
