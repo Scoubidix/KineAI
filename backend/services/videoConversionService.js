@@ -42,17 +42,93 @@ function validateMagicBytes(filePath) {
 }
 
 /**
- * Obtenir la durée d'une vidéo en secondes
- * @param {string} filePath - Chemin du fichier vidéo
- * @returns {Promise<number>} Durée en secondes
+ * Métadonnées utiles d'une source.
+ * `colorTransfer` vaut `smpte2084` (Dolby Vision / PQ) ou `arib-std-b67` (HLG)
+ * sur une vidéo HDR — un transcodage naïf en H.264 8 bits la rendrait grise et
+ * fade, ce qui se voit beaucoup sur une démo d'exercice.
  */
-async function getVideoDuration(filePath) {
+async function probeVideo(filePath) {
   const metadata = await ffprobe(filePath);
-  return metadata.format.duration;
+  const stream = (metadata.streams || []).find((s) => s.codec_type === 'video') || {};
+  return {
+    duration: metadata.format?.duration ? Number(metadata.format.duration) : null,
+    width: stream.width || null,
+    height: stream.height || null,
+    colorTransfer: stream.color_transfer || null,
+  };
 }
 
 /**
- * Configuration pour la conversion vidéo → GIF
+ * Configuration du transcodage vidéo. 720p suffit sur une card de 300 px et
+ * dans une lightbox de téléphone, pour moitié moins de poids qu'en 1080p.
+ */
+const VIDEO_CONFIG = {
+  maxSizeMB: 50,      // couvre 15 s en 1080p, HEVC comme H.264
+  maxDurationS: 15,   // assez pour un mouvement complet
+  height: 720,        // largeur automatique paire (H.264 l'exige)
+  crf: 23,
+  maxrate: '3M',      // plafond dur : ~5,5 Mo au pire pour 15 s
+  bufsize: '6M',
+  fps: 30,            // plafonne les sources 60 im/s
+};
+
+/** Fonctions de transfert HDR : sans tonemapping, l'image sort délavée. */
+const HDR_TRANSFERS = ['smpte2084', 'arib-std-b67']; // Dolby Vision/PQ, HLG
+
+/**
+ * Le binaire embarqué expose-t-il `zscale` (libzimg) ? Sondé une seule fois par
+ * processus. Le build Windows de @ffmpeg-installer l'a ; celui de Clever Cloud
+ * (linux-x64) est à vérifier au déploiement — d'où le repli, plutôt qu'une
+ * hypothèse.
+ */
+let zscaleAvailable = null;
+function hasZscale() {
+  if (zscaleAvailable !== null) return zscaleAvailable;
+  try {
+    const { execFileSync } = require('child_process');
+    const filters = execFileSync(ffmpegInstaller.path, ['-hide_banner', '-filters'], {
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    zscaleAvailable = /\bzscale\b/.test(filters);
+  } catch (error) {
+    logger.warn('Impossible de sonder les filtres ffmpeg, zscale supposé absent:', error.message);
+    zscaleAvailable = false;
+  }
+  logger.info(`ffmpeg: filtre zscale ${zscaleAvailable ? 'disponible' : 'absent'}`);
+  return zscaleAvailable;
+}
+
+/**
+ * Chaîne de filtres commune à la vidéo et au poster : mise à l'échelle 720p,
+ * puis tonemapping si la source est HDR. Le poster doit subir exactement le
+ * même traitement, sinon il ressort délavé alors que la vidéo est correcte.
+ *
+ * `scale=-2:720` : hauteur 720, largeur automatique paire (H.264 l'exige).
+ * `format=yuv420p` : 8 bits 4:2:0, le seul profil lu partout.
+ * La rotation EXIF est appliquée automatiquement par ffmpeg dès qu'un filtre
+ * `-vf` est présent (autorotate actif par défaut) et aplatie dans le flux.
+ */
+function buildFilterChain(colorTransfer) {
+  const scale = `scale=-2:${VIDEO_CONFIG.height}:flags=lanczos`;
+
+  if (!HDR_TRANSFERS.includes(colorTransfer)) {
+    return `${scale},format=yuv420p`;
+  }
+
+  if (hasZscale()) {
+    return `${scale},zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,`
+      + `tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p`;
+  }
+
+  logger.warn('Source HDR sans zscale : repli sur colorspace=all=bt709 (rendu approximatif)');
+  return `${scale},colorspace=all=bt709:iall=bt2020nc:fast=1,format=yuv420p`;
+}
+
+/**
+ * DEPRECATED — transition GIF → vidéo (2026-08). Plus aucun appelant : le
+ * pipeline d'upload produit désormais un MP4. Retrait prévu en phase 4, quand
+ * le compteur de convergence approchera de zéro.
  */
 const GIF_CONFIG = {
   width: 320,           // Résolution: 320p (optimisé pour taille fichier)
@@ -155,17 +231,129 @@ async function convertVideoToGif(videoPath, outputFileName) {
 }
 
 /**
- * Valider un fichier vidéo uploadé
- * @param {Object} file - Objet file de multer
- * @param {number} maxSizeMB - Taille max en MB (défaut: 30MB)
- * @returns {Promise<Object>} { valid: boolean, error?: string }
+ * Transcoder une source en MP4 H.264 720p, sans audio, prêt pour la lecture en
+ * flux. Le transcodage n'est pas optionnel : les iPhone filment en HEVC/H.265
+ * par défaut, que ni Chrome ni Firefox ne lisent.
  */
-async function validateVideoFile(file, maxSizeMB = 30) {
-  if (!file) {
-    return { valid: false, error: 'Aucun fichier fourni' };
+async function transcodeToMp4(inputPath, outputBaseName, probe) {
+  const TIMEOUT_MS = 180000; // 3 min : 15 s de 4K prennent plus qu'un GIF de 320 px
+  const outputPath = path.join(os.tmpdir(), `${outputBaseName}.mp4`);
+  const fileName = `${outputBaseName}.mp4`;
+
+  const conversion = new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .outputOptions([
+        '-vf', buildFilterChain(probe?.colorTransfer),
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', String(VIDEO_CONFIG.crf),
+        // Qualité constante mais plafond dur, pour borner le poids du fichier.
+        '-maxrate', VIDEO_CONFIG.maxrate,
+        '-bufsize', VIDEO_CONFIG.bufsize,
+        '-r', String(VIDEO_CONFIG.fps),
+        '-profile:v', 'high',
+        '-level', '4.0',
+        '-pix_fmt', 'yuv420p',
+        // Une vidéo tournée au cabinet peut capter des voix, y compris d'autres
+        // patients : la piste audio est supprimée, pas atténuée.
+        '-an',
+        // Sans faststart, l'index du MP4 est en fin de fichier et le navigateur
+        // doit tout télécharger avant la première image.
+        '-movflags', '+faststart',
+      ])
+      .format('mp4')
+      .output(outputPath)
+      .on('start', (commandLine) => logger.info('Commande ffmpeg (mp4):', commandLine))
+      .on('end', () => resolve())
+      .on('error', (err) => {
+        logger.error('Erreur transcodage MP4:', err);
+        reject(new Error(`Échec de la conversion vidéo: ${err.message}`));
+      })
+      .run();
+  });
+
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Conversion timeout: la vidéo prend trop de temps à convertir (max 3 minutes)')), TIMEOUT_MS)
+  );
+
+  await Promise.race([conversion, timeout]);
+
+  const buffer = await fs.readFile(outputPath);
+  const sizeInMB = parseFloat((buffer.length / (1024 * 1024)).toFixed(2));
+
+  // Dimensions réelles du fichier produit : elles servent au front à signaler
+  // un cadrage vertical avant validation.
+  let out = { width: null, height: null };
+  try {
+    const outProbe = await module.exports.probeVideo(outputPath);
+    out = { width: outProbe.width, height: outProbe.height };
+  } catch (error) {
+    logger.warn('Impossible de relire les dimensions du MP4 produit:', error);
   }
 
-  // Vérifier les magic bytes (vraie signature du fichier)
+  await fs.unlink(outputPath).catch((err) =>
+    logger.warn('Erreur suppression du MP4 temporaire:', err)
+  );
+
+  logger.info(`MP4 généré: ${fileName} (${sizeInMB} MB, ${out.width}x${out.height})`);
+  return { buffer, fileName, sizeInMB, ...out };
+}
+
+/**
+ * Extraire l'image d'aperçu. À une seconde plutôt qu'à zéro : la première image
+ * d'une vidéo de téléphone est souvent floue, ou montre la main qui vient
+ * d'appuyer. Sur une source plus courte, on prend le milieu.
+ */
+async function extractPoster(inputPath, outputBaseName, probe) {
+  const TIMEOUT_MS = 60000;
+  const at = probe?.duration ? Math.min(1, probe.duration / 2) : 0;
+  const outputPath = path.join(os.tmpdir(), `${outputBaseName}.jpg`);
+  const fileName = `${outputBaseName}.jpg`;
+
+  const extraction = new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .seekInput(at)
+      .outputOptions([
+        '-frames:v', '1',
+        '-vf', buildFilterChain(probe?.colorTransfer),
+        '-q:v', '3',
+      ])
+      .format('image2')
+      .output(outputPath)
+      .on('start', (commandLine) => logger.info('Commande ffmpeg (poster):', commandLine))
+      .on('end', () => resolve())
+      .on('error', (err) => {
+        logger.error('Erreur extraction poster:', err);
+        reject(new Error(`Échec de l'extraction du poster: ${err.message}`));
+      })
+      .run();
+  });
+
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Extraction poster timeout')), TIMEOUT_MS)
+  );
+
+  await Promise.race([extraction, timeout]);
+
+  const buffer = await fs.readFile(outputPath);
+  await fs.unlink(outputPath).catch((err) =>
+    logger.warn('Erreur suppression du poster temporaire:', err)
+  );
+
+  logger.info(`Poster généré: ${fileName} (${Math.round(buffer.length / 1024)} Ko)`);
+  return { buffer, fileName };
+}
+
+/**
+ * Valider un fichier vidéo uploadé.
+ * Renvoie le `probe` en cas de succès : le contrôleur le réutilise pour le
+ * transcodage, ce qui évite un second aller-retour ffprobe.
+ */
+async function validateVideoFile(file, maxSizeMB = VIDEO_CONFIG.maxSizeMB) {
+  if (!file) {
+    return { valid: false, error: 'Aucun fichier vidéo fourni' };
+  }
+
   if (!validateMagicBytes(file.path)) {
     return {
       valid: false,
@@ -173,7 +361,6 @@ async function validateVideoFile(file, maxSizeMB = 30) {
     };
   }
 
-  // Vérifier le type MIME
   const allowedMimeTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo'];
   if (!allowedMimeTypes.includes(file.mimetype)) {
     return {
@@ -182,34 +369,40 @@ async function validateVideoFile(file, maxSizeMB = 30) {
     };
   }
 
-  // Vérifier la taille
   const sizeInMB = file.size / (1024 * 1024);
   if (sizeInMB > maxSizeMB) {
     return {
       valid: false,
-      error: `Fichier trop volumineux. Taille max: ${maxSizeMB}MB (fichier: ${sizeInMB.toFixed(2)}MB)`
+      error: `Vidéo trop lourde (${Math.round(sizeInMB)} Mo, maximum ${maxSizeMB} Mo). Filme en 1080p plutôt qu'en 4K, ou raccourcis la séquence.`
     };
   }
 
-  // Vérifier la durée de la vidéo (max 10 secondes)
+  // `module.exports.probeVideo` et non `probeVideo` : la référence passe par
+  // l'objet exporté, ce qui rend la fonction remplaçable en test.
+  let probe = null;
   try {
-    const duration = await getVideoDuration(file.path);
-    if (duration > 10) {
-      return {
-        valid: false,
-        error: `Vidéo trop longue: ${Math.round(duration)}s. Maximum 10 secondes pour un exercice.`
-      };
-    }
+    probe = await module.exports.probeVideo(file.path);
   } catch (error) {
-    logger.warn('Impossible de vérifier la durée vidéo:', error);
-    // On continue, pas critique
+    logger.warn('Impossible de lire les métadonnées vidéo:', error);
+    // Pas critique : le transcodage échouera proprement si le fichier est cassé.
   }
 
-  return { valid: true };
+  if (probe?.duration && probe.duration > VIDEO_CONFIG.maxDurationS) {
+    return {
+      valid: false,
+      error: `Vidéo trop longue (${Math.round(probe.duration)} s, maximum ${VIDEO_CONFIG.maxDurationS} s). Garde uniquement le mouvement.`
+    };
+  }
+
+  return { valid: true, probe };
 }
 
 module.exports = {
-  convertVideoToGif,
+  convertVideoToGif, // DEPRECATED — plus aucun appelant, retrait en phase 4
   validateVideoFile,
+  probeVideo,
+  transcodeToMp4,
+  extractPoster,
   GIF_CONFIG,
+  VIDEO_CONFIG,
 };
