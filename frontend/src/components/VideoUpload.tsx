@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Upload, Loader2, CheckCircle, XCircle, Film, Trash2 } from 'lucide-react';
+import { Upload, Loader2, CheckCircle, XCircle, AlertTriangle, Film, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
@@ -129,9 +129,15 @@ export default function VideoUpload({ value, onChange }: VideoUploadProps) {
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      handleFile(files[0]);
+    const file = e.target.files?.[0];
+    // Vider l'input quoi qu'il arrive : un `<input type="file">` qui garde sa
+    // valeur ne réémet pas `change` si l'utilisateur resélectionne le MÊME
+    // fichier. Après un échec — coupure réseau, refus de taille — le kiné
+    // cliquerait alors sur son fichier sans que rien ne se passe, et sans le
+    // moindre retour. Le glisser-déposer n'est pas concerné (aucun input).
+    e.target.value = '';
+    if (file) {
+      handleFile(file);
     }
   };
 
@@ -140,9 +146,9 @@ export default function VideoUpload({ value, onChange }: VideoUploadProps) {
     setDimensions(null);
     setError(null);
     setUploadProgress('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    // Pas de remise à zéro de `fileInputRef` ici : l'input ne vit que dans la
+    // branche « aucun média », donc il est déjà démonté quand ce bouton existe.
+    // C'est son remontage, quand `hasMedia` repasse à false, qui le vide.
   };
 
   const hasMedia = Boolean(value.videoUrl || value.gifUrl);
@@ -204,7 +210,9 @@ export default function VideoUpload({ value, onChange }: VideoUploadProps) {
               cadrage de la vignette rogne les côtés. */}
           {isPortrait && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
-              <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+              {/* `AlertTriangle` et non `XCircle` : ce bandeau conseille, il ne
+                  refuse rien. Une icône d'erreur contredirait le message. */}
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
               <p className="text-xs text-amber-800 dark:text-amber-200">
                 Vidéo filmée à la verticale : sur la vignette, seuls les côtés seront
                 rognés — la vidéo complète reste visible en grand. Pour un cadrage
