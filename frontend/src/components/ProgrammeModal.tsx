@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { ExerciceMedia } from '@/components/ExerciceMedia';
 import { PaywallModal } from '@/components/PaywallModal';
 import { useSubscription } from '@/hooks/useSubscription';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
@@ -31,8 +32,10 @@ interface ExerciseOption {
   isPublic: boolean;
   tags?: string;
   description?: string; // déjà renvoyé par l'API, exposé pour l'aperçu
-  gifUrl?: string;      // URL signée GCS, déjà renvoyée par l'API
-  gifPath?: string;     // chemin GCS, déjà renvoyé par l'API
+  // URLs signées GCS, déjà renvoyées par l'API
+  videoUrl?: string | null;
+  posterUrl?: string | null;
+  gifUrl?: string | null;
 }
 
 interface ProgrammeExercise {
@@ -124,11 +127,15 @@ function ExercisePreviewPopover({ exercise }: { exercise: ExerciseOption }) {
         <div className="space-y-2 min-w-0">
           <p className="font-medium text-sm text-foreground break-words">{exercise.nom}</p>
 
-          {exercise.gifUrl ? (
-            <img
-              src={exercise.gifUrl}
-              alt={`Démonstration : ${exercise.nom}`}
-              className="max-w-full max-h-[70vh] mx-auto rounded-md border bg-muted object-contain"
+          {exercise.videoUrl || exercise.gifUrl ? (
+            <ExerciceMedia
+              videoUrl={exercise.videoUrl}
+              posterUrl={exercise.posterUrl}
+              gifUrl={exercise.gifUrl}
+              alt={exercise.nom}
+              className="rounded-md border bg-muted"
+              mediaClassName="mx-auto block max-h-[70vh] w-auto max-w-full object-contain"
+              autoPlayOnHover
             />
           ) : (
             <div className="flex items-center justify-center h-24 rounded-md border bg-muted text-xs text-gray-500">
