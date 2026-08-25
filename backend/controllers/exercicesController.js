@@ -2,6 +2,47 @@ const logger = require('../utils/logger');
 const prismaService = require('../services/prismaService');
 const gcsStorageService = require('../services/gcsStorageService');
 
+/**
+ * Applique les règles de cohabitation GIF / vidéo à une mise à jour.
+ *
+ * La vidéo prime : dès qu'un `videoPath` est présent, le GIF legacy disparaît —
+ * sans ça l'état reste ambigu et le compteur de convergence ne descend jamais.
+ * Le front ne pose plus jamais de `gifPath` : cette colonne ne peut que
+ * disparaître.
+ *
+ * @param {object|null} existing - L'exercice en base, ou null à la création
+ * @param {object} body - Corps de requête déjà validé par Zod
+ * @returns {{videoPath: string|null, posterPath: string|null, gifPath: string|null, orphans: string[]}}
+ */
+function resolveMediaPaths(existing, body) {
+  const pick = (key) => (body[key] !== undefined ? (body[key] || null) : (existing?.[key] ?? null));
+
+  const videoPath = pick('videoPath');
+  const posterPath = pick('posterPath');
+  const gifPath = videoPath ? null : pick('gifPath');
+
+  const kept = [videoPath, posterPath, gifPath];
+  const orphans = [existing?.videoPath, existing?.posterPath, existing?.gifPath]
+    .filter((p) => p && !kept.includes(p));
+
+  return { videoPath, posterPath, gifPath, orphans };
+}
+
+/**
+ * Supprime de GCS les fichiers que plus aucune colonne ne référence.
+ * Best-effort : le nouveau fichier est déjà déposé, une suppression ratée laisse
+ * un orphelin sur le bucket mais ne doit jamais faire échouer la mise à jour.
+ */
+async function deleteOrphanMedia(orphans) {
+  for (const mediaPath of orphans) {
+    try {
+      await gcsStorageService.deleteExerciceMedia(mediaPath);
+    } catch (error) {
+      logger.warn("Erreur suppression d'un média d'exercice orphelin:", error);
+    }
+  }
+}
+
 // 🔐 Toutes les routes supposent que req.uid est défini par le middleware authenticate
 
 // Fonction utilitaire pour trier les exercices par ordre alphabétique
@@ -136,7 +177,7 @@ exports.unpublishExercice = async (req, res) => {
 // ADMIN : éditer n'importe quel exo public
 exports.adminUpdateExercice = async (req, res) => {
   const { id } = req.params;
-  const { nom, description, tags, gifPath } = req.body;
+  const { nom, description, tags } = req.body;
   try {
     const prisma = prismaService.getInstance();
     const exercice = await prisma.exerciceModele.findUnique({ where: { id: parseInt(id) } });
@@ -145,15 +186,7 @@ exports.adminUpdateExercice = async (req, res) => {
       return res.status(404).json({ error: 'Exercice public introuvable' });
     }
 
-    // Si un nouveau gifPath remplace l'ancien, supprimer l'ancien GIF de GCS
-    if (gifPath !== undefined && exercice.gifPath && gifPath !== exercice.gifPath) {
-      try {
-        await gcsStorageService.deleteExerciceMedia(exercice.gifPath);
-        logger.info(`Ancien GIF supprimé de GCS: ${exercice.gifPath}`);
-      } catch (error) {
-        logger.warn('Erreur suppression ancien GIF:', error);
-      }
-    }
+    const media = resolveMediaPaths(exercice, req.body);
 
     const updated = await prisma.exerciceModele.update({
       where: { id: parseInt(id) },
@@ -161,14 +194,16 @@ exports.adminUpdateExercice = async (req, res) => {
         nom: nom !== undefined ? nom : exercice.nom,
         description: description !== undefined ? description : exercice.description,
         tags: tags !== undefined ? (tags || null) : exercice.tags,
-        gifPath: gifPath !== undefined ? (gifPath || null) : exercice.gifPath,
+        gifPath: media.gifPath,
+        videoPath: media.videoPath,
+        posterPath: media.posterPath,
       },
     });
 
-    if (updated.gifPath) {
-      updated.gifUrl = await gcsStorageService.generateSignedUrl(updated.gifPath);
-    }
-    res.json(updated);
+    await deleteOrphanMedia(media.orphans);
+
+    const [enriched] = await gcsStorageService.enrichExercicesWithSignedUrls([updated]);
+    res.json(enriched);
   } catch (err) {
     logger.error('Erreur édition exercice public :', err);
     res.status(500).json({ error: 'Erreur édition exercice' });
@@ -204,13 +239,9 @@ exports.adminDeleteExercice = async (req, res) => {
       });
     }
 
-    if (exercice.gifPath) {
-      try {
-        await gcsStorageService.deleteExerciceMedia(exercice.gifPath);
-      } catch (error) {
-        logger.warn('Erreur suppression GIF GCS:', error);
-      }
-    }
+    await deleteOrphanMedia(
+      [exercice.videoPath, exercice.posterPath, exercice.gifPath].filter(Boolean)
+    );
 
     await prisma.exerciceModele.delete({ where: { id: parseInt(id) } });
     res.status(204).send();
@@ -297,7 +328,7 @@ exports.getAllTags = async (req, res) => {
 };
 
 exports.createExercice = async (req, res) => {
-  const { nom, description, tags, gifPath, videoPath, posterPath } = req.body;
+  const { nom, description, tags } = req.body;
 
   try {
     const firebaseUid = req.uid;
@@ -311,25 +342,23 @@ exports.createExercice = async (req, res) => {
       return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
     }
 
+    const media = resolveMediaPaths(null, req.body);
+
     const newExercice = await prisma.exerciceModele.create({
       data: {
         nom,
         description,
         tags: tags || null,
-        gifPath: gifPath || null, // Chemin GCS du GIF (ex: "exercices/123_demo.gif")
-        videoPath: videoPath || null,
-        posterPath: posterPath || null,
+        gifPath: media.gifPath,
+        videoPath: media.videoPath,
+        posterPath: media.posterPath,
         isPublic: false,
         kineId: kine.id,
       },
     });
 
-    // Générer URL signée si gifPath existe
-    if (newExercice.gifPath) {
-      newExercice.gifUrl = await gcsStorageService.generateSignedUrl(newExercice.gifPath);
-    }
-
-    res.status(201).json(newExercice);
+    const [enriched] = await gcsStorageService.enrichExercicesWithSignedUrls([newExercice]);
+    res.status(201).json(enriched);
   } catch (err) {
     logger.error("Erreur création exercice :", err);
     res.status(500).json({ error: "Erreur création exercice" });
@@ -338,7 +367,7 @@ exports.createExercice = async (req, res) => {
 
 exports.updateExercice = async (req, res) => {
   const { id } = req.params;
-  const { nom, description, tags, gifPath, videoPath, posterPath } = req.body;
+  const { nom, description, tags } = req.body;
 
   try {
     const firebaseUid = req.uid;
@@ -360,16 +389,7 @@ exports.updateExercice = async (req, res) => {
       return res.status(403).json({ error: "Non autorisé à modifier cet exercice" });
     }
 
-    // Si un nouveau gifPath est fourni et différent de l'ancien, supprimer l'ancien GIF de GCS
-    if (gifPath !== undefined && exercice.gifPath && gifPath !== exercice.gifPath) {
-      try {
-        await gcsStorageService.deleteExerciceMedia(exercice.gifPath);
-        logger.info(`Ancien GIF supprimé de GCS: ${exercice.gifPath}`);
-      } catch (error) {
-        logger.warn('Erreur lors de la suppression de l\'ancien GIF:', error);
-        // On continue quand même l'update
-      }
-    }
+    const media = resolveMediaPaths(exercice, req.body);
 
     const updated = await prisma.exerciceModele.update({
       where: { id: parseInt(id) },
@@ -377,18 +397,17 @@ exports.updateExercice = async (req, res) => {
         nom,
         description,
         tags: tags || null,
-        gifPath: gifPath !== undefined ? (gifPath || null) : exercice.gifPath,
-        videoPath: videoPath !== undefined ? (videoPath || null) : exercice.videoPath,
-        posterPath: posterPath !== undefined ? (posterPath || null) : exercice.posterPath,
+        gifPath: media.gifPath,
+        videoPath: media.videoPath,
+        posterPath: media.posterPath,
       },
     });
 
-    // Générer URL signée pour la réponse
-    if (updated.gifPath) {
-      updated.gifUrl = await gcsStorageService.generateSignedUrl(updated.gifPath);
-    }
+    // Après l'écriture : plus rien ne référence ces fichiers.
+    await deleteOrphanMedia(media.orphans);
 
-    res.json(updated);
+    const [enriched] = await gcsStorageService.enrichExercicesWithSignedUrls([updated]);
+    res.json(enriched);
   } catch (err) {
     logger.error("Erreur modification exercice :", err);
     res.status(500).json({ error: "Erreur modification exercice" });
@@ -439,16 +458,9 @@ exports.deleteExercice = async (req, res) => {
       });
     }
 
-    // Supprimer le GIF associé de GCS s'il existe
-    if (exercice.gifPath) {
-      try {
-        await gcsStorageService.deleteExerciceMedia(exercice.gifPath);
-        logger.info(`GIF supprimé de GCS: ${exercice.gifPath}`);
-      } catch (error) {
-        logger.warn('Erreur lors de la suppression du GIF de GCS:', error);
-        // On continue quand même la suppression de l'exercice
-      }
-    }
+    await deleteOrphanMedia(
+      [exercice.videoPath, exercice.posterPath, exercice.gifPath].filter(Boolean)
+    );
 
     await prisma.exerciceModele.delete({
       where: { id: parseInt(id) },
@@ -461,21 +473,18 @@ exports.deleteExercice = async (req, res) => {
   }
 };
 
-exports.uploadVideoAndConvert = async (req, res) => {
+exports.uploadExerciceMedia = async (req, res) => {
   const videoConversionService = require('../services/videoConversionService');
   const fs = require('fs').promises;
 
   try {
-    // Vérifier qu'un fichier a été uploadé
     if (!req.file) {
-      return res.status(400).json({ error: "Aucun fichier vidéo fourni" });
+      return res.status(400).json({ error: 'Aucun fichier vidéo fourni' });
     }
 
-    // Valider le fichier vidéo
-    const validation = await videoConversionService.validateVideoFile(req.file, 30);
+    const validation = await videoConversionService.validateVideoFile(req.file);
     if (!validation.valid) {
-      // Nettoyer le fichier uploadé
-      await fs.unlink(req.file.path).catch(err =>
+      await fs.unlink(req.file.path).catch((err) =>
         logger.warn('Erreur lors de la suppression du fichier temporaire:', err)
       );
       return res.status(400).json({ error: validation.error });
@@ -483,49 +492,52 @@ exports.uploadVideoAndConvert = async (req, res) => {
 
     logger.info(`Upload vidéo reçu: ${req.file.originalname} (${(req.file.size / 1024 / 1024).toFixed(2)} MB)`);
 
-    // Convertir la vidéo en GIF
-    const { buffer: gifBuffer, fileName: gifFileName, sizeInMB } =
-      await videoConversionService.convertVideoToGif(
-        req.file.path,
-        `exercice_${Date.now()}`
-      );
+    // Vidéo et poster partagent le même préfixe : la paire reste identifiable
+    // sur le bucket.
+    const baseName = `exercice_${Date.now()}`;
+    const video = await videoConversionService.transcodeToMp4(req.file.path, baseName, validation.probe);
+    const poster = await videoConversionService.extractPoster(req.file.path, baseName, validation.probe);
 
-    logger.info(`GIF généré: ${gifFileName} (${sizeInMB} MB)`);
+    const [videoPath, posterPath] = await Promise.all([
+      gcsStorageService.uploadExerciceFile(video.buffer, video.fileName, 'video/mp4'),
+      gcsStorageService.uploadExerciceFile(poster.buffer, poster.fileName, 'image/jpeg'),
+    ]);
 
-    // Upload le GIF sur GCS (retourne le path, pas l'URL)
-    const gifPath = await gcsStorageService.uploadGif(gifBuffer, gifFileName);
+    const [videoUrl, posterUrl] = await Promise.all([
+      gcsStorageService.generateSignedUrl(videoPath),
+      gcsStorageService.generateSignedUrl(posterPath),
+    ]);
 
-    // Générer une URL signée pour l'affichage immédiat
-    const gifUrl = await gcsStorageService.generateSignedUrl(gifPath);
-
-    // Nettoyer le fichier vidéo temporaire
-    await fs.unlink(req.file.path).catch(err =>
+    await fs.unlink(req.file.path).catch((err) =>
       logger.warn('Erreur lors de la suppression de la vidéo temporaire:', err)
     );
 
-    logger.info(`Upload GCS complet. Path: ${gifPath}`);
+    logger.info(`Upload GCS complet. Vidéo: ${videoPath}, poster: ${posterPath}`);
 
     res.status(200).json({
       success: true,
-      gifPath,     // Chemin GCS à stocker en DB
-      gifUrl,      // URL signée temporaire pour affichage immédiat
-      fileName: gifFileName,
-      sizeInMB
+      videoPath,    // à stocker en DB
+      posterPath,   // à stocker en DB
+      videoUrl,     // URL signée temporaire pour l'aperçu immédiat
+      posterUrl,
+      // Dimensions de sortie : le front s'en sert pour signaler un cadrage
+      // vertical avant validation, sans bloquer le kiné.
+      width: video.width,
+      height: video.height,
+      sizeInMB: video.sizeInMB,
     });
-
   } catch (err) {
     logger.error("Erreur lors de l'upload et conversion vidéo:", err);
 
-    // Nettoyer le fichier temporaire en cas d'erreur
     if (req.file && req.file.path) {
-      await fs.unlink(req.file.path).catch(err =>
-        logger.warn('Erreur lors de la suppression du fichier temporaire:', err)
+      await fs.unlink(req.file.path).catch((e) =>
+        logger.warn('Erreur lors de la suppression du fichier temporaire:', e)
       );
     }
 
     res.status(500).json({
-      error: "Erreur lors de la conversion de la vidéo",
-      details: err.message
+      error: 'Erreur lors de la conversion de la vidéo',
+      details: err.message,
     });
   }
 };

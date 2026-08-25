@@ -29,10 +29,12 @@ const storage = multer.diskStorage({
   }
 });
 
+const MAX_UPLOAD_MB = 50; // doit rester aligné sur VIDEO_CONFIG.maxSizeMB
+
 const upload = multer({
   storage,
   limits: {
-    fileSize: 30 * 1024 * 1024, // 30MB max
+    fileSize: MAX_UPLOAD_MB * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
     const allowedMimeTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo'];
@@ -43,6 +45,22 @@ const upload = multer({
     }
   }
 });
+
+/**
+ * Multer refuse au-delà de la limite AVANT le contrôleur. Sans ce relais,
+ * l'erreur remonte au handler global en 500 et le kiné ne sait pas quoi faire.
+ */
+const handleUploadError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({
+      error: `Vidéo trop lourde (maximum ${MAX_UPLOAD_MB} Mo). Filme en 1080p plutôt qu'en 4K, ou raccourcis la séquence.`,
+    });
+  }
+  if (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  next();
+};
 
 // Routes pour les exercices (similaire aux patients)
 router.get('/public', authenticate, exercicesController.getPublicExercices);
@@ -62,7 +80,7 @@ router.post('/', authenticate, crudWriteLimiter, validate(createExerciceSchema),
 router.put('/:id', authenticate, crudWriteLimiter, validate(updateExerciceSchema), exercicesController.updateExercice);
 router.delete('/:id', authenticate, crudWriteLimiter, exercicesController.deleteExercice);
 
-// Route pour upload vidéo et conversion en GIF
-router.post('/upload-video', authenticate, videoUploadLimiter, upload.single('video'), exercicesController.uploadVideoAndConvert);
+// Route pour upload vidéo : transcodage MP4 720p + poster JPEG
+router.post('/upload-video', authenticate, videoUploadLimiter, upload.single('video'), handleUploadError, exercicesController.uploadExerciceMedia);
 
 module.exports = router;
