@@ -100,17 +100,34 @@ function hasZscale() {
 }
 
 /**
- * Chaîne de filtres commune à la vidéo et au poster : mise à l'échelle 720p,
- * puis tonemapping si la source est HDR. Le poster doit subir exactement le
- * même traitement, sinon il ressort délavé alors que la vidéo est correcte.
+ * Chaîne de filtres commune à la vidéo et au poster : mise à l'échelle,
+ * plafonnée à 720 sur le PETIT côté, puis tonemapping si la source est HDR. Le
+ * poster doit subir exactement le même traitement, sinon il ressort délavé
+ * alors que la vidéo est correcte.
  *
- * `scale=-2:720` : hauteur 720, largeur automatique paire (H.264 l'exige).
+ * Le petit côté (pas systématiquement la hauteur) est plafonné à 720 : une
+ * source filmée en portrait (ex. 1080×1920) doit ressortir en 720×1280, pas en
+ * 406×720 — `scale=-2:720` pinait la hauteur et laissait la largeur s'écraser.
+ * Le paysage reste le cadrage RECOMMANDÉ (bandeau d'avertissement à l'upload,
+ * inchangé), mais une source portrait uploadée quand même doit rester nette :
+ * la source est supprimée après conversion, donc jamais ré-encodable.
+ *
+ * `min(720, i?)` empêche aussi l'upscale d'une source déjà sous les 720 sur
+ * son petit côté (ex. 480×360 doit rester 480×360, pas doubler en 960×720).
+ * `trunc(.../2)*2` force la parité du côté plafonné : H.264 exige des
+ * dimensions paires, et `min()` seul ne la garantit pas sur une source de
+ * largeur/hauteur impaire. Le côté opposé reste à `-2`, le sentinel ffmpeg qui
+ * calcule automatiquement une dimension paire à partir du ratio d'origine et
+ * de l'autre dimension déjà fixée.
  * `format=yuv420p` : 8 bits 4:2:0, le seul profil lu partout.
  * La rotation EXIF est appliquée automatiquement par ffmpeg dès qu'un filtre
  * `-vf` est présent (autorotate actif par défaut) et aplatie dans le flux.
  */
 function buildFilterChain(colorTransfer) {
-  const scale = `scale=-2:${VIDEO_CONFIG.height}:flags=lanczos`;
+  const shortSide = VIDEO_CONFIG.height; // 720 : plafond du petit côté, pas de la hauteur
+  const capEven = (dim) => `trunc(min(${shortSide},${dim})/2)*2`;
+  const scale =
+    `scale='if(gt(iw,ih),-2,${capEven('iw')})':'if(gt(iw,ih),${capEven('ih')},-2)':flags=lanczos`;
 
   if (!HDR_TRANSFERS.includes(colorTransfer)) {
     return `${scale},format=yuv420p`;
