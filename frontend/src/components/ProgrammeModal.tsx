@@ -127,13 +127,21 @@ function ExercisePreviewPopover({ exercise }: { exercise: ExerciseOption }) {
         <div className="space-y-2 min-w-0">
           <p className="font-medium text-sm text-foreground break-words">{exercise.nom}</p>
 
+          {/* `ExerciceMedia` choisit seul entre la vidéo et le GIF legacy. On
+              garde quand même le repli explicite ci-dessous : son bloc vide à
+              lui n'est qu'un rectangle gris, et en pleine consultation un texte
+              vaut mieux. */}
           {exercise.videoUrl || exercise.gifUrl ? (
             <ExerciceMedia
               videoUrl={exercise.videoUrl}
               posterUrl={exercise.posterUrl}
               gifUrl={exercise.gifUrl}
               alt={exercise.nom}
-              className="rounded-md border bg-muted"
+              // `min-h-24` : sans hauteur intrinsèque ici (pas de ratio imposé,
+              // le média se dimensionne seul), le bloc de repli d'ExerciceMedia
+              // — affiché si l'URL signée a expiré — s'écraserait à l'épaisseur
+              // de sa bordure. Le kiné ne verrait rien du tout, en plein appel.
+              className="min-h-24 rounded-md border bg-muted"
               mediaClassName="mx-auto block max-h-[70vh] w-auto max-w-full object-contain"
               autoPlayOnHover
             />
