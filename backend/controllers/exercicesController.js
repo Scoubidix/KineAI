@@ -297,7 +297,7 @@ exports.getAllTags = async (req, res) => {
 };
 
 exports.createExercice = async (req, res) => {
-  const { nom, description, tags, gifPath } = req.body;
+  const { nom, description, tags, gifPath, videoPath, posterPath } = req.body;
 
   try {
     const firebaseUid = req.uid;
@@ -317,6 +317,8 @@ exports.createExercice = async (req, res) => {
         description,
         tags: tags || null,
         gifPath: gifPath || null, // Chemin GCS du GIF (ex: "exercices/123_demo.gif")
+        videoPath: videoPath || null,
+        posterPath: posterPath || null,
         isPublic: false,
         kineId: kine.id,
       },
@@ -336,7 +338,7 @@ exports.createExercice = async (req, res) => {
 
 exports.updateExercice = async (req, res) => {
   const { id } = req.params;
-  const { nom, description, tags, gifPath } = req.body;
+  const { nom, description, tags, gifPath, videoPath, posterPath } = req.body;
 
   try {
     const firebaseUid = req.uid;
@@ -375,7 +377,9 @@ exports.updateExercice = async (req, res) => {
         nom,
         description,
         tags: tags || null,
-        gifPath: gifPath !== undefined ? (gifPath || null) : exercice.gifPath
+        gifPath: gifPath !== undefined ? (gifPath || null) : exercice.gifPath,
+        videoPath: videoPath !== undefined ? (videoPath || null) : exercice.videoPath,
+        posterPath: posterPath !== undefined ? (posterPath || null) : exercice.posterPath,
       },
     });
 

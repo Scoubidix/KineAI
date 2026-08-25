@@ -130,7 +130,12 @@ const createExerciceSchema = z.object({
   nom: trimmedString(255),
   description: z.string().max(2000),
   tags: z.string().max(500).nullable().optional(),
+  // Chemins GCS (dossier exercices/). Zod n'est pas en mode strict : tout champ
+  // absent d'ici est silencieusement retiré du body, le fichier partirait sur
+  // GCS sans que son chemin n'atteigne jamais la base.
   gifPath: z.string().max(500).nullable().optional(),
+  videoPath: z.string().max(500).nullable().optional(),
+  posterPath: z.string().max(500).nullable().optional(),
 });
 
 const updateExerciceSchema = z.object({
@@ -138,6 +143,8 @@ const updateExerciceSchema = z.object({
   description: z.string().max(2000).optional(),
   tags: z.string().max(500).nullable().optional(),
   gifPath: z.string().max(500).nullable().optional(),
+  videoPath: z.string().max(500).nullable().optional(),
+  posterPath: z.string().max(500).nullable().optional(),
 });
 
 // ========== TEMPLATES ==========

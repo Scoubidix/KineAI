@@ -159,7 +159,9 @@ model ExerciceModele {
   nom         String
   description String
   gifUrl      String? // DEPRECATED: Ancienne URL Firebase (pour migration)
-  gifPath     String? // NOUVEAU: Chemin GCS (ex: "exercices/123_demo.gif") - HDS compliant
+  gifPath     String? // GIF GCS — legacy, conservé pendant la transition vers la vidéo
+  videoPath   String? // MP4 H.264 720p GCS (exercices/) — média de référence
+  posterPath  String? // JPEG d'aperçu GCS (exercices/) — vignette de la vidéo
   tags        String? // tags séparés par virgules
   isPublic    Boolean  @default(false)
   createdAt   DateTime @default(now())
