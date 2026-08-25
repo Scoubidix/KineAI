@@ -6,8 +6,15 @@ export interface ExerciceModele {
   nom: string;
   description: string;
   tags?: string; // liste séparée par des virgules, ex. "Rachis, Mobilité articulaire"
-  gifUrl?: string | null; // URL signée temporaire générée par le backend
-  gifPath?: string | null; // chemin GCS stocké en base
+  // URLs signées temporaires générées par le backend
+  videoUrl?: string | null;
+  posterUrl?: string | null;
+  gifUrl?: string | null; // legacy : présent tant que l'exercice n'a pas été refilmé
+  // Chemins GCS stockés en base — servent à l'état (badge « À refilmer »),
+  // jamais à l'affichage.
+  videoPath?: string | null;
+  posterPath?: string | null;
+  gifPath?: string | null;
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
@@ -26,7 +33,9 @@ export interface ExerciceTemplateItem {
     nom: string;
     description: string;
     tags?: string;
-    gifUrl?: string;
+    videoUrl?: string | null;
+    posterUrl?: string | null;
+    gifUrl?: string | null;
     isPublic: boolean;
   };
 }

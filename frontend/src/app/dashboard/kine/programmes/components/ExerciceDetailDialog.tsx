@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Globe, Lock, Pencil, Trash2 } from 'lucide-react';
 import type { ExerciceModele } from '@/types/exercice';
 import { parseTags } from '@/utils/exerciceFiltering';
+import { ExerciceMedia } from '@/components/ExerciceMedia';
 
 interface ExerciceDetailDialogProps {
   exercice: ExerciceModele;
@@ -68,12 +69,17 @@ export function ExerciceDetailDialog({
             ))}
           </div>
 
-          {exercice.gifUrl && (
-            <img
-              src={exercice.gifUrl}
+          {/* Cadrage naturel ici, contrairement à la card : le panneau de détail
+              est le seul endroit où le kiné voit toute l'image. */}
+          {(exercice.videoUrl || exercice.gifUrl) && (
+            <ExerciceMedia
+              videoUrl={exercice.videoUrl}
+              posterUrl={exercice.posterUrl}
+              gifUrl={exercice.gifUrl}
               alt={exercice.nom}
-              loading="lazy"
-              className="w-full rounded-lg"
+              className="w-full rounded-lg bg-muted"
+              mediaClassName="block h-auto w-full"
+              autoPlayOnHover
             />
           )}
 

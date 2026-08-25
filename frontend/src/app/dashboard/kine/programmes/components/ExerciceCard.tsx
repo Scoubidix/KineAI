@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Check, Info } from 'lucide-react';
 import type { ExerciceModele } from '@/types/exercice';
+import { ExerciceMedia } from '@/components/ExerciceMedia';
 import { ExerciceDetailDialog } from './ExerciceDetailDialog';
 
 interface ExerciceCardProps {
@@ -43,27 +44,27 @@ export function ExerciceCard({
     <>
       {/* content-visibility : le navigateur saute le rendu des cards hors écran. */}
       <div className="[content-visibility:auto] [contain-intrinsic-size:auto_220px]">
-        {/* Emplacement média 16:9, au format des vidéos à venir. La hauteur est
-            réservée même sans média, pour qu'aucun décalage de mise en page
-            (CLS) ne se produise au chargement.
-            Le GIF actuel y est affiché en `object-cover` : une source qui n'est
-            pas en 16:9 sera donc recadrée. */}
+        {/* Média de la card : logique déléguée à ExerciceMedia (vidéo, GIF
+            legacy ou bloc vide selon l'exercice). */}
         <div
           className={`card-hover relative overflow-hidden rounded-xl ${
             selectable && !alreadyIncluded ? 'cursor-pointer' : ''
           } ${selected ? 'ring-2 ring-[#3899aa]' : ''} ${alreadyIncluded ? 'opacity-60' : ''}`}
           onClick={selectable ? handleMediaClick : undefined}
         >
-          {exercice.gifUrl ? (
-            <img
-              src={exercice.gifUrl}
-              alt=""
-              loading="lazy"
-              className="aspect-video w-full object-cover bg-muted"
-            />
-          ) : (
-            <div className="aspect-video bg-muted" aria-hidden="true" />
-          )}
+          {/* Emplacement média 16:9 : la hauteur est réservée même sans média,
+              pour qu'aucun décalage de mise en page (CLS) ne se produise.
+              `object-cover` recadre une source qui n'est pas en 16:9 — le
+              cadrage complet reste visible dans le panneau de détail. */}
+          <ExerciceMedia
+            videoUrl={exercice.videoUrl}
+            posterUrl={exercice.posterUrl}
+            gifUrl={exercice.gifUrl}
+            alt={exercice.nom}
+            className="aspect-video w-full bg-muted"
+            // Pas de lecture au survol pendant une sélection : le geste sert à cocher.
+            autoPlayOnHover={!selectable}
+          />
 
           {/* Coche de sélection : ronde et blanche, le seul badge qui restera
               lisible sur une vignette vidéo (pattern Google Photos). */}
