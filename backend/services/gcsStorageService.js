@@ -41,43 +41,42 @@ const storage = new Storage({
 const bucket = storage.bucket(BUCKET_NAME);
 
 /**
- * Upload un GIF vers GCS (fichier PRIVÉ par défaut)
- * @param {Buffer} fileBuffer - Buffer du fichier GIF
- * @param {string} fileName - Nom du fichier (sera préfixé avec timestamp)
- * @returns {Promise<string>} Le chemin du fichier (gifPath), PAS l'URL
+ * Upload un média d'exercice vers GCS (fichier PRIVÉ par défaut).
+ * Tous les médias d'exercice — MP4, poster JPEG, GIF legacy — restent sous le
+ * préfixe `exercices/` : la garde de deleteExerciceMedia en dépend.
+ * @returns {Promise<string>} Le chemin du fichier, PAS l'URL
  */
-async function uploadGif(fileBuffer, fileName) {
+async function uploadExerciceFile(fileBuffer, fileName, contentType) {
   try {
-    // Générer un nom unique avec timestamp
     const timestamp = Date.now();
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const uniqueFileName = `${timestamp}_${sanitizedFileName}`;
-    const gifPath = `${EXERCICES_FOLDER}${uniqueFileName}`;
+    const filePath = `${EXERCICES_FOLDER}${timestamp}_${sanitizedFileName}`;
 
-    const file = bucket.file(gifPath);
-
-    // Upload le buffer - fichier PRIVÉ par défaut (pas de makePublic)
+    const file = bucket.file(filePath);
     await file.save(fileBuffer, {
       metadata: {
-        contentType: 'image/gif',
-        cacheControl: 'private, max-age=3600', // Cache privé 1h
-        metadata: {
-          uploadedAt: new Date().toISOString(),
-        }
+        contentType,
+        cacheControl: 'private, max-age=3600',
+        metadata: { uploadedAt: new Date().toISOString() },
       },
       resumable: false,
     });
 
-    // PAS de makePublic() - le fichier reste privé
-    // L'accès se fera via URLs signées temporaires
-
-    logger.info(`GIF uploadé sur GCS (privé): ${gifPath}`);
-    return gifPath; // Retourne le PATH, pas l'URL
-
+    // PAS de makePublic() : l'accès se fait via URLs signées temporaires.
+    logger.info(`Média d'exercice uploadé sur GCS (privé): ${filePath}`);
+    return filePath;
   } catch (error) {
-    logger.error('Erreur lors de l\'upload du GIF sur GCS:', error);
-    throw new Error(`Échec de l'upload du GIF: ${error.message}`);
+    logger.error("Erreur lors de l'upload du média d'exercice sur GCS:", error);
+    throw new Error(`Échec de l'upload du média: ${error.message}`);
   }
+}
+
+/**
+ * DEPRECATED — transition GIF → vidéo (2026-08). Conservée le temps de la
+ * transition, plus aucun appelant après le passage au MP4.
+ */
+async function uploadGif(fileBuffer, fileName) {
+  return uploadExerciceFile(fileBuffer, fileName, 'image/gif');
 }
 
 /**
@@ -116,75 +115,102 @@ async function generateSignedUrl(gifPath, expirationMs = DEFAULT_SIGNED_URL_EXPI
 }
 
 /**
- * Supprimer un GIF de GCS à partir de son chemin
- * @param {string} gifPath - Chemin du fichier (ex: "exercices/123_demo.gif")
- * @returns {Promise<void>}
+ * Supprimer un média d'exercice de GCS à partir de son chemin.
+ * Sert aussi bien aux MP4 et aux posters qu'aux GIF legacy.
+ * @param {string} mediaPath - Chemin du fichier (ex: "exercices/123_demo.mp4")
  */
-async function deleteGif(gifPath) {
+async function deleteExerciceMedia(mediaPath) {
   try {
-    if (!gifPath) {
-      logger.warn('Tentative de suppression d\'un GIF avec chemin vide');
+    if (!mediaPath) {
+      logger.warn("Tentative de suppression d'un média d'exercice avec chemin vide");
       return;
     }
 
     // Vérification de sécurité : uniquement dossier exercices/
-    if (!gifPath.startsWith(EXERCICES_FOLDER)) {
-      logger.error('Tentative de suppression hors du dossier exercices:', gifPath);
+    if (!mediaPath.startsWith(EXERCICES_FOLDER)) {
+      logger.error('Tentative de suppression hors du dossier exercices:', mediaPath);
       throw new Error('Chemin de fichier non autorisé');
     }
 
-    const file = bucket.file(gifPath);
+    const file = bucket.file(mediaPath);
 
-    // Vérifier si le fichier existe avant de supprimer
     const [exists] = await file.exists();
     if (!exists) {
-      logger.warn(`Le fichier n'existe pas sur GCS (déjà supprimé?): ${gifPath}`);
+      logger.warn(`Le fichier n'existe pas sur GCS (déjà supprimé?): ${mediaPath}`);
       return;
     }
 
-    // Supprimer le fichier
     await file.delete();
-    logger.info(`GIF supprimé de GCS: ${gifPath}`);
-
+    logger.info(`Média d'exercice supprimé de GCS: ${mediaPath}`);
   } catch (error) {
-    logger.error('Erreur lors de la suppression du GIF sur GCS:', error);
-    throw new Error(`Échec de la suppression du GIF: ${error.message}`);
+    logger.error("Erreur lors de la suppression du média d'exercice sur GCS:", error);
+    throw new Error(`Échec de la suppression du média: ${error.message}`);
   }
 }
 
 /**
- * Génère des URLs signées pour une liste d'exercices
- * Utile pour enrichir les réponses API avec des URLs temporaires
- * @param {Array} exercices - Liste d'exercices avec gifPath
- * @param {number} expirationMs - Durée de validité (défaut: 1h)
- * @returns {Promise<Array>} Exercices enrichis avec gifUrl (URL signée)
+ * URLs signées des médias d'un ExerciceModele.
+ * La vidéo prime : quand elle existe, le GIF legacy n'est plus signé — et il
+ * n'existe de toute façon plus en base, la règle de remplacement l'ayant effacé.
+ * Signer coûte un aller-retour GCS par fichier (file.exists()), on ne signe donc
+ * que ce qui sera réellement affiché.
+ */
+async function signExerciceMediaUrls(source, expirationMs = DEFAULT_SIGNED_URL_EXPIRATION, version = 'v4') {
+  const videoPath = source?.videoPath;
+  const posterPath = source?.posterPath;
+  const gifPath = source?.gifPath;
+
+  if (videoPath) {
+    const [videoUrl, posterUrl] = await Promise.all([
+      generateSignedUrl(videoPath, expirationMs, version),
+      posterPath ? generateSignedUrl(posterPath, expirationMs, version) : Promise.resolve(null),
+    ]);
+    return { gifUrl: null, videoUrl, posterUrl };
+  }
+
+  if (gifPath) {
+    return { gifUrl: await generateSignedUrl(gifPath, expirationMs, version), videoUrl: null, posterUrl: null };
+  }
+
+  return { gifUrl: null, videoUrl: null, posterUrl: null };
+}
+
+/**
+ * URL signée de la démo à montrer au patient : la vidéo si elle existe, sinon le
+ * GIF legacy. Le type de média est porté par l'extension de l'URL — c'est ce qui
+ * permet au chat patient de choisir entre <video> et <img> sans changer de
+ * protocole, et sans migrer les messages déjà en base.
+ */
+async function generateDemoSignedUrl(exerciceModele, expirationMs, version = 'v2') {
+  const mediaPath = exerciceModele?.videoPath || exerciceModele?.gifPath;
+  if (!mediaPath) return null;
+  return generateSignedUrl(mediaPath, expirationMs, version);
+}
+
+/**
+ * Génère les URLs signées pour une liste d'exercices.
+ * Point de passage unique de tous les appelants (exercices publics/privés,
+ * templates, programmes) : c'est ici, et pas dans chaque contrôleur, que la
+ * transition vidéo se propage.
+ * @param {Array} exercices - ExerciceModele, ou relations portant `exerciceModele`
  */
 async function enrichExercicesWithSignedUrls(exercices, expirationMs = DEFAULT_SIGNED_URL_EXPIRATION) {
   if (!exercices || !Array.isArray(exercices)) {
     return exercices;
   }
 
-  const enriched = await Promise.all(
+  return Promise.all(
     exercices.map(async (ex) => {
-      // Chercher gifPath directement ou dans exerciceModele (pour les relations)
-      const gifPath = ex.gifPath || ex.exerciceModele?.gifPath;
-
-      if (gifPath) {
-        const signedUrl = await generateSignedUrl(gifPath, expirationMs);
-        return {
-          ...ex,
-          gifUrl: signedUrl, // Ajoute l'URL signée temporaire
-        };
-      }
-
-      return {
-        ...ex,
-        gifUrl: null,
-      };
+      // Les URLs se posent là où vivent les chemins : sur l'exercice modèle quand
+      // l'appelant passe des ExerciceProgramme / ExerciceTemplateItem, sur l'objet
+      // lui-même quand il passe des ExerciceModele.
+      const nested = ex?.exerciceModele || null;
+      const urls = await signExerciceMediaUrls(nested || ex, expirationMs);
+      return nested
+        ? { ...ex, exerciceModele: { ...nested, ...urls } }
+        : { ...ex, ...urls };
     })
   );
-
-  return enriched;
 }
 
 /**
@@ -516,9 +542,12 @@ async function deleteNouveauteImage(imagePath) {
 }
 
 module.exports = {
-  uploadGif,
+  uploadGif, // DEPRECATED — transition GIF → vidéo
+  uploadExerciceFile,
   generateSignedUrl,
-  deleteGif,
+  signExerciceMediaUrls,
+  generateDemoSignedUrl,
+  deleteExerciceMedia,
   enrichExercicesWithSignedUrls,
   extractFileNameFromPath,
   convertFirebaseUrlToGcsPath,

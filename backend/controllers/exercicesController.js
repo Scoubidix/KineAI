@@ -148,7 +148,7 @@ exports.adminUpdateExercice = async (req, res) => {
     // Si un nouveau gifPath remplace l'ancien, supprimer l'ancien GIF de GCS
     if (gifPath !== undefined && exercice.gifPath && gifPath !== exercice.gifPath) {
       try {
-        await gcsStorageService.deleteGif(exercice.gifPath);
+        await gcsStorageService.deleteExerciceMedia(exercice.gifPath);
         logger.info(`Ancien GIF supprimé de GCS: ${exercice.gifPath}`);
       } catch (error) {
         logger.warn('Erreur suppression ancien GIF:', error);
@@ -206,7 +206,7 @@ exports.adminDeleteExercice = async (req, res) => {
 
     if (exercice.gifPath) {
       try {
-        await gcsStorageService.deleteGif(exercice.gifPath);
+        await gcsStorageService.deleteExerciceMedia(exercice.gifPath);
       } catch (error) {
         logger.warn('Erreur suppression GIF GCS:', error);
       }
@@ -363,7 +363,7 @@ exports.updateExercice = async (req, res) => {
     // Si un nouveau gifPath est fourni et différent de l'ancien, supprimer l'ancien GIF de GCS
     if (gifPath !== undefined && exercice.gifPath && gifPath !== exercice.gifPath) {
       try {
-        await gcsStorageService.deleteGif(exercice.gifPath);
+        await gcsStorageService.deleteExerciceMedia(exercice.gifPath);
         logger.info(`Ancien GIF supprimé de GCS: ${exercice.gifPath}`);
       } catch (error) {
         logger.warn('Erreur lors de la suppression de l\'ancien GIF:', error);
@@ -442,7 +442,7 @@ exports.deleteExercice = async (req, res) => {
     // Supprimer le GIF associé de GCS s'il existe
     if (exercice.gifPath) {
       try {
-        await gcsStorageService.deleteGif(exercice.gifPath);
+        await gcsStorageService.deleteExerciceMedia(exercice.gifPath);
         logger.info(`GIF supprimé de GCS: ${exercice.gifPath}`);
       } catch (error) {
         logger.warn('Erreur lors de la suppression du GIF de GCS:', error);
