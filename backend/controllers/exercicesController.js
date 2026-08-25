@@ -32,9 +32,32 @@ function resolveMediaPaths(existing, body) {
  * Supprime de GCS les fichiers que plus aucune colonne ne référence.
  * Best-effort : le nouveau fichier est déjà déposé, une suppression ratée laisse
  * un orphelin sur le bucket mais ne doit jamais faire échouer la mise à jour.
+ *
+ * @param {string[]} orphans
+ * @param {number|null} exceptExerciceId - Exercice à exclure du comptage de
+ *   références. À la mise à jour, la ligne porte déjà les NOUVEAUX chemins au
+ *   moment de l'appel : on l'exclut par prudence (elle ne référence de toute
+ *   façon plus les chemins orphelins passés ici). À la suppression, la ligne
+ *   est effacée AVANT cet appel (voir call sites) : elle ne peut plus
+ *   s'auto-référencer, ce paramètre reste donc à `null`.
  */
-async function deleteOrphanMedia(orphans) {
+async function deleteOrphanMedia(orphans, exceptExerciceId = null) {
+  const prisma = prismaService.getInstance();
   for (const mediaPath of orphans) {
+    // Un chemin arrive du corps de la requête : rien ne garantit qu'il
+    // appartienne à l'appelant. Sans cette vérification, un kiné pourrait
+    // poser le chemin d'un exercice d'autrui sur le sien, le supprimer, et
+    // effacer définitivement le fichier — la source ayant déjà disparu.
+    const stillReferenced = await prisma.exerciceModele.count({
+      where: {
+        ...(exceptExerciceId ? { id: { not: exceptExerciceId } } : {}),
+        OR: [{ videoPath: mediaPath }, { posterPath: mediaPath }, { gifPath: mediaPath }],
+      },
+    });
+    if (stillReferenced > 0) {
+      logger.warn('Média encore référencé par un autre exercice, suppression annulée:', mediaPath);
+      continue;
+    }
     try {
       await gcsStorageService.deleteExerciceMedia(mediaPath);
     } catch (error) {
@@ -219,7 +242,10 @@ exports.adminUpdateExercice = async (req, res) => {
       },
     });
 
-    await deleteOrphanMedia(media.orphans);
+    // La ligne porte déjà les NOUVEAUX chemins : on l'exclut du comptage pour
+    // ne jamais se bloquer soi-même sur un ancien chemin qu'on ne référence
+    // plus.
+    await deleteOrphanMedia(media.orphans, exercice.id);
 
     const [enriched] = await gcsStorageService.enrichExercicesWithSignedUrls([updated]);
     res.json(enriched);
@@ -258,11 +284,18 @@ exports.adminDeleteExercice = async (req, res) => {
       });
     }
 
+    // La ligne d'abord : sinon elle référence encore ses propres chemins au
+    // moment du comptage dans deleteOrphanMedia, qui annulerait alors TOUTE
+    // suppression de fichier. Ordre aussi plus sûr en cas d'échec : si le
+    // delete Prisma échoue, aucun média n'est perdu (l'ancien ordre effaçait
+    // les fichiers avant, laissant une ligne avec des chemins pendants si le
+    // delete échouait ensuite).
+    await prisma.exerciceModele.delete({ where: { id: parseInt(id) } });
+
     await deleteOrphanMedia(
       [exercice.videoPath, exercice.posterPath, exercice.gifPath].filter(Boolean)
     );
 
-    await prisma.exerciceModele.delete({ where: { id: parseInt(id) } });
     res.status(204).send();
   } catch (err) {
     logger.error('Erreur suppression exercice public :', err);
@@ -422,8 +455,10 @@ exports.updateExercice = async (req, res) => {
       },
     });
 
-    // Après l'écriture : plus rien ne référence ces fichiers.
-    await deleteOrphanMedia(media.orphans);
+    // Après l'écriture : la ligne porte déjà les nouveaux chemins, on l'exclut
+    // du comptage pour ne jamais se bloquer soi-même sur un ancien chemin
+    // qu'on ne référence plus.
+    await deleteOrphanMedia(media.orphans, exercice.id);
 
     const [enriched] = await gcsStorageService.enrichExercicesWithSignedUrls([updated]);
     res.json(enriched);
@@ -477,13 +512,19 @@ exports.deleteExercice = async (req, res) => {
       });
     }
 
-    await deleteOrphanMedia(
-      [exercice.videoPath, exercice.posterPath, exercice.gifPath].filter(Boolean)
-    );
-
+    // La ligne d'abord : sinon elle référence encore ses propres chemins au
+    // moment du comptage dans deleteOrphanMedia, qui annulerait alors TOUTE
+    // suppression de fichier. Ordre aussi plus sûr en cas d'échec : si le
+    // delete Prisma échoue, aucun média n'est perdu (l'ancien ordre effaçait
+    // les fichiers avant, laissant une ligne avec des chemins pendants si le
+    // delete échouait ensuite).
     await prisma.exerciceModele.delete({
       where: { id: parseInt(id) },
     });
+
+    await deleteOrphanMedia(
+      [exercice.videoPath, exercice.posterPath, exercice.gifPath].filter(Boolean)
+    );
 
     res.status(204).send();
   } catch (err) {
