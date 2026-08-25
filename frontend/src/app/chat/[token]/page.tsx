@@ -23,6 +23,19 @@ const isVideoUrl = (src?: string): boolean => {
   }
 };
 
+/**
+ * Force iOS à peindre une première image plutôt qu'un cadre noir : Safari et le
+ * navigateur intégré de WhatsApp ignorent `preload`. Le fragment n'est ni envoyé
+ * au serveur ni couvert par la signature GCS.
+ *
+ * À appliquer aux DEUX vidéos — vignette et plein écran. L'overlay démarre en
+ * `autoPlay muted`, ce qui suffit d'ordinaire, mais si l'autoplay est refusé par
+ * une variante de navigateur intégré, le patient se retrouve devant un cadre
+ * noir avec une barre de contrôle discrète. Défense en profondeur, à coût nul.
+ */
+const withFirstFrameHint = (src: string): string =>
+  src.includes('#') ? src : `${src}#t=0.1`;
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -687,7 +700,7 @@ export default function PatientChatPage() {
                       remarkPlugins={[remarkGfm]}
                       components={{
                         img: ({ src, alt }) =>
-                          isVideoUrl(src) ? (
+                          src && isVideoUrl(src) ? (
                             <button
                               type="button"
                               onClick={() => setExpandedMedia(src || null)}
@@ -695,18 +708,15 @@ export default function PatientChatPage() {
                               aria-label={alt || 'Voir la démonstration'}
                             >
                               <video
-                                // `#t=0.1` force iOS à peindre une image plutôt
-                                // qu'un cadre noir : sans ça, la démo paraît
-                                // vide dans Safari et dans le navigateur intégré
-                                // de WhatsApp.
-                                src={`${src}#t=0.1`}
+                                aria-hidden="true"
+                                src={withFirstFrameHint(src)}
                                 className="max-w-[150px] rounded-lg shadow-sm"
                                 muted
                                 loop
                                 playsInline
                                 preload="metadata"
                               />
-                              <span className="absolute inset-0 m-auto flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white shadow">
+                              <span aria-hidden="true" className="absolute inset-0 m-auto flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white shadow">
                                 <Play className="h-4 w-4 translate-x-[1px]" fill="currentColor" />
                               </span>
                             </button>
@@ -833,7 +843,7 @@ export default function PatientChatPage() {
         >
           {isVideoUrl(expandedMedia) ? (
             <video
-              src={expandedMedia}
+              src={withFirstFrameHint(expandedMedia)}
               className="max-w-full max-h-[85vh] rounded-xl shadow-2xl"
               controls
               autoPlay
