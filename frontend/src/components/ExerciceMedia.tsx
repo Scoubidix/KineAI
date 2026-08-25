@@ -12,6 +12,11 @@ export interface ExerciceMediaProps {
   /** GIF legacy — affiché uniquement en l'absence de vidéo. */
   gifUrl?: string | null;
   alt?: string;
+  /** Nom accessible du bouton lecture/pause. À renseigner quand `alt` est
+      volontairement vide (nom déjà affiché en texte à côté de la vignette) —
+      sinon chaque bouton d'une grille annonce le même « Lire la démonstration »
+      générique, sans dire de quel exercice. Par défaut, reprend `alt`. */
+  label?: string;
   /** Classes du conteneur : ratio, largeur, arrondi, fond. */
   className?: string;
   /** Classes du média. Par défaut il remplit le conteneur en `object-cover`. */
@@ -41,12 +46,18 @@ export function ExerciceMedia({
   posterUrl,
   gifUrl,
   alt = '',
+  label,
   className = '',
   mediaClassName = 'block h-full w-full object-cover',
   autoPlayOnHover = false,
   showPlayButton = true,
   autoPlay,
 }: ExerciceMediaProps) {
+  // Nom accessible du bouton : `label` s'il est fourni, sinon `alt`. Distinct
+  // de l'`aria-label` de la balise <video> elle-même (ligne plus bas), qui
+  // reste sur `alt` seul — décoratif quand `alt=""`, comme voulu par les
+  // appelants qui affichent déjà le nom en texte visible.
+  const playButtonLabel = label || alt;
   const [failed, setFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -135,7 +146,7 @@ export function ExerciceMedia({
               if (playing) stop();
               else play();
             }}
-            aria-label={playing ? `Arrêter la démonstration${alt ? ` de ${alt}` : ''}` : `Lire la démonstration${alt ? ` de ${alt}` : ''}`}
+            aria-label={playing ? `Arrêter la démonstration${playButtonLabel ? ` de ${playButtonLabel}` : ''}` : `Lire la démonstration${playButtonLabel ? ` de ${playButtonLabel}` : ''}`}
             className={`absolute inset-0 m-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white shadow-lg backdrop-blur-sm transition-opacity ${
               isMobile
                 ? ''
