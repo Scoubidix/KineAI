@@ -2,9 +2,26 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Send, Loader2, AlertCircle, CheckCircle, Trophy, X, Check, MessageCircle } from 'lucide-react';
+import { Send, Loader2, AlertCircle, CheckCircle, Trophy, X, Check, MessageCircle, Play } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+/**
+ * Le type de média est porté par l'extension du chemin : c'est ce qui permet de
+ * ne rien changer au protocole markdown, et donc de ne pas migrer les messages
+ * déjà figés en base.
+ *
+ * On teste le `pathname` et non l'URL complète, qui porte la signature GCS en
+ * chaîne de requête. `new URL()` lève sur une valeur vide ou relative : on
+ * protège, et on retombe sur <img>, le comportement d'avant la transition.
+ */
+const isVideoUrl = (src?: string): boolean => {
+  try {
+    return /\.mp4$/i.test(new URL(src ?? '').pathname);
+  } catch {
+    return false;
+  }
+};
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -123,7 +140,7 @@ export default function PatientChatPage() {
   const [isNotifying, setIsNotifying] = useState(false);
   const [notifyCooldown, setNotifyCooldown] = useState(false);
   const [showNotifySuccess, setShowNotifySuccess] = useState(false);
-  const [expandedGif, setExpandedGif] = useState<string | null>(null);
+  const [expandedMedia, setExpandedMedia] = useState<string | null>(null);
 
   // Référence pour le scroll automatique
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -669,16 +686,40 @@ export default function PatientChatPage() {
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
-                        img: ({ src, alt }) => (
-                          <img
-                            src={src}
-                            alt={alt || 'Image'}
-                            className="max-w-[150px] rounded-lg my-2 shadow-sm cursor-pointer hover:opacity-80 transition-opacity"
-                            loading="lazy"
-                            style={{ height: 'auto' }}
-                            onClick={() => setExpandedGif(src || null)}
-                          />
-                        ),
+                        img: ({ src, alt }) =>
+                          isVideoUrl(src) ? (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedMedia(src || null)}
+                              className="relative my-2 block cursor-pointer transition-opacity hover:opacity-80"
+                              aria-label={alt || 'Voir la démonstration'}
+                            >
+                              <video
+                                // `#t=0.1` force iOS à peindre une image plutôt
+                                // qu'un cadre noir : sans ça, la démo paraît
+                                // vide dans Safari et dans le navigateur intégré
+                                // de WhatsApp.
+                                src={`${src}#t=0.1`}
+                                className="max-w-[150px] rounded-lg shadow-sm"
+                                muted
+                                loop
+                                playsInline
+                                preload="metadata"
+                              />
+                              <span className="absolute inset-0 m-auto flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white shadow">
+                                <Play className="h-4 w-4 translate-x-[1px]" fill="currentColor" />
+                              </span>
+                            </button>
+                          ) : (
+                            <img
+                              src={src}
+                              alt={alt || 'Image'}
+                              className="max-w-[150px] rounded-lg my-2 shadow-sm cursor-pointer hover:opacity-80 transition-opacity"
+                              loading="lazy"
+                              style={{ height: 'auto' }}
+                              onClick={() => setExpandedMedia(src || null)}
+                            />
+                          ),
                         p: ({ children }) => (
                           <p className="whitespace-pre-wrap mb-2 last:mb-0">{children}</p>
                         ),
@@ -785,17 +826,31 @@ export default function PatientChatPage() {
         </div>
       </div>
 
-      {expandedGif && (
+      {expandedMedia && (
         <div
           className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
-          onClick={() => setExpandedGif(null)}
+          onClick={() => setExpandedMedia(null)}
         >
-          <img
-            src={expandedGif}
-            alt="GIF agrandi"
-            className="max-w-full max-h-[85vh] rounded-xl shadow-2xl"
-            style={{ height: 'auto' }}
-          />
+          {isVideoUrl(expandedMedia) ? (
+            <video
+              src={expandedMedia}
+              className="max-w-full max-h-[85vh] rounded-xl shadow-2xl"
+              controls
+              autoPlay
+              loop
+              muted
+              playsInline
+              // Le clic sur les contrôles ne doit pas refermer l'overlay.
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <img
+              src={expandedMedia}
+              alt="Démonstration agrandie"
+              className="max-w-full max-h-[85vh] rounded-xl shadow-2xl"
+              style={{ height: 'auto' }}
+            />
+          )}
         </div>
       )}
 
