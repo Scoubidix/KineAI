@@ -56,6 +56,8 @@ export function TemplateCard({
       items.map((item) => ({
         id: item.id,
         nom: item.exerciceModele.nom,
+        videoUrl: item.exerciceModele.videoUrl ?? null,
+        posterUrl: item.exerciceModele.posterUrl ?? null,
         gifUrl: item.exerciceModele.gifUrl ?? null,
       })),
     [items],

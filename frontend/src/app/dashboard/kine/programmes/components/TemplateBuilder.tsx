@@ -53,6 +53,8 @@ export function TemplateBuilder({ mode, templateId }: TemplateBuilderProps) {
         .map((item) => ({
           exerciceId: item.exerciceModele.id,
           nom: item.exerciceModele.nom,
+          videoUrl: item.exerciceModele.videoUrl ?? null,
+          posterUrl: item.exerciceModele.posterUrl ?? null,
           gifUrl: item.exerciceModele.gifUrl ?? null,
           series: item.series,
           repetitions: item.repetitions,

@@ -63,9 +63,19 @@ export function ProgrammeDetailDialog({
         const found = programmes.find((p: { id: number }) => p.id === programme.id);
         setSlides(
           (found?.exercices ?? []).map(
-            (ex: { id: number; exerciceModele: { nom: string; gifUrl?: string | null } }) => ({
+            (ex: {
+              id: number;
+              exerciceModele: {
+                nom: string;
+                videoUrl?: string | null;
+                posterUrl?: string | null;
+                gifUrl?: string | null;
+              };
+            }) => ({
               id: ex.id,
               nom: ex.exerciceModele.nom,
+              videoUrl: ex.exerciceModele.videoUrl ?? null,
+              posterUrl: ex.exerciceModele.posterUrl ?? null,
               gifUrl: ex.exerciceModele.gifUrl ?? null,
             }),
           ),

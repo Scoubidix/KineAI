@@ -21,9 +21,11 @@ export interface BuilderDraftExercice {
   tempsRepos: number;
   tempsTravail: number;
   instructions: string;
-  /** URL signée de la démo, pour l'aperçu dans le builder. Peut avoir expiré si
-      le brouillon est repris longtemps après : le rendu retombe alors sur le
-      bloc vide. */
+  /** URLs signées de la démo, pour l'aperçu dans le builder. Peuvent avoir
+      expiré si le brouillon est repris longtemps après : le rendu retombe alors
+      sur le bloc vide. */
+  videoUrl?: string | null;
+  posterUrl?: string | null;
   gifUrl?: string | null;
   /** Renseigné quand l'exercice provient de l'aplatissement d'un template. */
   fromTemplate?: { id: number; nom: string };
@@ -146,6 +148,8 @@ export function flattenSelection(
         // ExerciceProgramme.consigne est non-nullable côté base,
         // alors que ExerciceTemplateItem.instructions est optionnel.
         instructions: item.instructions || '',
+        videoUrl: item.exerciceModele.videoUrl ?? null,
+        posterUrl: item.exerciceModele.posterUrl ?? null,
         gifUrl: item.exerciceModele.gifUrl ?? null,
         fromTemplate: { id: template.id, nom: template.nom },
       });
@@ -158,6 +162,8 @@ export function flattenSelection(
     result.push({
       exerciceId: exercice.id,
       nom: exercice.nom,
+      videoUrl: exercice.videoUrl ?? null,
+      posterUrl: exercice.posterUrl ?? null,
       gifUrl: exercice.gifUrl ?? null,
       ...DEFAULT_EXERCICE_SETTINGS,
     });

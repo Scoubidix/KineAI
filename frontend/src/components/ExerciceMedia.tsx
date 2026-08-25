@@ -18,6 +18,9 @@ export interface ExerciceMediaProps {
   mediaClassName?: string;
   /** Grilles kiné : lecture au survol en desktop. Désactivé en mode sélection. */
   autoPlayOnHover?: boolean;
+  /** À passer à `false` là où le tap a déjà un rôle (carrousel : avancer d'une
+      vignette). Sans ça, le bouton centré capterait le geste. */
+  showPlayButton?: boolean;
 }
 
 /**
@@ -36,6 +39,7 @@ export function ExerciceMedia({
   className = '',
   mediaClassName = 'block h-full w-full object-cover',
   autoPlayOnHover = false,
+  showPlayButton = true,
 }: ExerciceMediaProps) {
   const [failed, setFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -89,10 +93,13 @@ export function ExerciceMedia({
           className={mediaClassName}
         />
 
-        {/* Bouton de lecture, TOUJOURS monté — c'est ce qui le rend atteignable
-            au clavier. Une démonstration d'exercice n'est pas décorative : sans
-            ce bouton, un kiné qui navigue au clavier ne voit jamais le mouvement,
-            seulement une image figée (WCAG 2.1.1, niveau A).
+        {/* Bouton de lecture, monté dès que `showPlayButton` (true par défaut)
+            — c'est ce qui le rend atteignable au clavier. Une démonstration
+            d'exercice n'est pas décorative : sans ce bouton, un kiné qui navigue
+            au clavier ne voit jamais le mouvement, seulement une image figée
+            (WCAG 2.1.1, niveau A). `showPlayButton={false}` le retire là où le
+            tap a déjà un rôle (carrousel : avancer d'une vignette) — sans ça,
+            le bouton centré capterait le geste.
 
             Sur mobile le survol n'existe pas : le bouton reste visible en
             permanence, comme aujourd'hui.
@@ -105,26 +112,28 @@ export function ExerciceMedia({
             survol continue de lancer l'aperçu, et rien d'autre ne bouge.
 
             `stopPropagation` : lancer la lecture ne coche jamais l'exercice. */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (playing) stop();
-            else play();
-          }}
-          aria-label={playing ? `Arrêter la démonstration${alt ? ` de ${alt}` : ''}` : `Lire la démonstration${alt ? ` de ${alt}` : ''}`}
-          className={`absolute inset-0 m-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white shadow-lg backdrop-blur-sm transition-opacity ${
-            isMobile
-              ? ''
-              : 'opacity-0 pointer-events-none focus-visible:opacity-100 focus-visible:pointer-events-auto'
-          }`}
-        >
-          {playing ? (
-            <Pause className="h-5 w-5" fill="currentColor" />
-          ) : (
-            <Play className="h-5 w-5 translate-x-[1px]" fill="currentColor" />
-          )}
-        </button>
+        {showPlayButton && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (playing) stop();
+              else play();
+            }}
+            aria-label={playing ? `Arrêter la démonstration${alt ? ` de ${alt}` : ''}` : `Lire la démonstration${alt ? ` de ${alt}` : ''}`}
+            className={`absolute inset-0 m-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white shadow-lg backdrop-blur-sm transition-opacity ${
+              isMobile
+                ? ''
+                : 'opacity-0 pointer-events-none focus-visible:opacity-100 focus-visible:pointer-events-auto'
+            }`}
+          >
+            {playing ? (
+              <Pause className="h-5 w-5" fill="currentColor" />
+            ) : (
+              <Play className="h-5 w-5 translate-x-[1px]" fill="currentColor" />
+            )}
+          </button>
+        )}
       </div>
     );
   }

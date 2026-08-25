@@ -1,10 +1,13 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { ExerciceMedia } from '@/components/ExerciceMedia';
 
 export interface CarouselSlide {
   id: number;
   nom: string;
+  videoUrl?: string | null;
+  posterUrl?: string | null;
   gifUrl?: string | null;
 }
 
@@ -95,16 +98,22 @@ export function MediaCarousel({
       >
         {slides.map((slide) => (
           <div key={slide.id} className="w-full shrink-0">
-            {slide.gifUrl ? (
-              <img
-                src={slide.gifUrl}
-                alt=""
-                loading="lazy"
-                className="aspect-video w-full object-cover bg-muted"
-              />
-            ) : (
-              <div className="aspect-video w-full bg-muted" aria-hidden="true" />
-            )}
+            <ExerciceMedia
+              videoUrl={slide.videoUrl}
+              posterUrl={slide.posterUrl}
+              gifUrl={slide.gifUrl}
+              alt={slide.nom}
+              className="aspect-video w-full bg-muted"
+              // Le survol du carrousel place aussi le pointeur sur la vignette :
+              // la vidéo courante s'anime donc au survol, comme le faisait le
+              // GIF. Sans ça, une card de template qui bougeait deviendrait une
+              // image figée.
+              autoPlayOnHover
+              // Mais pas de bouton centré : ici le tap sert à avancer d'une
+              // vignette. Sur mobile les vignettes restent donc figées, et c'est
+              // le panneau de détail qui sert à regarder un exercice.
+              showPlayButton={false}
+            />
           </div>
         ))}
       </div>

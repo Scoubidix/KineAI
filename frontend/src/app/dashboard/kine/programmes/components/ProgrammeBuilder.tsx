@@ -122,7 +122,13 @@ export function ProgrammeBuilder({ mode, programmeId }: ProgrammeBuilderProps) {
       duree: programme.duree ?? DEFAULT_DUREE,
       exercices: (programme.exercices ?? []).map(
         (ex: {
-          exerciceModele: { id: number; nom: string; gifUrl?: string | null };
+          exerciceModele: {
+            id: number;
+            nom: string;
+            videoUrl?: string | null;
+            posterUrl?: string | null;
+            gifUrl?: string | null;
+          };
           series: number;
           repetitions: number;
           pause: number;
@@ -131,6 +137,8 @@ export function ProgrammeBuilder({ mode, programmeId }: ProgrammeBuilderProps) {
         }) => ({
           exerciceId: ex.exerciceModele.id,
           nom: ex.exerciceModele.nom,
+          videoUrl: ex.exerciceModele.videoUrl ?? null,
+          posterUrl: ex.exerciceModele.posterUrl ?? null,
           gifUrl: ex.exerciceModele.gifUrl ?? null,
           series: ex.series,
           repetitions: ex.repetitions,

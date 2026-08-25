@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { GripVertical, X } from 'lucide-react';
 import type { BuilderDraftExercice } from '@/hooks/useBuilderDraft';
+import { ExerciceMedia } from '@/components/ExerciceMedia';
 
 /**
  * Borne la saisie au minimum accepté par l'API. Un champ vidé donne
@@ -35,8 +36,6 @@ export function BuilderExerciceRow({
   onChange,
   onRemove,
 }: BuilderExerciceRowProps) {
-  const [mediaFailed, setMediaFailed] = useState(false);
-
   // dnd-kit fournit nativement les capteurs clavier : le réordonnancement est
   // donc réalisable sans souris (WCAG 2.1.1).
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -76,19 +75,14 @@ export function BuilderExerciceRow({
           <GripVertical className="h-5 w-5" />
         </button>
 
-        {exercice.gifUrl && !mediaFailed ? (
-          <img
-            src={exercice.gifUrl}
-            alt=""
-            loading="lazy"
-            // L'URL signée peut avoir expiré si le brouillon a été repris
-            // longtemps après : on retombe alors sur le bloc vide.
-            onError={() => setMediaFailed(true)}
-            className={`${mediaClass} object-cover bg-muted`}
-          />
-        ) : (
-          <div className={`${mediaClass} bg-muted`} aria-hidden="true" />
-        )}
+        <ExerciceMedia
+          videoUrl={exercice.videoUrl}
+          posterUrl={exercice.posterUrl}
+          gifUrl={exercice.gifUrl}
+          alt={exercice.nom}
+          className={`${mediaClass} bg-muted`}
+          autoPlayOnHover
+        />
       </div>
 
       <Card className={`flex-1 min-w-0 ${isDragging ? 'shadow-lg' : ''}`}>
