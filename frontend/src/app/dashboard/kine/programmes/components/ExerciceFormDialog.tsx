@@ -18,7 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tag } from 'lucide-react';
-import VideoUpload from '@/components/VideoUpload';
+import VideoUpload, { EMPTY_MEDIA, type ExerciceMediaValue } from '@/components/VideoUpload';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
 import type { ExerciceModele } from '@/types/exercice';
@@ -43,8 +43,7 @@ interface FormState {
   nom: string;
   description: string;
   tags: string[];
-  gifUrl: string | null;
-  gifPath: string | null;
+  media: ExerciceMediaValue;
 }
 
 const EMPTY_FORM: FormState = {
@@ -52,8 +51,7 @@ const EMPTY_FORM: FormState = {
   nom: '',
   description: '',
   tags: [],
-  gifUrl: null,
-  gifPath: null,
+  media: EMPTY_MEDIA,
 };
 
 interface ExerciceFormDialogProps {
@@ -83,8 +81,14 @@ export function ExerciceFormDialog({
             nom: exercice.nom,
             description: exercice.description,
             tags: parseTags(exercice.tags),
-            gifUrl: exercice.gifUrl ?? null,
-            gifPath: exercice.gifPath ?? null,
+            media: {
+              videoUrl: exercice.videoUrl ?? null,
+              videoPath: exercice.videoPath ?? null,
+              posterUrl: exercice.posterUrl ?? null,
+              posterPath: exercice.posterPath ?? null,
+              gifUrl: exercice.gifUrl ?? null,
+              gifPath: exercice.gifPath ?? null,
+            },
           }
         : EMPTY_FORM,
     );
@@ -110,7 +114,10 @@ export function ExerciceFormDialog({
           nom: form.nom,
           description: form.description,
           tags: form.tags.length > 0 ? form.tags.join(', ') : null,
-          gifPath: form.gifPath, // on envoie le chemin GCS, pas l'URL signée
+          // On envoie les chemins GCS, jamais les URLs signées.
+          videoPath: form.media.videoPath,
+          posterPath: form.media.posterPath,
+          gifPath: form.media.gifPath,
           isPublic: false,
         }),
       });
@@ -226,11 +233,8 @@ export function ExerciceFormDialog({
               </div>
 
               <VideoUpload
-                gifUrl={form.gifUrl}
-                gifPath={form.gifPath}
-                onGifChange={({ gifUrl, gifPath }: { gifUrl: string | null; gifPath: string | null }) =>
-                  setForm((prev) => ({ ...prev, gifUrl, gifPath }))
-                }
+                value={form.media}
+                onChange={(media) => setForm((prev) => ({ ...prev, media }))}
               />
             </div>
           </div>

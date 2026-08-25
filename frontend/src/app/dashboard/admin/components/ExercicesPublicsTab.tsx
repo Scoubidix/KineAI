@@ -19,7 +19,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import VideoUpload from '@/components/VideoUpload';
+import VideoUpload, { type ExerciceMediaValue } from '@/components/VideoUpload';
+import { ExerciceMedia } from '@/components/ExerciceMedia';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Users } from 'lucide-react';
@@ -29,7 +30,11 @@ export interface PublicExercice {
   nom: string;
   description: string;
   tags: string | null;
+  videoUrl: string | null;
+  posterUrl: string | null;
   gifUrl: string | null;
+  videoPath: string | null;
+  posterPath: string | null;
   gifPath: string | null;
   isPublic: boolean;
   kineId: number;
@@ -39,12 +44,14 @@ export interface PublicExercice {
 
 interface EditState {
   id: number; nom: string; description: string; tags: string;
-  gifUrl: string | null; gifPath: string | null; usageCount: number;
+  media: ExerciceMediaValue; usageCount: number;
 }
 
 interface PrivateExercice {
   id: number;
   nom: string;
+  videoUrl: string | null;
+  posterUrl: string | null;
   gifUrl: string | null;
   tags: string | null;
 }
@@ -98,7 +105,12 @@ export default function ExercicesPublicsTab() {
 
   const openEdit = (ex: PublicExercice) => setEditing({
     id: ex.id, nom: ex.nom, description: ex.description, tags: ex.tags || '',
-    gifUrl: ex.gifUrl, gifPath: ex.gifPath, usageCount: ex.usageCount,
+    usageCount: ex.usageCount,
+    media: {
+      videoUrl: ex.videoUrl, videoPath: ex.videoPath,
+      posterUrl: ex.posterUrl, posterPath: ex.posterPath,
+      gifUrl: ex.gifUrl, gifPath: ex.gifPath,
+    },
   });
 
   const handleSaveEdit = async () => {
@@ -110,7 +122,9 @@ export default function ExercicesPublicsTab() {
         nom: editing.nom,
         description: editing.description,
         tags: editing.tags || null,
-        gifPath: editing.gifPath,
+        videoPath: editing.media.videoPath,
+        posterPath: editing.media.posterPath,
+        gifPath: editing.media.gifPath,
       }),
     });
     if (res.ok) {
@@ -153,10 +167,14 @@ export default function ExercicesPublicsTab() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {publics.map((ex) => (
               <Card key={ex.id} className="overflow-hidden">
-                {ex.gifUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={ex.gifUrl} alt={ex.nom} className="w-full aspect-[3/4] object-cover" />
-                )}
+                <ExerciceMedia
+                  videoUrl={ex.videoUrl}
+                  posterUrl={ex.posterUrl}
+                  gifUrl={ex.gifUrl}
+                  alt={ex.nom}
+                  className="w-full aspect-[3/4] bg-muted"
+                  autoPlayOnHover
+                />
                 <CardContent className="p-3 space-y-2">
                   <div className="font-medium">{ex.nom}</div>
                   <div className="text-xs text-muted-foreground">
@@ -217,10 +235,14 @@ export default function ExercicesPublicsTab() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {privates.map((ex) => (
               <Card key={ex.id} className="overflow-hidden">
-                {ex.gifUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={ex.gifUrl} alt={ex.nom} className="w-full aspect-[3/4] object-cover" />
-                )}
+                <ExerciceMedia
+                  videoUrl={ex.videoUrl}
+                  posterUrl={ex.posterUrl}
+                  gifUrl={ex.gifUrl}
+                  alt={ex.nom}
+                  className="w-full aspect-[3/4] bg-muted"
+                  autoPlayOnHover
+                />
                 <CardContent className="p-3 space-y-2">
                   <div className="font-medium">{ex.nom}</div>
                   <AlertDialog>
@@ -273,9 +295,8 @@ export default function ExercicesPublicsTab() {
                 <Input value={editing.tags} onChange={(e) => setEditing({ ...editing, tags: e.target.value })} />
               </div>
               <VideoUpload
-                gifUrl={editing.gifUrl}
-                gifPath={editing.gifPath}
-                onGifChange={({ gifUrl, gifPath }) => setEditing({ ...editing, gifUrl, gifPath })}
+                value={editing.media}
+                onChange={(media) => setEditing({ ...editing, media })}
               />
             </div>
           )}

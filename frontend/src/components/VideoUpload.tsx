@@ -5,36 +5,54 @@ import { Upload, Loader2, CheckCircle, XCircle, Film, Trash2 } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { ExerciceMedia } from '@/components/ExerciceMedia';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
-interface VideoUploadProps {
-  gifUrl: string | null;      // URL signée pour affichage (preview)
-  gifPath: string | null;     // Chemin GCS pour stockage DB
-  onGifChange: (data: { gifUrl: string | null; gifPath: string | null }) => void;
+/** Les six champs média d'un exercice, tels qu'ils circulent dans les formulaires. */
+export interface ExerciceMediaValue {
+  videoUrl: string | null;
+  videoPath: string | null;
+  posterUrl: string | null;
+  posterPath: string | null;
+  /** Legacy : lecture seule ici. Une vidéo qui arrive l'efface. */
+  gifUrl: string | null;
+  gifPath: string | null;
 }
 
-export default function VideoUpload({ gifUrl, gifPath, onGifChange }: VideoUploadProps) {
+export const EMPTY_MEDIA: ExerciceMediaValue = {
+  videoUrl: null, videoPath: null,
+  posterUrl: null, posterPath: null,
+  gifUrl: null, gifPath: null,
+};
+
+interface VideoUploadProps {
+  value: ExerciceMediaValue;
+  onChange: (value: ExerciceMediaValue) => void;
+}
+
+export default function VideoUpload({ value, onChange }: VideoUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const ACCEPTED_FORMATS = ['video/mp4', 'video/quicktime', 'video/x-msvideo'];
-  const MAX_SIZE_MB = 30;
+  const MAX_SIZE_MB = 50; // doit rester aligné sur VIDEO_CONFIG.maxSizeMB côté backend
+  const MAX_DURATION_S = 15;
 
   const validateFile = (file: File): string | null => {
     if (!ACCEPTED_FORMATS.includes(file.type)) {
       return 'Format non supporté. Formats acceptés : MP4, MOV, AVI';
     }
-
     const sizeInMB = file.size / (1024 * 1024);
     if (sizeInMB > MAX_SIZE_MB) {
-      return `Fichier trop volumineux (${sizeInMB.toFixed(1)}MB). Taille max : ${MAX_SIZE_MB}MB`;
+      // Même formulation que le backend : le kiné doit savoir quoi faire, pas
+      // seulement que c'est refusé.
+      return `Vidéo trop lourde (${Math.round(sizeInMB)} Mo, maximum ${MAX_SIZE_MB} Mo). Filme en 1080p plutôt qu'en 4K, ou raccourcis la séquence.`;
     }
-
     return null;
   };
 
@@ -47,15 +65,14 @@ export default function VideoUpload({ gifUrl, gifPath, onGifChange }: VideoUploa
       return;
     }
 
-    setVideoFile(file);
     setIsUploading(true);
-    setUploadProgress('Upload de la vidéo...');
+    setUploadProgress('Envoi de la vidéo...');
 
     try {
       const formData = new FormData();
       formData.append('video', file);
 
-      setUploadProgress('Conversion en GIF (peut prendre 10-30s)...');
+      setUploadProgress('Conversion en vidéo 720p (10-30 s)...');
 
       const res = await fetchWithAuth(`${apiUrl}/exercices/upload-video`, {
         method: 'POST',
@@ -64,22 +81,28 @@ export default function VideoUpload({ gifUrl, gifPath, onGifChange }: VideoUploa
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.error || 'Erreur lors de l\'upload');
+        throw new Error(errorData.error || "Erreur lors de l'upload");
       }
 
       const data = await res.json();
-      setUploadProgress('GIF généré avec succès !');
-      // Retourne gifPath (pour DB) et gifUrl (URL signée pour affichage)
-      onGifChange({ gifPath: data.gifPath, gifUrl: data.gifUrl });
+      setUploadProgress('Vidéo prête !');
+      setDimensions(data.width && data.height ? { width: data.width, height: data.height } : null);
 
-      setTimeout(() => {
-        setUploadProgress('');
-      }, 2000);
+      // La vidéo remplace le GIF legacy, ici comme en base : sans ça l'état
+      // resterait ambigu entre le formulaire et le serveur.
+      onChange({
+        videoUrl: data.videoUrl,
+        videoPath: data.videoPath,
+        posterUrl: data.posterUrl,
+        posterPath: data.posterPath,
+        gifUrl: null,
+        gifPath: null,
+      });
 
+      setTimeout(() => setUploadProgress(''), 2000);
     } catch (err) {
       console.error('Erreur upload vidéo:', err);
-      setError(err instanceof Error ? err.message : 'Erreur lors de l\'upload');
-      setVideoFile(null);
+      setError(err instanceof Error ? err.message : "Erreur lors de l'upload");
     } finally {
       setIsUploading(false);
     }
@@ -112,15 +135,18 @@ export default function VideoUpload({ gifUrl, gifPath, onGifChange }: VideoUploa
     }
   };
 
-  const handleRemoveGif = () => {
-    onGifChange({ gifUrl: null, gifPath: null });
-    setVideoFile(null);
+  const handleRemoveMedia = () => {
+    onChange(EMPTY_MEDIA);
+    setDimensions(null);
     setError(null);
     setUploadProgress('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
+
+  const hasMedia = Boolean(value.videoUrl || value.gifUrl);
+  const isPortrait = dimensions !== null && dimensions.height > dimensions.width;
 
   return (
     <div className="space-y-3">
@@ -129,39 +155,63 @@ export default function VideoUpload({ gifUrl, gifPath, onGifChange }: VideoUploa
         Vidéo de démonstration (optionnel)
       </Label>
 
-      {gifUrl ? (
+      {hasMedia ? (
         <div className="space-y-3">
           <div className="relative rounded-lg border-2 border-green-500 bg-green-50 dark:bg-green-900/20 p-4">
             <div className="flex items-start gap-3">
               <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-1" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-green-900 dark:text-green-100">
-                  GIF de démonstration ajouté
+                  {value.videoUrl ? 'Vidéo de démonstration ajoutée' : 'GIF de démonstration (ancien format)'}
                 </p>
                 <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                  Le GIF sera affiché dans le chat patient
+                  {value.videoUrl
+                    ? 'Elle sera affichée dans le chat de tes patients.'
+                    : 'Envoie une nouvelle vidéo pour la remplacer : tes patients verront un mouvement net.'}
                 </p>
               </div>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={handleRemoveGif}
+                onClick={handleRemoveMedia}
+                aria-label="Retirer le média"
                 className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-100"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
             </div>
 
-            <div className="mt-3 rounded-md overflow-hidden bg-white dark:bg-gray-800">
-              <img
-                src={gifUrl}
-                alt="Aperçu du GIF"
-                className="w-full max-w-xs mx-auto rounded-md"
-                loading="lazy"
+            {/* Aperçu au cadrage exact de la vignette : le kiné voit ce que
+                verront ses patients avant de valider, plutôt qu'après. */}
+            <div className="mt-3">
+              <ExerciceMedia
+                videoUrl={value.videoUrl}
+                posterUrl={value.posterUrl}
+                gifUrl={value.gifUrl}
+                alt="Aperçu de la démonstration"
+                className="mx-auto aspect-video w-full max-w-xs rounded-md bg-muted"
+                autoPlayOnHover
               />
+              <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
+                Aperçu du cadrage affiché sur les vignettes.
+              </p>
             </div>
           </div>
+
+          {/* Conseillé, pas imposé : bloquer un kiné entre deux patients ne lui
+              laisse aucun recours. La vidéo entière est conservée, seul le
+              cadrage de la vignette rogne les côtés. */}
+          {isPortrait && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+              <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+              <p className="text-xs text-amber-800 dark:text-amber-200">
+                Vidéo filmée à la verticale : sur la vignette, seuls les côtés seront
+                rognés — la vidéo complète reste visible en grand. Pour un cadrage
+                idéal, filme à l&apos;horizontale.
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         <div
@@ -211,7 +261,7 @@ export default function VideoUpload({ gifUrl, gifPath, onGifChange }: VideoUploa
                     <span className="text-blue-600">parcours</span>
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    MP4, MOV, AVI • Max {MAX_SIZE_MB}MB
+                    MP4, MOV, AVI • Max {MAX_SIZE_MB} Mo
                   </p>
                 </div>
               </>
@@ -235,7 +285,8 @@ export default function VideoUpload({ gifUrl, gifPath, onGifChange }: VideoUploa
       )}
 
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        La vidéo sera convertie en GIF optimisé (320p). Durée max : 10 secondes.
+        La vidéo est convertie en MP4 720p, sans le son. Durée max : {MAX_DURATION_S} secondes.
+        Taille max : {MAX_SIZE_MB} Mo.
       </p>
     </div>
   );
