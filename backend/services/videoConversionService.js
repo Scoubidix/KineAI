@@ -121,8 +121,12 @@ function buildFilterChain(colorTransfer) {
       + `tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p`;
   }
 
+  // `iall=bt2020` et non `bt2020nc` : le filtre `colorspace` n'accepte comme
+  // « système » que bt470m, bt470bg, bt601-6-525, bt601-6-625, bt709,
+  // smpte170m, smpte240m et bt2020. `bt2020nc` fait échouer ffmpeg au
+  // lancement — donc ce repli, censé sauver le rendu, tuerait le transcodage.
   logger.warn('Source HDR sans zscale : repli sur colorspace=all=bt709 (rendu approximatif)');
-  return `${scale},colorspace=all=bt709:iall=bt2020nc:fast=1,format=yuv420p`;
+  return `${scale},colorspace=all=bt709:iall=bt2020:fast=1,format=yuv420p`;
 }
 
 /**
@@ -240,8 +244,16 @@ async function transcodeToMp4(inputPath, outputBaseName, probe) {
   const outputPath = path.join(os.tmpdir(), `${outputBaseName}.mp4`);
   const fileName = `${outputBaseName}.mp4`;
 
+  // La commande est capturée : si le délai gagne la course, il faut tuer le
+  // processus ffmpeg et effacer le fichier partiel. Sans ça, un transcodage
+  // qui déborde laisse un MP4 de plusieurs dizaines de Mo dans le dossier
+  // temporaire et un ffmpeg qui continue de tourner après l'erreur rendue au
+  // client — sur un serveur qui vit longtemps, ça s'accumule.
+  let command;
+  let timer;
+
   const conversion = new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
+    command = ffmpeg(inputPath)
       .outputOptions([
         '-vf', buildFilterChain(probe?.colorTransfer),
         '-c:v', 'libx264',
@@ -268,15 +280,30 @@ async function transcodeToMp4(inputPath, outputBaseName, probe) {
       .on('error', (err) => {
         logger.error('Erreur transcodage MP4:', err);
         reject(new Error(`Échec de la conversion vidéo: ${err.message}`));
-      })
-      .run();
+      });
+    command.run();
   });
 
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Conversion timeout: la vidéo prend trop de temps à convertir (max 3 minutes)')), TIMEOUT_MS)
-  );
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error('Conversion timeout: la vidéo prend trop de temps à convertir (max 3 minutes)')),
+      TIMEOUT_MS,
+    );
+  });
 
-  await Promise.race([conversion, timeout]);
+  try {
+    await Promise.race([conversion, timeout]);
+  } catch (error) {
+    try {
+      command?.kill('SIGKILL');
+    } catch (killError) {
+      logger.warn('Impossible de tuer le processus ffmpeg:', killError);
+    }
+    await fs.unlink(outputPath).catch(() => {});
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 
   const buffer = await fs.readFile(outputPath);
   const sizeInMB = parseFloat((buffer.length / (1024 * 1024)).toFixed(2));
@@ -310,8 +337,12 @@ async function extractPoster(inputPath, outputBaseName, probe) {
   const outputPath = path.join(os.tmpdir(), `${outputBaseName}.jpg`);
   const fileName = `${outputBaseName}.jpg`;
 
+  // Même garde que le transcodage : tuer ffmpeg et nettoyer si le délai gagne.
+  let command;
+  let timer;
+
   const extraction = new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
+    command = ffmpeg(inputPath)
       .seekInput(at)
       .outputOptions([
         '-frames:v', '1',
@@ -325,15 +356,27 @@ async function extractPoster(inputPath, outputBaseName, probe) {
       .on('error', (err) => {
         logger.error('Erreur extraction poster:', err);
         reject(new Error(`Échec de l'extraction du poster: ${err.message}`));
-      })
-      .run();
+      });
+    command.run();
   });
 
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Extraction poster timeout')), TIMEOUT_MS)
-  );
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Extraction poster timeout')), TIMEOUT_MS);
+  });
 
-  await Promise.race([extraction, timeout]);
+  try {
+    await Promise.race([extraction, timeout]);
+  } catch (error) {
+    try {
+      command?.kill('SIGKILL');
+    } catch (killError) {
+      logger.warn('Impossible de tuer le processus ffmpeg:', killError);
+    }
+    await fs.unlink(outputPath).catch(() => {});
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 
   const buffer = await fs.readFile(outputPath);
   await fs.unlink(outputPath).catch((err) =>
