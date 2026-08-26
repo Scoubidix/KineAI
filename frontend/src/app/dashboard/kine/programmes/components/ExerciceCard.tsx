@@ -174,9 +174,8 @@ export function ExerciceCard({
                 // stopPropagation, un clic dans l'explication cocherait la card.
                 onClick={(e) => e.stopPropagation()}
               >
-                Cet exercice date du format GIF : 320 px, saccadé, et lourd à charger
-                pour tes patients. Refilme-le depuis « Modifier » — la vidéo remplace
-                le GIF et tes patients voient un mouvement net.
+                La démo de cet exercice est en basse qualité. Refilme-la depuis
+                « Modifier » : tes patients verront le mouvement bien plus nettement.
               </PopoverContent>
             </Popover>
           )}

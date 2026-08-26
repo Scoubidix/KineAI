@@ -72,7 +72,7 @@ export default function VideoUpload({ value, onChange }: VideoUploadProps) {
       const formData = new FormData();
       formData.append('video', file);
 
-      setUploadProgress('Conversion en vidéo 720p (10-30 s)...');
+      setUploadProgress('Préparation de la vidéo (10-30 s)...');
 
       const res = await fetchWithAuth(`${apiUrl}/exercices/upload-video`, {
         method: 'POST',
@@ -271,6 +271,12 @@ export default function VideoUpload({ value, onChange }: VideoUploadProps) {
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     MP4, MOV, AVI • Max {MAX_SIZE_MB} Mo
                   </p>
+                  {/* Rappelé ici aussi : c'est le moment où le kiné choisit son
+                      fichier, donc le dernier où le conseil peut encore servir.
+                      Le bandeau ambre, lui, n'arrive qu'après l'envoi. */}
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
+                    Filme à l&apos;horizontale, téléphone couché
+                  </p>
                 </div>
               </>
             )}
@@ -292,9 +298,13 @@ export default function VideoUpload({ value, onChange }: VideoUploadProps) {
         </div>
       )}
 
+      {/* Le conseil de cadrage passe avant les contraintes : c'est le seul point
+          sur lequel le kiné peut encore agir au moment où il lit cette ligne. Le
+          format technique de sortie, lui, ne le concerne pas. */}
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        La vidéo est convertie en MP4 720p, sans le son. Durée max : {MAX_DURATION_S} secondes.
-        Taille max : {MAX_SIZE_MB} Mo.
+        Filme <span className="font-medium text-gray-700 dark:text-gray-300">à l&apos;horizontale</span>,
+        téléphone couché : c&apos;est le cadrage des vignettes, et tes patients voient
+        tout le mouvement. Durée max : {MAX_DURATION_S} secondes. Taille max : {MAX_SIZE_MB} Mo.
       </p>
     </div>
   );
