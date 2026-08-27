@@ -59,16 +59,30 @@ async function probeVideo(filePath) {
 }
 
 /**
- * Configuration du transcodage vidéo. 720p suffit sur une card de 300 px et
- * dans une lightbox de téléphone, pour moitié moins de poids qu'en 1080p.
+ * Configuration du transcodage vidéo.
+ *
+ * Le dimensionnement est piloté par la plus grande surface d'affichage, pas par
+ * la plus courante : les vignettes et les dialogues se contentent largement de
+ * 720p, mais le lecteur expose le plein écran natif, hors de portée de toute
+ * limite CSS. C'est ce cas-là qui fixe la résolution.
  */
 const VIDEO_CONFIG = {
   maxSizeMB: 50,      // couvre 15 s en 1080p, HEVC comme H.264
   maxDurationS: 15,   // assez pour un mouvement complet
-  height: 720,        // largeur automatique paire (H.264 l'exige)
-  crf: 23,
-  maxrate: '3M',      // plafond dur : ~5,5 Mo au pire pour 15 s
-  bufsize: '6M',
+  // Plafond du PETIT côté. 1080 et non 720 : le lecteur expose le plein écran
+  // natif, et sur un moniteur 27" (2560×1440, souvent 3840×2160) une source
+  // 720p y est agrandie 2 à 3 fois — visiblement pixelisée. Aucune limite CSS
+  // ne protège de ce chemin. L'autre côté est calculé automatiquement, pair
+  // (H.264 l'exige).
+  height: 1080,
+  // 21 plutôt que 23 : sur un fond uni tenu par une caméra fixe, ce sont les
+  // aplats qui trahissent la compression avant les détails. Le surcoût est
+  // marginal — les mesures réelles tournent à ~230 kbit/s, très loin du plafond.
+  crf: 21,
+  // Filet de sécurité, pas un objectif : à 1080p une séquence chargée pourrait
+  // frôler 3 Mbit/s et se dégrader visiblement. Relevé en conséquence.
+  maxrate: '6M',
+  bufsize: '12M',
   fps: 30,            // plafonne les sources 60 im/s
 };
 
@@ -101,19 +115,19 @@ function hasZscale() {
 
 /**
  * Chaîne de filtres commune à la vidéo et au poster : mise à l'échelle,
- * plafonnée à 720 sur le PETIT côté, puis tonemapping si la source est HDR. Le
+ * plafonnée à 1080 sur le PETIT côté, puis tonemapping si la source est HDR. Le
  * poster doit subir exactement le même traitement, sinon il ressort délavé
  * alors que la vidéo est correcte.
  *
- * Le petit côté (pas systématiquement la hauteur) est plafonné à 720 : une
- * source filmée en portrait (ex. 1080×1920) doit ressortir en 720×1280, pas en
- * 406×720 — `scale=-2:720` pinait la hauteur et laissait la largeur s'écraser.
+ * Le petit côté (pas systématiquement la hauteur) est plafonné à 1080 : une
+ * source filmée en portrait doit ressortir en 1080×1920, pas écrasée en
+ * paysage — `scale=-2:H` pinait la hauteur et laissait la largeur s'écraser.
  * Le paysage reste le cadrage RECOMMANDÉ (bandeau d'avertissement à l'upload,
  * inchangé), mais une source portrait uploadée quand même doit rester nette :
  * la source est supprimée après conversion, donc jamais ré-encodable.
  *
- * `min(720, i?)` empêche aussi l'upscale d'une source déjà sous les 720 sur
- * son petit côté (ex. 480×360 doit rester 480×360, pas doubler en 960×720).
+ * `min(1080, i?)` empêche aussi l'upscale d'une source déjà sous les 1080 sur
+ * son petit côté (ex. 480×360 doit rester 480×360, pas être agrandi).
  * `trunc(.../2)*2` force la parité du côté plafonné : H.264 exige des
  * dimensions paires, et `min()` seul ne la garantit pas sur une source de
  * largeur/hauteur impaire. Le côté opposé reste à `-2`, le sentinel ffmpeg qui
@@ -124,7 +138,7 @@ function hasZscale() {
  * `-vf` est présent (autorotate actif par défaut) et aplatie dans le flux.
  */
 function buildFilterChain(colorTransfer) {
-  const shortSide = VIDEO_CONFIG.height; // 720 : plafond du petit côté, pas de la hauteur
+  const shortSide = VIDEO_CONFIG.height; // plafond du PETIT côté, pas de la hauteur
   const capEven = (dim) => `trunc(min(${shortSide},${dim})/2)*2`;
   const scale =
     `scale='if(gt(iw,ih),-2,${capEven('iw')})':'if(gt(iw,ih),${capEven('ih')},-2)':flags=lanczos`;
@@ -252,8 +266,9 @@ async function convertVideoToGif(videoPath, outputFileName) {
 }
 
 /**
- * Transcoder une source en MP4 H.264 720p, sans audio, prêt pour la lecture en
- * flux. Le transcodage n'est pas optionnel : les iPhone filment en HEVC/H.265
+ * Transcoder une source en MP4 H.264 (petit côté plafonné à 1080), sans audio,
+ * prêt pour la lecture en flux.
+ * Le transcodage n'est pas optionnel : les iPhone filment en HEVC/H.265
  * par défaut, que ni Chrome ni Firefox ne lisent.
  */
 async function transcodeToMp4(inputPath, outputBaseName, probe) {
