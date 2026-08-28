@@ -75,14 +75,24 @@ const VIDEO_CONFIG = {
   // ne protège de ce chemin. L'autre côté est calculé automatiquement, pair
   // (H.264 l'exige).
   height: 1080,
-  // 21 plutôt que 23 : sur un fond uni tenu par une caméra fixe, ce sont les
-  // aplats qui trahissent la compression avant les détails. Le surcoût est
-  // marginal — les mesures réelles tournent à ~230 kbit/s, très loin du plafond.
-  crf: 21,
-  // Filet de sécurité, pas un objectif : à 1080p une séquence chargée pourrait
-  // frôler 3 Mbit/s et se dégrader visiblement. Relevé en conséquence.
-  maxrate: '6M',
-  bufsize: '12M',
+  // Le curseur qualité. C'est CE réglage qu'il faut bouger si les vidéos
+  // paraissent molles, pas la résolution : 18 est la zone considérée comme
+  // visuellement transparente. À 21, une démo réelle sortait à ~1 Mbit/s en
+  // 1080p — très loin des 4 à 8 Mbit/s auxquels le 1080p se diffuse
+  // habituellement, et le mouvement s'en ressentait.
+  // Baisser encore (17, 16) si besoin : chaque point coûte environ 15 % de plus.
+  crf: 18,
+  // Vitesse d'encodage contre efficacité de compression. `slow` analyse
+  // beaucoup plus que `veryfast` : à CRF égal, il rend une image plus propre
+  // pour un poids comparable. Ça ne coûte que du CPU, et les clips font 15 s
+  // au maximum.
+  preset: 'slow',
+  // Filet de sécurité, pas un objectif. Il ne doit se déclencher que sur du
+  // contenu pathologique : s'il mord sur une prise ordinaire, il dégrade
+  // l'image en silence, ce qui est précisément le problème qu'on corrige.
+  // Plafond dur du pire cas : 15 s x 8 Mbit/s, soit ~15 Mo.
+  maxrate: '8M',
+  bufsize: '16M',
   fps: 30,            // plafonne les sources 60 im/s
 };
 
@@ -289,7 +299,7 @@ async function transcodeToMp4(inputPath, outputBaseName, probe) {
       .outputOptions([
         '-vf', buildFilterChain(probe?.colorTransfer),
         '-c:v', 'libx264',
-        '-preset', 'veryfast',
+        '-preset', VIDEO_CONFIG.preset,
         '-crf', String(VIDEO_CONFIG.crf),
         // Qualité constante mais plafond dur, pour borner le poids du fichier.
         '-maxrate', VIDEO_CONFIG.maxrate,

@@ -72,7 +72,7 @@ export default function VideoUpload({ value, onChange }: VideoUploadProps) {
       const formData = new FormData();
       formData.append('video', file);
 
-      setUploadProgress('Préparation de la vidéo (10-30 s)...');
+      setUploadProgress('Préparation de la vidéo (20-60 s)...');
 
       const res = await fetchWithAuth(`${apiUrl}/exercices/upload-video`, {
         method: 'POST',
