@@ -3,6 +3,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+/**
+ * Délai d'intention avant de lancer l'aperçu au survol (motif YouTube/Netflix).
+ * Sans lui, balayer la souris sur une grille de 25 exercices déclenche 25
+ * téléchargements de plusieurs Mo — les vidéos sont en `preload="none"`, donc
+ * c'est bien la lecture qui amorce le transfert. 500 ms : assez pour distinguer
+ * un survol volontaire d'un passage de souris, assez court pour ne pas donner
+ * l'impression que la vignette ne répond pas.
+ */
+const HOVER_INTENT_MS = 500;
+
 export interface ExerciceMediaProps {
   /** MP4 720p — prioritaire dès qu'il est présent. */
   videoUrl?: string | null;
@@ -96,6 +106,34 @@ export function ExerciceMedia({
     else play();
   }, [playing, play, stop]);
 
+  // Survol : on n'amorce la lecture qu'après HOVER_INTENT_MS passées sur la
+  // vignette. Le clic, lui, reste instantané — il exprime déjà l'intention.
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelHoverIntent = useCallback(() => {
+    if (hoverTimer.current === null) return;
+    clearTimeout(hoverTimer.current);
+    hoverTimer.current = null;
+  }, []);
+
+  const handleHoverStart = useCallback(() => {
+    cancelHoverIntent();
+    hoverTimer.current = setTimeout(() => {
+      hoverTimer.current = null;
+      play();
+    }, HOVER_INTENT_MS);
+  }, [cancelHoverIntent, play]);
+
+  const handleHoverEnd = useCallback(() => {
+    // Annuler d'abord : sinon un départ de souris avant l'échéance laisserait
+    // le minuteur lancer la lecture sur une vignette qu'on a déjà quittée.
+    cancelHoverIntent();
+    stop();
+  }, [cancelHoverIntent, stop]);
+
+  // Le minuteur ne doit survivre ni au démontage, ni à un changement de source.
+  useEffect(() => cancelHoverIntent, [cancelHoverIntent, videoUrl, gifUrl]);
+
   // Lecture au geste : seulement si personne ne pilote déjà la lecture depuis
   // l'extérieur (`autoPlay`), sinon le clic de l'utilisateur et le parent se
   // contrediraient.
@@ -120,8 +158,8 @@ export function ExerciceMedia({
           loop
           playsInline
           onError={() => setFailed(true)}
-          onMouseEnter={autoPlayOnHover && !isMobile ? play : undefined}
-          onMouseLeave={autoPlayOnHover && !isMobile ? stop : undefined}
+          onMouseEnter={autoPlayOnHover && !isMobile ? handleHoverStart : undefined}
+          onMouseLeave={autoPlayOnHover && !isMobile ? handleHoverEnd : undefined}
           // Rien ne se superpose plus au média : sur mobile, un bouton centré
           // masquait précisément la partie du mouvement qu'on vient regarder.
           // C'est donc la vidéo elle-même qui porte la commande.
