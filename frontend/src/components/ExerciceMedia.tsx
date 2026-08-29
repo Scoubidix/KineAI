@@ -161,6 +161,35 @@ export function ExerciceMedia({
           className={`${mediaClassName}${clickToPlay ? ' cursor-pointer' : ''}`}
         />
 
+        {/* Poster superposé, et non le seul attribut `poster` natif.
+            La spec HTML ne permet pas de revenir au poster : son « show poster
+            flag » tombe dès la première lecture et seul un `load()` le relève —
+            au prix d'un rechargement de la vidéo. Au repos, la balise réaffiche
+            donc son image 0, celle où le kiné est encore en position de départ,
+            alors que le poster est pris au milieu du mouvement : le retour de
+            survol sautait d'une image à l'autre.
+
+            Une image superposée qu'on fait apparaître au repos règle les deux
+            choses d'un coup — l'image de repos redevient le poster, et le
+            passage se fond au lieu de couper. C'est le motif de YouTube et
+            Netflix, pour cette raison précise.
+
+            `inset-0 m-auto` recentre quel que soit le cadrage : les appelants
+            passent aussi bien `h-full w-full object-cover` (grilles) que
+            `w-auto max-h-[70vh] object-contain` (panneau de détail).
+            `pointer-events-none` : le clic traverse et atteint la vidéo.
+            `motion-reduce` : pas de fondu si le système demande moins d'animations. */}
+        {posterUrl && (
+          <img
+            src={posterUrl}
+            alt=""
+            aria-hidden="true"
+            className={`pointer-events-none absolute inset-0 m-auto transition-opacity duration-200 motion-reduce:transition-none ${mediaClassName} ${
+              playing ? 'opacity-0' : 'opacity-100'
+            }`}
+          />
+        )}
+
       </div>
     );
   }
