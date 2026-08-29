@@ -71,24 +71,18 @@ export function ExerciceCard({
             // Décoratif : le nom est déjà affiché en texte juste sous la
             // vignette, le répéter le ferait annoncer deux fois.
             alt=""
-            // Nom accessible du bouton lecture/pause (voir `alt=""` ci-dessus) :
+            // Nom accessible de la commande de lecture (voir `alt=""` ci-dessus) :
             // sans lui, chaque carte de la grille annonce le même « Lire la
             // démonstration » générique au clavier et au lecteur d'écran.
             label={exercice.nom}
             className="aspect-video w-full bg-muted"
             // Pas de lecture au survol pendant une sélection : le geste sert à cocher.
             autoPlayOnHover={!selectable}
-            // En mode sélection, le bouton est retiré plutôt que rendu inerte :
-            // sur mobile il reste visible en permanence (pas de concept de
-            // survol), pile au centre de la vignette — sur une grille à 2
-            // colonnes (~165×93 px de média), c'est exactement là que le pouce
-            // tape pour cocher l'exercice. `stopPropagation` sur le bouton
-            // ferait alors jouer la vidéo au lieu de cocher, dans le flow
-            // principal « construire un programme au téléphone ». Hors
-            // sélection, l'affordance clavier reste inchangée ; en sélection,
-            // la vidéo reste atteignable via le bouton « i » →
-            // ExerciceDetailDialog, qui monte son propre ExerciceMedia.
-            showPlayButton={!selectable}
+            // Idem pour le clic : en mode sélection, taper sur la vignette coche
+            // l'exercice — c'est le flow principal « construire un programme au
+            // téléphone », il prime sur la lecture. La démo y reste atteignable
+            // par le « i », qui ouvre ExerciceDetailDialog et son propre média.
+            playOnClick={!selectable}
           />
 
           {/* Coche de sélection : ronde et blanche, le seul badge qui restera
@@ -156,10 +150,8 @@ export function ExerciceCard({
                   // En bas à gauche, et non en haut à droite : le haut-gauche
                   // accueille déjà la pastille « déjà ajouté », large elle aussi,
                   // et sur une card de 165 px les deux se chevauchent. Le bas
-                  // gauche est le seul coin libre en toutes circonstances — le
-                  // « i » est en bas à droite, et le bouton de lecture, centré,
-                  // ne coexiste jamais avec ce badge (il n'apparaît qu'avec une
-                  // vidéo, que ce badge exclut par construction).
+                  // gauche est le seul coin libre : le « i » est en bas à
+                  // droite.
                   className="absolute bottom-2 left-2 rounded-full bg-red-600 px-2 py-1 text-[10px] font-medium text-white shadow"
                 >
                   À refilmer

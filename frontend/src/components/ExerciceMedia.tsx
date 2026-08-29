@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export interface ExerciceMediaProps {
@@ -12,9 +11,9 @@ export interface ExerciceMediaProps {
   /** GIF legacy — affiché uniquement en l'absence de vidéo. */
   gifUrl?: string | null;
   alt?: string;
-  /** Nom accessible du bouton lecture/pause. À renseigner quand `alt` est
+  /** Nom accessible de la commande lecture/pause. À renseigner quand `alt` est
       volontairement vide (nom déjà affiché en texte à côté de la vignette) —
-      sinon chaque bouton d'une grille annonce le même « Lire la démonstration »
+      sinon chaque vignette d'une grille annonce le même « Lire la démonstration »
       générique, sans dire de quel exercice. Par défaut, reprend `alt`. */
   label?: string;
   /** Classes du conteneur : ratio, largeur, arrondi, fond. */
@@ -23,9 +22,10 @@ export interface ExerciceMediaProps {
   mediaClassName?: string;
   /** Grilles kiné : lecture au survol en desktop. Désactivé en mode sélection. */
   autoPlayOnHover?: boolean;
-  /** À passer à `false` là où le tap a déjà un rôle (carrousel : avancer d'une
-      vignette). Sans ça, le bouton centré capterait le geste. */
-  showPlayButton?: boolean;
+  /** Lecture au clic / au tap sur le média lui-même. À passer à `false` là où
+      le geste a déjà un rôle : carrousel (avancer d'une vignette), mode
+      sélection (cocher l'exercice). Sans ça, la lecture volerait le geste. */
+  playOnClick?: boolean;
   /** Lecture pilotée par le parent : `true` lance, `false` arrête et rembobine.
       Le carrousel s'en sert pour animer la seule vignette visible — le survol ne
       peut pas suffire là-bas, car une diapositive amenée sous le curseur par la
@@ -50,14 +50,11 @@ export function ExerciceMedia({
   className = '',
   mediaClassName = 'block h-full w-full object-cover',
   autoPlayOnHover = false,
-  showPlayButton = true,
+  playOnClick = true,
   autoPlay,
 }: ExerciceMediaProps) {
-  // Nom accessible du bouton : `label` s'il est fourni, sinon `alt`. Distinct
-  // de l'`aria-label` de la balise <video> elle-même (ligne plus bas), qui
-  // reste sur `alt` seul — décoratif quand `alt=""`, comme voulu par les
-  // appelants qui affichent déjà le nom en texte visible.
-  const playButtonLabel = label || alt;
+  // Nom accessible de la commande : `label` s'il est fourni, sinon `alt`.
+  const playLabel = label || alt;
   const [failed, setFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -94,6 +91,16 @@ export function ExerciceMedia({
     else stop();
   }, [autoPlay, play, stop]);
 
+  const toggle = useCallback(() => {
+    if (playing) stop();
+    else play();
+  }, [playing, play, stop]);
+
+  // Lecture au geste : seulement si personne ne pilote déjà la lecture depuis
+  // l'extérieur (`autoPlay`), sinon le clic de l'utilisateur et le parent se
+  // contrediraient.
+  const clickToPlay = playOnClick && autoPlay === undefined;
+
   // Une URL signée peut avoir expiré (brouillon repris longtemps après) : on
   // retombe alors sur le bloc vide plutôt que sur une image cassée.
   if (videoUrl && !failed) {
@@ -112,54 +119,48 @@ export function ExerciceMedia({
           muted
           loop
           playsInline
-          aria-label={alt || undefined}
           onError={() => setFailed(true)}
           onMouseEnter={autoPlayOnHover && !isMobile ? play : undefined}
           onMouseLeave={autoPlayOnHover && !isMobile ? stop : undefined}
-          className={mediaClassName}
+          // Rien ne se superpose plus au média : sur mobile, un bouton centré
+          // masquait précisément la partie du mouvement qu'on vient regarder.
+          // C'est donc la vidéo elle-même qui porte la commande.
+          //
+          // Elle en porte alors aussi le rôle et le nom accessibles, et devient
+          // atteignable au clavier : une démonstration d'exercice n'est pas
+          // décorative, un kiné qui navigue au clavier doit pouvoir la lancer
+          // (WCAG 2.1.1, niveau A). Espace et Entrée sont les deux touches
+          // attendues d'un `role="button"`.
+          role={clickToPlay ? 'button' : undefined}
+          tabIndex={clickToPlay ? 0 : undefined}
+          aria-label={
+            clickToPlay
+              ? `${playing ? 'Arrêter' : 'Lire'} la démonstration${playLabel ? ` de ${playLabel}` : ''}`
+              : alt || undefined
+          }
+          onClick={
+            clickToPlay
+              ? (e) => {
+                  // Le geste sert à lire, pas à déclencher ce que fait un
+                  // ancêtre cliquable.
+                  e.stopPropagation();
+                  toggle();
+                }
+              : undefined
+          }
+          onKeyDown={
+            clickToPlay
+              ? (e) => {
+                  if (e.key !== ' ' && e.key !== 'Enter') return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggle();
+                }
+              : undefined
+          }
+          className={`${mediaClassName}${clickToPlay ? ' cursor-pointer' : ''}`}
         />
 
-        {/* Bouton de lecture, monté dès que `showPlayButton` (true par défaut)
-            — c'est ce qui le rend atteignable au clavier. Une démonstration
-            d'exercice n'est pas décorative : sans ce bouton, un kiné qui navigue
-            au clavier ne voit jamais le mouvement, seulement une image figée
-            (WCAG 2.1.1, niveau A). `showPlayButton={false}` le retire là où le
-            tap a déjà un rôle (carrousel : avancer d'une vignette) — sans ça,
-            le bouton centré capterait le geste.
-
-            Sur mobile le survol n'existe pas : le bouton reste visible en
-            permanence, comme aujourd'hui.
-
-            Sur desktop il n'apparaît QU'À la prise de focus clavier, et reste
-            `pointer-events-none` le reste du temps. C'est délibéré : le révéler
-            au survol placerait une cible de clic de 44 px au centre de la card,
-            qui avalerait le clic servant à cocher l'exercice en mode sélection.
-            Le comportement souris existant est donc strictement inchangé — le
-            survol continue de lancer l'aperçu, et rien d'autre ne bouge.
-
-            `stopPropagation` : lancer la lecture ne coche jamais l'exercice. */}
-        {showPlayButton && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (playing) stop();
-              else play();
-            }}
-            aria-label={playing ? `Arrêter la démonstration${playButtonLabel ? ` de ${playButtonLabel}` : ''}` : `Lire la démonstration${playButtonLabel ? ` de ${playButtonLabel}` : ''}`}
-            className={`absolute inset-0 m-auto flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white shadow-lg backdrop-blur-sm transition-opacity ${
-              isMobile
-                ? ''
-                : 'opacity-0 pointer-events-none focus-visible:opacity-100 focus-visible:pointer-events-auto'
-            }`}
-          >
-            {playing ? (
-              <Pause className="h-5 w-5" fill="currentColor" />
-            ) : (
-              <Play className="h-5 w-5 translate-x-[1px]" fill="currentColor" />
-            )}
-          </button>
-        )}
       </div>
     );
   }

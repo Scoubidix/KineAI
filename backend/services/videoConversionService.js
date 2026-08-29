@@ -369,13 +369,19 @@ async function transcodeToMp4(inputPath, outputBaseName, probe) {
 }
 
 /**
- * Extraire l'image d'aperçu. À une seconde plutôt qu'à zéro : la première image
- * d'une vidéo de téléphone est souvent floue, ou montre la main qui vient
- * d'appuyer. Sur une source plus courte, on prend le milieu.
+ * Extraire l'image d'aperçu, au MILIEU de la séquence.
+ *
+ * Ni à zéro ni à une seconde : au début, un kiné est encore en position de
+ * départ — souvent immobile, parfois la main sur le téléphone qu'il vient de
+ * lancer. À mi-parcours, le mouvement est à son amplitude, et la vignette suffit
+ * à reconnaître l'exercice sans le lire.
+ *
+ * Repli à zéro si `ffprobe` n'a pas su donner la durée : mieux vaut une première
+ * image qu'aucun poster, la vidéo retomberait alors sur `preload="metadata"`.
  */
 async function extractPoster(inputPath, outputBaseName, probe) {
   const TIMEOUT_MS = 60000;
-  const at = probe?.duration ? Math.min(1, probe.duration / 2) : 0;
+  const at = probe?.duration ? probe.duration / 2 : 0;
   const outputPath = path.join(os.tmpdir(), `${outputBaseName}.jpg`);
   const fileName = `${outputBaseName}.jpg`;
 

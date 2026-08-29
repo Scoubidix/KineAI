@@ -116,9 +116,9 @@ export function MediaCarousel({
               // carrousel est actif, au survol sur desktop comme au premier
               // appui sur mobile — et on n'anime que celle-là.
               autoPlay={active && i === index}
-              // Pas de bouton centré : ici le tap sert à avancer d'une vignette,
-              // et il le capterait.
-              showPlayButton={false}
+              // Pas de lecture au clic : ici le tap sert à avancer d'une
+              // vignette, et la lecture lui volerait le geste.
+              playOnClick={false}
             />
           </div>
         ))}
