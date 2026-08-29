@@ -216,13 +216,15 @@ export function ExerciceMedia({
             passent aussi bien `h-full w-full object-cover` (grilles) que
             `w-auto max-h-[70vh] object-contain` (panneau de détail).
             `pointer-events-none` : le clic traverse et atteint la vidéo.
-            `motion-reduce` : pas de fondu si le système demande moins d'animations. */}
+            `motion-reduce` : pas de fondu du tout si le système demande moins
+            d'animations — c'est la première chose à vérifier si le fondu semble
+            absent (Windows : Accessibilité › Effets visuels › Effets d'animation). */}
         {posterUrl && (
           <img
             src={posterUrl}
             alt=""
             aria-hidden="true"
-            className={`pointer-events-none absolute inset-0 m-auto transition-opacity duration-200 motion-reduce:transition-none ${mediaClassName} ${
+            className={`pointer-events-none absolute inset-0 m-auto transition-opacity duration-700 ease-out motion-reduce:transition-none ${mediaClassName} ${
               playing ? 'opacity-0' : 'opacity-100'
             }`}
           />
