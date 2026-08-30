@@ -161,6 +161,13 @@ export function ExerciceMedia({
   // contrediraient.
   const clickToPlay = playOnClick && autoPlay === undefined;
 
+  // Le survol est un mécanisme d'APERÇU : il lance au survol et rembobine au
+  // départ de la souris. Il n'a aucun sens là où la vidéo tourne déjà en boucle
+  // parce qu'on a ouvert la surface pour ça — il reprendrait la main et
+  // rembobinerait la démo au premier passage de souris. `autoPlayOnMount` le
+  // désactive donc, même si un appelant passe les deux.
+  const hoverEnabled = autoPlayOnHover && !isMobile && !autoPlayOnMount;
+
   // Une URL signée peut avoir expiré (brouillon repris longtemps après) : on
   // retombe alors sur le bloc vide plutôt que sur une image cassée.
   if (videoUrl && !failed) {
@@ -180,8 +187,8 @@ export function ExerciceMedia({
           loop
           playsInline
           onError={() => setFailed(true)}
-          onMouseEnter={autoPlayOnHover && !isMobile ? handleHoverStart : undefined}
-          onMouseLeave={autoPlayOnHover && !isMobile ? handleHoverEnd : undefined}
+          onMouseEnter={hoverEnabled ? handleHoverStart : undefined}
+          onMouseLeave={hoverEnabled ? handleHoverEnd : undefined}
           // Rien ne se superpose plus au média : sur mobile, un bouton centré
           // masquait précisément la partie du mouvement qu'on vient regarder.
           // C'est donc la vidéo elle-même qui porte la commande.
