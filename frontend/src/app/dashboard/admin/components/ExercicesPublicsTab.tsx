@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,8 @@ import VideoUpload, { type ExerciceMediaValue } from '@/components/VideoUpload';
 import { ExerciceMedia } from '@/components/ExerciceMedia';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Users } from 'lucide-react';
+import { matchesSearch } from '@/utils/exerciceFiltering';
+import { Loader2, Search, Users } from 'lucide-react';
 
 export interface PublicExercice {
   id: number;
@@ -65,6 +66,24 @@ export default function ExercicesPublicsTab() {
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<EditState | null>(null);
   const [legacyGifCount, setLegacyGifCount] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+
+  // Même moteur que la bibliothèque côté kiné (`matchesSearch`) : multi-mots,
+  // insensible aux accents et à la casse, sur nom + description + tags. Le
+  // filtrage est côté client — les deux listes sont déjà chargées en entier.
+  // Les exos privés n'ont pas de description dans cette vue : on passe une
+  // chaîne vide plutôt que d'élargir le contrat de la fonction.
+  const filteredPublics = useMemo(
+    () => publics.filter((ex) => matchesSearch({ ...ex, tags: ex.tags ?? undefined }, search)),
+    [publics, search],
+  );
+  const filteredPrivates = useMemo(
+    () =>
+      privates.filter((ex) =>
+        matchesSearch({ nom: ex.nom, description: '', tags: ex.tags ?? undefined }, search),
+      ),
+    [privates, search],
+  );
 
   const loadLegacyGifCount = async () => {
     const res = await fetchWithAuth(`${API_BASE}/exercices/admin/legacy-gif-count`);
@@ -184,24 +203,49 @@ export default function ExercicesPublicsTab() {
         )}
       </div>
 
+      {/* Même barre que la bibliothèque côté kiné : elle filtre les DEUX
+          sections d'un coup, publics et privés. Sans elle, la page devient
+          impraticable dès que la bibliothèque publique s'étoffe. */}
+      <div className="relative w-full sm:w-80">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <Input
+          className="pl-10"
+          placeholder="Rechercher un exercice…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Rechercher un exercice"
+        />
+      </div>
+
       <section>
-        <h3 className="text-lg font-semibold mb-3">Bibliothèque publique</h3>
+        <h3 className="text-lg font-semibold mb-3">
+          Bibliothèque publique
+          {search && (
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {filteredPublics.length} / {publics.length}
+            </span>
+          )}
+        </h3>
         {loading ? (
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
           </div>
-        ) : publics.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucun exercice public pour le moment.</p>
+        ) : filteredPublics.length === 0 ? (
+          // Distinguer « la bibliothèque est vide » de « la recherche ne donne
+          // rien » : sinon un admin croit avoir perdu ses exercices.
+          <p className="text-sm text-muted-foreground">
+            {search ? 'Aucun exercice public ne correspond à cette recherche.' : 'Aucun exercice public pour le moment.'}
+          </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {publics.map((ex) => (
+            {filteredPublics.map((ex) => (
               <Card key={ex.id} className="overflow-hidden">
                 <ExerciceMedia
                   videoUrl={ex.videoUrl}
                   posterUrl={ex.posterUrl}
                   gifUrl={ex.gifUrl}
                   alt={ex.nom}
-                  className="w-full aspect-[3/4] bg-muted"
+                  className="w-full aspect-video bg-muted"
                   autoPlayOnHover
                 />
                 <CardContent className="p-3 space-y-2">
@@ -257,19 +301,28 @@ export default function ExercicesPublicsTab() {
       </section>
 
       <section>
-        <h3 className="text-lg font-semibold mb-3">Mes exos privés</h3>
-        {privates.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucun exercice privé à promouvoir.</p>
+        <h3 className="text-lg font-semibold mb-3">
+          Mes exos privés
+          {search && (
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {filteredPrivates.length} / {privates.length}
+            </span>
+          )}
+        </h3>
+        {filteredPrivates.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {search ? 'Aucun exercice privé ne correspond à cette recherche.' : 'Aucun exercice privé à promouvoir.'}
+          </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {privates.map((ex) => (
+            {filteredPrivates.map((ex) => (
               <Card key={ex.id} className="overflow-hidden">
                 <ExerciceMedia
                   videoUrl={ex.videoUrl}
                   posterUrl={ex.posterUrl}
                   gifUrl={ex.gifUrl}
                   alt={ex.nom}
-                  className="w-full aspect-[3/4] bg-muted"
+                  className="w-full aspect-video bg-muted"
                   autoPlayOnHover
                 />
                 <CardContent className="p-3 space-y-2">
