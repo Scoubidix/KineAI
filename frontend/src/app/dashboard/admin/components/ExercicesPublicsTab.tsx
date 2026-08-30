@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +67,48 @@ export default function ExercicesPublicsTab() {
   const [editing, setEditing] = useState<EditState | null>(null);
   const [legacyGifCount, setLegacyGifCount] = useState<number | null>(null);
   const [search, setSearch] = useState('');
+  // Lecteur du dialogue d'édition : sert à choisir l'image de la miniature.
+  const posterVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [posterBusy, setPosterBusy] = useState(false);
+
+  /**
+   * Régénère la miniature à l'instant affiché dans le lecteur.
+   *
+   * N'écrit rien en base : la route renvoie le chemin, on le pose dans l'état
+   * du formulaire, et c'est « Enregistrer » qui le persiste — le backend traite
+   * alors l'ancienne miniature comme un orphelin et la supprime de GCS. C'est
+   * le même chemin que le remplacement d'une vidéo.
+   */
+  const handleUsePosterFrame = async () => {
+    const video = posterVideoRef.current;
+    if (!editing || !video) return;
+
+    setPosterBusy(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/exercices/admin/${editing.id}/poster`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ atSeconds: video.currentTime }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Échec de la génération');
+      }
+      const data = await res.json();
+      setEditing((prev) =>
+        prev ? { ...prev, media: { ...prev.media, posterPath: data.posterPath, posterUrl: data.posterUrl } } : prev,
+      );
+      toast({ title: 'Miniature mise à jour', description: "Enregistre pour l'appliquer." });
+    } catch (e) {
+      toast({
+        title: 'Échec',
+        description: e instanceof Error ? e.message : 'Erreur',
+        variant: 'destructive',
+      });
+    } finally {
+      setPosterBusy(false);
+    }
+  };
 
   // Même moteur que la bibliothèque côté kiné (`matchesSearch`) : multi-mots,
   // insensible aux accents et à la casse, sur nom + description + tags. Le
@@ -376,6 +418,44 @@ export default function ExercicesPublicsTab() {
                 <Label>Tags (séparés par des virgules)</Label>
                 <Input value={editing.tags} onChange={(e) => setEditing({ ...editing, tags: e.target.value })} />
               </div>
+
+              {/* Choix de la miniature. Le lecteur natif sert de sélecteur
+                  d'image : l'admin déplace le curseur jusqu'à l'image voulue et
+                  valide — il voit exactement ce qu'il choisit, sans slider à
+                  part. L'extraction se fait côté serveur, avec la même chaîne
+                  de filtres que la miniature automatique, sinon une image
+                  choisie à la main sortirait avec un rendu différent. */}
+              {editing.media.videoUrl && (
+                <div className="space-y-2 rounded-md border p-3">
+                  <Label>Miniature</Label>
+                  <video
+                    ref={posterVideoRef}
+                    src={editing.media.videoUrl}
+                    poster={editing.media.posterUrl ?? undefined}
+                    controls
+                    muted
+                    playsInline
+                    preload="metadata"
+                    className="w-full rounded bg-muted"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleUsePosterFrame}
+                      disabled={posterBusy}
+                    >
+                      {posterBusy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Utiliser cette image
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Place le curseur sur l&apos;image voulue.
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <VideoUpload
                 value={editing.media}
                 onChange={(media) => setEditing({ ...editing, media })}

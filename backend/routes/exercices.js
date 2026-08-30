@@ -72,6 +72,13 @@ router.get('/tags', authenticate, exercicesController.getAllTags);
 // ===== ROUTES ADMIN (gestion de la bibliothèque publique) =====
 router.get('/admin/legacy-gif-count', authenticate, requireAdmin, exercicesController.getLegacyGifCount);
 router.get('/admin/public', authenticate, requireAdmin, exercicesController.getAdminPublicExercices);
+// Régénération de la miniature à un instant choisi.
+// `crudWriteLimiter` (30/min) et non `videoUploadLimiter` (3/min) : choisir la
+// bonne image est un geste d'essai-erreur, un admin en tentera plusieurs
+// d'affilée. L'opération reste bien plus légère qu'un upload — pas de
+// transcodage, une seule image extraite — et la route est déjà fermée aux
+// non-admins.
+router.post('/admin/:id/poster', authenticate, requireAdmin, crudWriteLimiter, exercicesController.adminRegeneratePoster);
 router.patch('/admin/:id/publish', authenticate, requireAdmin, exercicesController.publishExercice);
 router.patch('/admin/:id/unpublish', authenticate, requireAdmin, exercicesController.unpublishExercice);
 router.put('/admin/:id', authenticate, requireAdmin, validate(updateExerciceSchema), exercicesController.adminUpdateExercice);

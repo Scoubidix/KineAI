@@ -119,6 +119,38 @@ async function generateSignedUrl(gifPath, expirationMs = DEFAULT_SIGNED_URL_EXPI
  * Sert aussi bien aux MP4 et aux posters qu'aux GIF legacy.
  * @param {string} mediaPath - Chemin du fichier (ex: "exercices/123_demo.mp4")
  */
+/**
+ * Rapatrie un média d'exercice depuis GCS vers un fichier local.
+ *
+ * Sert à re-générer un poster à un autre instant : la source d'origine est
+ * supprimée après conversion, donc la seule vidéo disponible est celle du
+ * bucket, et ffmpeg a besoin d'un fichier local.
+ *
+ * Même garde de préfixe que la suppression : un chemin arbitraire ne doit pas
+ * permettre de rapatrier un avatar, un contrat ou une pièce jointe de support.
+ *
+ * @param {string} mediaPath - Chemin GCS (ex: "exercices/123_demo.mp4")
+ * @param {string} destination - Chemin local du fichier à écrire
+ */
+async function downloadExerciceMedia(mediaPath, destination) {
+  if (!mediaPath) {
+    throw new Error('Chemin de fichier manquant');
+  }
+  if (!mediaPath.startsWith(EXERCICES_FOLDER)) {
+    logger.error('Tentative de téléchargement hors du dossier exercices:', mediaPath);
+    throw new Error('Chemin de fichier non autorisé');
+  }
+
+  const file = bucket.file(mediaPath);
+  const [exists] = await file.exists();
+  if (!exists) {
+    throw new Error(`Fichier introuvable sur GCS: ${mediaPath}`);
+  }
+
+  await file.download({ destination });
+  logger.info(`Média d'exercice rapatrié depuis GCS: ${mediaPath}`);
+}
+
 async function deleteExerciceMedia(mediaPath) {
   try {
     if (!mediaPath) {
@@ -544,6 +576,7 @@ async function deleteNouveauteImage(imagePath) {
 module.exports = {
   uploadGif, // DEPRECATED — transition GIF → vidéo
   uploadExerciceFile,
+  downloadExerciceMedia,
   generateSignedUrl,
   signExerciceMediaUrls,
   generateDemoSignedUrl,

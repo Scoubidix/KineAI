@@ -378,10 +378,22 @@ async function transcodeToMp4(inputPath, outputBaseName, probe) {
  *
  * Repli à zéro si `ffprobe` n'a pas su donner la durée : mieux vaut une première
  * image qu'aucun poster, la vidéo retomberait alors sur `preload="metadata"`.
+ *
+ * `atSeconds` permet à la console d'admin d'imposer un autre instant, choisi
+ * dans le lecteur : le milieu est un bon défaut automatique, pas toujours la
+ * meilleure image d'un mouvement donné.
  */
-async function extractPoster(inputPath, outputBaseName, probe) {
+async function extractPoster(inputPath, outputBaseName, probe, atSeconds) {
   const TIMEOUT_MS = 60000;
-  const at = probe?.duration ? probe.duration / 2 : 0;
+  // Instant choisi par l'appelant (console d'admin) s'il est exploitable,
+  // sinon le milieu par défaut. Borné à la durée : un instant au-delà de la fin
+  // ne rendrait aucune image et ffmpeg échouerait sur un fichier vide.
+  const duration = probe?.duration ?? null;
+  const requested = Number.isFinite(atSeconds) && atSeconds >= 0 ? atSeconds : null;
+  const at =
+    requested !== null
+      ? (duration ? Math.min(requested, Math.max(duration - 0.1, 0)) : requested)
+      : (duration ? duration / 2 : 0);
   const outputPath = path.join(os.tmpdir(), `${outputBaseName}.jpg`);
   const fileName = `${outputBaseName}.jpg`;
 

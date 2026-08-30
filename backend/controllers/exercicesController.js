@@ -217,6 +217,64 @@ exports.unpublishExercice = async (req, res) => {
 };
 
 // ADMIN : éditer n'importe quel exo public
+// ADMIN : régénère la miniature d'un exercice public à un instant choisi dans
+// sa vidéo. La source d'origine étant supprimée après conversion, la seule
+// vidéo disponible est celle du bucket : on la rapatrie le temps d'extraire
+// une image, avec la MÊME chaîne de filtres que le poster automatique — sinon
+// une miniature choisie à la main sortirait avec un rendu différent.
+//
+// N'écrit RIEN en base : elle renvoie le chemin, et c'est l'enregistrement du
+// formulaire qui le persiste. `resolveMediaPaths` traite alors l'ancien poster
+// comme un orphelin et `deleteOrphanMedia` l'efface — exactement le chemin
+// déjà emprunté par le remplacement d'une vidéo, aucune règle en double.
+exports.adminRegeneratePoster = async (req, res) => {
+  const videoConversionService = require('../services/videoConversionService');
+  const fs = require('fs').promises;
+  const os = require('os');
+  const path = require('path');
+
+  const { id } = req.params;
+  const { atSeconds } = req.body;
+
+  if (!Number.isFinite(atSeconds) || atSeconds < 0) {
+    return res.status(400).json({ error: 'Instant invalide' });
+  }
+
+  let localVideo = null;
+  try {
+    const prisma = prismaService.getInstance();
+    const exercice = await prisma.exerciceModele.findUnique({ where: { id: parseInt(id) } });
+
+    if (!exercice || !exercice.isPublic) {
+      return res.status(404).json({ error: 'Exercice public introuvable' });
+    }
+    if (!exercice.videoPath) {
+      return res.status(400).json({ error: "Cet exercice n'a pas de vidéo : impossible d'en extraire une image." });
+    }
+
+    const baseName = `exercice_${Date.now()}`;
+    localVideo = path.join(os.tmpdir(), `${baseName}_source.mp4`);
+    await gcsStorageService.downloadExerciceMedia(exercice.videoPath, localVideo);
+
+    const probe = await videoConversionService.probeVideo(localVideo);
+    const poster = await videoConversionService.extractPoster(localVideo, baseName, probe, atSeconds);
+    const posterPath = await gcsStorageService.uploadExerciceFile(poster.buffer, poster.fileName, 'image/jpeg');
+    const posterUrl = await gcsStorageService.generateSignedUrl(posterPath);
+
+    logger.info(`Miniature régénérée à ${atSeconds}s pour l'exercice ${id}: ${posterPath}`);
+    res.json({ posterPath, posterUrl });
+  } catch (err) {
+    logger.error('Erreur régénération de la miniature :', err);
+    res.status(500).json({ error: 'Erreur lors de la génération de la miniature' });
+  } finally {
+    if (localVideo) {
+      await fs.unlink(localVideo).catch((e) =>
+        logger.warn('Erreur suppression de la vidéo temporaire :', e)
+      );
+    }
+  }
+};
+
 exports.adminUpdateExercice = async (req, res) => {
   const { id } = req.params;
   const { nom, description, tags } = req.body;
