@@ -13,6 +13,13 @@ import { useIsMobile } from '@/hooks/use-mobile';
  */
 const HOVER_INTENT_MS = 500;
 
+/**
+ * Délai avant le démarrage automatique dans un panneau ouvert exprès pour voir
+ * l'exercice. Pas zéro : laisser le poster une demi-seconde évite que le
+ * panneau s'ouvre déjà en mouvement, et laisse le fondu se voir.
+ */
+const OPEN_AUTOPLAY_MS = 500;
+
 export interface ExerciceMediaProps {
   /** MP4 720p — prioritaire dès qu'il est présent. */
   videoUrl?: string | null;
@@ -36,6 +43,10 @@ export interface ExerciceMediaProps {
       le geste a déjà un rôle : carrousel (avancer d'une vignette), mode
       sélection (cocher l'exercice). Sans ça, la lecture volerait le geste. */
   playOnClick?: boolean;
+  /** Démarre seule peu après l'affichage. Réservé aux surfaces qu'on ouvre
+      exprès pour regarder la démo (panneau de détail) : le kiné a déjà exprimé
+      son intention en cliquant, lui redemander un geste est une friction. */
+  autoPlayOnMount?: boolean;
   /** Lecture pilotée par le parent : `true` lance, `false` arrête et rembobine.
       Le carrousel s'en sert pour animer la seule vignette visible — le survol ne
       peut pas suffire là-bas, car une diapositive amenée sous le curseur par la
@@ -61,6 +72,7 @@ export function ExerciceMedia({
   mediaClassName = 'block h-full w-full object-cover',
   autoPlayOnHover = false,
   playOnClick = true,
+  autoPlayOnMount = false,
   autoPlay,
 }: ExerciceMediaProps) {
   // Nom accessible de la commande : `label` s'il est fourni, sinon `alt`.
@@ -133,6 +145,16 @@ export function ExerciceMedia({
 
   // Le minuteur ne doit survivre ni au démontage, ni à un changement de source.
   useEffect(() => cancelHoverIntent, [cancelHoverIntent, videoUrl, gifUrl]);
+
+  // Démarrage automatique à l'affichage, pour les surfaces ouvertes exprès.
+  // `autoPlay` (pilotage externe) reste prioritaire : deux sources de vérité se
+  // contrediraient. Le minuteur est annulé au démontage — un panneau refermé
+  // avant l'échéance ne doit pas lancer une vidéo qui n'est plus à l'écran.
+  useEffect(() => {
+    if (!autoPlayOnMount || autoPlay !== undefined || !videoUrl) return;
+    const timer = setTimeout(play, OPEN_AUTOPLAY_MS);
+    return () => clearTimeout(timer);
+  }, [autoPlayOnMount, autoPlay, videoUrl, play]);
 
   // Lecture au geste : seulement si personne ne pilote déjà la lecture depuis
   // l'extérieur (`autoPlay`), sinon le clic de l'utilisateur et le parent se

@@ -80,6 +80,10 @@ export function ExerciceDetailDialog({
               className="w-full rounded-lg bg-muted"
               mediaClassName="block h-auto w-full"
               autoPlayOnHover
+              // Ouvrir ce panneau, c'est déjà demander à voir la démo : elle
+              // démarre seule, sans réclamer un second geste. Le délai laisse
+              // le poster s'afficher et le fondu se voir.
+              autoPlayOnMount
             />
           )}
 
