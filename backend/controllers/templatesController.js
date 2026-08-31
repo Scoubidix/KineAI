@@ -1,6 +1,7 @@
 const logger = require('../utils/logger');
 const prismaService = require('../services/prismaService');
 const gcsStorageService = require('../services/gcsStorageService');
+const { checkExercicesAccessibles } = require('../services/exerciceAccessService');
 
 // 🔐 Toutes les routes supposent que req.uid est défini par le middleware authenticate
 
@@ -253,6 +254,18 @@ exports.createTemplate = async (req, res) => {
       return res.status(400).json({ error: "Nom et exercices requis" });
     }
 
+    // Ownership sur les exercices rattaches : sans ca, un id arbitraire suffisait
+    // a se faire renvoyer l'exercice d'un autre kine, URLs signees comprises.
+    const acces = await checkExercicesAccessibles(kine.id, exercises.map((ex) => ex.exerciceId));
+    if (!acces.ok) {
+      logger.warn('Exercices non autorises refuses (creation template)');
+      return res.status(403).json({
+        success: false,
+        error: "Un des exercices selectionnes n'est pas accessible",
+        code: 'EXERCICE_FORBIDDEN',
+      });
+    }
+
     // Créer le template avec ses exercices en transaction
     const newTemplate = await prisma.exerciceTemplate.create({
       data: {
@@ -333,6 +346,17 @@ exports.updateTemplate = async (req, res) => {
     // Vérifier ownership et que ce n'est pas public
     if (template.kineId !== kine.id || template.isPublic) {
       return res.status(403).json({ error: "Non autorisé à modifier ce template" });
+    }
+
+    // Avant la transaction : un refus ne doit pas laisser le template vide.
+    const acces = await checkExercicesAccessibles(kine.id, (exercises || []).map((ex) => ex.exerciceId));
+    if (!acces.ok) {
+      logger.warn('Exercices non autorises refuses (modification template)');
+      return res.status(403).json({
+        success: false,
+        error: "Un des exercices selectionnes n'est pas accessible",
+        code: 'EXERCICE_FORBIDDEN',
+      });
     }
 
     // Mettre à jour en transaction

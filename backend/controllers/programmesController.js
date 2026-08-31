@@ -2,6 +2,7 @@ const prismaService = require('../services/prismaService');
 const { generateChatUrl } = require('../services/patientTokenService');
 const gcsStorageService = require('../services/gcsStorageService');
 const activityService = require('../services/activityService');
+const { checkExercicesAccessibles } = require('../services/exerciceAccessService');
 const logger = require('../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../utils/logSanitizer');
 
@@ -216,6 +217,18 @@ exports.createProgramme = async (req, res) => {
       return res.status(403).json({ error: "Patient non trouvé ou accès refusé." });
     }
 
+    // Ownership sur les exercices rattaches : le controle sur le patient ne dit
+    // rien des exercices, et la relecture renvoie leurs URLs signees.
+    const acces = await checkExercicesAccessibles(kine.id, exercises.map((ex) => ex.exerciceId));
+    if (!acces.ok) {
+      logger.warn(`Exercices non autorises refuses (creation programme, kine ${sanitizeId(kine.id)})`);
+      return res.status(403).json({
+        success: false,
+        error: "Un des exercices selectionnes n'est pas accessible",
+        code: 'EXERCICE_FORBIDDEN',
+      });
+    }
+
     // Le programme demarre aujourd'hui et la date de fin est derivee de la duree.
     // C'est le serveur qui la calcule : dateFin pilote l'expiration du jeton
     // patient, la laisser au client rendrait le plafond de duree contournable.
@@ -401,7 +414,18 @@ exports.updateProgramme = async (req, res) => {
     if (!programme) {
       return res.status(404).json({ error: "Programme non trouvé ou accès refusé" });
     }
-    
+
+    // Avant le deleteMany : un refus ne doit pas laisser le programme vide.
+    const acces = await checkExercicesAccessibles(kine.id, exercises.map((ex) => ex.exerciceId));
+    if (!acces.ok) {
+      logger.warn(`Exercices non autorises refuses (modification programme, kine ${sanitizeId(kine.id)})`);
+      return res.status(403).json({
+        success: false,
+        error: "Un des exercices selectionnes n'est pas accessible",
+        code: 'EXERCICE_FORBIDDEN',
+      });
+    }
+
     // Supprimer les anciens exercices du programme
     await prisma.exerciceProgramme.deleteMany({ 
       where: { programmeId } 
