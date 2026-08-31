@@ -126,25 +126,40 @@ const updateProgrammeSchema = z.object({
 
 // ========== EXERCICE MODELE ==========
 
+// Chemins GCS des médias d'un exercice. Deux raisons d'être stricts ici :
+//  1. Zod n'est pas en mode strict : un champ absent du schéma est silencieusement
+//     retiré du body, le fichier partirait sur GCS sans que son chemin n'atteigne
+//     jamais la base.
+//  2. Le bucket est UNIQUE (contrats, avatars, support y sont d'autres préfixes)
+//     et ces chemins sont recopiés en base puis signés dans la réponse. Sans le
+//     cadrage sur `exercices/`, un kiné pourrait faire signer le contrat d'un
+//     autre en le déclarant comme la vidéo de son propre exercice.
+// Un seul segment après le dossier : c'est la forme produite par
+// `uploadExerciceFile` (`exercices/<timestamp>_<nom>`), et ça exclut tout
+// échappement vers un autre préfixe.
+const exerciceMediaPath = () =>
+  z.string()
+    .max(500)
+    .regex(/^exercices\/[^/]+$/, 'Chemin de média invalide')
+    .nullable()
+    .optional();
+
 const createExerciceSchema = z.object({
   nom: trimmedString(255),
   description: z.string().max(2000),
   tags: z.string().max(500).nullable().optional(),
-  // Chemins GCS (dossier exercices/). Zod n'est pas en mode strict : tout champ
-  // absent d'ici est silencieusement retiré du body, le fichier partirait sur
-  // GCS sans que son chemin n'atteigne jamais la base.
-  gifPath: z.string().max(500).nullable().optional(),
-  videoPath: z.string().max(500).nullable().optional(),
-  posterPath: z.string().max(500).nullable().optional(),
+  gifPath: exerciceMediaPath(),
+  videoPath: exerciceMediaPath(),
+  posterPath: exerciceMediaPath(),
 });
 
 const updateExerciceSchema = z.object({
   nom: trimmedString(255).optional(),
   description: z.string().max(2000).optional(),
   tags: z.string().max(500).nullable().optional(),
-  gifPath: z.string().max(500).nullable().optional(),
-  videoPath: z.string().max(500).nullable().optional(),
-  posterPath: z.string().max(500).nullable().optional(),
+  gifPath: exerciceMediaPath(),
+  videoPath: exerciceMediaPath(),
+  posterPath: exerciceMediaPath(),
 });
 
 // ========== TEMPLATES ==========

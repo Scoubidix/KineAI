@@ -80,14 +80,46 @@ async function uploadGif(fileBuffer, fileName) {
 }
 
 /**
- * Génère une URL signée temporaire pour accéder à un fichier privé
+ * Dossiers connus du bucket. Une signature demandée hors de ces préfixes ne
+ * correspond à aucun usage légitime : c'est le filet par défaut.
+ */
+const ALL_FOLDERS = [
+  EXERCICES_FOLDER,
+  AVATARS_FOLDER,
+  CONTRACTS_FOLDER,
+  SUPPORT_FOLDER,
+  NOUVEAUTES_FOLDER,
+];
+
+/**
+ * Génère une URL signée temporaire pour accéder à un fichier privé.
+ *
+ * ⚠️ Le bucket est UNIQUE : contrats, avatars, pièces jointes support et médias
+ * d'exercices n'y sont que des préfixes. Signer un chemin sans vérifier son
+ * dossier revient donc à donner une clé de lecture sur n'importe quel fichier de
+ * la plateforme — et certains chemins viennent du corps d'une requête (les
+ * `videoPath`/`posterPath`/`gifPath` d'un exercice). L'appelant déclare le
+ * dossier qu'il attend ; à défaut on n'autorise que les dossiers connus.
+ *
  * @param {string} gifPath - Le chemin du fichier (ex: "exercices/123_demo.gif")
  * @param {number} expirationMs - Durée de validité en ms (défaut: 1h)
+ * @param {string} version - 'v4' (max 7 j) ou 'v2' (longue durée)
+ * @param {string[]} allowedPrefixes - Dossiers autorisés pour ce chemin
  * @returns {Promise<string|null>} URL signée temporaire ou null si erreur
  */
-async function generateSignedUrl(gifPath, expirationMs = DEFAULT_SIGNED_URL_EXPIRATION, version = 'v4') {
+async function generateSignedUrl(
+  gifPath,
+  expirationMs = DEFAULT_SIGNED_URL_EXPIRATION,
+  version = 'v4',
+  allowedPrefixes = ALL_FOLDERS,
+) {
   try {
     if (!gifPath) {
+      return null;
+    }
+
+    if (!allowedPrefixes.some((prefix) => gifPath.startsWith(prefix))) {
+      logger.error('Tentative de signature hors des dossiers autorisés:', gifPath);
       return null;
     }
 
@@ -180,6 +212,9 @@ async function deleteExerciceMedia(mediaPath) {
   }
 }
 
+/** Cadrage des signatures de médias d'exercice (cf. generateSignedUrl). */
+const EXERCICE_ONLY = [EXERCICES_FOLDER];
+
 /**
  * URLs signées des médias d'un ExerciceModele.
  * La vidéo prime : quand elle existe, le GIF legacy n'est plus signé — et il
@@ -192,16 +227,23 @@ async function signExerciceMediaUrls(source, expirationMs = DEFAULT_SIGNED_URL_E
   const posterPath = source?.posterPath;
   const gifPath = source?.gifPath;
 
+  // `EXERCICE_ONLY` partout ici : ces trois chemins transitent par le corps des
+  // requêtes de création/édition d'exercice. Sans ce cadrage, un chemin pointant
+  // vers `contracts/` reviendrait signé dans la réponse.
   if (videoPath) {
     const [videoUrl, posterUrl] = await Promise.all([
-      generateSignedUrl(videoPath, expirationMs, version),
-      posterPath ? generateSignedUrl(posterPath, expirationMs, version) : Promise.resolve(null),
+      generateSignedUrl(videoPath, expirationMs, version, EXERCICE_ONLY),
+      posterPath ? generateSignedUrl(posterPath, expirationMs, version, EXERCICE_ONLY) : Promise.resolve(null),
     ]);
     return { gifUrl: null, videoUrl, posterUrl };
   }
 
   if (gifPath) {
-    return { gifUrl: await generateSignedUrl(gifPath, expirationMs, version), videoUrl: null, posterUrl: null };
+    return {
+      gifUrl: await generateSignedUrl(gifPath, expirationMs, version, EXERCICE_ONLY),
+      videoUrl: null,
+      posterUrl: null,
+    };
   }
 
   return { gifUrl: null, videoUrl: null, posterUrl: null };
@@ -216,7 +258,7 @@ async function signExerciceMediaUrls(source, expirationMs = DEFAULT_SIGNED_URL_E
 async function generateDemoSignedUrl(exerciceModele, expirationMs, version = 'v2') {
   const mediaPath = exerciceModele?.videoPath || exerciceModele?.gifPath;
   if (!mediaPath) return null;
-  return generateSignedUrl(mediaPath, expirationMs, version);
+  return generateSignedUrl(mediaPath, expirationMs, version, EXERCICE_ONLY);
 }
 
 /**
@@ -495,7 +537,7 @@ async function generateContractPdfSignedUrl(path, expirationMs = CONTRACT_PDF_SI
     logger.error(`Chemin invalide pour signed URL contrat: ${path}`);
     return null;
   }
-  return generateSignedUrl(path, expirationMs);
+  return generateSignedUrl(path, expirationMs, 'v4', [CONTRACTS_FOLDER]);
 }
 
 /**
