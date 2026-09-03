@@ -637,8 +637,9 @@ const pionnierMessageLimiter = rateLimit({
     const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
     logger.warn(`Rate limit depasse - Pionniers message - User: ${safeUser}`);
     res.status(429).json({
+      success: false,
       error: 'Trop de messages envoyés',
-      details: 'Maximum 30 messages par 5 minutes. Veuillez patienter.',
+      code: 'PIONNIER_MESSAGE_LIMIT',
       retryAfter: 300
     });
   }
