@@ -64,6 +64,11 @@ model Kine {
   notifications     Notification[]
   nouveauteVues     NouveauteVue[]
 
+  // ========== GROUPE PIONNIERS ==========
+  pionnierMessages PionnierMessage[]
+  pionnierRead     PionnierRead?
+  // ======================================
+
   // ========== NOUVELLES RELATIONS IA ==========
   chatIaBasique        ChatIaBasique[]
   chatIaBiblio         ChatIaBiblio[]
@@ -1098,3 +1103,34 @@ enum VisioChannel {
 }
 
 // =================================================
+
+// ========== GROUPE PIONNIERS (salon communautaire) ==========
+
+model PionnierMessage {
+  id             Int       @id @default(autoincrement())
+  body           String    @db.Text // Texte brut, 4000 caracteres max
+  imagePath      String? // Chemin GCS de la piece jointe (dossier pionniers/)
+  createdAt      DateTime  @default(now())
+  deletedAt      DateTime? // Soft delete : un message supprime n'est jamais renvoye par l'API
+  deletedByAdmin Boolean   @default(false) // Audit : suppression de curation (true) ou par l'auteur (false)
+
+  authorId Int
+  author   Kine @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  replyToId Int?
+  replyTo   PionnierMessage?  @relation("PionnierReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   PionnierMessage[] @relation("PionnierReplies")
+
+  @@index([createdAt])
+  @@index([authorId])
+  @@map("pionnier_messages")
+}
+
+model PionnierRead {
+  kineId            Int      @id
+  kine              Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  lastReadMessageId Int      @default(0)
+  updatedAt         DateTime @updatedAt
+
+  @@map("pionnier_reads")
+}
