@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const admin = require('../firebase/firebase');
 const logger = require('../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../utils/logSanitizer');
+const pionniersChatService = require('./pionniersChatService');
 
 class RGPDService {
   constructor() {
@@ -602,6 +603,14 @@ Pour toute question concernant vos données: contact@monassistantkine.com
       };
 
       logger.warn(`📊 Données à supprimer: ${deletionDetails.patients} patients, ${deletionDetails.programmes} programmes`);
+
+      // Les objets GCS ne sont pas concernes par le ON DELETE CASCADE : on les
+      // purge avant de perdre la trace des chemins. Best-effort, jamais bloquant.
+      try {
+        await pionniersChatService.purgeKineImages(kine.id);
+      } catch (err) {
+        logger.warn(`Purge des images Pionniers echouee pour ${sanitizeUID(kineUid)}: ${err.message}`);
+      }
 
       // 3. Suppression en cascade avec transaction
       await prisma.$transaction(async (tx) => {

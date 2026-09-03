@@ -5,6 +5,7 @@ const gcsStorageService = require('./gcsStorageService');
 const { PIONNIERS_FOLDER, AVATARS_FOLDER } = require('./gcsStorageService');
 const { getEffectivePlan } = require('./planService');
 const { getAdminEmails } = require('../utils/adminEmails');
+const logger = require('../utils/logger');
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
@@ -167,11 +168,101 @@ async function setLastRead(kineId, messageId) {
   return next;
 }
 
+/**
+ * Poste un message. Un replyToId qui ne designe pas un message vivant est
+ * ignore silencieusement : le message part quand meme, sans citation.
+ */
+async function createMessage(kineId, { body, replyToId = null, imagePath = null }) {
+  const prisma = prismaService.getInstance();
+
+  let validReplyToId = null;
+  if (replyToId) {
+    const target = await prisma.pionnierMessage.findFirst({
+      where: { id: replyToId, deletedAt: null },
+      select: { id: true },
+    });
+    validReplyToId = target?.id ?? null;
+  }
+
+  const row = await prisma.pionnierMessage.create({
+    data: { body, imagePath, replyToId: validReplyToId, authorId: kineId },
+    include: MESSAGE_INCLUDE,
+  });
+
+  const [message] = await serializeMessages([row]);
+  return message;
+}
+
+/**
+ * Soft delete d'un message : autorise a son auteur et aux administrateurs.
+ * L'image GCS est supprimee dans la foulee ; son echec est journalise sans
+ * bloquer, le message restant supprime cote base.
+ */
+async function deleteMessage({ kineId, isAdmin, messageId }) {
+  const prisma = prismaService.getInstance();
+
+  const message = await prisma.pionnierMessage.findFirst({
+    where: { id: messageId, deletedAt: null },
+    select: { id: true, authorId: true, imagePath: true },
+  });
+
+  if (!message) return { status: 'NOT_FOUND' };
+
+  const isAuthor = message.authorId === kineId;
+  if (!isAuthor && !isAdmin) return { status: 'FORBIDDEN' };
+
+  await prisma.pionnierMessage.update({
+    where: { id: message.id },
+    data: { deletedAt: new Date(), deletedByAdmin: !isAuthor },
+  });
+
+  if (message.imagePath) {
+    try {
+      await gcsStorageService.deletePionnierImage(message.imagePath);
+    } catch (err) {
+      logger.warn(`Suppression GCS echouee pour le message Pionniers #${message.id}: ${err.message}`);
+    }
+  }
+
+  logger.info(`Message Pionniers #${message.id} supprime (admin: ${!isAuthor})`);
+  return { status: 'OK' };
+}
+
+/**
+ * Supprime de GCS toutes les images postees par un kine.
+ * Appelee AVANT la suppression RGPD du compte : le ON DELETE CASCADE emporte les
+ * lignes en base, mais laisserait les objets GCS orphelins. Best-effort, comme
+ * supportService.purgeTicketImages.
+ */
+async function purgeKineImages(kineId) {
+  const prisma = prismaService.getInstance();
+  const messages = await prisma.pionnierMessage.findMany({
+    where: { authorId: kineId, imagePath: { not: null } },
+    select: { id: true, imagePath: true },
+  });
+
+  for (const message of messages) {
+    try {
+      await gcsStorageService.deletePionnierImage(message.imagePath);
+    } catch (err) {
+      logger.warn(`Purge GCS echouee pour le message Pionniers #${message.id}: ${err.message}`);
+    }
+  }
+
+  if (messages.length > 0) {
+    logger.info(`${messages.length} image(s) Pionniers purgee(s) pour le kine #${kineId}`);
+  }
+  return messages.length;
+}
+
 module.exports = {
   resolveAccess,
   listMessages,
   getUnreadCount,
   setLastRead,
+  createMessage,
+  deleteMessage,
+  purgeKineImages,
   MESSAGE_INCLUDE,
   serializeMessages,
 };
