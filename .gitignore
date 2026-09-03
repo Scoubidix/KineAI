@@ -23,6 +23,7 @@ frontend/build/
 frontend/.turbo
 backend/lib/
 backend/dist/
+backend/uploads/
 
 # ========== LOGS ==========
 npm-debug.log*

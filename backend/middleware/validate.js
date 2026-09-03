@@ -206,6 +206,12 @@ const sendWhatsappSchema = z.object({
   body: z.string().min(1).max(10000),
 });
 
+// ========== GROUPE PIONNIERS ==========
+
+const pionnierReadSchema = z.object({
+  lastReadMessageId: z.number().int().min(0),
+});
+
 module.exports = {
   validate,
   createPatientSchema,
@@ -222,4 +228,5 @@ module.exports = {
   personalizeTemplateSchema,
   templateHistorySchema,
   sendWhatsappSchema,
+  pionnierReadSchema,
 };

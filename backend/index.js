@@ -614,6 +614,7 @@ app.use('/api/admin/nouveautes', require('./routes/adminNouveautes'));  // Admin
 
 // SUPPORT, EXERCICES, EXERCICE-TEMPLATES : rate limiting dans le routeur APRÈS authenticate
 app.use('/api/support', supportRoutes);
+app.use('/api/pionniers', require('./routes/pionniers'));  // Salon communautaire Groupe Pionniers
 app.use('/exercices', exerciceRoutes);
 app.use('/exercice-templates', exerciceTemplatesRoutes);
 app.use('/api/test', testOpenAIRoutes);             // Tests - LIBRES
@@ -740,6 +741,7 @@ server.listen(PORT, '0.0.0.0', () => {
   logger.info(`🔒 Export RGPD: /api/rgpd/export-data`);
   logger.info(`🔒 Téléchargement RGPD: /api/rgpd/download/:token`);
   logger.info(`🔒 Suppression compte: /api/rgpd/delete-account`);
+  logger.info(`💬 Groupe Pionniers: /api/pionniers`);
   logger.info(`🔍 Debug Prisma: /debug/prisma-imports`);
   logger.info(`📊 Debug Connections: /debug/connections`);
   logger.info(`🔒 CORS configuré pour: https://monassistantkine.vercel.app, localhost:3000, localhost:3001, fichiers locaux`);

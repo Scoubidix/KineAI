@@ -619,6 +619,32 @@ const visioSendLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter pour l'envoi de messages dans le salon Groupe Pionniers
+ * 30 messages par 5 minutes par utilisateur
+ */
+const pionnierMessageLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 30,
+  message: {
+    error: 'Trop de messages envoyés',
+    details: 'Maximum 30 messages par 5 minutes. Veuillez patienter.',
+    retryAfter: 300
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'pionnier_message'),
+  handler: (req, res) => {
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`Rate limit depasse - Pionniers message - User: ${safeUser}`);
+    res.status(429).json({
+      error: 'Trop de messages envoyés',
+      details: 'Maximum 30 messages par 5 minutes. Veuillez patienter.',
+      retryAfter: 300
+    });
+  }
+});
+
+/**
  * Middleware pour afficher les informations de rate limiting
  * Utile pour le debugging
  */
@@ -661,5 +687,6 @@ module.exports = {
   magicLinkSignLimiter,
   visioPatientLimiter,
   visioSendLimiter,
+  pionnierMessageLimiter,
   rateLimitLogger
 };
