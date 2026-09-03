@@ -18,6 +18,7 @@ const AVATARS_FOLDER = 'avatars/';
 const CONTRACTS_FOLDER = 'contracts/';
 const SUPPORT_FOLDER = 'support/';
 const NOUVEAUTES_FOLDER = 'nouveautes/';
+const PIONNIERS_FOLDER = 'pionniers/';
 const DEFAULT_SIGNED_URL_EXPIRATION = 60 * 60 * 1000; // 1 heure en ms
 const CONTRACT_PDF_SIGNED_URL_EXPIRATION = 7 * 24 * 60 * 60 * 1000; // 7 jours en ms
 
@@ -89,6 +90,7 @@ const ALL_FOLDERS = [
   CONTRACTS_FOLDER,
   SUPPORT_FOLDER,
   NOUVEAUTES_FOLDER,
+  PIONNIERS_FOLDER,
 ];
 
 /**
@@ -500,6 +502,71 @@ async function deleteSupportImage(imagePath) {
 }
 
 /**
+ * Upload une image du salon Groupe Pionniers vers GCS (fichier PRIVE)
+ * @param {Buffer} fileBuffer - Buffer de l'image
+ * @param {string} fileName - Nom d'origine du fichier
+ * @param {string} contentType - MIME type detecte
+ * @returns {Promise<string>} Le chemin du fichier (imagePath)
+ */
+async function uploadPionnierImage(fileBuffer, fileName, contentType) {
+  try {
+    const timestamp = Date.now();
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const imagePath = `${PIONNIERS_FOLDER}${timestamp}_${sanitizedFileName}`;
+
+    await bucket.file(imagePath).save(fileBuffer, {
+      metadata: {
+        contentType,
+        cacheControl: 'private, max-age=3600',
+        metadata: { uploadedAt: new Date().toISOString() }
+      },
+      resumable: false,
+    });
+
+    logger.info(`Image Pionniers uploadee sur GCS (privee): ${imagePath}`);
+    return imagePath;
+
+  } catch (error) {
+    logger.error('Erreur lors de l\'upload de l\'image Pionniers sur GCS:', error);
+    throw new Error(`Echec de l'upload de l'image: ${error.message}`);
+  }
+}
+
+/**
+ * Supprimer une image du salon Groupe Pionniers de GCS
+ * @param {string} imagePath - Chemin du fichier (ex: "pionniers/123_a.png")
+ * @returns {Promise<void>}
+ */
+async function deletePionnierImage(imagePath) {
+  try {
+    if (!imagePath) {
+      logger.warn('Tentative de suppression d\'une image Pionniers avec chemin vide');
+      return;
+    }
+
+    // Verification de securite : uniquement dossier pionniers/
+    if (!imagePath.startsWith(PIONNIERS_FOLDER)) {
+      logger.error('Tentative de suppression hors du dossier pionniers:', imagePath);
+      throw new Error('Chemin de fichier non autorise');
+    }
+
+    const file = bucket.file(imagePath);
+    const [exists] = await file.exists();
+    if (!exists) {
+      logger.warn(`L'image Pionniers n'existe pas sur GCS (deja supprimee?): ${imagePath}`);
+      return;
+    }
+
+    await file.delete();
+    logger.info(`Image Pionniers supprimee de GCS: ${imagePath}`);
+
+  } catch (error) {
+    logger.error('Erreur lors de la suppression de l\'image Pionniers sur GCS:', error);
+    throw new Error(`Echec de la suppression de l'image: ${error.message}`);
+  }
+}
+
+/**
  * Upload du PDF final scellé d'un contrat de remplacement/assistanat
  * @param {Buffer} fileBuffer - Buffer du PDF
  * @param {number|string} contractId - ID du contrat
@@ -636,10 +703,13 @@ module.exports = {
   deleteContractPdf,
   uploadNouveauteImage,
   deleteNouveauteImage,
+  uploadPionnierImage,
+  deletePionnierImage,
   BUCKET_NAME,
   EXERCICES_FOLDER,
   AVATARS_FOLDER,
   CONTRACTS_FOLDER,
   SUPPORT_FOLDER,
   NOUVEAUTES_FOLDER,
+  PIONNIERS_FOLDER,
 };
