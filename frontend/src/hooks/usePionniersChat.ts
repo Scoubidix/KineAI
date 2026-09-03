@@ -67,10 +67,16 @@ export function usePionniersChat() {
     fetchWithAuth(`${API_URL}/api/pionniers/read`, {
       method: 'POST',
       body: JSON.stringify({ lastReadMessageId: target }),
-    }).catch(() => {
-      // Echec : on autorise un nouvel essai au prochain appel.
-      lastSentReadRef.current = 0;
-    });
+    })
+      .then((res) => {
+        // fetchWithAuth ne rejette pas sur un statut d'erreur : sans ce test, un 500
+        // laisserait la garde epinglee et aucun nouvel essai ne serait tente.
+        if (!res.ok) lastSentReadRef.current = 0;
+      })
+      .catch(() => {
+        // Echec reseau : on autorise aussi un nouvel essai au prochain appel.
+        lastSentReadRef.current = 0;
+      });
   }, []);
 
   // Chargement initial : ancre de non-lus figee, puis derniere page du fil.
