@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const { sanitizeEmail } = require('../utils/logSanitizer');
 const prismaService = require('../services/prismaService');
 const { getEffectivePlan } = require('../services/planService');
+const { getAdminEmails } = require('../utils/adminEmails');
 // Middleware pour vérifier les autorisations selon le plan d'abonnement
 
 // Matrice des features IA gatées par plan — source unique pour requireAssistant
@@ -321,11 +322,59 @@ const requireAdmin = async (req, res, next) => {
   }
 };
 
+/**
+ * Middleware d'acces au salon « Groupe Pionniers ».
+ * Acces accorde au plan effectif PIONNIER, ou a un administrateur (ADMIN_EMAILS).
+ */
+const requirePionnier = async (req, res, next) => {
+  try {
+    const prisma = prismaService.getInstance();
+    const kine = await prisma.kine.findUnique({
+      where: { uid: req.uid },
+      select: { id: true, email: true, planType: true }
+    });
+
+    if (!kine) {
+      return res.status(404).json({
+        success: false,
+        error: 'Utilisateur non trouvé',
+        code: 'USER_NOT_FOUND'
+      });
+    }
+
+    const isAdmin = getAdminEmails().includes(kine.email.toLowerCase());
+    const isPionnier = getEffectivePlan(kine) === 'PIONNIER';
+
+    if (!isAdmin && !isPionnier) {
+      logger.warn(`🚫 Accès Groupe Pionniers refusé - User: ${sanitizeEmail(kine.email)}`);
+      return res.status(403).json({
+        success: false,
+        error: 'Espace réservé aux membres du plan Pionnier',
+        code: 'PIONNIER_ACCESS_REQUIRED'
+      });
+    }
+
+    req.kineId = kine.id;
+    req.kineEmail = kine.email;
+    req.isAdmin = isAdmin;
+    next();
+
+  } catch (error) {
+    logger.error('Erreur vérification accès Pionnier:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur interne du serveur',
+      code: 'PIONNIER_CHECK_ERROR'
+    });
+  }
+};
+
 module.exports = {
   canCreateProgramme,
   requireAssistant,
   requireAssistantOrPreview,
   requireFeature,
   getPlanInfo,
-  requireAdmin
+  requireAdmin,
+  requirePionnier
 };
