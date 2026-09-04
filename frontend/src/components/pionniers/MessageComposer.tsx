@@ -2,6 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { ImagePlus, Send, X, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import type { PionnierMessage } from '@/hooks/usePionniersChat';
 
 interface Props {
@@ -11,6 +13,13 @@ interface Props {
 }
 
 const MAX_BODY_LENGTH = 4000;
+
+/** Apercu textuel d'un message cite, y compris quand il ne porte qu'une image. */
+function quotePreview(message: PionnierMessage) {
+  const body = message.body.trim();
+  if (body) return body.slice(0, 80);
+  return message.imageUrl ? 'Image' : '';
+}
 
 export default function MessageComposer({ replyTo, onCancelReply, onSend }: Props) {
   const [body, setBody] = useState('');
@@ -45,11 +54,12 @@ export default function MessageComposer({ replyTo, onCancelReply, onSend }: Prop
   };
 
   return (
-    <div className="border-t border-border bg-background p-3">
+    <div className="px-2 pb-2 sm:px-6">
       {replyTo && (
-        <div className="mb-2 flex items-center gap-2 rounded-md bg-muted px-2 py-1 text-xs">
+        <div className="mx-1 mb-1.5 flex items-center gap-2 rounded-lg bg-muted px-3 py-1.5 text-xs">
           <span className="min-w-0 flex-1 truncate text-muted-foreground">
-            Réponse à <span className="font-medium">{replyTo.author.displayName}</span> · {replyTo.body.slice(0, 80)}
+            Réponse à <span className="font-medium text-foreground">{replyTo.author.displayName}</span>
+            {quotePreview(replyTo) && <> · {quotePreview(replyTo)}</>}
           </span>
           <button type="button" onClick={onCancelReply} aria-label="Annuler la réponse">
             <X className="h-3.5 w-3.5" />
@@ -58,7 +68,7 @@ export default function MessageComposer({ replyTo, onCancelReply, onSend }: Prop
       )}
 
       {image && (
-        <div className="mb-2 flex items-center gap-2 rounded-md bg-muted px-2 py-1 text-xs">
+        <div className="mx-1 mb-1.5 flex items-center gap-2 rounded-lg bg-muted px-3 py-1.5 text-xs">
           {preview && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview} alt="" className="h-12 w-12 shrink-0 rounded object-cover" />
@@ -74,14 +84,14 @@ export default function MessageComposer({ replyTo, onCancelReply, onSend }: Prop
         </div>
       )}
 
-      <div className="flex items-end gap-2">
+      <div className="relative flex items-center rounded-full border-2 border-border bg-white px-4 py-1 shadow-sm transition-all focus-within:border-[#3899aa]/60 focus-within:shadow-md dark:bg-card">
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
           aria-label="Joindre une image"
-          className="rounded-md p-2 text-muted-foreground hover:bg-muted"
+          className="mr-2 shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          <ImagePlus className="h-5 w-5" />
+          <ImagePlus className="h-4 w-4" />
         </button>
         <input
           ref={fileRef}
@@ -91,29 +101,36 @@ export default function MessageComposer({ replyTo, onCancelReply, onSend }: Prop
           onChange={(e) => setImage(e.target.files?.[0] ?? null)}
         />
 
-        <textarea
-          value={body}
+        <Input
           aria-label="Message à envoyer au Groupe Pionniers"
-          maxLength={MAX_BODY_LENGTH}
+          placeholder="Écris aux autres Pionniers — sans donnée identifiant un patient"
+          value={body}
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+            // isComposing : ne pas envoyer quand Entree valide une saisie IME.
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              submit();
+            }
           }}
-          rows={1}
-          placeholder="Écris aux autres Pionniers — sans donnée identifiant un patient"
-          className="max-h-40 min-h-[38px] flex-1 resize-y rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3899aa]/40"
+          disabled={sending}
+          maxLength={MAX_BODY_LENGTH}
+          className="min-h-[40px] border-0 bg-transparent px-0 shadow-none placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0"
         />
 
-        <button
-          type="button"
+        <Button
           onClick={submit}
           disabled={sending || (!body.trim() && !image)}
+          size="icon"
           aria-label="Envoyer"
-          className="rounded-md bg-[#3899aa] p-2 text-white transition-colors hover:bg-[#2d7a88] disabled:opacity-40"
+          className="btn-teal ml-2 h-8 w-8 shrink-0 rounded-full"
         >
-          {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-        </button>
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </Button>
       </div>
+      <p className="mt-1.5 px-2 text-[11px] text-muted-foreground">
+        <span className="hidden sm:inline">Entrée pour envoyer</span>
+      </p>
     </div>
   );
 }

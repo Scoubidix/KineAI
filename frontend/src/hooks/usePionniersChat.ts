@@ -137,10 +137,11 @@ export function usePionniersChat() {
         const res = await fetchWithAuth(url);
         if (!res.ok) return;
         const data = await res.json();
-        if (data.messages?.length) {
-          pushMessages(data.messages);
-          markRead();
-        }
+        // PAS de markRead() ici : un message qui arrive pendant que le lecteur est
+        // remonte dans un retard de plusieurs pages marquerait tout le retard comme
+        // lu. Quand il est reellement en bas, l'effet stick-to-bottom fait defiler,
+        // ce qui declenche onScroll -> markRead.
+        if (data.messages?.length) pushMessages(data.messages);
       } catch { /* silencieux : reessai au tick suivant */ }
     };
 
@@ -222,12 +223,48 @@ export function usePionniersChat() {
   const deleteMessage = useCallback(async (id: number) => {
     try {
       const res = await fetchWithAuth(`${API_URL}/api/pionniers/messages/${id}`, { method: 'DELETE' });
-      if (res.ok) setMessages((prev) => prev.filter((m) => m.id !== id));
-    } catch { /* silencieux */ }
+      if (!res.ok) {
+        setError('Suppression impossible.');
+        return;
+      }
+      setMessages((prev) => prev.filter((m) => m.id !== id));
+    } catch {
+      setError('Suppression impossible.');
+    }
+  }, []);
+
+  // Les URLs signees GCS expirent au bout d'une heure alors que la page reste
+  // ouverte toute la journee : quand une image echoue a charger, on redemande des
+  // URLs fraiches pour CE message seulement. `refreshing` evite qu'une salve
+  // d'images expirees ne declenche autant d'appels que d'images.
+  const refreshing = useRef<Set<number>>(new Set());
+  const refreshMedia = useCallback(async (id: number) => {
+    if (refreshing.current.has(id)) return;
+    refreshing.current.add(id);
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/pionniers/messages/${id}/media`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === id
+            ? {
+                ...m,
+                imageUrl: data.imageUrl ?? m.imageUrl,
+                author: { ...m.author, avatarUrl: data.avatarUrl ?? m.author.avatarUrl },
+              }
+            : m
+        )
+      );
+    } catch {
+      /* silencieux : l'image reste cassee, un rechargement la retablira */
+    } finally {
+      refreshing.current.delete(id);
+    }
   }, []);
 
   return {
     messages, loading, error, hasMore, firstUnreadId, currentKineId, isAdmin, hasAccess,
-    sendMessage, deleteMessage, loadOlder, markRead,
+    sendMessage, deleteMessage, loadOlder, markRead, refreshMedia,
   };
 }

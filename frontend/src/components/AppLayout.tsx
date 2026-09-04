@@ -1309,7 +1309,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   // Onglet « Groupe Pionniers » : visibilite + pastille de non-lus (un seul appel)
   const [pionniersAccess, setPionniersAccess] = useState(false);
-  const [pionniersUnread, setPionniersUnread] = useState(false);
+  const [pionniersUnreadCount, setPionniersUnreadCount] = useState(0);
   useEffect(() => {
     if (role !== 'kine') return;
     let cancelled = false;
@@ -1320,7 +1320,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         const data = await res.json();
         if (cancelled) return;
         setPionniersAccess(Boolean(data.hasAccess));
-        setPionniersUnread(Boolean(data.hasAccess) && data.count > 0);
+        setPionniersUnreadCount(data.hasAccess ? (data.count || 0) : 0);
       } catch { /* silencieux */ }
     };
     fetchPionniers();
@@ -1592,11 +1592,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
                               {contractsUnreadCount}
                             </Badge>
                           )}
-                          {item.href === '/dashboard/kine/groupe-pionniers' && pionniersUnread && (
-                            <span className="relative ml-auto flex h-2.5 w-2.5 shrink-0">
-                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#3899aa] opacity-90" />
-                              <span className="absolute inline-flex h-full w-full animate-pulse rounded-full bg-[#3899aa]/60" />
-                              <span className="relative m-auto inline-flex h-2.5 w-2.5 rounded-full bg-[#3899aa]" />
+                          {item.href === '/dashboard/kine/groupe-pionniers' && pionniersUnreadCount > 0 && (
+                            <span className="relative ml-auto flex shrink-0 items-center">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#3899aa] opacity-60" />
+                              <span className="relative inline-flex min-w-[20px] items-center justify-center rounded-full bg-[#3899aa] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                                {pionniersUnreadCount > 99 ? '99+' : pionniersUnreadCount}
+                              </span>
                             </span>
                           )}
                         </Link>

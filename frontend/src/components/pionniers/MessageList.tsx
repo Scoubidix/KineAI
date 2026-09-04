@@ -14,10 +14,12 @@ interface Props {
   onReply: (message: PionnierMessage) => void;
   onDelete: (id: number) => void;
   onZoom: (url: string) => void;
+  onRefreshMedia: (id: number) => void;
 }
 
 export default function MessageList({
-  messages, firstUnreadId, currentKineId, isAdmin, hasMore, onLoadOlder, onReply, onDelete, onZoom,
+  messages, firstUnreadId, currentKineId, isAdmin, hasMore,
+  onLoadOlder, onReply, onDelete, onZoom, onRefreshMedia,
 }: Props) {
   return (
     <div className="flex flex-col">
@@ -48,6 +50,7 @@ export default function MessageList({
             onReply={onReply}
             onDelete={onDelete}
             onZoom={onZoom}
+            onRefreshMedia={onRefreshMedia}
           />
         </React.Fragment>
       ))}
