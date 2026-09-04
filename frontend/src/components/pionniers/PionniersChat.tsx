@@ -17,7 +17,7 @@ export default function PionniersChat() {
   const router = useRouter();
   const {
     messages, loading, error, hasMore, firstUnreadId, currentKineId, isAdmin, hasAccess,
-    sendMessage, deleteMessage, loadOlder, markRead, refreshMedia,
+    sendMessage, editMessage, deleteMessage, loadOlder, markRead, refreshMedia,
   } = usePionniersChat();
 
   // Garde d'appartenance cote client : la vraie barriere reste le 403 du serveur.
@@ -165,6 +165,7 @@ export default function PionniersChat() {
             onDelete={deleteMessage}
             onZoom={setZoomed}
             onRefreshMedia={refreshMedia}
+            onEdit={editMessage}
           />
         )}
       </div>

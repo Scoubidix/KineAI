@@ -60,6 +60,14 @@ router.post(
   pionnierImageUpload.single('image'),
   pionniersController.postMessage
 );
+router.patch(
+  '/messages/:id',
+  authenticate,
+  requirePionnier,
+  pionnierMessageLimiter,
+  pionnierImageUpload.single('image'),
+  pionniersController.patchMessage
+);
 router.delete('/messages/:id', authenticate, requirePionnier, pionniersController.deleteMessage);
 router.post('/read', authenticate, requirePionnier, validate(pionnierReadSchema), pionniersController.setRead);
 

@@ -66,6 +66,7 @@ async function serializeMessages(rows) {
     body: row.body,
     imageUrl: await signUrl(row.imagePath, [PIONNIERS_FOLDER]),
     createdAt: row.createdAt,
+    editedAt: row.editedAt ?? null,
     author: {
       id: row.author.id,
       displayName: displayName(row.author),
@@ -256,6 +257,56 @@ async function purgeKineImages(kineId) {
 }
 
 /**
+ * Modifie un message. Reserve a SON AUTEUR : un admin peut supprimer pour la
+ * curation, jamais reecrire les propos d'un confrere.
+ *
+ * L'image se remplace (nouveau imagePath) ou se retire (removeImage). Dans les
+ * deux cas l'ancien objet GCS est supprime — best-effort, comme partout ailleurs.
+ *
+ * @param {{ kineId: number, messageId: number, body: string,
+ *           imagePath: string|null, removeImage: boolean }} params
+ * @returns {Promise<{ status: 'OK'|'NOT_FOUND'|'FORBIDDEN'|'EMPTY', message?: object }>}
+ */
+async function updateMessage({ kineId, messageId, body, imagePath = null, removeImage = false }) {
+  const prisma = prismaService.getInstance();
+
+  const existing = await prisma.pionnierMessage.findFirst({
+    where: { id: messageId, deletedAt: null },
+    select: { id: true, authorId: true, imagePath: true },
+  });
+
+  if (!existing) return { status: 'NOT_FOUND' };
+  if (existing.authorId !== kineId) return { status: 'FORBIDDEN' };
+
+  // Image resultante : la nouvelle si fournie, rien si retiree, l'ancienne sinon.
+  let nextImagePath = existing.imagePath;
+  if (imagePath) nextImagePath = imagePath;
+  else if (removeImage) nextImagePath = null;
+
+  // Meme invariant qu'a la creation : un message doit porter du texte ou une image.
+  if (!body && !nextImagePath) return { status: 'EMPTY' };
+
+  const row = await prisma.pionnierMessage.update({
+    where: { id: existing.id },
+    data: { body, imagePath: nextImagePath, editedAt: new Date() },
+    include: MESSAGE_INCLUDE,
+  });
+
+  // L'ancienne image n'est plus referencee : on la retire du stockage.
+  if (existing.imagePath && existing.imagePath !== nextImagePath) {
+    try {
+      await gcsStorageService.deletePionnierImage(existing.imagePath);
+    } catch (err) {
+      logger.warn(`Suppression GCS echouee pour l'ancienne image du message #${existing.id}: ${err.message}`);
+    }
+  }
+
+  const [message] = await serializeMessages([row]);
+  logger.info(`Message Pionniers #${existing.id} modifie par son auteur`);
+  return { status: 'OK', message };
+}
+
+/**
  * Re-signe les medias d'un message. Les URLs signees expirent au bout d'une heure
  * alors que la page est faite pour rester ouverte : le front rappelle cette route
  * quand une image echoue a charger, plutot que de recharger tout le fil.
@@ -290,6 +341,7 @@ module.exports = {
   setLastRead,
   createMessage,
   deleteMessage,
+  updateMessage,
   purgeKineImages,
   getMessageMedia,
   MESSAGE_INCLUDE,

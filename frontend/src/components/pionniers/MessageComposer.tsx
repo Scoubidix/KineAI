@@ -103,7 +103,7 @@ export default function MessageComposer({ replyTo, onCancelReply, onSend }: Prop
 
         <Input
           aria-label="Message à envoyer au Groupe Pionniers"
-          placeholder="Écris aux autres Pionniers — sans donnée identifiant un patient"
+          placeholder="Écris aux autres Pionniers"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={(e) => {
@@ -128,9 +128,6 @@ export default function MessageComposer({ replyTo, onCancelReply, onSend }: Prop
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>
       </div>
-      <p className="mt-1.5 px-2 text-[11px] text-muted-foreground">
-        <span className="hidden sm:inline">Entrée pour envoyer</span>
-      </p>
     </div>
   );
 }

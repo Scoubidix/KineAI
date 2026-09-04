@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { PIONNIERS_READ_EVENT } from '@/hooks/usePionniersChat';
 import {
   SidebarProvider,
   Sidebar,
@@ -1325,7 +1326,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
     };
     fetchPionniers();
     const interval = setInterval(fetchPionniers, 60 * 1000);
-    return () => { cancelled = true; clearInterval(interval); };
+
+    // La page du salon signale qu'elle vient de marquer les messages comme lus :
+    // sans ce raccourci, la pastille resterait allumee jusqu'au prochain tick.
+    const onRead = () => setPionniersUnreadCount(0);
+    window.addEventListener(PIONNIERS_READ_EVENT, onRead);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener(PIONNIERS_READ_EVENT, onRead);
+    };
   }, [role]);
 
   const navigationItems = getNavigationItems();

@@ -222,6 +222,13 @@ const createPionnierMessageSchema = z.object({
   replyToId: z.coerce.number().int().positive().optional(),
 });
 
+// Modification d'un message : la citation n'est pas modifiable (elle appartient au
+// fil, pas au message), et removeImage arrive en chaine « true »/« false ».
+const updatePionnierMessageSchema = z.object({
+  body: z.string().trim().max(4000).optional().default(''),
+  removeImage: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
+});
+
 module.exports = {
   validate,
   createPatientSchema,
@@ -240,4 +247,5 @@ module.exports = {
   sendWhatsappSchema,
   pionnierReadSchema,
   createPionnierMessageSchema,
+  updatePionnierMessageSchema,
 };

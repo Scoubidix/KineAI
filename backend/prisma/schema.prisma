@@ -1113,6 +1113,7 @@ model PionnierMessage {
   createdAt      DateTime  @default(now())
   deletedAt      DateTime? // Soft delete : un message supprime n'est jamais renvoye par l'API
   deletedByAdmin Boolean   @default(false) // Audit : suppression de curation (true) ou par l'auteur (false)
+  editedAt       DateTime? // Derniere modification par l'auteur ; alimente la mention « modifie »
 
   authorId Int
   author   Kine @relation(fields: [authorId], references: [id], onDelete: Cascade)

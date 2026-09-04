@@ -7,6 +7,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const POLL_INTERVAL_MS = 7000;
 const PAGE_SIZE = 50;
 
+/** Emis quand le curseur de lecture part au serveur : la sidebar eteint sa pastille sans attendre son polling 60 s. */
+export const PIONNIERS_READ_EVENT = 'pionniers:read';
+
 export interface PionnierAuthor {
   id: number;
   displayName: string;
@@ -25,6 +28,7 @@ export interface PionnierMessage {
   body: string;
   imageUrl: string | null;
   createdAt: string;
+  editedAt: string | null;
   author: PionnierAuthor;
   replyTo: PionnierReplyTo | null;
 }
@@ -71,7 +75,10 @@ export function usePionniersChat() {
       .then((res) => {
         // fetchWithAuth ne rejette pas sur un statut d'erreur : sans ce test, un 500
         // laisserait la garde epinglee et aucun nouvel essai ne serait tente.
-        if (!res.ok) lastSentReadRef.current = 0;
+        if (!res.ok) { lastSentReadRef.current = 0; return; }
+        // La sidebar ne repond qu'au polling 60 s : sans ce signal, la pastille
+        // resterait allumee jusqu'a une minute apres l'ouverture de la page.
+        window.dispatchEvent(new CustomEvent(PIONNIERS_READ_EVENT));
       })
       .catch(() => {
         // Echec reseau : on autorise aussi un nouvel essai au prochain appel.
@@ -233,6 +240,39 @@ export function usePionniersChat() {
     }
   }, []);
 
+  /**
+   * Modifie un message dont on est l'auteur.
+   * @param removeImage retire la piece jointe existante ; fournir `image` la remplace.
+   */
+  const editMessage = useCallback(
+    async (id: number, body: string, image: File | null, removeImage: boolean) => {
+      const formData = new FormData();
+      formData.append('body', body);
+      if (removeImage) formData.append('removeImage', 'true');
+      if (image) formData.append('image', image);
+
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/pionniers/messages/${id}`, {
+          method: 'PATCH',
+          body: formData,
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error || 'Modification impossible.');
+          return false;
+        }
+        const data = await res.json();
+        setMessages((prev) => prev.map((m) => (m.id === id ? data.message : m)));
+        setError(null);
+        return true;
+      } catch {
+        setError('Modification impossible.');
+        return false;
+      }
+    },
+    []
+  );
+
   // Les URLs signees GCS expirent au bout d'une heure alors que la page reste
   // ouverte toute la journee : quand une image echoue a charger, on redemande des
   // URLs fraiches pour CE message seulement. `refreshing` evite qu'une salve
@@ -265,6 +305,6 @@ export function usePionniersChat() {
 
   return {
     messages, loading, error, hasMore, firstUnreadId, currentKineId, isAdmin, hasAccess,
-    sendMessage, deleteMessage, loadOlder, markRead, refreshMedia,
+    sendMessage, editMessage, deleteMessage, loadOlder, markRead, refreshMedia,
   };
 }

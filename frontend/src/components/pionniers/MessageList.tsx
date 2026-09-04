@@ -15,11 +15,12 @@ interface Props {
   onDelete: (id: number) => void;
   onZoom: (url: string) => void;
   onRefreshMedia: (id: number) => void;
+  onEdit: (id: number, body: string, image: File | null, removeImage: boolean) => Promise<boolean>;
 }
 
 export default function MessageList({
   messages, firstUnreadId, currentKineId, isAdmin, hasMore,
-  onLoadOlder, onReply, onDelete, onZoom, onRefreshMedia,
+  onLoadOlder, onReply, onDelete, onZoom, onRefreshMedia, onEdit,
 }: Props) {
   return (
     <div className="flex flex-col">
@@ -46,8 +47,10 @@ export default function MessageList({
           )}
           <MessageItem
             message={message}
+            isOwn={message.author.id === currentKineId}
             canDelete={isAdmin || message.author.id === currentKineId}
             onReply={onReply}
+            onEdit={onEdit}
             onDelete={onDelete}
             onZoom={onZoom}
             onRefreshMedia={onRefreshMedia}

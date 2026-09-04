@@ -2,7 +2,7 @@
 const service = require('../services/pionniersChatService');
 const { processUploadedImage, cleanupTempFile } = require('../utils/uploadedImage');
 const { uploadPionnierImage } = require('../services/gcsStorageService');
-const { createPionnierMessageSchema } = require('../middleware/validate');
+const { createPionnierMessageSchema, updatePionnierMessageSchema } = require('../middleware/validate');
 const logger = require('../utils/logger');
 
 /** Convertit un parametre de requete en entier positif, ou undefined. */
@@ -96,6 +96,66 @@ const pionniersController = {
     } finally {
       // Multer a deja ecrit le fichier sur disque quand une validation sort en
       // amont de processUploadedImage : sans ce filet, le temporaire s'accumule.
+      cleanupTempFile(req.file);
+    }
+  },
+
+  /**
+   * PATCH /api/pionniers/messages/:id (multipart, image optionnelle)
+   * Reserve a l'auteur du message. `removeImage=true` retire la piece jointe ;
+   * fournir une nouvelle image la remplace.
+   */
+  async patchMessage(req, res) {
+    try {
+      const messageId = toPositiveInt(req.params.id);
+      if (!messageId) {
+        return res.status(400).json({ success: false, error: 'Identifiant invalide', code: 'INVALID_ID' });
+      }
+
+      const parsed = updatePionnierMessageSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          error: 'Données invalides',
+          code: 'VALIDATION_ERROR',
+          details: parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })),
+        });
+      }
+
+      const { body, removeImage = false } = parsed.data;
+
+      const { imagePath, error } = await processUploadedImage(req.file, uploadPionnierImage);
+      if (error) {
+        return res.status(400).json({ success: false, error, code: 'INVALID_IMAGE' });
+      }
+
+      const { status, message } = await service.updateMessage({
+        kineId: req.kineId,
+        messageId,
+        body,
+        imagePath,
+        removeImage,
+      });
+
+      if (status === 'NOT_FOUND') {
+        return res.status(404).json({ success: false, error: 'Message non trouvé', code: 'MESSAGE_NOT_FOUND' });
+      }
+      if (status === 'FORBIDDEN') {
+        return res.status(403).json({
+          success: false,
+          error: 'Seul l\'auteur peut modifier son message',
+          code: 'EDIT_FORBIDDEN'
+        });
+      }
+      if (status === 'EMPTY') {
+        return res.status(400).json({ success: false, error: 'Message ou image requis', code: 'EMPTY_MESSAGE' });
+      }
+
+      res.json({ success: true, message });
+    } catch (err) {
+      logger.error('Erreur modification message Pionniers', { error: err.message });
+      res.status(500).json({ success: false, error: 'Erreur serveur', code: 'PIONNIERS_UPDATE_ERROR' });
+    } finally {
       cleanupTempFile(req.file);
     }
   },
