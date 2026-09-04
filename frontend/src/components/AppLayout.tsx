@@ -89,7 +89,8 @@ import {
   MessageCircle,
   Camera,
   HelpCircle,
-  Video
+  Video,
+  MessagesSquare
 } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { normalizeFirstName, normalizeLastName } from '@/utils/nameNormalization';
@@ -1306,6 +1307,27 @@ export default function AppLayout({ children }: AppLayoutProps) {
     return () => { cancelled = true; clearInterval(interval); };
   }, [role]);
 
+  // Onglet « Groupe Pionniers » : visibilite + pastille de non-lus (un seul appel)
+  const [pionniersAccess, setPionniersAccess] = useState(false);
+  const [pionniersUnread, setPionniersUnread] = useState(false);
+  useEffect(() => {
+    if (role !== 'kine') return;
+    let cancelled = false;
+    const fetchPionniers = async () => {
+      try {
+        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/pionniers/unread-count`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setPionniersAccess(Boolean(data.hasAccess));
+        setPionniersUnread(Boolean(data.hasAccess) && data.count > 0);
+      } catch { /* silencieux */ }
+    };
+    fetchPionniers();
+    const interval = setInterval(fetchPionniers, 60 * 1000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [role]);
+
   const navigationItems = getNavigationItems();
 
   // Regroupement en sous-catégories pour la sidebar kiné (fond teal)
@@ -1332,6 +1354,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
       label: 'Communauté',
       items: [
         { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, emoji: '🎁', highlight: false },
+        // Reserve aux membres du plan Pionnier (et aux admins) : masque pour les autres
+        ...(pionniersAccess
+          ? [{ href: '/dashboard/kine/groupe-pionniers', label: 'Groupe Pionniers', icon: MessagesSquare, emoji: '💬', highlight: false }]
+          : []),
       ],
     },
   ];
@@ -1565,6 +1591,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
                             <Badge variant="destructive" className="ml-auto h-4 px-1.5 text-[9px] leading-none">
                               {contractsUnreadCount}
                             </Badge>
+                          )}
+                          {item.href === '/dashboard/kine/groupe-pionniers' && pionniersUnread && (
+                            <span className="relative ml-auto flex h-2.5 w-2.5 shrink-0">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#3899aa] opacity-90" />
+                              <span className="absolute inline-flex h-full w-full animate-pulse rounded-full bg-[#3899aa]/60" />
+                              <span className="relative m-auto inline-flex h-2.5 w-2.5 rounded-full bg-[#3899aa]" />
+                            </span>
                           )}
                         </Link>
                       </SidebarMenuButton>
