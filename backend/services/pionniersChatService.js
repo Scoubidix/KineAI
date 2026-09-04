@@ -255,6 +255,34 @@ async function purgeKineImages(kineId) {
   return messages.length;
 }
 
+/**
+ * Re-signe les medias d'un message. Les URLs signees expirent au bout d'une heure
+ * alors que la page est faite pour rester ouverte : le front rappelle cette route
+ * quand une image echoue a charger, plutot que de recharger tout le fil.
+ * @returns {Promise<{ imageUrl: string|null, avatarUrl: string|null }|null>} null si le message n'existe pas/plus
+ */
+async function getMessageMedia(messageId) {
+  const prisma = prismaService.getInstance();
+
+  const message = await prisma.pionnierMessage.findFirst({
+    where: { id: messageId, deletedAt: null },
+    select: { imagePath: true, author: { select: { avatarPath: true } } },
+  });
+
+  if (!message) return null;
+
+  const [imageUrl, avatarUrl] = await Promise.all([
+    message.imagePath
+      ? gcsStorageService.generateSignedUrl(message.imagePath, undefined, 'v4', [PIONNIERS_FOLDER])
+      : null,
+    message.author?.avatarPath
+      ? gcsStorageService.generateSignedUrl(message.author.avatarPath, undefined, 'v4', [AVATARS_FOLDER])
+      : null,
+  ]);
+
+  return { imageUrl, avatarUrl };
+}
+
 module.exports = {
   resolveAccess,
   listMessages,
@@ -263,6 +291,7 @@ module.exports = {
   createMessage,
   deleteMessage,
   purgeKineImages,
+  getMessageMedia,
   MESSAGE_INCLUDE,
   serializeMessages,
 };

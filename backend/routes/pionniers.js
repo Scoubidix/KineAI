@@ -8,7 +8,7 @@ const router = express.Router();
 const pionniersController = require('../controllers/pionniersController');
 const { authenticate } = require('../middleware/authenticate');
 const { requirePionnier } = require('../middleware/authorization');
-const { pionnierMessageLimiter } = require('../middleware/rateLimiter');
+const { pionnierMessageLimiter, pionnierReadLimiter } = require('../middleware/rateLimiter');
 const { validate, pionnierReadSchema } = require('../middleware/validate');
 const { cleanupTempFile } = require('../utils/uploadedImage');
 const logger = require('../utils/logger');
@@ -41,10 +41,17 @@ const pionnierImageUpload = multer({
 // Compteur de non-lus : accessible a tout kine authentifie. C'est la reponse
 // (hasAccess) qui indique au front s'il doit afficher l'onglet, d'ou l'absence
 // volontaire de requirePionnier ici.
-router.get('/unread-count', authenticate, pionniersController.getUnreadCount);
+router.get('/unread-count', authenticate, pionnierReadLimiter, pionniersController.getUnreadCount);
 
 // Salon : reserve aux membres
-router.get('/messages', authenticate, requirePionnier, pionniersController.getMessages);
+router.get('/messages', authenticate, requirePionnier, pionnierReadLimiter, pionniersController.getMessages);
+router.get(
+  '/messages/:id/media',
+  authenticate,
+  requirePionnier,
+  pionnierReadLimiter,
+  pionniersController.getMessageMedia
+);
 router.post(
   '/messages',
   authenticate,

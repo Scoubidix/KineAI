@@ -625,11 +625,6 @@ const visioSendLimiter = rateLimit({
 const pionnierMessageLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
   max: 30,
-  message: {
-    error: 'Trop de messages envoyés',
-    details: 'Maximum 30 messages par 5 minutes. Veuillez patienter.',
-    retryAfter: 300
-  },
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => generateSecureKey(req, 'pionnier_message'),
@@ -640,6 +635,31 @@ const pionnierMessageLimiter = rateLimit({
       success: false,
       error: 'Trop de messages envoyés',
       code: 'PIONNIER_MESSAGE_LIMIT',
+      retryAfter: 300
+    });
+  }
+});
+
+/**
+ * Rate limiter pour la LECTURE du salon Groupe Pionniers.
+ * Le fil est interrogé toutes les 7 s par onglet ouvert et /unread-count toutes
+ * les 60 s par TOUS les kinés authentifiés (pas seulement les membres) : le
+ * plafond doit laisser passer plusieurs onglets sans gêner l'usage normal.
+ * 250 requêtes / 5 minutes par utilisateur ≈ 50/min, soit ~5 onglets en polling.
+ */
+const pionnierReadLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 250,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'pionnier_read'),
+  handler: (req, res) => {
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`Rate limit depasse - Pionniers lecture - User: ${safeUser}`);
+    res.status(429).json({
+      success: false,
+      error: 'Trop de requêtes sur le salon. Réessaie dans quelques minutes.',
+      code: 'PIONNIER_READ_LIMIT',
       retryAfter: 300
     });
   }
@@ -689,5 +709,6 @@ module.exports = {
   visioPatientLimiter,
   visioSendLimiter,
   pionnierMessageLimiter,
+  pionnierReadLimiter,
   rateLimitLogger
 };

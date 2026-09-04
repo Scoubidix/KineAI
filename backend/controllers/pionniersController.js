@@ -2,9 +2,8 @@
 const service = require('../services/pionniersChatService');
 const { processUploadedImage, cleanupTempFile } = require('../utils/uploadedImage');
 const { uploadPionnierImage } = require('../services/gcsStorageService');
+const { createPionnierMessageSchema } = require('../middleware/validate');
 const logger = require('../utils/logger');
-
-const MAX_BODY_LENGTH = 4000;
 
 /** Convertit un parametre de requete en entier positif, ou undefined. */
 function toPositiveInt(value) {
@@ -65,18 +64,23 @@ const pionniersController = {
   /** POST /api/pionniers/messages (multipart, image optionnelle) */
   async postMessage(req, res) {
     try {
-      const body = (req.body.body || '').trim();
-      const replyToId = toPositiveInt(req.body.replyToId) || null;
+      // Zod applique ICI et non via validate() : multer a deja ecrit le fichier
+      // temporaire, et seul le finally de ce handler le nettoie. Une validation
+      // en middleware sortirait avant, en laissant le fichier sur le disque.
+      const parsed = createPionnierMessageSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          error: 'Données invalides',
+          code: 'VALIDATION_ERROR',
+          details: parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })),
+        });
+      }
+
+      const { body, replyToId = null } = parsed.data;
 
       if (!body && !req.file) {
         return res.status(400).json({ success: false, error: 'Message ou image requis', code: 'EMPTY_MESSAGE' });
-      }
-      if (body.length > MAX_BODY_LENGTH) {
-        return res.status(400).json({
-          success: false,
-          error: `Message trop long (${MAX_BODY_LENGTH} caractères max)`,
-          code: 'MESSAGE_TOO_LONG'
-        });
       }
 
       const { imagePath, error } = await processUploadedImage(req.file, uploadPionnierImage);
@@ -121,6 +125,31 @@ const pionniersController = {
     } catch (err) {
       logger.error('Erreur suppression message Pionniers', { error: err.message });
       res.status(500).json({ success: false, error: 'Erreur serveur', code: 'PIONNIERS_DELETE_ERROR' });
+    }
+  },
+
+  /**
+   * GET /api/pionniers/messages/:id/media
+   * Re-signe l'image et l'avatar d'un message. Les URLs signees valent 1 h alors
+   * que la page reste ouverte toute la journee : le front rappelle cette route
+   * quand une image echoue a charger, au lieu de recharger tout le fil.
+   */
+  async getMessageMedia(req, res) {
+    try {
+      const messageId = toPositiveInt(req.params.id);
+      if (!messageId) {
+        return res.status(400).json({ success: false, error: 'Identifiant invalide', code: 'INVALID_ID' });
+      }
+
+      const media = await service.getMessageMedia(messageId);
+      if (!media) {
+        return res.status(404).json({ success: false, error: 'Message non trouvé', code: 'MESSAGE_NOT_FOUND' });
+      }
+
+      res.json({ success: true, ...media });
+    } catch (err) {
+      logger.error('Erreur rafraichissement media Pionniers', { error: err.message });
+      res.status(500).json({ success: false, error: 'Erreur serveur', code: 'PIONNIERS_MEDIA_ERROR' });
     }
   },
 

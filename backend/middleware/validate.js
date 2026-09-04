@@ -212,6 +212,16 @@ const pionnierReadSchema = z.object({
   lastReadMessageId: z.number().int().min(0),
 });
 
+// POST /api/pionniers/messages arrive en multipart : toutes les valeurs sont des
+// CHAINES, et un champ repete devient un TABLEAU (ce qui faisait planter un
+// .trim() direct). D'ou la coercition et le refus explicite de tout non-string.
+// Ce schema est applique DANS le controller et non via validate(), pour rester
+// couvert par le finally qui nettoie le fichier temporaire de multer.
+const createPionnierMessageSchema = z.object({
+  body: z.string().trim().max(4000).optional().default(''),
+  replyToId: z.coerce.number().int().positive().optional(),
+});
+
 module.exports = {
   validate,
   createPatientSchema,
@@ -229,4 +239,5 @@ module.exports = {
   templateHistorySchema,
   sendWhatsappSchema,
   pionnierReadSchema,
+  createPionnierMessageSchema,
 };

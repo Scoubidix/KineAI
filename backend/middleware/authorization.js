@@ -324,17 +324,20 @@ const requireAdmin = async (req, res, next) => {
 
 /**
  * Middleware d'acces au salon « Groupe Pionniers ».
- * Acces accorde au plan effectif PIONNIER, ou a un administrateur (ADMIN_EMAILS).
+ *
+ * La DECISION d'acces n'est pas prise ici : elle vit une seule fois, dans
+ * pionniersChatService.resolveAccess, que /unread-count utilise aussi. Ce
+ * middleware ne fait que la traduire en HTTP. Dupliquer la regle exposerait a
+ * une derive ou la sidebar afficherait un onglet renvoyant 403 (ou l'inverse).
  */
 const requirePionnier = async (req, res, next) => {
   try {
-    const prisma = prismaService.getInstance();
-    const kine = await prisma.kine.findUnique({
-      where: { uid: req.uid },
-      select: { id: true, email: true, planType: true }
-    });
+    // require paresseux : pionniersChatService importe planService, qui importe
+    // ce module dans certains chemins de test. Charger a l'appel evite le cycle.
+    const { resolveAccess } = require('../services/pionniersChatService');
+    const { kineId, hasAccess, isAdmin } = await resolveAccess(req.uid);
 
-    if (!kine) {
+    if (kineId === null) {
       return res.status(404).json({
         success: false,
         error: 'Utilisateur non trouvé',
@@ -342,11 +345,8 @@ const requirePionnier = async (req, res, next) => {
       });
     }
 
-    const isAdmin = getAdminEmails().includes(kine.email.toLowerCase());
-    const isPionnier = getEffectivePlan(kine) === 'PIONNIER';
-
-    if (!isAdmin && !isPionnier) {
-      logger.warn(`🚫 Accès Groupe Pionniers refusé - User: ${sanitizeEmail(kine.email)}`);
+    if (!hasAccess) {
+      logger.warn(`🚫 Accès Groupe Pionniers refusé - Kine #${kineId}`);
       return res.status(403).json({
         success: false,
         error: 'Espace réservé aux membres du plan Pionnier',
@@ -354,8 +354,7 @@ const requirePionnier = async (req, res, next) => {
       });
     }
 
-    req.kineId = kine.id;
-    req.kineEmail = kine.email;
+    req.kineId = kineId;
     req.isAdmin = isAdmin;
     next();
 

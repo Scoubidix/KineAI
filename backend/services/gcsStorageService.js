@@ -1,4 +1,5 @@
 const { Storage } = require('@google-cloud/storage');
+const crypto = require('crypto');
 const logger = require('../utils/logger');
 
 /**
@@ -501,18 +502,35 @@ async function deleteSupportImage(imagePath) {
   }
 }
 
+// Extension de fichier deduite du MIME type reellement detecte (magic bytes),
+// jamais de celle annoncee par le client.
+const PIONNIER_EXTENSIONS = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
+
 /**
- * Upload une image du salon Groupe Pionniers vers GCS (fichier PRIVE)
+ * Upload une image du salon Groupe Pionniers vers GCS (fichier PRIVE).
+ *
+ * Le nom d'origine est VOLONTAIREMENT jete : dans un salon entre professionnels
+ * de sante, un fichier peut s'appeler « IRM_genou_Dupont_Jean.jpg » et ferait
+ * entrer un nom de patient dans le chemin GCS et dans les logs. Le nom stocke
+ * est donc entierement genere : horodatage + alea + extension deduite du type
+ * reellement detecte.
+ *
  * @param {Buffer} fileBuffer - Buffer de l'image
- * @param {string} fileName - Nom d'origine du fichier
+ * @param {string} _fileName - Nom d'origine (ignore, conserve pour l'uniformite de signature)
  * @param {string} contentType - MIME type detecte
  * @returns {Promise<string>} Le chemin du fichier (imagePath)
  */
-async function uploadPionnierImage(fileBuffer, fileName, contentType) {
+async function uploadPionnierImage(fileBuffer, _fileName, contentType) {
   try {
     const timestamp = Date.now();
-    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const imagePath = `${PIONNIERS_FOLDER}${timestamp}_${sanitizedFileName}`;
+    const random = crypto.randomBytes(8).toString('hex');
+    const extension = PIONNIER_EXTENSIONS[contentType] || 'bin';
+    const imagePath = `${PIONNIERS_FOLDER}${timestamp}_${random}.${extension}`;
 
     await bucket.file(imagePath).save(fileBuffer, {
       metadata: {
