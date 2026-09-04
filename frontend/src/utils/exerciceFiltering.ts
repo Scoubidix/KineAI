@@ -74,3 +74,20 @@ export function sortByNom<T extends { nom: string }>(list: T[]): T[] {
     a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }),
   );
 }
+
+/**
+ * Catégories suggérées, dans l'ordre d'affichage. Servent à la fois de cases à
+ * cocher dans le formulaire d'exercice et de filter chips dans la bibliothèque :
+ * une liste fixe garantit une rangée de filtres stable, identique pour tous les
+ * kinés, cohérente avec ce qu'on leur propose à la création.
+ */
+export const SUGGESTED_TAGS = [
+  'Mobilité articulaire',
+  'Renforcement musculaire',
+  'Étirements',
+  'Proprioception',
+  'Cardio-respiratoire',
+  'Membre supérieur',
+  'Membre inférieur',
+  'Rachis',
+] as const;

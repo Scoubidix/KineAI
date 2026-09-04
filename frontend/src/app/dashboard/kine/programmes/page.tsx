@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Search } from 'lucide-react';
+import { SUGGESTED_TAGS } from '@/utils/exerciceFiltering';
 import { usePaywall } from '@/hooks/usePaywall';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import type { ExerciceModele, ExerciceTemplate } from '@/types/exercice';
@@ -25,6 +26,7 @@ import {
 } from '@/hooks/useBuilderDraft';
 import { QuickActions } from './components/QuickActions';
 import { ExercicesTab } from './components/ExercicesTab';
+import { TagFilterChips } from './components/TagFilterChips';
 import { TemplatesTab } from './components/TemplatesTab';
 import { ProgrammesTab } from './components/ProgrammesTab';
 import { SelectionActionBar } from './components/SelectionActionBar';
@@ -60,6 +62,13 @@ export default function ProgrammesPage() {
   // Recherche partagee par les onglets Exercices et Templates, saisie dans l'en-tete.
   const [search, setSearch] = useState('');
   const [onlyMine, setOnlyMine] = useState(false);
+  // Catégories cochées dans la rangée de filter chips (onglet Exercices uniquement).
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const toggleTag = useCallback((tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+    );
+  }, []);
   const [createExerciceSignal, setCreateExerciceSignal] = useState(0);
 
   // --- Mode sélection ---
@@ -340,6 +349,18 @@ export default function ProgrammesPage() {
             )}
           </div>
 
+          {/* Facettes de la bibliothèque d'exercices : chips à bascule sous la
+              recherche (pattern Material « filter chips »), combinées en ET. */}
+          {tab === 'exercices' && (
+            <TagFilterChips
+              className="mt-3"
+              tags={SUGGESTED_TAGS}
+              selected={selectedTags}
+              onToggle={toggleTag}
+              onClear={() => setSelectedTags([])}
+            />
+          )}
+
           {selectMode && (
             <p className="mt-4 text-sm text-muted-foreground">
               {selectKind === 'template'
@@ -378,6 +399,7 @@ export default function ProgrammesPage() {
               enabled={tab === 'exercices'}
               search={search}
               onlyMine={onlyMine}
+              tags={selectedTags}
               createSignal={createExerciceSignal}
               selectable={selectMode}
               selectedIds={selectedExercices.map((ex) => ex.id)}

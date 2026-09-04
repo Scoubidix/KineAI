@@ -22,21 +22,9 @@ import VideoUpload, { EMPTY_MEDIA, type ExerciceMediaValue } from '@/components/
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
 import type { ExerciceModele } from '@/types/exercice';
-import { parseTags } from '@/utils/exerciceFiltering';
+import { parseTags, SUGGESTED_TAGS } from '@/utils/exerciceFiltering';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-// Tags suggérés avec ordre de priorité — repris de l'ancienne page create-exercise.
-export const SUGGESTED_TAGS = [
-  'Mobilité articulaire',
-  'Renforcement musculaire',
-  'Étirements',
-  'Proprioception',
-  'Cardio-respiratoire',
-  'Membre supérieur',
-  'Membre inférieur',
-  'Rachis',
-];
 
 interface FormState {
   id: number | null;

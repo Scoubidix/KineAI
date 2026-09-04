@@ -14,6 +14,8 @@ interface ExercicesTabProps {
   /** Recherche et filtre de propriete, saisis dans l'en-tete de la page. */
   search: string;
   onlyMine: boolean;
+  /** Catégories cochées dans la rangée de filter chips de l'en-tête (logique ET). */
+  tags: string[];
   /** Incrémenté par le shell quand la card « Créer un exercice » est cliquée. */
   createSignal: number;
   /** Mode sélection : piloté par le shell, qui détient la sélection. */
@@ -35,6 +37,7 @@ export function ExercicesTab({
   enabled,
   search,
   onlyMine,
+  tags,
   createSignal,
   selectable = false,
   selectedIds = [],
@@ -45,10 +48,7 @@ export function ExercicesTab({
   const [editing, setEditing] = useState<ExerciceModele | null>(null);
   const [deleting, setDeleting] = useState<ExerciceModele | null>(null);
 
-  // `tags` reste dans le contrat du hook : c'est le point d'extension prévu si
-  // des facettes deviennent un jour nécessaires. Aujourd'hui la recherche
-  // multi-mots couvre déjà les tags, donc rien n'est filtré par ce biais.
-  const library = useExercicesLibrary({ enabled, search, tags: [], onlyMine });
+  const library = useExercicesLibrary({ enabled, search, tags, onlyMine });
 
   const { mine: mineCount, publics: publicsCount } = library.counts;
 
@@ -73,7 +73,7 @@ export function ExercicesTab({
     return () => observer.disconnect();
   }, [hasMorePublics, loadMorePublics]);
 
-  const hasSearch = search.trim().length > 0;
+  const hasFilters = search.trim().length > 0 || tags.length > 0;
   const isEmpty = mineCount === 0 && publicsCount === 0;
 
   return (
@@ -100,11 +100,11 @@ export function ExercicesTab({
           <CardContent className="text-center py-10">
             <Dumbbell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">
-              {hasSearch ? 'Aucun exercice trouvé' : 'Aucun exercice disponible'}
+              {hasFilters ? 'Aucun exercice trouvé' : 'Aucun exercice disponible'}
             </h3>
             <p className="text-muted-foreground">
-              {hasSearch
-                ? 'Essaie une autre recherche.'
+              {hasFilters
+                ? 'Essaie une autre recherche ou retire un filtre.'
                 : 'Commence par créer ton premier exercice.'}
             </p>
           </CardContent>
