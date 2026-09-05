@@ -66,7 +66,8 @@ const updateKineProfileSchema = z.object({
   // trimmedString applique déjà trim() + min(1) — rejette les chaînes vides ET "   ".
   firstName: trimmedString(100).optional(),
   lastName:  trimmedString(100).optional(),
-  email: z.string().email().optional(),
+  // Pas d'email : il vient du token Firebase à l'inscription et sert de clé d'accès admin
+  // (ADMIN_EMAILS). Le rendre modifiable ici permettrait de s'attribuer un email admin.
   phone: optionalTrimmedString(20),
   adresseCabinet: optionalTrimmedString(500),
   // Nullable : le front envoie null pour effacer le RPPS (Prisma le stocke en NULL).

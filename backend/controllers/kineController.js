@@ -143,7 +143,7 @@ const updateKineProfile = async (req, res) => {
   const uid = req.uid; // Récupéré depuis le middleware authenticate
   const {
     firstName, lastName,
-    email, phone, adresseCabinet, rpps,
+    phone, adresseCabinet, rpps,
     civilite, birthDate, birthPlace, departementOrdre, numeroOrdinal, numeroUrssaf, adresseDomicile
   } = req.body;
 
@@ -162,10 +162,6 @@ const updateKineProfile = async (req, res) => {
       return res.status(404).json({ error: 'Kiné non trouvé dans la base de données.' });
     }
 
-    // Validation basique des données
-    if (email && !email.includes('@')) {
-      return res.status(400).json({ error: 'Format email invalide.' });
-    }
     // Note : firstName/lastName non-vides (y compris "   ") sont déjà rejetés par
     // Zod via trimmedString — pas de check redondant ici.
 
@@ -174,7 +170,6 @@ const updateKineProfile = async (req, res) => {
     // Nom et prénom : normalisés avant sauvegarde (source de vérité du format en DB)
     if (firstName !== undefined) updateData.firstName = normalizeFirstName(firstName);
     if (lastName !== undefined)  updateData.lastName  = normalizeLastName(lastName);
-    if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
     if (adresseCabinet !== undefined) updateData.adresseCabinet = adresseCabinet;
     if (rpps !== undefined) updateData.rpps = rpps;
