@@ -35,33 +35,45 @@ const createKine = async (req, res) => {
 
   logger.warn("📥 Création kiné - UID:", sanitizeUID(uid));
 
-  // Honeypot anti-bot : si le champ caché est rempli, rejet silencieux (faux 201) ET
-  // suppression du compte Firebase que le front vient de créer. Sans cela il resterait un
-  // compte orphelin (Firebase sans ligne Kine) qui bloquerait toute nouvelle inscription
-  // avec cet email. `website` est l'ancien nom du champ, encore envoyé par des bots écrits
-  // sur l'ancien formulaire ; « website » n'est plus utilisé côté front car l'autofill des
-  // navigateurs le remplissait.
-  if (req.body.hpField || req.body.website) {
-    logger.warn("🤖 Bot détecté (honeypot) - rejet silencieux");
-    await admin.auth().deleteUser(uid).catch((err) => {
-      logger.error("❌ Suppression du compte Firebase (honeypot) impossible:", err.message);
-    });
-    return res.status(201).json({ id: 0, message: "OK" });
-  }
-
-  if (!email) {
-    return res.status(400).json({ error: "Email absent du token d'authentification." });
-  }
-
   try {
     const prisma = prismaService.getInstance();
 
+    // Contrôle d'existence AVANT le honeypot : un kiné déjà inscrit qui rejouerait cette
+    // requête avec le champ piège rempli ne doit jamais perdre son compte Firebase.
     const existing = await prisma.kine.findUnique({
       where: { uid },
     });
 
     if (existing) {
-      return res.status(409).json({ error: 'Un kiné avec ce UID existe déjà.' });
+      return res.status(409).json({ success: false, error: 'Un kiné avec ce UID existe déjà.', code: 'KINE_ALREADY_EXISTS' });
+    }
+
+    // Honeypot anti-bot : si le champ caché est rempli, rejet silencieux (faux 201) ET
+    // suppression du compte Firebase que le front vient de créer. Sans cela il resterait un
+    // compte orphelin (Firebase sans ligne Kine) qui bloquerait toute nouvelle inscription
+    // avec cet email. `website` est l'ancien nom du champ, encore envoyé par des bots écrits
+    // sur l'ancien formulaire ; il n'est plus utilisé côté front car l'autofill des
+    // navigateurs le remplissait.
+    if (req.body.hpField || req.body.website) {
+      logger.warn("🤖 Bot détecté (honeypot) - rejet silencieux");
+      await admin.auth().deleteUser(uid).catch((err) => {
+        logger.error("❌ Suppression du compte Firebase (honeypot) impossible:", err.message);
+      });
+      return res.status(201).json({ id: 0, message: "OK" });
+    }
+
+    if (!email) {
+      return res.status(400).json({ success: false, error: "Email absent du token d'authentification.", code: 'EMAIL_MISSING' });
+    }
+
+    // Un ID token reste valide ~1 h après la suppression du compte (JWT sans état, pas de
+    // checkRevoked dans authenticate) : on refuse de créer une ligne Kine pour un compte
+    // Firebase qui n'existe plus, sinon un bot passé par le honeypot pourrait rejouer son
+    // token et réserver l'email définitivement.
+    const firebaseUser = await admin.auth().getUser(uid).catch(() => null);
+    if (!firebaseUser) {
+      logger.warn("🚫 Création kiné refusée : compte Firebase introuvable - UID:", sanitizeUID(uid));
+      return res.status(401).json({ success: false, error: 'Compte Firebase introuvable.', code: 'FIREBASE_USER_NOT_FOUND' });
     }
 
     // Récupérer l'adresse IP du client (avec support des proxies)

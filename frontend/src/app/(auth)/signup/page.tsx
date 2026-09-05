@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { auth } from "@/lib/firebase/config";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -79,9 +79,15 @@ export default function SignupPage() {
       return;
     }
 
+    // Compte Firebase créé pendant cette tentative : s'il est créé mais que la suite échoue,
+    // on le supprime dans le catch pour ne pas laisser un compte orphelin (Firebase sans
+    // ligne Kine) qui bloquerait toute nouvelle inscription et toute connexion avec cet email.
+    let createdUser: User | null = null;
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      createdUser = user;
 
       const now = new Date().toISOString();
       const token = await user.getIdToken();
@@ -102,9 +108,24 @@ export default function SignupPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erreur lors de la création du profil");
+        // 409 : un profil existe déjà pour ce compte Firebase, il ne faut surtout pas le supprimer.
+        if (response.status === 409) createdUser = null;
+        const errorData = await response.json().catch(() => ({}));
+        // authenticate répond avec `message`, les contrôleurs avec `error`.
+        throw new Error(errorData.error || errorData.message || "Erreur lors de la création du profil");
       }
+
+      // Le backend a rejeté l'inscription sans créer de profil (réponse neutre, id 0) :
+      // le compte Firebase n'existe déjà plus côté serveur, on ne va pas plus loin.
+      const created = await response.json().catch(() => ({}));
+      if (!created || created.id === 0) {
+        createdUser = null;
+        throw new Error("Inscription impossible pour le moment. Réessaie dans quelques instants.");
+      }
+
+      // À partir d'ici le profil Kine existe : un échec ultérieur (acceptations légales,
+      // email de vérification) ne doit plus entraîner la suppression du compte Firebase.
+      createdUser = null;
 
       // Enregistrer les acceptations dans legal_acceptances (audit RGPD).
       // Pas de version envoyée : le backend remplit depuis LEGAL_VERSIONS.
@@ -138,9 +159,19 @@ export default function SignupPage() {
       setSignupComplete(true);
     } catch (error) {
       const err = error as Error;
+
+      // Compensation : le compte Firebase a été créé mais le profil backend non.
+      // L'utilisateur vient de se connecter, il peut supprimer son propre compte sans
+      // réauthentification. Sans cela, l'email serait bloqué pour toujours.
+      if (createdUser) {
+        await createdUser.delete().catch(() => {});
+      }
+
       let errorMessage = "Une erreur est survenue lors de la création du compte.";
       if (err.message.includes("email-already-in-use")) {
         errorMessage = "Un compte existe déjà avec cette adresse email.";
+      } else if (err.message.includes("Inscription impossible")) {
+        errorMessage = err.message;
       }
       toast({ variant: "destructive", title: "Erreur d'inscription", description: errorMessage });
     } finally {
