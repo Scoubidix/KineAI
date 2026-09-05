@@ -54,7 +54,8 @@ const avatarUpload = multer({
 });
 
 // POST /kine - Créer un nouveau kiné (lors de l'inscription)
-router.post('/', signupLimiter, validate(createKineSchema), createKine);
+// authenticate est obligatoire : uid et email sont pris dans le token vérifié, pas dans le body.
+router.post('/', signupLimiter, authenticate, validate(createKineSchema), createKine);
 
 // GET /kine/profile - Récupérer le profil du kiné connecté (nécessite auth)
 router.get('/profile', authenticate, getKineProfile);

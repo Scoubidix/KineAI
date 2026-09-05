@@ -15,7 +15,7 @@ export default function SignupPage() {
     email: "",
     password: "",
   });
-  const [website, setWebsite] = useState("");
+  const [hpField, setHpField] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -94,11 +94,10 @@ export default function SignupPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+        // uid et email ne sont plus envoyés : le backend les lit dans le token Firebase.
         body: JSON.stringify({
-          uid: user.uid,
-          email,
           acceptedLegalAt: now,
-          website,
+          hpField,
         }),
       });
 
@@ -235,15 +234,20 @@ export default function SignupPage() {
 
         <form onSubmit={handleSignup} className="space-y-5">
 
-          {/* Honeypot - invisible pour les humains */}
-          <div className="absolute left-[-9999px]" aria-hidden="true" tabIndex={-1}>
-            <label htmlFor="website">Website</label>
+          {/* Honeypot anti-bot. Masqué en display:none (classe `hidden`) et non par un
+              positionnement hors écran : l'autofill de Chrome remplit tout champ focusable
+              du formulaire quand l'utilisateur choisit une suggestion d'adresse, hors écran
+              compris, ce qui faisait passer des humains pour des bots. Un champ display:none
+              n'est pas focusable, Chrome ne le remplit jamais. Le nom reste sans rapport
+              avec un champ connu de l'autofill (« website » l'était). */}
+          <div className="hidden" aria-hidden="true" tabIndex={-1}>
+            <label htmlFor="hp-field">Laisser ce champ vide</label>
             <input
-              id="website"
-              name="website"
+              id="hp-field"
+              name="hp_field"
               type="text"
-              value={website}
-              onChange={(e) => setWebsite(e.target.value)}
+              value={hpField}
+              onChange={(e) => setHpField(e.target.value)}
               autoComplete="off"
             />
           </div>

@@ -2,6 +2,7 @@
 // FICHIER: kineController.js (VERSION FINALE AVEC LOGIQUE CONDITIONNELLE)
 // ==========================================
 
+const admin = require('../firebase/firebase');
 const prismaService = require('../services/prismaService');
 const logger = require('../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../utils/logSanitizer');
@@ -25,14 +26,31 @@ function getParisWeekBounds(ref = new Date()) {
 
 
 const createKine = async (req, res) => {
-  const { uid, email, acceptedLegalAt } = req.body;
+  // Identité prise dans le token Firebase vérifié par `authenticate`, jamais dans le body :
+  // sinon n'importe quel compte pourrait réserver l'email d'un autre (y compris un email
+  // de ADMIN_EMAILS, dont dépend requireAdmin) ou créer une ligne pour un UID étranger.
+  const uid = req.uid;
+  const email = req.userEmail;
+  const { acceptedLegalAt } = req.body;
 
-  logger.warn("📥 Création kiné - UID:", sanitizeUID(req.body.uid));
+  logger.warn("📥 Création kiné - UID:", sanitizeUID(uid));
 
-  // Honeypot anti-bot : si le champ caché est rempli, rejet silencieux
-  if (req.body.website) {
+  // Honeypot anti-bot : si le champ caché est rempli, rejet silencieux (faux 201) ET
+  // suppression du compte Firebase que le front vient de créer. Sans cela il resterait un
+  // compte orphelin (Firebase sans ligne Kine) qui bloquerait toute nouvelle inscription
+  // avec cet email. `website` est l'ancien nom du champ, encore envoyé par des bots écrits
+  // sur l'ancien formulaire ; « website » n'est plus utilisé côté front car l'autofill des
+  // navigateurs le remplissait.
+  if (req.body.hpField || req.body.website) {
     logger.warn("🤖 Bot détecté (honeypot) - rejet silencieux");
+    await admin.auth().deleteUser(uid).catch((err) => {
+      logger.error("❌ Suppression du compte Firebase (honeypot) impossible:", err.message);
+    });
     return res.status(201).json({ id: 0, message: "OK" });
+  }
+
+  if (!email) {
+    return res.status(400).json({ error: "Email absent du token d'authentification." });
   }
 
   try {

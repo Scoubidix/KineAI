@@ -56,10 +56,11 @@ const updatePatientContactSchema = z.object({
 // ========== KINE ==========
 
 const createKineSchema = z.object({
-  uid: trimmedString(128),
-  email: z.string().email(),
+  // uid et email ne sont PAS lus dans le body : le contrôleur les prend dans le token Firebase
+  // (req.uid, req.userEmail). S'ils sont envoyés, Zod les retire (mode strip).
   acceptedLegalAt: z.string().optional(),   // ISO timestamp, backend remplit les versions
-  website: z.string().optional(),            // honeypot — accepte pour que le controller le détecte
+  hpField: z.string().optional(),            // honeypot — accepte pour que le controller le détecte
+  website: z.string().optional(),            // ancien nom du honeypot : un bot écrit sur l'ancien formulaire l'envoie encore
 });
 
 const updateKineProfileSchema = z.object({
