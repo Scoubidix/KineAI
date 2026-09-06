@@ -26,7 +26,7 @@ function renderHeader(kineProfile, bilanDate, logoUrl) {
 ${kineProfile.rpps ? `<div>RPPS : ${escapeHtml(kineProfile.rpps)}</div>` : ''}
 ${kineProfile.adresseCabinet ? `<div>${escapeHtml(kineProfile.adresseCabinet)}</div>` : ''}
 </div>
-<div class="bilan-header-right">${logo}<div class="bilan-brand">Mon Assistant Kiné</div><div>Le ${escapeHtml(formatDateLongFr(bilanDate))}</div></div>
+<div class="bilan-header-right"><div class="bilan-brand-row">${logo}<div class="bilan-brand">Mon Assistant Kiné</div></div><div>Le ${escapeHtml(formatDateLongFr(bilanDate))}</div></div>
 </header>`;
 }
 

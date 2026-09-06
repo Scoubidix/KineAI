@@ -6,7 +6,8 @@ const PRINT_CSS = `
 .bilan-header-left { font-size: 10pt; line-height: 1.4; }
 .bilan-header-name { font-weight: 700; font-size: 12pt; }
 .bilan-header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2pt; text-align: right; font-size: 9.5pt; color: #555; }
-.bilan-logo { width: 32pt; height: 32pt; border-radius: 6pt; object-fit: cover; }
+.bilan-brand-row { display: flex; align-items: center; gap: 6pt; }
+.bilan-logo { width: 28pt; height: 28pt; border-radius: 6pt; object-fit: cover; }
 .bilan-brand { font-weight: 700; color: #3899aa; }
 .bilan-title { text-align: center; font-size: 14pt; font-weight: 700; letter-spacing: .04em; margin: 12pt 0 4pt; }
 .bilan-patient { text-align: center; color: #444; font-size: 10.5pt; margin-bottom: 10pt; }
