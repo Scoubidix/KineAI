@@ -54,6 +54,41 @@ export const emptyBilanDocument = (): BilanDocument => ({
   measurements: [],
 });
 
+// ==================== RESSOURCE /api/bilans (plan 2) ====================
+
+export interface PatientSummary {
+  id: number;
+  firstName: string;
+  lastName: string;
+  birthDate?: string;
+}
+
+export interface BilanRecord {
+  id: number;
+  status: BilanStatus;
+  type: BilanType;
+  motif: string | null;
+  rawNotes: string | null;
+  document: BilanDocument | null; // null = bilan hérité (bilanHtml)
+  bilanHtml: string | null;
+  patientId: number | null;
+  patient: PatientSummary | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BilanListItem {
+  id: number;
+  status: BilanStatus;
+  type: BilanType;
+  motif: string | null;
+  updatedAt: string;
+  createdAt: string;
+  patient: Pick<PatientSummary, 'id' | 'firstName' | 'lastName'> | null;
+}
+
+export type BilanPatch = Partial<Pick<BilanRecord, 'rawNotes' | 'motif' | 'type' | 'document'>>;
+
 export type CanonicalFieldType = 'NUMERIC' | 'BOOLEAN' | 'TEXT' | 'ENUM';
 
 export interface CanonicalField {
@@ -73,6 +108,7 @@ export interface CanonicalField {
   presentation: 'TABLE' | 'NARRATIVE';
 }
 
+// ⚠️ Hérité : sert uniquement à lire structuredData des bilans antérieurs à la V1. Les nouveaux bilans utilisent BilanDocument.
 export interface CanonicalMeasurement {
   kind: 'canonical';
   key: string;
