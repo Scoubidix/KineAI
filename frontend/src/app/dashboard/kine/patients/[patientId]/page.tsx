@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
@@ -15,7 +15,10 @@ import DOMPurify from 'dompurify';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { fetchBilanRender, downloadBilanPdf } from '@/utils/bilanExport';
-import { BilanStatus } from '@/types/bilan';
+import { createBilan, deleteBilan, ApiError } from '@/utils/bilanApi';
+import { BilanStatus, BilanDocument } from '@/types/bilan';
+import { PaywallModal } from '@/components/PaywallModal';
+import { usePaywall } from '@/hooks/usePaywall';
 import { useToast } from '@/hooks/use-toast';
 import QuickContactModal from '@/components/QuickContactModal';
 import { isMobileFR } from '@/lib/phone';
@@ -50,7 +53,8 @@ interface BilanSummary {
 
 interface BilanFull extends BilanSummary {
   rawNotes: string;
-  bilanHtml: string;
+  bilanHtml: string | null;
+  document: BilanDocument | null;
 }
 
 interface ArchivedProgramme {
@@ -103,6 +107,10 @@ export default function PatientDetailPage() {
   const { patientId } = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  // usePaywall (JS non typé) infère subscription en `null` côté TS ; caste minimale locale
+  // (même limitation préexistante que dans BilanStartBlock.tsx, non traitée ici — hors périmètre).
+  const { subscription } = usePaywall() as { subscription: { planType: string } | null };
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
 
   // La création part de la bibliothèque en mode sélection, avec le patient
   // déjà retenu : « Continuer » ouvre ensuite le builder pré-rempli.
@@ -141,9 +149,6 @@ export default function PatientDetailPage() {
   const [showBilansModal, setShowBilansModal] = useState(false);
   const [loadingBilans, setLoadingBilans] = useState(false);
   const [loadingBilanDetail, setLoadingBilanDetail] = useState(false);
-  const [editingBilanId, setEditingBilanId] = useState<number | null>(null);
-  const [editBilanHtml, setEditBilanHtml] = useState('');
-  const editBilanRef = useRef<HTMLDivElement>(null);
   const [renderedBilanHtml, setRenderedBilanHtml] = useState<string | null>(null);
   const [renderBilanError, setRenderBilanError] = useState<string | null>(null);
 
@@ -196,7 +201,7 @@ export default function PatientDetailPage() {
 
   // Charger le rendu (moteur serveur) du bilan sélectionné en lecture seule
   useEffect(() => {
-    if (!selectedBilan || editingBilanId === selectedBilan.id) return;
+    if (!selectedBilan) return;
     let cancelled = false;
     setRenderedBilanHtml(null);
     setRenderBilanError(null);
@@ -204,7 +209,7 @@ export default function PatientDetailPage() {
       .then((r) => { if (!cancelled) setRenderedBilanHtml(r.html); })
       .catch((e: Error) => { if (!cancelled) setRenderBilanError(e.message); });
     return () => { cancelled = true; };
-  }, [selectedBilan?.id, editingBilanId]);
+  }, [selectedBilan?.id]);
 
   const handleViewBilan = async (bilanId: number) => {
     try {
@@ -213,7 +218,6 @@ export default function PatientDetailPage() {
       const data = await res.json();
       if (data.success) {
         setSelectedBilan(data.bilan);
-        setEditingBilanId(null);
       }
     } catch {
       toast({ title: 'Erreur', description: 'Impossible de charger le bilan', variant: 'destructive' });
@@ -222,51 +226,24 @@ export default function PatientDetailPage() {
     }
   };
 
-  const handleStartEditBilan = () => {
-    if (!selectedBilan) return;
-    setEditingBilanId(selectedBilan.id);
-    setEditBilanHtml(selectedBilan.bilanHtml);
-    setTimeout(() => {
-      if (editBilanRef.current) {
-        editBilanRef.current.innerHTML = selectedBilan.bilanHtml;
-      }
-    }, 50);
-  };
-
-  const handleSaveEditBilan = async () => {
-    if (!selectedBilan || !editBilanRef.current) return;
+  const handleNewBilan = async () => {
     try {
-      const newHtml = DOMPurify.sanitize(editBilanRef.current.innerHTML);
-      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patientId}/bilans/${selectedBilan.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ bilanHtml: newHtml }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSelectedBilan({ ...selectedBilan, bilanHtml: newHtml });
-        setEditingBilanId(null);
-        toast({ title: 'Bilan modifié', description: 'Les modifications ont été sauvegardées' });
-      } else {
-        toast({ title: 'Erreur', description: data.error || 'Erreur modification', variant: 'destructive' });
-      }
-    } catch {
-      toast({ title: 'Erreur', description: 'Erreur lors de la modification', variant: 'destructive' });
+      const bilan = await createBilan({ type: 'INITIAL', patientId: Number(patientId) });
+      router.push(`/dashboard/kine/bilan-kine/${bilan.id}`);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'PLAN_REQUIRED') setIsPaywallOpen(true);
+      else toast({ title: 'Erreur', description: (e as Error).message, variant: 'destructive' });
     }
   };
 
   const handleDeleteBilan = async (bilanId: number) => {
     try {
-      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patientId}/bilans/${bilanId}`, {
-        method: 'DELETE',
-      });
-      const data = await res.json();
-      if (data.success) {
-        setBilans(prev => prev.filter(b => b.id !== bilanId));
-        if (selectedBilan?.id === bilanId) setSelectedBilan(null);
-        toast({ title: 'Bilan supprimé', description: 'Le bilan a été supprimé' });
-      }
-    } catch {
-      toast({ title: 'Erreur', description: 'Erreur lors de la suppression', variant: 'destructive' });
+      await deleteBilan(bilanId);
+      setBilans(prev => prev.filter(b => b.id !== bilanId));
+      if (selectedBilan?.id === bilanId) setSelectedBilan(null);
+      toast({ title: 'Bilan supprimé', description: 'Le bilan a été supprimé' });
+    } catch (e) {
+      toast({ title: 'Erreur', description: (e as Error).message || 'Erreur lors de la suppression', variant: 'destructive' });
     }
   };
 
@@ -687,7 +664,6 @@ export default function PatientDetailPage() {
           setShowBilansModal(open);
           if (!open) {
             setSelectedBilan(null);
-            setEditingBilanId(null);
           }
         }}>
           <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
@@ -695,7 +671,7 @@ export default function PatientDetailPage() {
               <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
                 {selectedBilan ? (
                   <>
-                    <button onClick={() => { setSelectedBilan(null); setEditingBilanId(null); }} className="hover:opacity-80 transition-opacity">
+                    <button onClick={() => setSelectedBilan(null)} className="hover:opacity-80 transition-opacity">
                       <ArrowLeft className="w-5 h-5" />
                     </button>
                     {selectedBilan.motif || 'Bilan kinésithérapique'}
@@ -711,6 +687,12 @@ export default function PatientDetailPage() {
 
             {!selectedBilan ? (
               <div className="space-y-4 pt-2">
+                <div className="flex justify-end">
+                  <Button size="sm" onClick={handleNewBilan} className="h-8 text-xs btn-teal">
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    Nouveau bilan
+                  </Button>
+                </div>
                 {loadingBilans ? (
                   <div className="text-center py-8">
                     <Loader2 className="animate-spin h-6 w-6 text-[#3899aa] mx-auto" />
@@ -784,28 +766,21 @@ export default function PatientDetailPage() {
               <div className="space-y-4 pt-2">
                 {/* Actions bilan */}
                 <div className="flex items-center justify-end gap-2">
-                  {editingBilanId === selectedBilan.id ? (
-                    <>
-                      <Button size="sm" variant="outline" onClick={() => setEditingBilanId(null)} className="h-8 text-xs">
-                        Annuler
-                      </Button>
-                      <Button size="sm" onClick={handleSaveEditBilan} className="h-8 text-xs btn-teal">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Sauvegarder
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button size="sm" variant="outline" onClick={handleStartEditBilan} className="h-8 text-xs">
-                        <Edit className="w-3 h-3 mr-1" />
-                        Modifier
-                      </Button>
-                      <Button size="sm" onClick={() => handleDownloadBilanPDF(selectedBilan)} className="h-8 text-xs btn-teal">
-                        <Download className="w-3 h-3 mr-1" />
-                        PDF
-                      </Button>
-                    </>
+                  {selectedBilan.document && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => router.push(`/dashboard/kine/bilan-kine/${selectedBilan.id}?step=document`)}
+                      className="h-8 text-xs"
+                    >
+                      <Edit className="w-3 h-3 mr-1" />
+                      Ouvrir dans l'éditeur
+                    </Button>
                   )}
+                  <Button size="sm" onClick={() => handleDownloadBilanPDF(selectedBilan)} className="h-8 text-xs btn-teal">
+                    <Download className="w-3 h-3 mr-1" />
+                    PDF
+                  </Button>
                 </div>
 
                 <div className="text-xs text-muted-foreground">
@@ -816,18 +791,8 @@ export default function PatientDetailPage() {
                   <div className="text-center py-6">
                     <Loader2 className="animate-spin h-5 w-5 text-[#3899aa] mx-auto" />
                   </div>
-                ) : editingBilanId === selectedBilan.id ? (
-                  // Clé distincte de l'aperçu : sinon React réutilise le nœud et le innerHTML
-                  // injecté dans l'éditeur reste affiché sous le rendu (doublon après sauvegarde)
-                  <div
-                    key="bilan-edit"
-                    ref={editBilanRef}
-                    contentEditable
-                    suppressContentEditableWarning
-                    className="min-h-[200px] max-h-[50vh] overflow-y-auto text-sm leading-relaxed p-4 rounded-lg border-2 border-[#3899aa]/40 bg-white dark:bg-card focus:outline-none"
-                  />
                 ) : (
-                  <div key="bilan-view" className="bilan-preview text-sm leading-relaxed p-4 rounded-lg border bg-white dark:bg-card max-h-[50vh] overflow-y-auto">
+                  <div className="bilan-preview text-sm leading-relaxed p-4 rounded-lg border bg-white dark:bg-card max-h-[50vh] overflow-y-auto">
                     {renderBilanError ? (
                       <p className="text-sm text-destructive text-center py-8">{renderBilanError}</p>
                     ) : renderedBilanHtml === null ? (
@@ -1176,6 +1141,8 @@ export default function PatientDetailPage() {
             )}
           </DialogContent>
         </Dialog>
+
+        <PaywallModal isOpen={isPaywallOpen} onClose={() => setIsPaywallOpen(false)} subscription={subscription} />
       </div>
     </>
   );

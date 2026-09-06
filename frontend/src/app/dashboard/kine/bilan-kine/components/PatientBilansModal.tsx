@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import DOMPurify from 'dompurify';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -17,13 +18,11 @@ import {
   Trash2,
   ArrowLeft,
   Loader2,
-  Save,
-  X,
-  User,
   Calendar,
 } from 'lucide-react';
-import { BilanType, BILAN_TYPE_LABELS, BILAN_TYPE_COLORS } from '@/types/bilan';
+import { BilanType, BilanStatus, BilanDocument, BILAN_TYPE_LABELS, BILAN_TYPE_COLORS } from '@/types/bilan';
 import { fetchBilanRender, downloadBilanPdf } from '@/utils/bilanExport';
+import { deleteBilan } from '@/utils/bilanApi';
 
 interface PatientWithBilans {
   id: number;
@@ -38,14 +37,16 @@ interface BilanSummary {
   id: number;
   motif: string | null;
   type: BilanType;
+  status: BilanStatus;
   createdAt: string;
   updatedAt: string;
 }
 
 interface BilanFull extends BilanSummary {
   rawNotes: string;
-  bilanHtml: string;
+  bilanHtml: string | null;
   structuredData: unknown;
+  document: BilanDocument | null;
 }
 
 type View = 'search' | 'list' | 'detail';
@@ -57,6 +58,7 @@ interface PatientBilansModalProps {
 
 export default function PatientBilansModal({ open, onOpenChange }: PatientBilansModalProps) {
   const { toast } = useToast();
+  const router = useRouter();
 
   const [view, setView] = useState<View>('search');
   const [search, setSearch] = useState('');
@@ -70,9 +72,6 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
 
   const [selectedBilan, setSelectedBilan] = useState<BilanFull | null>(null);
   const [loadingBilan, setLoadingBilan] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [savingEdit, setSavingEdit] = useState(false);
-  const editRef = useRef<HTMLDivElement>(null);
   const [renderedHtml, setRenderedHtml] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
 
@@ -84,7 +83,6 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
       setSelectedPatient(null);
       setBilans([]);
       setSelectedBilan(null);
-      setEditing(false);
     }
   }, [open]);
 
@@ -105,16 +103,9 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
     fetchPatients();
   }, [open, view]);
 
-  // Injection HTML dans le contentEditable d'édition (équivalent du pattern existant)
-  useEffect(() => {
-    if (editing && editRef.current && selectedBilan) {
-      editRef.current.innerHTML = selectedBilan.bilanHtml;
-    }
-  }, [editing, selectedBilan]);
-
   // Chargement du rendu (lecture seule) via le moteur serveur
   useEffect(() => {
-    if (editing || !selectedBilan) return;
+    if (!selectedBilan) return;
     let cancelled = false;
     setRenderedHtml(null);
     setRenderError(null);
@@ -122,7 +113,7 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
       .then((r) => { if (!cancelled) setRenderedHtml(r.html); })
       .catch((e: Error) => { if (!cancelled) setRenderError(e.message); });
     return () => { cancelled = true; };
-  }, [editing, selectedBilan]);
+  }, [selectedBilan]);
 
   const filteredPatients = patients.filter((p) =>
     matchesAllTokens(`${p.firstName} ${p.lastName}`, search)
@@ -153,7 +144,6 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
       const json = await res.json();
       if (json.success) {
         setSelectedBilan(json.bilan);
-        setEditing(false);
         setView('detail');
       }
     } finally {
@@ -161,56 +151,16 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
     }
   };
 
-  const handleStartEdit = () => {
-    setEditing(true);
-  };
-
-  const handleCancelEdit = () => {
-    setEditing(false);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!selectedPatient || !selectedBilan || !editRef.current) return;
-    try {
-      setSavingEdit(true);
-      const newHtml = DOMPurify.sanitize(editRef.current.innerHTML);
-      const res = await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${selectedPatient.id}/bilans/${selectedBilan.id}`,
-        { method: 'PUT', body: JSON.stringify({ bilanHtml: newHtml }) }
-      );
-      const json = await res.json();
-      if (json.success) {
-        setSelectedBilan({ ...selectedBilan, bilanHtml: newHtml });
-        setEditing(false);
-        toast({ title: 'Bilan modifié', description: 'Les modifications ont été sauvegardées' });
-      } else {
-        toast({ title: 'Erreur', description: json.error || 'Sauvegarde impossible', variant: 'destructive' });
-      }
-    } catch {
-      toast({ title: 'Erreur', description: 'Sauvegarde impossible', variant: 'destructive' });
-    } finally {
-      setSavingEdit(false);
-    }
-  };
-
   const handleDeleteBilan = async () => {
-    if (!selectedPatient || !selectedBilan) return;
+    if (!selectedBilan) return;
     try {
-      const res = await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${selectedPatient.id}/bilans/${selectedBilan.id}`,
-        { method: 'DELETE' }
-      );
-      const json = await res.json();
-      if (json.success) {
-        setBilans((prev) => prev.filter((b) => b.id !== selectedBilan.id));
-        setSelectedBilan(null);
-        setView('list');
-        toast({ title: 'Bilan supprimé', description: 'Le bilan a été supprimé' });
-      } else {
-        toast({ title: 'Erreur', description: json.error || 'Suppression impossible', variant: 'destructive' });
-      }
-    } catch {
-      toast({ title: 'Erreur', description: 'Suppression impossible', variant: 'destructive' });
+      await deleteBilan(selectedBilan.id);
+      setBilans((prev) => prev.filter((b) => b.id !== selectedBilan.id));
+      setSelectedBilan(null);
+      setView('list');
+      toast({ title: 'Bilan supprimé', description: 'Le bilan a été supprimé' });
+    } catch (e) {
+      toast({ title: 'Erreur', description: (e as Error).message || 'Suppression impossible', variant: 'destructive' });
     }
   };
 
@@ -364,7 +314,6 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
                 size="sm"
                 onClick={() => {
                   setSelectedBilan(null);
-                  setEditing(false);
                   setView('list');
                 }}
                 className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
@@ -373,66 +322,42 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
                 Retour à la liste
               </Button>
               <div className="flex gap-2">
-                {editing ? (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleCancelEdit}
-                      disabled={savingEdit}
-                      className="h-8 rounded-full px-3"
-                    >
-                      <X className="h-3.5 w-3.5 mr-1.5" />
-                      Annuler
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleSaveEdit}
-                      disabled={savingEdit}
-                      className="btn-teal h-8 rounded-full px-3"
-                    >
-                      {savingEdit ? (
-                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                      ) : (
-                        <Save className="h-3.5 w-3.5 mr-1.5" />
-                      )}
-                      Enregistrer
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button size="sm" onClick={handleStartEdit} className="btn-teal h-8 rounded-full px-3">
-                      <Edit className="h-3.5 w-3.5 mr-1.5" />
-                      Modifier
-                    </Button>
-                    <Button size="sm" onClick={handleDownloadPdf} className="btn-teal h-8 rounded-full px-3">
-                      <Download className="h-3.5 w-3.5 mr-1.5" />
-                      PDF
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="outline" className="h-8 rounded-full px-3 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20">
-                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                          Supprimer
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Supprimer ce bilan ?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Cette action est irréversible. Le bilan ne sera plus visible dans la fiche patient.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Annuler</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleDeleteBilan} className="bg-red-600 hover:bg-red-700">
-                            Supprimer
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
+                {selectedBilan.document && (
+                  <Button
+                    size="sm"
+                    onClick={() => router.push(`/dashboard/kine/bilan-kine/${selectedBilan.id}?step=document`)}
+                    className="btn-teal h-8 rounded-full px-3"
+                  >
+                    <Edit className="h-3.5 w-3.5 mr-1.5" />
+                    Ouvrir dans l'éditeur
+                  </Button>
                 )}
+                <Button size="sm" onClick={handleDownloadPdf} className="btn-teal h-8 rounded-full px-3">
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                  PDF
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="outline" className="h-8 rounded-full px-3 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20">
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                      Supprimer
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Supprimer ce bilan ?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Cette action est irréversible. Le bilan ne sera plus visible dans la fiche patient.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteBilan} className="bg-red-600 hover:bg-red-700">
+                        Supprimer
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
 
@@ -441,34 +366,17 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
               <div className="text-xs text-muted-foreground italic">Motif : {selectedBilan.motif}</div>
             )}
 
-            {/* Contenu (édition ou lecture) */}
+            {/* Contenu (lecture seule) */}
             <div className="flex-1 overflow-y-auto">
-              {/* Clés distinctes : sans elles React réutilise le même nœud DOM et le contenu injecté
-                  par innerHTML dans l'éditeur reste affiché sous l'aperçu (doublon après sauvegarde) */}
-              {editing ? (
-                <div
-                  key="bilan-edit"
-                  ref={editRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  className="min-h-[400px] text-sm leading-relaxed text-foreground p-4 rounded-xl border-2 border-[#3899aa]/40 bg-white dark:bg-card focus:outline-none focus:border-[#3899aa]/70 transition-all"
-                />
-              ) : (
-                <div key="bilan-view" className="bilan-preview min-h-[200px] text-sm leading-relaxed text-foreground p-4 rounded-xl border border-border/50 bg-white dark:bg-card">
-                  {renderError ? (
-                    <p className="text-sm text-destructive text-center py-8">{renderError}</p>
-                  ) : renderedHtml === null ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-[#3899aa] mx-auto" />
-                  ) : (
-                    <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderedHtml) }} />
-                  )}
-                </div>
-              )}
-              {editing && (
-                <p className="text-[11px] text-muted-foreground mt-2 text-right">
-                  Tu peux modifier directement le contenu ci-dessus
-                </p>
-              )}
+              <div className="bilan-preview min-h-[200px] text-sm leading-relaxed text-foreground p-4 rounded-xl border border-border/50 bg-white dark:bg-card">
+                {renderError ? (
+                  <p className="text-sm text-destructive text-center py-8">{renderError}</p>
+                ) : renderedHtml === null ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-[#3899aa] mx-auto" />
+                ) : (
+                  <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderedHtml) }} />
+                )}
+              </div>
             </div>
           </div>
         )}
