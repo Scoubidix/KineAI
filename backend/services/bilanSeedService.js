@@ -155,6 +155,8 @@ async function runBilanSeed({ prisma, data } = {}) {
   logger.info(
     `Seed bilan : appliqué v${applied} → v${data.version} (${data.fields.length} champs, ${data.templates.length} templates)`
   );
+  // require paresseux : évite un import circulaire au chargement du module
+  require('./bilanRenderService').invalidateCatalogCache();
 }
 
 module.exports = { loadSeedFile, validateSeed, runBilanSeed, DEFAULT_SEED_PATH };

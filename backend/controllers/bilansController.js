@@ -65,11 +65,12 @@ exports.getBilans = async (req, res) => {
     const { patient, prisma } = ctx;
 
     const bilans = await prisma.bilanKine.findMany({
-      where: { patientId: patient.id, isActive: true },
+      where: { patientId: patient.id, isActive: true, status: { not: 'BROUILLON' } },
       select: {
         id: true,
         motif: true,
         type: true,
+        status: true,
         createdAt: true,
         updatedAt: true,
       },
