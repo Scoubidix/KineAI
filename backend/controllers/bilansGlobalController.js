@@ -4,6 +4,7 @@ const bilanRenderService = require('../services/bilanRenderService');
 const { PRINT_CSS } = require('../services/bilanRenderer');
 const { generatePdfBuffer, PDF_ERROR_CODES } = require('../services/pdfService');
 const { sanitizeId } = require('../utils/logSanitizer');
+const draftService = require('../services/bilanDraftService');
 
 /**
  * GET /api/bilans/patients-with-bilans
@@ -132,5 +133,117 @@ exports.downloadBilanPdf = async (req, res) => {
     }
     logger.error('Erreur PDF bilan :', err);
     res.status(500).json({ success: false, error: 'Erreur génération PDF', code: err.code === PDF_ERROR_CODES.RENDER_FAILED ? PDF_ERROR_CODES.RENDER_FAILED : 'INTERNAL_ERROR' });
+  }
+};
+
+// Traduit une DraftError en réponse HTTP ; toute autre erreur → 500
+function sendDraftError(res, err, context) {
+  if (err instanceof draftService.DraftError) {
+    return res.status(err.status).json({ success: false, error: err.message, code: err.code, ...err.extra });
+  }
+  logger.error(`Erreur ${context} :`, err);
+  return res.status(500).json({ success: false, error: `Erreur ${context}`, code: 'INTERNAL_ERROR' });
+}
+
+const LIST_STATUSES = ['BROUILLON', 'GENERE', 'ENREGISTRE'];
+
+/** POST /api/bilans */
+exports.createBilanDraft = async (req, res) => {
+  try {
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const { type = 'INITIAL', patientId = null, motif = null } = req.body;
+    const bilan = await draftService.createDraft({ kineId, type, patientId, motif });
+    res.status(201).json({ success: true, bilan });
+  } catch (err) {
+    sendDraftError(res, err, 'création du brouillon');
+  }
+};
+
+/** GET /api/bilans?status=BROUILLON,GENERE&limit=20 */
+exports.listMyBilans = async (req, res) => {
+  try {
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const statuses = req.query.status ? String(req.query.status).split(',').map((s) => s.trim()) : ['BROUILLON', 'GENERE'];
+    if (statuses.some((s) => !LIST_STATUSES.includes(s))) {
+      return res.status(400).json({ success: false, error: 'Statut invalide', code: 'INVALID_STATUS' });
+    }
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+    const bilans = await draftService.listMyBilans({ kineId, statuses, limit });
+    res.json({ success: true, bilans });
+  } catch (err) {
+    sendDraftError(res, err, 'liste des bilans');
+  }
+};
+
+/** GET /api/bilans/:id */
+exports.getBilanForEditor = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const bilan = await draftService.getForEditor({ kineId, bilanId });
+    res.json({ success: true, bilan });
+  } catch (err) {
+    sendDraftError(res, err, 'lecture du bilan');
+  }
+};
+
+/** PATCH /api/bilans/:id — autosave */
+exports.patchBilan = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const { expectedUpdatedAt, ...patch } = req.body;
+    const { updatedAt } = await draftService.updateDraft({ kineId, bilanId, patch, expectedUpdatedAt });
+    res.json({ success: true, updatedAt });
+  } catch (err) {
+    sendDraftError(res, err, 'sauvegarde du bilan');
+  }
+};
+
+/** POST /api/bilans/:id/attach */
+exports.attachPatient = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const bilan = await draftService.attachPatient({ kineId, bilanId, patientId: req.body.patientId });
+    res.json({ success: true, bilan });
+  } catch (err) {
+    sendDraftError(res, err, 'rattachement du patient');
+  }
+};
+
+/** POST /api/bilans/:id/finalize */
+exports.finalizeBilan = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const bilan = await draftService.finalizeBilan({ kineId, bilanId });
+    res.json({ success: true, bilan });
+  } catch (err) {
+    sendDraftError(res, err, 'enregistrement du bilan');
+  }
+};
+
+/** DELETE /api/bilans/:id */
+exports.deleteBilan = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const { deleted } = await draftService.removeBilan({ kineId, bilanId });
+    res.json({ success: true, deleted });
+  } catch (err) {
+    sendDraftError(res, err, 'suppression du bilan');
   }
 };
