@@ -48,7 +48,7 @@ const scoreField = (field: CanonicalField, q: string): number => {
   // Inclus dans le label
   if (label.includes(q)) return 60;
   // Inclus dans un alias (ex: "empty can" pour le Test de Jobe)
-  if (Array.isArray(field.aliases) && field.aliases.some((a) => a.toLowerCase().includes(q))) return 55;
+  if (Array.isArray(field.aliases) && field.aliases.some((a) => normalize(a).includes(q))) return 55;
   // Inclus dans la key technique
   if (key.includes(q)) return 50;
   // Inclus dans la catégorie

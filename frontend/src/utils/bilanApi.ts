@@ -8,11 +8,14 @@ export class ApiError extends Error {
   code: string;
   status: number;
   details?: string[];
-  constructor(message: string, code: string, status: number, details?: string[]) {
+  /** Délai suggéré (ms) avant de réessayer, lu depuis l'en-tête Retry-After (429). */
+  retryAfterMs?: number;
+  constructor(message: string, code: string, status: number, details?: string[], retryAfterMs?: number) {
     super(message);
     this.code = code;
     this.status = status;
     this.details = details;
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
@@ -33,7 +36,11 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     const message = (json.error as string) || `Erreur ${res.status}`;
     const code = (json.code as string) || 'HTTP_ERROR';
     if (res.status === 409 && code === 'STALE_DRAFT') throw new StaleDraftError(message, json.updatedAt as string);
-    throw new ApiError(message, code, res.status, json.details as string[] | undefined);
+    const retryAfterHeader = res.headers.get('Retry-After');
+    const retryAfterMs = retryAfterHeader && !Number.isNaN(Number(retryAfterHeader))
+      ? Number(retryAfterHeader) * 1000
+      : undefined;
+    throw new ApiError(message, code, res.status, json.details as string[] | undefined, retryAfterMs);
   }
   return json as T;
 }
