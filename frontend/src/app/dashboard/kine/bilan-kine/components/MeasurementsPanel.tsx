@@ -168,7 +168,6 @@ export default function MeasurementsPanel({
   // qui ne sont pas déjà dans measurements, à la fin, dans l'ordre du template.
   // Les valeurs déjà saisies dans le bilan en cours ne sont jamais touchées.
   const handleApplyTemplate = (template: BilanTemplate) => {
-    const seenKeys = new Set<string>();
     const existingLabels = new Set(addedCustomLabels);
     const toAdd: DocumentMeasurement[] = [];
     const touchedCategories = new Set<string>();
@@ -176,16 +175,29 @@ export default function MeasurementsPanel({
     for (const item of template.items) {
       if (item.kind === 'canonical') {
         const field = fieldsByKey.get(item.key);
-        if (seenKeys.has(item.key) || (field && isFieldExhausted(field))) continue;
-        seenKeys.add(item.key);
-        toAdd.push({
-          kind: 'canonical',
-          key: item.key,
-          value: null,
-          presentation: field?.presentation === 'NARRATIVE' ? 'narrative' : 'table',
-          origin: 'manual',
-        });
-        touchedCategories.add(field?.category ?? UNKNOWN_CATEGORY);
+        // Champ inconnu au catalogue : on ne l'ajoute qu'une fois (aucune notion de côté).
+        if (!field) {
+          const already =
+            measurements.some((m) => m.kind === 'canonical' && m.key === item.key) ||
+            toAdd.some((m) => m.kind === 'canonical' && m.key === item.key);
+          if (already) continue;
+          toAdd.push({ kind: 'canonical', key: item.key, value: null, presentation: 'table', origin: 'manual' });
+          touchedCategories.add(UNKNOWN_CATEGORY);
+          continue;
+        }
+        const presentation: Presentation = field.presentation === 'NARRATIVE' ? 'narrative' : 'table';
+        if (field.lateralized) {
+          // D puis G, comme l'ajout manuel ; rien si les deux côtés existent déjà (dans measurements ou dans toAdd).
+          const has = (side: Side) =>
+            hasCanonical(field.key, side) || toAdd.some((m) => m.kind === 'canonical' && m.key === field.key && m.side === side);
+          const side: Side | null = !has('D') ? 'D' : !has('G') ? 'G' : null;
+          if (!side) continue;
+          toAdd.push({ kind: 'canonical', key: field.key, value: null, side, presentation, origin: 'manual' });
+        } else {
+          if (isFieldExhausted(field) || toAdd.some((m) => m.kind === 'canonical' && m.key === field.key)) continue;
+          toAdd.push({ kind: 'canonical', key: field.key, value: null, presentation, origin: 'manual' });
+        }
+        touchedCategories.add(field.category ?? UNKNOWN_CATEGORY);
       } else {
         const labelKey = item.label.trim().toLowerCase();
         if (existingLabels.has(labelKey)) continue;
