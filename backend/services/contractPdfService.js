@@ -1,6 +1,6 @@
 const crypto = require('crypto');
-const logger = require('../utils/logger');
 const { renderRemplacementLiberalHtml } = require('../templates/contrats/remplacement-liberal');
+const { generatePdfBuffer, isPuppeteerEnabled, PDF_ERROR_CODES } = require('./pdfService');
 
 /**
  * Service de génération PDF pour les contrats remplacement/assistanat.
@@ -9,19 +9,14 @@ const { renderRemplacementLiberalHtml } = require('../templates/contrats/remplac
  *   PUPPETEER_ENABLED=true  (défaut)  → génération réelle via Chromium headless
  *   PUPPETEER_ENABLED=false           → endpoint renvoie 503 (cas staging Pico 256MB)
  *
- * En tests, Puppeteer est mocké via jest.mock.
+ * Puppeteer (isPuppeteerEnabled / generatePdfBuffer) est mutualisé dans pdfService.js
+ * (réutilisé par les bilans). En tests, Puppeteer est mocké via jest.mock.
  */
 
 const ERROR_CODES = {
   UNSUPPORTED_TYPE: 'UNSUPPORTED_TYPE',
-  PUPPETEER_DISABLED: 'PUPPETEER_DISABLED',
-  RENDER_FAILED: 'RENDER_FAILED',
+  ...PDF_ERROR_CODES,
 };
-
-function isPuppeteerEnabled() {
-  // Défaut : true. Désactivable uniquement par valeur explicite 'false'.
-  return String(process.env.PUPPETEER_ENABLED ?? 'true').toLowerCase() !== 'false';
-}
 
 // Formate les dates en français : ISO (2026-06-01) ou Date → "01/06/2026"
 function formatDateFr(value) {
@@ -129,53 +124,6 @@ function renderContractHtml(contract, kineInitiateur, kineDestinataire = null) {
   }
   const pdfData = buildPdfData(contract, kineInitiateur, kineDestinataire);
   return renderRemplacementLiberalHtml(pdfData);
-}
-
-/**
- * Génère un buffer PDF à partir du HTML rendu, via Puppeteer.
- * Le require de puppeteer est lazy pour éviter de charger Chromium au boot
- * (et pour permettre aux tests de mock proprement).
- *
- * @returns {Promise<Buffer>}
- * @throws si PUPPETEER_ENABLED=false → code PUPPETEER_DISABLED
- */
-async function generatePdfBuffer(html) {
-  if (!isPuppeteerEnabled()) {
-    const err = new Error('Génération PDF désactivée sur cet environnement (PUPPETEER_ENABLED=false)');
-    err.code = ERROR_CODES.PUPPETEER_DISABLED;
-    throw err;
-  }
-
-  const puppeteer = require('puppeteer');
-  let browser = null;
-  try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-      ],
-    });
-    const page = await browser.newPage();
-    // networkidle0 attend que toutes les ressources (dont logo) soient chargées
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '2cm', right: '2cm', bottom: '2cm', left: '2cm' },
-    });
-    return pdfBuffer;
-  } catch (err) {
-    logger.error('Erreur génération PDF Puppeteer :', err);
-    const e = new Error('Échec de la génération du PDF');
-    e.code = ERROR_CODES.RENDER_FAILED;
-    throw e;
-  } finally {
-    if (browser) {
-      try { await browser.close(); } catch (_) { /* noop */ }
-    }
-  }
 }
 
 /**
