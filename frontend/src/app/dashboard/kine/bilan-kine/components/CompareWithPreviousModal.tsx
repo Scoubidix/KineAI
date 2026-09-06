@@ -11,6 +11,8 @@ import {
   BILAN_TYPE_LABELS,
   BILAN_TYPE_COLORS,
   StructuredData,
+  BilanDocument,
+  DocumentMeasurement,
 } from '@/types/bilan';
 import BilanDetailView from './BilanDetailView';
 
@@ -21,18 +23,32 @@ interface BilanSummary {
   createdAt: string;
 }
 
+// Bilan tel que renvoyé par GET /api/patients/:pid/bilans/:id
+interface BilanDetail {
+  document: BilanDocument | null;
+  structuredData: StructuredData | null;
+}
+
 export interface SelectedBilan {
   id: number;
   type: BilanType;
   createdAt: string;
   motif: string | null;
-  structuredData: StructuredData | null;
+  measurements: DocumentMeasurement[];
 }
+
+// Pont pour les bilans hérités (avant le document V1) : les côtés (D/G) n'existaient
+// pas encore dans structuredData, donc ils sont perdus ici — acceptable pour l'historique.
+export const legacyToDocumentMeasurements = (sd: StructuredData | null): DocumentMeasurement[] =>
+  (sd?.measurements ?? []).map((m) => (m.kind === 'canonical'
+    ? { kind: 'canonical', key: m.key, value: m.value, presentation: 'table', origin: 'previous' }
+    : { kind: 'custom', label: m.label, value: m.value, presentation: 'table', origin: 'previous' }));
 
 interface CompareWithPreviousModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   patientId: number;
+  excludeId?: number;
   initialSelectedIds?: number[];
   onSelect: (bilans: SelectedBilan[]) => void;
 }
@@ -41,6 +57,7 @@ export default function CompareWithPreviousModal({
   open,
   onOpenChange,
   patientId,
+  excludeId,
   initialSelectedIds = [],
   onSelect,
 }: CompareWithPreviousModalProps) {
@@ -62,7 +79,7 @@ export default function CompareWithPreviousModal({
         const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patientId}/bilans`);
         if (!res.ok) return;
         const json = await res.json();
-        if (json.success) setBilans(json.bilans);
+        if (json.success) setBilans((json.bilans as BilanSummary[]).filter((b) => b.id !== excludeId));
       } finally {
         setLoading(false);
       }
@@ -70,7 +87,7 @@ export default function CompareWithPreviousModal({
 
     fetchBilans();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, patientId]);
+  }, [open, patientId, excludeId]);
 
   const toggleSelected = (id: number) => {
     setSelectedIds((prev) => {
@@ -90,12 +107,13 @@ export default function CompareWithPreviousModal({
       if (!res.ok) return;
       const json = await res.json();
       if (!json.success) return;
+      const bilan = json.bilan as BilanDetail;
       setPreviewing({
         id: b.id,
         type: b.type,
         createdAt: b.createdAt,
         motif: b.motif,
-        structuredData: json.bilan.structuredData ?? null,
+        measurements: bilan.document?.measurements ?? legacyToDocumentMeasurements(bilan.structuredData ?? null),
       });
     } finally {
       setPreviewLoadingId(null);
@@ -113,7 +131,7 @@ export default function CompareWithPreviousModal({
         return;
       }
       const selected = bilans.filter((b) => selectedIds.has(b.id));
-      // Charge en parallèle les structuredData de chaque bilan sélectionné
+      // Charge en parallèle les mesures de chaque bilan sélectionné
       const fullBilans = await Promise.all(
         selected.map(async (b) => {
           try {
@@ -121,12 +139,13 @@ export default function CompareWithPreviousModal({
             if (!res.ok) return null;
             const json = await res.json();
             if (!json.success) return null;
+            const bilan = json.bilan as BilanDetail;
             return {
               id: b.id,
               type: b.type,
               createdAt: b.createdAt,
               motif: b.motif,
-              structuredData: json.bilan.structuredData ?? null,
+              measurements: bilan.document?.measurements ?? legacyToDocumentMeasurements(bilan.structuredData ?? null),
             } as SelectedBilan;
           } catch {
             return null;

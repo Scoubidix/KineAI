@@ -217,7 +217,7 @@ export default function BilanKinePage() {
       ...sortedPrevious.map((b) => ({
         type: b.type,
         createdAt: b.createdAt,
-        data: b.structuredData ?? EMPTY_STRUCTURED_DATA,
+        data: fromDocMeasurements(b.measurements),
         isCurrent: false,
       })),
       {
@@ -1244,11 +1244,7 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
               const mostRecent = [...bilans].sort(
                 (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
               )[0];
-              if (mostRecent.structuredData) {
-                setStructuredData({
-                  measurements: mostRecent.structuredData.measurements.map((m) => ({ ...m })),
-                });
-              }
+              setStructuredData(fromDocMeasurements(mostRecent.measurements));
             }
           }}
         />
