@@ -18,7 +18,6 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import NouveauBilanModal from '@/app/dashboard/kine/bilan-kine/components/NouveauBilanModal';
 import NouveauContratModal from '@/app/dashboard/kine/contrats/components/NouveauContratModal';
 
 // Interfaces pour les types de données
@@ -115,7 +114,6 @@ export default function KineHomePage() {
   const [loading, setLoading] = useState(true);
   const [loadingAdherence, setLoadingAdherence] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [bilanModalOpen, setBilanModalOpen] = useState(false);
   const [contratModalOpen, setContratModalOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -340,7 +338,7 @@ export default function KineHomePage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Actions rapides</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <button onClick={() => setBilanModalOpen(true)} className="card-hover rounded-xl p-4 text-center transition-all">
+            <button onClick={() => router.push('/dashboard/kine/bilan-kine')} className="card-hover rounded-xl p-4 text-center transition-all">
               <div className="w-10 h-10 mx-auto mb-2 rounded-lg flex items-center justify-center text-xl bg-[#ecfdf5]">📝</div>
               <div className="text-sm font-semibold">Nouveau bilan</div>
               <div className="text-[11px] text-muted-foreground">Générer en 2 min</div>
@@ -488,7 +486,6 @@ export default function KineHomePage() {
         </Card>
       </div>
 
-      <NouveauBilanModal open={bilanModalOpen} onOpenChange={setBilanModalOpen} />
       <NouveauContratModal open={contratModalOpen} onOpenChange={setContratModalOpen} />
     </>
   );

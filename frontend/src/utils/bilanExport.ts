@@ -13,6 +13,7 @@ export interface BilanRender {
   html: string;
   title: string;
   css: string;
+  examenHtml: string;
 }
 
 /** HTML rendu par le moteur serveur (à passer dans DOMPurify avant affichage). */
@@ -20,7 +21,15 @@ export async function fetchBilanRender(bilanId: number, options?: RenderOptions)
   const res = await fetchWithAuth(`${API}/api/bilans/${bilanId}/render${query(options)}`);
   const json = await res.json();
   if (!res.ok || !json.success) throw new Error(json.error || 'Rendu du bilan impossible');
-  return { html: json.html, title: json.title, css: json.css };
+  return { html: json.html, title: json.title, css: json.css, examenHtml: json.examenHtml ?? '' };
+}
+
+/** Texte brut d'un rendu (copier / mail) : balises retirées, lignes vides compressées. */
+export function bilanRenderToText(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('h1, h2, h3, p, tr, div.bilan-sign, header').forEach((el) => el.append('\n'));
+  doc.querySelectorAll('td, th').forEach((el) => el.append('\t'));
+  return (doc.body.textContent || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /** Repli quand le PDF serveur est indisponible : fenêtre d'impression du HTML rendu. */

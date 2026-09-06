@@ -1265,7 +1265,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { href: '/dashboard/kine/home', label: 'Accueil Kiné', icon: Home, disabled: false },
         { href: '/dashboard/kine/patients', label: 'Patients', icon: Users, disabled: false },
         { href: '/dashboard/kine/programmes', label: 'Programmes', icon: Calendar, disabled: false },
-        { href: '/dashboard/kine/bilan-kine', label: 'Bilan Kiné', icon: ClipboardCheck, disabled: false },
+        { href: '/dashboard/kine/bilan-kine', label: 'Bilans', icon: ClipboardCheck, disabled: false },
         { href: '/dashboard/kine/chatbot-admin', label: 'Module administratif', icon: FileText, disabled: false },
         { href: '/dashboard/kine/contrats', label: 'Mes Contrats', icon: Briefcase, disabled: false },
         { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, disabled: false },
@@ -1355,7 +1355,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       items: [
         { href: '/dashboard/kine/patients', label: 'Patients', icon: Users, emoji: '👥', highlight: false },
         { href: '/dashboard/kine/programmes', label: 'Programmes', icon: Calendar, emoji: '📋', highlight: false },
-        { href: '/dashboard/kine/bilan-kine', label: 'Bilan Kiné', icon: ClipboardCheck, emoji: '📝', highlight: false },
+        { href: '/dashboard/kine/bilan-kine', label: 'Bilans', icon: ClipboardCheck, emoji: '📝', highlight: false },
         { href: '/dashboard/kine/chatbot-admin', label: 'Module administratif', icon: FileText, emoji: '📁', highlight: false },
         { href: '/dashboard/kine/contrats', label: 'Mes Contrats', icon: Briefcase, emoji: '📄', highlight: false },
         { href: '/dashboard/kine/visio', label: 'Vidéotransmission', icon: Video, emoji: '📹', highlight: false },
