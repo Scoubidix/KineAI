@@ -198,6 +198,33 @@ const crudWriteLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter pour la génération PDF serveur (Puppeteer, ~1-2 s CPU par appel)
+ * 10 PDF par minute et par kiné — protège le CPU, pas de skip GET (contrairement
+ * à crudWriteLimiter) car cette route GET déclenche bien un rendu coûteux.
+ */
+const pdfGenerationLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // 10 PDF max par minute
+  message: {
+    error: 'Trop de générations de PDF',
+    details: 'Veuillez patienter 1 minute avant de réessayer',
+    retryAfter: 60
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'pdf_generation'),
+  handler: (req, res) => {
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Génération PDF - User: ${safeUser}`);
+    res.status(429).json({
+      error: 'Trop de générations de PDF',
+      details: 'Veuillez patienter 1 minute avant de réessayer',
+      retryAfter: 60
+    });
+  }
+});
+
+/**
  * Rate limiter pour les endpoints d'authentification
  * Prévient les attaques par force brute
  */
@@ -692,6 +719,7 @@ module.exports = {
   gptLimiter,
   gptHeavyLimiter,
   crudWriteLimiter,
+  pdfGenerationLimiter,
   authLimiter,
   whatsappSendLimiter,
   whatsappTemplatesPatientLimiter,
