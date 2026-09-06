@@ -93,18 +93,27 @@ async function updateDraft({ kineId, bilanId, patch, expectedUpdatedAt }) {
     data.document = result.data;
   }
 
-  // Contrôle de concurrence atomique : l'UPDATE ne passe que si updatedAt n'a pas bougé.
+  // Vérification et écriture en une seule requête (check-and-set atomique) : l'UPDATE ne
+  // touche la ligne que si elle appartient au kiné, est active, et si updatedAt n'a pas bougé
+  // depuis la lecture par le client. Deux requêtes (updateMany + findFirst) laisseraient une
+  // fenêtre où la ligne peut disparaître ou être réécrite entre les deux, faussant le diagnostic.
   const expected = new Date(expectedUpdatedAt);
-  const { count } = await prisma.bilanKine.updateMany({
-    where: { id: bilanId, kineId, isActive: true, updatedAt: expected },
-    data,
-  });
-  const current = await prisma.bilanKine.findFirst({ where: { id: bilanId, kineId, isActive: true }, select: { updatedAt: true } });
-  if (!current) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
-  if (count === 0) {
-    throw new DraftError('STALE_DRAFT', 409, 'Ce bilan a été modifié ailleurs', { updatedAt: current.updatedAt });
+  try {
+    const updated = await prisma.bilanKine.update({
+      where: { id: bilanId, kineId, isActive: true, updatedAt: expected },
+      data,
+      select: { updatedAt: true },
+    });
+    return { updatedAt: updated.updatedAt };
+  } catch (err) {
+    // P2025 : aucune ligne ne correspond → soit le bilan n'existe plus, soit updatedAt a bougé
+    if (err && err.code === 'P2025') {
+      const current = await prisma.bilanKine.findFirst({ where: { id: bilanId, kineId, isActive: true }, select: { updatedAt: true } });
+      if (!current) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
+      throw new DraftError('STALE_DRAFT', 409, 'Ce bilan a été modifié ailleurs', { updatedAt: current.updatedAt });
+    }
+    throw err;
   }
-  return { updatedAt: current.updatedAt };
 }
 
 async function attachPatient({ kineId, bilanId, patientId }) {
