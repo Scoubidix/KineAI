@@ -159,6 +159,19 @@ function validateDocument(document, fields) {
   };
 }
 
+// Vrai si rien n'a été saisi : aucune section avec du texte, aucune mesure avec une valeur.
+// Sert au refus de finalisation (un bilan enregistré doit avoir un contenu).
+function isDocumentEmpty(document) {
+  if (!document) return true;
+  const hasSection = (document.sections || []).some((s) => typeof s.text === 'string' && s.text.trim() !== '');
+  if (hasSection) return false;
+  return !(document.measurements || []).some((m) => {
+    if (m.value === null || m.value === undefined) return false;
+    if (typeof m.value === 'string') return m.value.trim() !== '';
+    return true;
+  });
+}
+
 module.exports = {
   SCHEMA_VERSION,
   SECTION_KEYS,
@@ -170,4 +183,5 @@ module.exports = {
   normalizeLabel,
   buildDocumentSchema,
   validateDocument,
+  isDocumentEmpty,
 };
