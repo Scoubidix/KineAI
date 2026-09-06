@@ -45,11 +45,11 @@ model Kine {
   subscriptionStatus    SubscriptionStatus? // Statut de l'abonnement
   subscriptionStartDate DateTime? // Date début abonnement
   subscriptionEndDate   DateTime? // Date fin abonnement
-  billingCycle          String?   @default("monthly") // Cycle de facturation : "monthly" | "yearly"
+  billingCycle          String?             @default("monthly") // Cycle de facturation : "monthly" | "yearly"
   trialEndDate          DateTime? // Date fin période d'essai (si applicable)
   trialBilanMailSentAt  DateTime? // Essai : date d'envoi du mail "1er bilan" (idempotence)
   trialRecapMailSentAt  DateTime? // Essai : date d'envoi du mail récap de fin (idempotence)
-  hasHadTrial           Boolean   @default(false)
+  hasHadTrial           Boolean             @default(false)
   // ===============================================
 
   // ========== PARRAINAGE ==========
@@ -129,8 +129,8 @@ model Patient {
   firstName String
   lastName  String
   birthDate DateTime
-  phone     String?  // Optionnel : sert uniquement au canal WhatsApp (email par défaut)
-  email     String?  // Optionnel : le kiné peut créer un patient sans email
+  phone     String? // Optionnel : sert uniquement au canal WhatsApp (email par défaut)
+  email     String? // Optionnel : le kiné peut créer un patient sans email
   goals     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -417,7 +417,7 @@ model Nouveaute {
   id          Int                @id @default(autoincrement())
   titre       String
   description String
-  imagePaths  String[] @default([]) // Chemins GCS (dossier nouveautes/) — carrousel, pas les URLs signées
+  imagePaths  String[]           @default([]) // Chemins GCS (dossier nouveautes/) — carrousel, pas les URLs signées
   categorie   NouveauteCategorie @default(NOUVEAUTE)
   ctaLabel    String? // Libellé du bouton (optionnel)
   ctaHref     String? // Lien du bouton (optionnel)
@@ -679,7 +679,7 @@ model SupportTicket {
 model TicketMessage {
   id        Int      @id @default(autoincrement())
   body      String   @db.Text
-  imagePath String?  // Chemin GCS de la piece jointe (dossier support/), supprime a la resolution du ticket
+  imagePath String? // Chemin GCS de la piece jointe (dossier support/), supprime a la resolution du ticket
   isAdmin   Boolean  @default(false)
   createdAt DateTime @default(now())
 
@@ -724,28 +724,41 @@ enum BilanType {
   FINAL
 }
 
-model BilanKine {
-  id             Int       @id @default(autoincrement())
-  motif          String?   @db.VarChar(500) // Motif de consultation
-  rawNotes       String    @db.Text // Notes brutes du kiné
-  bilanHtml      String    @db.Text // HTML structuré généré par l'IA
-  type           BilanType @default(INITIAL)
-  structuredData Json? // Mesures canoniques + custom saisies par le kiné
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+enum BilanStatus {
+  BROUILLON // en cours de saisie, jamais listé côté patient
+  GENERE // au moins une rédaction (IA ou manuelle), pas encore enregistré
+  ENREGISTRE // validé et rattaché à un patient
+}
 
-  // Soft delete
+model BilanKine {
+  id             Int         @id @default(autoincrement())
+  motif          String?     @db.VarChar(500) // Motif de consultation
+  rawNotes       String?     @db.Text // Notes brutes du kiné (null = brouillon vide)
+  bilanHtml      String?     @db.Text // HTML hérité (bilans antérieurs à la V1) ; jamais écrit pour les nouveaux bilans
+  type           BilanType   @default(INITIAL)
+  status         BilanStatus @default(BROUILLON)
+  structuredData Json? // Hérité : mesures des anciens bilans (lecture seule)
+  document       Json? // V1 : sections + mesures codées (cf. services/bilanDocument.js) ; null = bilan hérité
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // Soft delete (bilans GENERE / ENREGISTRE uniquement ; un BROUILLON est supprimé physiquement)
   isActive  Boolean   @default(true)
   deletedAt DateTime?
 
   // Relations
   kineId    Int
-  kine      Kine    @relation(fields: [kineId], references: [id], onDelete: Cascade)
-  patientId Int
-  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  kine      Kine     @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  patientId Int? // null = mode libre (brouillon sans patient)
+  patient   Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  // Conversation copilote liée (plan 4) ; SetNull si la conversation est supprimée
+  copilotConversationId Int?          @unique
+  copilotConversation   Conversation? @relation(fields: [copilotConversationId], references: [id], onDelete: SetNull)
 
   @@index([kineId, createdAt])
   @@index([patientId, createdAt])
+  @@index([kineId, status, updatedAt])
   @@map("bilans_kine")
 }
 
@@ -758,20 +771,28 @@ enum CanonicalFieldType {
   ENUM // ex: testing musculaire 0/5..5/5 → select avec options
 }
 
+enum FieldPresentation {
+  TABLE // rendu en tableau dans l'examen clinique
+  NARRATIVE // transmis au rédacteur IA, rendu en prose
+}
+
 model BilanCanonicalField {
-  id        Int                @id @default(autoincrement())
-  key       String             @unique @db.VarChar(80) // snake_case stable, jamais renommer
-  label     String             @db.VarChar(200) // libellé affiché kiné
-  type      CanonicalFieldType
-  unit      String?            @db.VarChar(20) // /10, °, cm... (NUMERIC)
-  rangeMin  Float? // (NUMERIC)
-  rangeMax  Float? // (NUMERIC)
-  options   Json? // (ENUM) ex: ["0/5","1/5","2/5","3/5","4/5","5/5"]
-  category  String             @db.VarChar(80) // regroupement UI
-  order     Int                @default(0) // ordre d'affichage dans la catégorie
-  isActive  Boolean            @default(true)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id           Int                @id @default(autoincrement())
+  key          String             @unique @db.VarChar(80) // snake_case stable, jamais renommer
+  label        String             @db.VarChar(200) // libellé affiché kiné
+  type         CanonicalFieldType
+  unit         String?            @db.VarChar(20) // /10, °, cm... (NUMERIC)
+  rangeMin     Float? // (NUMERIC)
+  rangeMax     Float? // (NUMERIC)
+  options      Json? // (ENUM) ex: ["0/5","1/5","2/5","3/5","4/5","5/5"]
+  category     String             @db.VarChar(80) // regroupement UI
+  order        Int                @default(0) // ordre d'affichage dans la catégorie
+  aliases      Json               @default("[]") // string[] : synonymes écrits et oraux (extraction, recherche)
+  lateralized  Boolean            @default(false) // la mesure se saisit en D et/ou G
+  presentation FieldPresentation  @default(TABLE)
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
   @@index([isActive, category, order])
   @@map("bilan_canonical_fields")
@@ -981,6 +1002,8 @@ model Conversation {
   kineId   Int
   kine     Kine                  @relation(fields: [kineId], references: [id], onDelete: Cascade)
   messages ConversationMessage[]
+
+  bilan BilanKine? // bilan dont cette conversation est le copilote (plan 4)
 
   @@index([kineId, updatedAt])
   @@map("conversation")
