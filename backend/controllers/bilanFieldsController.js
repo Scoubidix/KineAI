@@ -93,6 +93,19 @@ function validateFieldPayload(body, { isUpdate = false } = {}) {
     return { error: 'isActive doit être un booléen', code: 'INVALID_IS_ACTIVE' };
   }
 
+  const { aliases, lateralized, presentation } = body;
+  if (aliases !== undefined) {
+    const ok = Array.isArray(aliases) && aliases.length <= 10
+      && aliases.every((a) => typeof a === 'string' && a.trim() && a.length <= 60);
+    if (!ok) return { error: 'aliases doit être un tableau de ≤ 10 chaînes non vides (≤ 60 caractères)', code: 'INVALID_ALIASES' };
+  }
+  if (lateralized !== undefined && typeof lateralized !== 'boolean') {
+    return { error: 'lateralized doit être un booléen', code: 'INVALID_LATERALIZED' };
+  }
+  if (presentation !== undefined && !['TABLE', 'NARRATIVE'].includes(presentation)) {
+    return { error: 'presentation doit valoir TABLE ou NARRATIVE', code: 'INVALID_PRESENTATION' };
+  }
+
   return null;
 }
 
@@ -105,7 +118,7 @@ exports.adminCreateField = async (req, res) => {
     if (validation) return res.status(400).json({ success: false, ...validation });
 
     const prisma = prismaService.getInstance();
-    const { key, label, type, unit, rangeMin, rangeMax, options, category, order } = req.body;
+    const { key, label, type, unit, rangeMin, rangeMax, options, category, order, aliases, lateralized, presentation } = req.body;
 
     const existing = await prisma.bilanCanonicalField.findUnique({ where: { key } });
     if (existing) {
@@ -124,6 +137,9 @@ exports.adminCreateField = async (req, res) => {
         category,
         order: order ?? 0,
         isActive: true,
+        aliases: aliases ?? [],
+        lateralized: lateralized ?? false,
+        presentation: presentation ?? 'TABLE',
       },
     });
 
@@ -155,7 +171,7 @@ exports.adminUpdateField = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Champ non trouvé', code: 'FIELD_NOT_FOUND' });
     }
 
-    const { label, type, unit, rangeMin, rangeMax, options, category, order, isActive } = req.body;
+    const { label, type, unit, rangeMin, rangeMax, options, category, order, isActive, aliases, lateralized, presentation } = req.body;
 
     const updated = await prisma.bilanCanonicalField.update({
       where: { id: fieldId },
@@ -169,6 +185,9 @@ exports.adminUpdateField = async (req, res) => {
         ...(category !== undefined && { category }),
         ...(order !== undefined && { order }),
         ...(isActive !== undefined && { isActive }),
+        ...(aliases !== undefined && { aliases }),
+        ...(lateralized !== undefined && { lateralized }),
+        ...(presentation !== undefined && { presentation }),
       },
     });
 

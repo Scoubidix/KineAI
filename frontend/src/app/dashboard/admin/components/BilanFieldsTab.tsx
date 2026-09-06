@@ -36,6 +36,9 @@ interface AdminBilanField {
   category: string;
   order: number;
   isActive: boolean;
+  aliases: string[];
+  lateralized: boolean;
+  presentation: 'TABLE' | 'NARRATIVE';
   createdAt: string;
   updatedAt: string;
 }
@@ -52,6 +55,9 @@ interface FieldFormState {
   category: string;
   order: number;
   isActive: boolean;
+  aliases: string[];
+  lateralized: boolean;
+  presentation: 'TABLE' | 'NARRATIVE';
 }
 
 const EMPTY_FORM: FieldFormState = {
@@ -65,6 +71,9 @@ const EMPTY_FORM: FieldFormState = {
   category: '',
   order: 0,
   isActive: true,
+  aliases: [],
+  lateralized: false,
+  presentation: 'TABLE',
 };
 
 const TYPE_LABELS: Record<CanonicalFieldType, string> = {
@@ -82,6 +91,7 @@ export default function BilanFieldsTab() {
   const [form, setForm] = useState<FieldFormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [optionDraft, setOptionDraft] = useState('');
+  const [aliasDraft, setAliasDraft] = useState('');
 
   const isEdit = form.id !== undefined;
 
@@ -105,6 +115,7 @@ export default function BilanFieldsTab() {
   const openCreate = () => {
     setForm(EMPTY_FORM);
     setOptionDraft('');
+    setAliasDraft('');
     setModalOpen(true);
   };
 
@@ -121,8 +132,12 @@ export default function BilanFieldsTab() {
       category: f.category,
       order: f.order,
       isActive: f.isActive,
+      aliases: Array.isArray(f.aliases) ? f.aliases : [],
+      lateralized: !!f.lateralized,
+      presentation: f.presentation ?? 'TABLE',
     });
     setOptionDraft('');
+    setAliasDraft('');
     setModalOpen(true);
   };
 
@@ -156,6 +171,9 @@ export default function BilanFieldsTab() {
         rangeMin: form.type === 'NUMERIC' && form.rangeMin !== '' ? Number(form.rangeMin) : null,
         rangeMax: form.type === 'NUMERIC' && form.rangeMax !== '' ? Number(form.rangeMax) : null,
         options: form.type === 'ENUM' ? form.options : null,
+        aliases: form.aliases,
+        lateralized: form.lateralized,
+        presentation: form.presentation,
       };
       if (isEdit) {
         payload.isActive = form.isActive;
@@ -214,6 +232,13 @@ export default function BilanFieldsTab() {
 
   const removeOption = (opt: string) => {
     setForm({ ...form, options: form.options.filter((o) => o !== opt) });
+  };
+
+  const addAlias = () => {
+    const v = aliasDraft.trim().toLowerCase();
+    if (!v || form.aliases.includes(v) || form.aliases.length >= 10) return;
+    setForm({ ...form, aliases: [...form.aliases, v] });
+    setAliasDraft('');
   };
 
   // Regroupement par catégorie pour affichage
@@ -300,6 +325,11 @@ export default function BilanFieldsTab() {
                                   {f.options.join(', ')}
                                 </span>
                               )}
+                              <div className="flex flex-wrap gap-1 mt-1 text-[11px] text-muted-foreground">
+                                {f.lateralized && <span className="rounded bg-muted px-1.5">D/G</span>}
+                                <span className="rounded bg-muted px-1.5">{f.presentation === 'NARRATIVE' ? 'Littérature' : 'Tableau'}</span>
+                                {Array.isArray(f.aliases) && f.aliases.length > 0 && <span>alias : {f.aliases.join(', ')}</span>}
+                              </div>
                             </td>
                             <td className="px-3 py-2">
                               {f.isActive ? (
@@ -498,6 +528,43 @@ export default function BilanFieldsTab() {
                 )}
               </div>
             )}
+
+            <div className="space-y-1">
+              <Label>Alias (synonymes, un par entrée)</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={aliasDraft}
+                  onChange={(e) => setAliasDraft(e.target.value)}
+                  placeholder="ex. jobe, empty can"
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAlias(); } }}
+                />
+                <Button type="button" variant="outline" onClick={addAlias}>Ajouter</Button>
+              </div>
+              {form.aliases.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {form.aliases.map((a) => (
+                    <span key={a} className="inline-flex items-center gap-1 text-xs bg-muted rounded-full px-2 py-0.5">
+                      {a}
+                      <button type="button" aria-label={`Retirer ${a}`} onClick={() => setForm({ ...form, aliases: form.aliases.filter((x) => x !== a) })}>×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={form.lateralized} onCheckedChange={(c) => setForm({ ...form, lateralized: c })} />
+              <Label>Latéralisé (D / G)</Label>
+            </div>
+            <div className="space-y-1">
+              <Label>Présentation dans le bilan</Label>
+              <div className="flex gap-2">
+                {(['TABLE', 'NARRATIVE'] as const).map((p) => (
+                  <Button key={p} type="button" size="sm" variant={form.presentation === p ? 'default' : 'outline'} onClick={() => setForm({ ...form, presentation: p })}>
+                    {p === 'TABLE' ? 'Tableau' : 'Littérature'}
+                  </Button>
+                ))}
+              </div>
+            </div>
 
             <div>
               <Label className="text-xs">Ordre d&apos;affichage dans la catégorie</Label>
