@@ -97,9 +97,9 @@ exports.renderBilan = async (req, res) => {
     if (bilanId === null) return;
     const kineId = await getKineId(req, res);
     if (!kineId) return;
-    const { html, title } = await bilanRenderService.renderForKine({ kineId, bilanId, includeEvolution: req.query.evolution === '1' });
+    const { html, examenHtml, title } = await bilanRenderService.renderForKine({ kineId, bilanId, includeEvolution: req.query.evolution === '1' });
     // css : permet au front de reconstituer un document imprimable si le PDF serveur est indisponible
-    res.json({ success: true, html, title, css: PRINT_CSS });
+    res.json({ success: true, html, title, css: PRINT_CSS, examenHtml });
   } catch (err) {
     if (err.code === 'BILAN_NOT_FOUND') {
       return res.status(404).json({ success: false, error: err.message, code: 'BILAN_NOT_FOUND' });

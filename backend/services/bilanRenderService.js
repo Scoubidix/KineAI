@@ -1,5 +1,7 @@
 const prismaService = require('./prismaService');
-const { renderBilanHtml, wrapPrintDocument } = require('./bilanRenderer');
+const { renderBilanHtml, wrapPrintDocument, getMeasurements } = require('./bilanRenderer');
+const { renderExamenHtml } = require('./bilanRenderer/examen');
+const { renderEvolutionHtml } = require('./bilanRenderer/evolution');
 const { BILAN_TYPE_LABELS } = require('./bilanRenderer/format');
 
 const CATALOG_TTL_MS = 10 * 60 * 1000;
@@ -75,7 +77,17 @@ async function renderForKine({ kineId, bilanId, includeEvolution = false }) {
     includeEvolution,
     logoUrl: getLogoUrl(),
   });
-  return { html, title: buildTitle(bilan), bilan };
+
+  let examenHtml = '';
+  if (bilan.document) {
+    const measurements = getMeasurements({ document: bilan.document });
+    examenHtml = renderExamenHtml(measurements, catalog);
+    if (includeEvolution && previousBilans.length > 0) {
+      examenHtml += renderEvolutionHtml({ type: bilan.type, createdAt: bilan.createdAt, measurements }, previousBilans, catalog);
+    }
+  }
+
+  return { html, examenHtml, title: buildTitle(bilan), bilan };
 }
 
 async function renderPrintDocumentForKine(args) {
