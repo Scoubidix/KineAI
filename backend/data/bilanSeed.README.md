@@ -46,7 +46,10 @@ vérité unique**.
   "rangeMin": 0,               // selon le type
   "rangeMax": 10,              // selon le type
   "options": ["...", "..."],   // selon le type
-  "isActive": false            // OPTIONNEL — défaut true ; false = champ masqué au kiné
+  "isActive": false,           // OPTIONNEL — défaut true ; false = champ masqué au kiné
+  "aliases": ["jobe", "empty can"],   // OPTIONNEL — synonymes écrits/oraux (≤ 10, ≤ 60 car.), en minuscules
+  "lateralized": true,                // OPTIONNEL — défaut false ; true = se saisit en D et/ou G
+  "presentation": "TABLE"             // OPTIONNEL — TABLE (défaut) | NARRATIVE (transmis au rédacteur IA)
 }
 ```
 
@@ -60,6 +63,9 @@ vérité unique**.
 | `category` | Non vide. Max 80 caractères. Sert à regrouper les champs à l'écran (ex. « Douleur », « Amplitudes », « Force »). |
 | `order` | Entier ≥ 0. Ordre d'affichage **à l'intérieur** de la catégorie. |
 | `isActive` | Optionnel, booléen. Défaut `true`. Mets `false` pour livrer un champ **désactivé** (masqué au kiné mais conservé — sa `key` reste valide). |
+| `aliases` | Optionnel. Tableau de 0 à 10 chaînes non vides, ≤ 60 caractères, en minuscules. Servent à la reconnaissance dans les notes et à la recherche. |
+| `lateralized` | Optionnel, booléen, défaut `false`. Vrai pour toute mesure prise d'un côté (amplitudes de membre, force, tests d'épaule, genou, hanche, cheville, coude, poignet). |
+| `presentation` | Optionnel, `TABLE` (défaut) ou `NARRATIVE`. `NARRATIVE` pour les champs `TEXT` (anamnèse) : ils sont rédigés en prose et non en tableau. |
 
 ### Détails selon `type`
 

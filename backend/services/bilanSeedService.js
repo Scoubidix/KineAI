@@ -7,6 +7,9 @@ const DEFAULT_SEED_PATH = path.join(__dirname, '..', 'data', 'bilanSeed.json');
 
 const FIELD_TYPES = ['NUMERIC', 'BOOLEAN', 'TEXT', 'ENUM'];
 const KEY_RE = /^[a-z][a-z0-9_]*$/;
+const PRESENTATIONS = ['TABLE', 'NARRATIVE'];
+const ALIAS_MAX_LEN = 60;
+const ALIASES_MAX = 10;
 
 /**
  * Lit et parse le fichier de seed. Renvoie null si absent/illisible/JSON invalide.
@@ -52,6 +55,18 @@ function validateSeed(data) {
     if (!Number.isInteger(f.order)) errors.push(`field.order doit être un entier pour ${f.key}`);
     if (f.isActive !== undefined && typeof f.isActive !== 'boolean') {
       errors.push(`field.isActive doit être un booléen pour ${f.key}`);
+    }
+    if (f.aliases !== undefined) {
+      const ok = Array.isArray(f.aliases)
+        && f.aliases.length <= ALIASES_MAX
+        && f.aliases.every((a) => typeof a === 'string' && a.trim() && a.length <= ALIAS_MAX_LEN);
+      if (!ok) errors.push(`field.aliases invalide (tableau de ≤ ${ALIASES_MAX} chaînes ≤ ${ALIAS_MAX_LEN}) pour ${f.key}`);
+    }
+    if (f.lateralized !== undefined && typeof f.lateralized !== 'boolean') {
+      errors.push(`field.lateralized doit être un booléen pour ${f.key}`);
+    }
+    if (f.presentation !== undefined && !PRESENTATIONS.includes(f.presentation)) {
+      errors.push(`field.presentation invalide (TABLE|NARRATIVE) pour ${f.key}`);
     }
     if (!FIELD_TYPES.includes(f.type)) {
       errors.push(`field.type invalide pour ${f.key} : ${f.type}`);

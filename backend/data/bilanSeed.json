@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "fields": [
     {
       "key": "eva_repos",
@@ -9,7 +9,15 @@
       "order": 1,
       "unit": "/10",
       "rangeMin": 0,
-      "rangeMax": 10
+      "rangeMax": 10,
+      "aliases": [
+        "eva repos",
+        "eva au repos",
+        "douleur au repos",
+        "en repos"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "eva_effort",
@@ -19,7 +27,15 @@
       "order": 2,
       "unit": "/10",
       "rangeMin": 0,
-      "rangeMax": 10
+      "rangeMax": 10,
+      "aliases": [
+        "eva effort",
+        "eva à l'effort",
+        "douleur effort",
+        "en mouvement"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "eva_nuit",
@@ -29,7 +45,14 @@
       "order": 3,
       "unit": "/10",
       "rangeMin": 0,
-      "rangeMax": 10
+      "rangeMax": 10,
+      "aliases": [
+        "eva nuit",
+        "eva nocturne",
+        "douleur la nuit"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "flexion_genou",
@@ -39,7 +62,13 @@
       "order": 30,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 160
+      "rangeMax": 160,
+      "aliases": [
+        "flexion genou",
+        "flexion du genou"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "extension_genou",
@@ -49,7 +78,14 @@
       "order": 31,
       "unit": "°",
       "rangeMin": -10,
-      "rangeMax": 10
+      "rangeMax": 10,
+      "aliases": [
+        "extension genou",
+        "déficit extension",
+        "flessum"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "flexion_epaule",
@@ -59,7 +95,14 @@
       "order": 1,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 180
+      "rangeMax": 180,
+      "aliases": [
+        "flexion épaule",
+        "élévation antérieure",
+        "antépulsion"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "extension_epaule",
@@ -69,7 +112,13 @@
       "order": 2,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 60
+      "rangeMax": 60,
+      "aliases": [
+        "extension épaule",
+        "rétropulsion"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "abduction_epaule",
@@ -79,7 +128,13 @@
       "order": 3,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 180
+      "rangeMax": 180,
+      "aliases": [
+        "abduction épaule",
+        "abd épaule"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "adduction_epaule",
@@ -89,7 +144,13 @@
       "order": 4,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 45
+      "rangeMax": 45,
+      "aliases": [
+        "adduction épaule",
+        "add épaule"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "rotation_externe_1",
@@ -99,105 +160,204 @@
       "order": 5,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 90
+      "rangeMax": 90,
+      "aliases": [
+        "rotation externe",
+        "re1",
+        "rotation externe coude au corps"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_neer",
       "label": "Test de Neer",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 10
+      "order": 10,
+      "aliases": [
+        "neer",
+        "test de neer"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_jobe",
       "label": "Test de Jobe",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 11
+      "order": 11,
+      "aliases": [
+        "jobe",
+        "empty can",
+        "test du supra-épineux",
+        "supra épineux"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_patte",
       "label": "Test de Patte",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 12
+      "order": 12,
+      "aliases": [
+        "patte",
+        "test de patte",
+        "infra-épineux"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_gerber",
       "label": "Test de Gerber (lift-off)",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 13
+      "order": 13,
+      "aliases": [
+        "gerber",
+        "lift off",
+        "lift-off",
+        "subscapulaire"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_speed",
       "label": "Test de Speed (palm-up)",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 14
+      "order": 14,
+      "aliases": [
+        "speed",
+        "palm up",
+        "palm-up"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_yergason",
       "label": "Test de Yergason",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 15
+      "order": 15,
+      "aliases": [
+        "yergason"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_hawkins_kennedy",
       "label": "Test de Hawkins-Kennedy",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 16
+      "order": 16,
+      "aliases": [
+        "hawkins",
+        "hawkins kennedy",
+        "hawkins-kennedy"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_yocum",
       "label": "Test de Yocum",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 17
+      "order": 17,
+      "aliases": [
+        "yocum"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_adduction_forcee",
       "label": "Test d'adduction forcée (cross-body)",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 18
+      "order": 18,
+      "aliases": [
+        "adduction forcée",
+        "cross arm",
+        "cross-arm",
+        "acromio-claviculaire"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_crank",
       "label": "Crank test",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 19
+      "order": 19,
+      "aliases": [
+        "crank"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_apprehension_posterieure",
       "label": "Test d'appréhension postérieure",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 20
+      "order": 20,
+      "aliases": [
+        "appréhension postérieure",
+        "jerk test"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_apprehension_anterieure",
       "label": "Test d'appréhension antérieure",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 21
+      "order": 21,
+      "aliases": [
+        "appréhension antérieure",
+        "apprehension anterieure",
+        "apprehension test"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_recentrage",
       "label": "Test de recentrage (relocation)",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 22
+      "order": 22,
+      "aliases": [
+        "recentrage",
+        "relocation",
+        "relocation test"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "load_and_shift_test",
       "label": "Load and shift test",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 23
+      "order": 23,
+      "aliases": [
+        "load and shift",
+        "load & shift"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "quad_dynamo",
@@ -207,7 +367,14 @@
       "order": 1,
       "unit": "kg",
       "rangeMin": 0,
-      "rangeMax": 100
+      "rangeMax": 100,
+      "aliases": [
+        "quadriceps dynamo",
+        "force quadriceps",
+        "quad dynamomètre"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "ij_dynalmo",
@@ -217,105 +384,203 @@
       "order": 2,
       "unit": "kg",
       "rangeMin": 0,
-      "rangeMax": 100
+      "rangeMax": 100,
+      "aliases": [
+        "ischio dynamo",
+        "force ischio",
+        "ij dynamomètre",
+        "ischio-jambiers dynamo"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_provocation_valgus_genou",
       "label": "Test de provocation en valgus",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 1
+      "order": 1,
+      "aliases": [
+        "valgus forcé",
+        "valgus stress",
+        "lli",
+        "ligament collatéral médial"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_provocation_varus_genou",
       "label": "Test de provocation en varus",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 2
+      "order": 2,
+      "aliases": [
+        "varus forcé",
+        "varus stress",
+        "lle genou",
+        "ligament collatéral latéral"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_lachman",
       "label": "Test de Lachman",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 3
+      "order": 3,
+      "aliases": [
+        "lachman"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_ressaut_rotatoire",
       "label": "Ressaut rotatoire (pivot shift)",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 4
+      "order": 4,
+      "aliases": [
+        "ressaut",
+        "pivot shift",
+        "pivot-shift",
+        "ressaut rotatoire"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "tiroir_anterieur_genou",
       "label": "Tiroir antérieur",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 5
+      "order": 5,
+      "aliases": [
+        "tiroir antérieur",
+        "tiroir anterieur",
+        "tiroir ant"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "tiroir_posterieur_genou",
       "label": "Tiroir postérieur",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 6
+      "order": 6,
+      "aliases": [
+        "tiroir postérieur",
+        "tiroir posterieur",
+        "tiroir post"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_godfrey",
       "label": "Test de Godfrey",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 7
+      "order": 7,
+      "aliases": [
+        "godfrey",
+        "avalement de la tta"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_muller",
       "label": "Test de Muller",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 8
+      "order": 8,
+      "aliases": [
+        "muller",
+        "müller"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "palpation_interligne_articulaire_genou",
       "label": "Palpation de l'interligne articulaire",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 9
+      "order": 9,
+      "aliases": [],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_apley",
       "label": "Test d'Apley",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 10
+      "order": 10,
+      "aliases": [
+        "apley",
+        "grinding test"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_thessaly",
       "label": "Test de Thessaly",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 11
+      "order": 11,
+      "aliases": [
+        "thessaly"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_mcmurray",
       "label": "Test de McMurray",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 12
+      "order": 12,
+      "aliases": [
+        "mcmurray",
+        "mc murray",
+        "mac murray"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_apprehension_smilie",
       "label": "Test d'appréhension de Smillie",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 13
+      "order": 13,
+      "aliases": [
+        "smillie",
+        "smilie",
+        "appréhension rotulienne"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_noble",
       "label": "Test de Noble",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 14
+      "order": 14,
+      "aliases": [
+        "noble",
+        "syndrome de la bandelette",
+        "tfl"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "mobilite_rotule",
@@ -327,7 +592,14 @@
         "Hypomobile",
         "Normale",
         "Hypermobile"
-      ]
+      ],
+      "aliases": [
+        "mobilité rotulienne",
+        "mobilite rotule",
+        "jeu rotulien"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "circonference_susrotulienne",
@@ -337,112 +609,233 @@
       "order": 1,
       "unit": "cm",
       "rangeMin": 20,
-      "rangeMax": 80
+      "rangeMax": 80,
+      "aliases": [
+        "périmètre sus-rotulien",
+        "circonférence sus-rotulienne",
+        "sus rotulien"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_phalen",
       "label": "Test de Phalen",
       "type": "BOOLEAN",
       "category": "Poignet/Main",
-      "order": 1
+      "order": 1,
+      "aliases": [
+        "phalen",
+        "canal carpien"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "signe_tinel",
       "label": "Signe de Tinel",
       "type": "BOOLEAN",
       "category": "Poignet/Main",
-      "order": 2
+      "order": 2,
+      "aliases": [
+        "tinel",
+        "signe de tinel"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_laseuge",
       "label": "Test de Lasègue",
       "type": "BOOLEAN",
       "category": "Rachis/Bassin",
-      "order": 1
+      "order": 1,
+      "aliases": [
+        "lasègue",
+        "lasegue",
+        "la segue",
+        "slr",
+        "straight leg raise"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "motif_consultation",
       "label": "Motif de consultation / histoire de la maladie",
       "type": "TEXT",
       "category": "Anamnèse",
-      "order": 1
+      "order": 1,
+      "aliases": [
+        "motif",
+        "motif de consultation",
+        "consulte pour"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "antecedents",
       "label": "Antécédents médico-chirurgicaux",
       "type": "TEXT",
       "category": "Anamnèse",
-      "order": 2
+      "order": 2,
+      "aliases": [
+        "antécédents",
+        "antecedents",
+        "atcd",
+        "atcds"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "date_lesion_chirurgie",
       "label": "Date de la lésion / de la chirurgie",
       "type": "TEXT",
       "category": "Anamnèse",
-      "order": 3
+      "order": 3,
+      "aliases": [
+        "date de la lésion",
+        "date de chirurgie",
+        "opéré le",
+        "accident le"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "protocole_chirurgical",
       "label": "Protocole / consignes du chirurgien",
       "type": "TEXT",
       "category": "Anamnèse",
-      "order": 4
+      "order": 4,
+      "aliases": [
+        "protocole",
+        "protocole chirurgical",
+        "protocole post-op",
+        "consignes chirurgien"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "profession_activites",
       "label": "Profession et activités quotidiennes",
       "type": "TEXT",
       "category": "Anamnèse",
-      "order": 5
+      "order": 5,
+      "aliases": [
+        "profession",
+        "métier",
+        "travail",
+        "activité professionnelle"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "activite_sportive",
       "label": "Activités sportives (type, fréquence, niveau)",
       "type": "TEXT",
       "category": "Anamnèse",
-      "order": 6
+      "order": 6,
+      "aliases": [
+        "sport",
+        "activité sportive",
+        "pratique sportive"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "traitement_en_cours",
       "label": "Traitements en cours",
       "type": "TEXT",
       "category": "Anamnèse",
-      "order": 7
+      "order": 7,
+      "aliases": [
+        "traitement",
+        "traitement en cours",
+        "médicaments",
+        "ttt"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "examens_imagerie",
       "label": "Examens complémentaires / imagerie",
       "type": "TEXT",
       "category": "Anamnèse",
-      "order": 8
+      "order": 8,
+      "aliases": [
+        "imagerie",
+        "irm",
+        "radio",
+        "radiographie",
+        "échographie",
+        "scanner"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "objectifs_patient",
       "label": "Objectifs et attentes du patient",
       "type": "TEXT",
       "category": "Anamnèse",
-      "order": 9
+      "order": 9,
+      "aliases": [
+        "objectifs du patient",
+        "attentes",
+        "souhaite",
+        "objectif patient"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "drapeaux_rouges",
       "label": "Drapeaux rouges (screening)",
       "type": "TEXT",
       "category": "Anamnèse",
-      "order": 10
+      "order": 10,
+      "aliases": [
+        "drapeaux rouges",
+        "red flags",
+        "signes d’alerte"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "douleur_nocturne",
       "label": "Douleur nocturne / réveils",
       "type": "BOOLEAN",
       "category": "Douleur",
-      "order": 4
+      "order": 4,
+      "aliases": [
+        "douleur nocturne",
+        "réveils nocturnes",
+        "douleur la nuit"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "localisation_douleur",
       "label": "Localisation de la douleur",
       "type": "TEXT",
       "category": "Douleur",
-      "order": 5
+      "order": 5,
+      "aliases": [
+        "localisation",
+        "siège de la douleur",
+        "douleur située"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "type_douleur",
@@ -455,14 +848,29 @@
         "Inflammatoire",
         "Neuropathique",
         "Mixte"
-      ]
+      ],
+      "aliases": [
+        "type de douleur",
+        "douleur mécanique",
+        "douleur inflammatoire",
+        "neuropathique"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "irradiations",
       "label": "Irradiations / trajet douloureux",
       "type": "TEXT",
       "category": "Douleur",
-      "order": 7
+      "order": 7,
+      "aliases": [
+        "irradiation",
+        "irradie",
+        "irradiant"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "dn4_score",
@@ -472,7 +880,13 @@
       "order": 8,
       "unit": "/10",
       "rangeMin": 0,
-      "rangeMax": 10
+      "rangeMax": 10,
+      "aliases": [
+        "dn4",
+        "score dn4"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "etat_cicatrice",
@@ -486,42 +900,78 @@
         "Inflammatoire",
         "Désunion / suintante",
         "Chéloïde / hypertrophique"
-      ]
+      ],
+      "aliases": [
+        "cicatrice",
+        "état cicatriciel"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "adherences_cicatrice",
       "label": "Adhérences cicatricielles",
       "type": "BOOLEAN",
       "category": "Cicatrice/Trophicité",
-      "order": 2
+      "order": 2,
+      "aliases": [
+        "adhérences",
+        "adherences",
+        "cicatrice adhérente"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "chaleur_locale",
       "label": "Chaleur locale",
       "type": "BOOLEAN",
       "category": "Cicatrice/Trophicité",
-      "order": 3
+      "order": 3,
+      "aliases": [
+        "chaleur",
+        "chaleur locale"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "rougeur_locale",
       "label": "Rougeur locale",
       "type": "BOOLEAN",
       "category": "Cicatrice/Trophicité",
-      "order": 4
+      "order": 4,
+      "aliases": [
+        "rougeur",
+        "érythème",
+        "erytheme"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "signe_du_godet",
       "label": "Signe du godet",
       "type": "BOOLEAN",
       "category": "Cicatrice/Trophicité",
-      "order": 5
+      "order": 5,
+      "aliases": [
+        "godet",
+        "signe du godet",
+        "œdème prenant le godet"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "troubles_trophiques",
       "label": "Troubles trophiques (peau, ongles, sudation…)",
       "type": "TEXT",
       "category": "Cicatrice/Trophicité",
-      "order": 6
+      "order": 6,
+      "aliases": [],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "circonference_cuisse",
@@ -531,7 +981,14 @@
       "order": 2,
       "unit": "cm",
       "rangeMin": 20,
-      "rangeMax": 90
+      "rangeMax": 90,
+      "aliases": [
+        "périmètre cuisse",
+        "circonférence cuisse",
+        "tour de cuisse"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "circonference_mollet",
@@ -541,7 +998,14 @@
       "order": 3,
       "unit": "cm",
       "rangeMin": 20,
-      "rangeMax": 60
+      "rangeMax": 60,
+      "aliases": [
+        "périmètre mollet",
+        "circonférence mollet",
+        "tour de mollet"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "circonference_cheville_huit",
@@ -551,7 +1015,15 @@
       "order": 4,
       "unit": "cm",
       "rangeMin": 30,
-      "rangeMax": 80
+      "rangeMax": 80,
+      "aliases": [
+        "périmètre cheville",
+        "figure en 8",
+        "figure of eight",
+        "cheville en 8"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "circonference_poignet",
@@ -561,7 +1033,13 @@
       "order": 5,
       "unit": "cm",
       "rangeMin": 10,
-      "rangeMax": 30
+      "rangeMax": 30,
+      "aliases": [
+        "périmètre poignet",
+        "tour de poignet"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "circonference_main",
@@ -571,7 +1049,13 @@
       "order": 6,
       "unit": "cm",
       "rangeMin": 15,
-      "rangeMax": 30
+      "rangeMax": 30,
+      "aliases": [
+        "périmètre main",
+        "tour de main"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "flexion_cervicale",
@@ -581,7 +1065,13 @@
       "order": 1,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 50
+      "rangeMax": 50,
+      "aliases": [
+        "flexion cervicale",
+        "flexion du cou"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "extension_cervicale",
@@ -591,7 +1081,13 @@
       "order": 2,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 60
+      "rangeMax": 60,
+      "aliases": [
+        "extension cervicale",
+        "extension du cou"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "rotation_cervicale_droite",
@@ -601,7 +1097,10 @@
       "order": 3,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 80
+      "rangeMax": 80,
+      "aliases": [],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "rotation_cervicale_gauche",
@@ -611,7 +1110,10 @@
       "order": 4,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 80
+      "rangeMax": 80,
+      "aliases": [],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "inclinaison_cervicale_droite",
@@ -621,7 +1123,10 @@
       "order": 5,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 45
+      "rangeMax": 45,
+      "aliases": [],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "inclinaison_cervicale_gauche",
@@ -631,7 +1136,10 @@
       "order": 6,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 45
+      "rangeMax": 45,
+      "aliases": [],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "distance_menton_sternum",
@@ -641,7 +1149,13 @@
       "order": 7,
       "unit": "cm",
       "rangeMin": 0,
-      "rangeMax": 10
+      "rangeMax": 10,
+      "aliases": [
+        "menton sternum",
+        "menton-sternum"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "indice_schober",
@@ -651,7 +1165,13 @@
       "order": 10,
       "unit": "cm",
       "rangeMin": 10,
-      "rangeMax": 17
+      "rangeMax": 17,
+      "aliases": [
+        "schober",
+        "indice de schober"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "distance_doigt_sol",
@@ -661,7 +1181,15 @@
       "order": 11,
       "unit": "cm",
       "rangeMin": 0,
-      "rangeMax": 60
+      "rangeMax": 60,
+      "aliases": [
+        "doigt sol",
+        "doigts-sol",
+        "dds",
+        "distance doigt-sol"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "extension_lombaire",
@@ -671,7 +1199,13 @@
       "order": 12,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 30
+      "rangeMax": 30,
+      "aliases": [
+        "extension lombaire",
+        "extension du rachis"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "flexion_hanche",
@@ -681,7 +1215,13 @@
       "order": 20,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 130
+      "rangeMax": 130,
+      "aliases": [
+        "flexion hanche",
+        "flexion de hanche"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "extension_hanche",
@@ -691,7 +1231,12 @@
       "order": 21,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 30
+      "rangeMax": 30,
+      "aliases": [
+        "extension hanche"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "abduction_hanche",
@@ -701,7 +1246,12 @@
       "order": 22,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 45
+      "rangeMax": 45,
+      "aliases": [
+        "abduction hanche"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "adduction_hanche",
@@ -711,7 +1261,12 @@
       "order": 23,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 30
+      "rangeMax": 30,
+      "aliases": [
+        "adduction hanche"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "rotation_interne_hanche",
@@ -721,7 +1276,13 @@
       "order": 24,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 45
+      "rangeMax": 45,
+      "aliases": [
+        "rotation interne hanche",
+        "ri hanche"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "rotation_externe_hanche",
@@ -731,7 +1292,13 @@
       "order": 25,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 60
+      "rangeMax": 60,
+      "aliases": [
+        "rotation externe hanche",
+        "re hanche"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "flexion_dorsale_cheville",
@@ -741,7 +1308,14 @@
       "order": 40,
       "unit": "°",
       "rangeMin": -20,
-      "rangeMax": 30
+      "rangeMax": 30,
+      "aliases": [
+        "flexion dorsale",
+        "dorsiflexion",
+        "fd cheville"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "flexion_plantaire_cheville",
@@ -751,7 +1325,13 @@
       "order": 41,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 50
+      "rangeMax": 50,
+      "aliases": [
+        "flexion plantaire",
+        "fp cheville"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "knee_to_wall",
@@ -761,7 +1341,15 @@
       "order": 42,
       "unit": "cm",
       "rangeMin": 0,
-      "rangeMax": 15
+      "rangeMax": 15,
+      "aliases": [
+        "knee to wall",
+        "knee-to-wall",
+        "ktw",
+        "lunge test"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "inversion_cheville",
@@ -771,7 +1359,13 @@
       "order": 43,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 40
+      "rangeMax": 40,
+      "aliases": [
+        "inversion",
+        "inversion cheville"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "eversion_cheville",
@@ -781,7 +1375,14 @@
       "order": 44,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 20
+      "rangeMax": 20,
+      "aliases": [
+        "éversion",
+        "eversion",
+        "éversion cheville"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "flexion_dorsale_hallux",
@@ -791,7 +1392,14 @@
       "order": 45,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 70
+      "rangeMax": 70,
+      "aliases": [
+        "flexion hallux",
+        "dorsiflexion hallux",
+        "gros orteil"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "flexion_coude",
@@ -801,7 +1409,13 @@
       "order": 50,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 150
+      "rangeMax": 150,
+      "aliases": [
+        "flexion coude",
+        "flexion du coude"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "extension_coude",
@@ -811,7 +1425,12 @@
       "order": 51,
       "unit": "°",
       "rangeMin": -10,
-      "rangeMax": 10
+      "rangeMax": 10,
+      "aliases": [
+        "extension coude"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "pronation_avant_bras",
@@ -821,7 +1440,13 @@
       "order": 52,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 90
+      "rangeMax": 90,
+      "aliases": [
+        "pronation",
+        "pronation avant-bras"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "supination_avant_bras",
@@ -831,7 +1456,13 @@
       "order": 53,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 90
+      "rangeMax": 90,
+      "aliases": [
+        "supination",
+        "supination avant-bras"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "flexion_poignet",
@@ -841,7 +1472,12 @@
       "order": 60,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 90
+      "rangeMax": 90,
+      "aliases": [
+        "flexion poignet"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "extension_poignet",
@@ -851,7 +1487,12 @@
       "order": 61,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 90
+      "rangeMax": 90,
+      "aliases": [
+        "extension poignet"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "inclinaison_radiale_poignet",
@@ -861,7 +1502,13 @@
       "order": 62,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 25
+      "rangeMax": 25,
+      "aliases": [
+        "inclinaison radiale",
+        "déviation radiale"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "inclinaison_ulnaire_poignet",
@@ -871,28 +1518,55 @@
       "order": 63,
       "unit": "°",
       "rangeMin": 0,
-      "rangeMax": 45
+      "rangeMax": 45,
+      "aliases": [
+        "inclinaison ulnaire",
+        "déviation ulnaire"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "rotation_interne_main_dos",
       "label": "Rotation interne (main-dos, niveau vertébral atteint)",
       "type": "TEXT",
       "category": "Epaule",
-      "order": 6
+      "order": 6,
+      "aliases": [
+        "rotation interne",
+        "main dos",
+        "ri main dos"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "sulcus_test",
       "label": "Sulcus test",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 24
+      "order": 24,
+      "aliases": [
+        "sulcus",
+        "signe du sillon"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_o_brien",
       "label": "Test de O'Brien (active compression)",
       "type": "BOOLEAN",
       "category": "Epaule",
-      "order": 25
+      "order": 25,
+      "aliases": [
+        "o'brien",
+        "obrien",
+        "o brien",
+        "active compression"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "force_prehension",
@@ -902,7 +1576,15 @@
       "order": 3,
       "unit": "kg",
       "rangeMin": 0,
-      "rangeMax": 80
+      "rangeMax": 80,
+      "aliases": [
+        "préhension",
+        "grip",
+        "jamar",
+        "force de préhension"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "testing_quadriceps",
@@ -917,7 +1599,10 @@
         "3/5",
         "4/5",
         "5/5"
-      ]
+      ],
+      "aliases": [],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "testing_ischio_jambiers",
@@ -932,7 +1617,10 @@
         "3/5",
         "4/5",
         "5/5"
-      ]
+      ],
+      "aliases": [],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "testing_moyen_fessier",
@@ -947,7 +1635,10 @@
         "3/5",
         "4/5",
         "5/5"
-      ]
+      ],
+      "aliases": [],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "testing_grand_fessier",
@@ -962,7 +1653,10 @@
         "3/5",
         "4/5",
         "5/5"
-      ]
+      ],
+      "aliases": [],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "testing_psoas",
@@ -977,7 +1671,10 @@
         "3/5",
         "4/5",
         "5/5"
-      ]
+      ],
+      "aliases": [],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "testing_tibial_anterieur",
@@ -992,7 +1689,10 @@
         "3/5",
         "4/5",
         "5/5"
-      ]
+      ],
+      "aliases": [],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "testing_fibulaires",
@@ -1007,7 +1707,10 @@
         "3/5",
         "4/5",
         "5/5"
-      ]
+      ],
+      "aliases": [],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "testing_triceps_sural",
@@ -1022,7 +1725,10 @@
         "3/5",
         "4/5",
         "5/5"
-      ]
+      ],
+      "aliases": [],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "releves_mollet_unipodal",
@@ -1032,7 +1738,14 @@
       "order": 12,
       "unit": "rép.",
       "rangeMin": 0,
-      "rangeMax": 40
+      "rangeMax": 40,
+      "aliases": [
+        "relevés de mollet",
+        "heel rise",
+        "mollet unipodal"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "testing_deltoide",
@@ -1047,7 +1760,10 @@
         "3/5",
         "4/5",
         "5/5"
-      ]
+      ],
+      "aliases": [],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "testing_biceps_brachial",
@@ -1062,7 +1778,10 @@
         "3/5",
         "4/5",
         "5/5"
-      ]
+      ],
+      "aliases": [],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "testing_triceps_brachial",
@@ -1077,7 +1796,10 @@
         "3/5",
         "4/5",
         "5/5"
-      ]
+      ],
+      "aliases": [],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "sorensen_secondes",
@@ -1087,7 +1809,14 @@
       "order": 16,
       "unit": "s",
       "rangeMin": 0,
-      "rangeMax": 240
+      "rangeMax": 240,
+      "aliases": [
+        "sorensen",
+        "sørensen",
+        "endurance lombaire"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "gainage_ventral_secondes",
@@ -1097,266 +1826,520 @@
       "order": 17,
       "unit": "s",
       "rangeMin": 0,
-      "rangeMax": 240
+      "rangeMax": 240,
+      "aliases": [
+        "gainage",
+        "planche",
+        "gainage ventral"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "choc_rotulien",
       "label": "Choc rotulien (épanchement)",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 15
+      "order": 15,
+      "aliases": [
+        "choc rotulien",
+        "épanchement",
+        "epanchement"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "signe_du_rabot",
       "label": "Signe du rabot",
       "type": "BOOLEAN",
       "category": "Genou",
-      "order": 16
+      "order": 16,
+      "aliases": [
+        "rabot",
+        "signe du rabot",
+        "crépitation"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_fadir",
       "label": "Test FADIR (conflit antérieur)",
       "type": "BOOLEAN",
       "category": "Hanche",
-      "order": 1
+      "order": 1,
+      "aliases": [
+        "fadir",
+        "flexion adduction rotation interne"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_faber",
       "label": "Test FABER (Patrick)",
       "type": "BOOLEAN",
       "category": "Hanche",
-      "order": 2
+      "order": 2,
+      "aliases": [
+        "faber",
+        "patrick",
+        "test de patrick"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "signe_trendelenburg",
       "label": "Signe de Trendelenburg",
       "type": "BOOLEAN",
       "category": "Hanche",
-      "order": 3
+      "order": 3,
+      "aliases": [
+        "trendelenburg"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_thomas",
       "label": "Test de Thomas (flessum de hanche)",
       "type": "BOOLEAN",
       "category": "Hanche",
-      "order": 4
+      "order": 4,
+      "aliases": [
+        "thomas",
+        "test de thomas",
+        "psoas"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "douleur_palpation_grand_trochanter",
       "label": "Douleur à la palpation du grand trochanter",
       "type": "BOOLEAN",
       "category": "Hanche",
-      "order": 5
+      "order": 5,
+      "aliases": [
+        "grand trochanter",
+        "palpation trochanter"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "douleur_abduction_resistee",
       "label": "Douleur à l'abduction résistée",
       "type": "BOOLEAN",
       "category": "Hanche",
-      "order": 6
+      "order": 6,
+      "aliases": [
+        "abduction résistée",
+        "abduction resistee",
+        "moyen fessier résisté"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_squeeze_adducteurs",
       "label": "Squeeze test des adducteurs",
       "type": "BOOLEAN",
       "category": "Hanche",
-      "order": 7
+      "order": 7,
+      "aliases": [
+        "squeeze adducteurs",
+        "squeeze test adducteurs"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "douleur_palpation_pubis",
       "label": "Douleur à la palpation de la symphyse pubienne",
       "type": "BOOLEAN",
       "category": "Hanche",
-      "order": 8
+      "order": 8,
+      "aliases": [
+        "pubis",
+        "palpation pubienne",
+        "pubalgie"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "tiroir_anterieur_cheville",
       "label": "Tiroir antérieur de cheville",
       "type": "BOOLEAN",
       "category": "Cheville/Pied",
-      "order": 1
+      "order": 1,
+      "aliases": [
+        "tiroir antérieur cheville",
+        "tiroir cheville",
+        "laxité antérieure"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_inversion_forcee",
       "label": "Test en varus forcé (inversion)",
       "type": "BOOLEAN",
       "category": "Cheville/Pied",
-      "order": 2
+      "order": 2,
+      "aliases": [
+        "inversion forcée",
+        "varus forcé cheville",
+        "talar tilt"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "squeeze_test",
       "label": "Squeeze test (syndesmose)",
       "type": "BOOLEAN",
       "category": "Cheville/Pied",
-      "order": 3
+      "order": 3,
+      "aliases": [
+        "squeeze test",
+        "squeeze",
+        "syndesmose"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_kleiger",
       "label": "Test de Kleiger (rotation externe)",
       "type": "BOOLEAN",
       "category": "Cheville/Pied",
-      "order": 4
+      "order": 4,
+      "aliases": [
+        "kleiger",
+        "rotation externe cheville"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_thompson",
       "label": "Test de Thompson",
       "type": "BOOLEAN",
       "category": "Cheville/Pied",
-      "order": 5
+      "order": 5,
+      "aliases": [
+        "thompson",
+        "test de thompson",
+        "rupture achille"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "douleur_palpation_lle",
       "label": "Douleur à la palpation du LLE (LTFA/LCF)",
       "type": "BOOLEAN",
       "category": "Cheville/Pied",
-      "order": 6
+      "order": 6,
+      "aliases": [
+        "lle",
+        "ligament latéral externe",
+        "lta",
+        "talo-fibulaire"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "douleur_palpation_tendon_achille",
       "label": "Douleur à la palpation du tendon d'Achille",
       "type": "BOOLEAN",
       "category": "Cheville/Pied",
-      "order": 7
+      "order": 7,
+      "aliases": [
+        "achille",
+        "tendon d’achille",
+        "palpation achille"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "douleur_palpation_aponevrose_plantaire",
       "label": "Douleur à la palpation de l'aponévrose plantaire",
       "type": "BOOLEAN",
       "category": "Cheville/Pied",
-      "order": 8
+      "order": 8,
+      "aliases": [
+        "aponévrose plantaire",
+        "fascia plantaire",
+        "aponevrose"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "windlass_test",
       "label": "Windlass test",
       "type": "BOOLEAN",
       "category": "Cheville/Pied",
-      "order": 9
+      "order": 9,
+      "aliases": [
+        "windlass",
+        "treuil"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_cozen",
       "label": "Test de Cozen",
       "type": "BOOLEAN",
       "category": "Coude",
-      "order": 1
+      "order": 1,
+      "aliases": [
+        "cozen",
+        "extension résistée du poignet"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_mill",
       "label": "Test de Mill",
       "type": "BOOLEAN",
       "category": "Coude",
-      "order": 2
+      "order": 2,
+      "aliases": [
+        "mill",
+        "test de mill"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_maudsley",
       "label": "Test de Maudsley (extension résistée du majeur)",
       "type": "BOOLEAN",
       "category": "Coude",
-      "order": 3
+      "order": 3,
+      "aliases": [
+        "maudsley",
+        "extension résistée du majeur"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_golfers_elbow",
       "label": "Test d'épitrochléite (golfer's elbow test)",
       "type": "BOOLEAN",
       "category": "Coude",
-      "order": 4
+      "order": 4,
+      "aliases": [
+        "golfer's elbow",
+        "golfer elbow",
+        "épitrochléite",
+        "epitrochleite"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "palpation_epicondyle_lateral",
       "label": "Douleur à la palpation de l'épicondyle latéral",
       "type": "BOOLEAN",
       "category": "Coude",
-      "order": 5
+      "order": 5,
+      "aliases": [
+        "épicondyle latéral",
+        "epicondyle lateral",
+        "épicondylite"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "palpation_epicondyle_medial",
       "label": "Douleur à la palpation de l'épicondyle médial",
       "type": "BOOLEAN",
       "category": "Coude",
-      "order": 6
+      "order": 6,
+      "aliases": [
+        "épicondyle médial",
+        "epicondyle medial",
+        "épitrochlée"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_finkelstein",
       "label": "Test de Finkelstein",
       "type": "BOOLEAN",
       "category": "Poignet/Main",
-      "order": 3
+      "order": 3,
+      "aliases": [
+        "finkelstein",
+        "de quervain"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "grind_test_pouce",
       "label": "Grind test du pouce (TMC)",
       "type": "BOOLEAN",
       "category": "Poignet/Main",
-      "order": 4
+      "order": 4,
+      "aliases": [
+        "grind test",
+        "grind pouce",
+        "rhizarthrose"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "palpation_tabatiere_anatomique",
       "label": "Douleur à la palpation de la tabatière anatomique",
       "type": "BOOLEAN",
       "category": "Poignet/Main",
-      "order": 5
+      "order": 5,
+      "aliases": [
+        "tabatière anatomique",
+        "tabatiere",
+        "scaphoïde"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_watson",
       "label": "Test de Watson",
       "type": "BOOLEAN",
       "category": "Poignet/Main",
-      "order": 6
+      "order": 6,
+      "aliases": [
+        "watson",
+        "scapho-lunaire"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_valgus_mp_pouce",
       "label": "Laxité en valgus de la MCP du pouce",
       "type": "BOOLEAN",
       "category": "Poignet/Main",
-      "order": 7
+      "order": 7,
+      "aliases": [
+        "valgus mp pouce",
+        "pouce du skieur",
+        "luc"
+      ],
+      "lateralized": true,
+      "presentation": "TABLE"
     },
     {
       "key": "test_slump",
       "label": "Test de Slump",
       "type": "BOOLEAN",
       "category": "Rachis/Bassin",
-      "order": 2
+      "order": 2,
+      "aliases": [
+        "slump",
+        "slump test"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "test_leri",
       "label": "Test de Léri (Lasègue inversé)",
       "type": "BOOLEAN",
       "category": "Rachis/Bassin",
-      "order": 3
+      "order": 3,
+      "aliases": [
+        "léri",
+        "leri",
+        "lasègue inversé",
+        "fémoral"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "signe_de_la_sonnette",
       "label": "Signe de la sonnette",
       "type": "BOOLEAN",
       "category": "Rachis/Bassin",
-      "order": 4
+      "order": 4,
+      "aliases": [
+        "sonnette",
+        "signe de la sonnette"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "test_provocation_sacro_iliaque",
       "label": "Tests de provocation sacro-iliaque (cluster)",
       "type": "BOOLEAN",
       "category": "Rachis/Bassin",
-      "order": 5
+      "order": 5,
+      "aliases": [
+        "sacro-iliaque",
+        "sacro iliaque",
+        "si",
+        "provocation si"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "test_spurling",
       "label": "Test de Spurling",
       "type": "BOOLEAN",
       "category": "Cervical",
-      "order": 1
+      "order": 1,
+      "aliases": [
+        "spurling"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "test_distraction_cervicale",
       "label": "Test de distraction cervicale",
       "type": "BOOLEAN",
       "category": "Cervical",
-      "order": 2
+      "order": 2,
+      "aliases": [
+        "distraction cervicale",
+        "traction cervicale"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "test_ulnt1",
       "label": "ULNT1 (mise en tension neurale du membre supérieur)",
       "type": "BOOLEAN",
       "category": "Cervical",
-      "order": 3
+      "order": 3,
+      "aliases": [
+        "ulnt1",
+        "ulnt 1",
+        "ulnt",
+        "neurodynamique médian"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "endurance_flechisseurs_profonds",
@@ -1366,56 +2349,116 @@
       "order": 4,
       "unit": "s",
       "rangeMin": 0,
-      "rangeMax": 120
+      "rangeMax": 120,
+      "aliases": [
+        "fléchisseurs profonds",
+        "ccft",
+        "endurance cervicale"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "paresthesies",
       "label": "Paresthésies",
       "type": "BOOLEAN",
       "category": "Neurologique",
-      "order": 1
+      "order": 1,
+      "aliases": [
+        "paresthésies",
+        "paresthesies",
+        "fourmillements",
+        "engourdissements"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "sensibilite",
       "label": "Sensibilité (territoires, hypoesthésie…)",
       "type": "TEXT",
       "category": "Neurologique",
-      "order": 2
+      "order": 2,
+      "aliases": [
+        "sensibilité",
+        "hypoesthésie",
+        "anesthésie",
+        "dermatome"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "reflexes_osteotendineux",
       "label": "Réflexes ostéo-tendineux (ROT)",
       "type": "TEXT",
       "category": "Neurologique",
-      "order": 3
+      "order": 3,
+      "aliases": [
+        "rot",
+        "réflexes",
+        "reflexes",
+        "réflexe rotulien",
+        "réflexe achilléen"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "force_myotomes",
       "label": "Force par myotomes (déficit moteur)",
       "type": "TEXT",
       "category": "Neurologique",
-      "order": 4
+      "order": 4,
+      "aliases": [
+        "myotomes",
+        "force segmentaire",
+        "déficit moteur"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "troubles_sphincteriens",
       "label": "Troubles sphinctériens / anesthésie en selle",
       "type": "BOOLEAN",
       "category": "Neurologique",
-      "order": 5
+      "order": 5,
+      "aliases": [
+        "troubles sphinctériens",
+        "sphincters",
+        "incontinence"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "boiterie",
       "label": "Boiterie",
       "type": "BOOLEAN",
       "category": "Fonctionnel",
-      "order": 1
+      "order": 1,
+      "aliases": [
+        "boiterie",
+        "boite",
+        "marche boiteuse"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "analyse_marche",
       "label": "Analyse qualitative de la marche",
       "type": "TEXT",
       "category": "Fonctionnel",
-      "order": 2
+      "order": 2,
+      "aliases": [
+        "marche",
+        "analyse de la marche",
+        "schéma de marche"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "aides_techniques",
@@ -1429,14 +2472,29 @@
         "2 cannes anglaises",
         "Déambulateur",
         "Fauteuil roulant"
-      ]
+      ],
+      "aliases": [
+        "aides techniques",
+        "cannes",
+        "béquilles",
+        "déambulateur"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "perimetre_marche",
       "label": "Périmètre de marche",
       "type": "TEXT",
       "category": "Fonctionnel",
-      "order": 4
+      "order": 4,
+      "aliases": [
+        "périmètre de marche",
+        "perimetre de marche",
+        "distance de marche"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "montee_descente_escaliers",
@@ -1449,7 +2507,14 @@
         "Avec aide / rampe",
         "Marche par marche",
         "Normale"
-      ]
+      ],
+      "aliases": [
+        "escaliers",
+        "montée escaliers",
+        "descente escaliers"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "appui_monopodal_secondes",
@@ -1459,7 +2524,14 @@
       "order": 6,
       "unit": "s",
       "rangeMin": 0,
-      "rangeMax": 60
+      "rangeMax": 60,
+      "aliases": [
+        "appui monopodal",
+        "unipodal",
+        "équilibre unipodal"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "tug_secondes",
@@ -1469,7 +2541,14 @@
       "order": 7,
       "unit": "s",
       "rangeMin": 0,
-      "rangeMax": 60
+      "rangeMax": 60,
+      "aliases": [
+        "tug",
+        "timed up and go",
+        "get up and go"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "tinetti_score",
@@ -1479,7 +2558,12 @@
       "order": 8,
       "unit": "/28",
       "rangeMin": 0,
-      "rangeMax": 28
+      "rangeMax": 28,
+      "aliases": [
+        "tinetti"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "test_6_minutes_marche",
@@ -1489,7 +2573,15 @@
       "order": 9,
       "unit": "m",
       "rangeMin": 0,
-      "rangeMax": 800
+      "rangeMax": 800,
+      "aliases": [
+        "tm6",
+        "6 minutes",
+        "test de marche de 6 minutes",
+        "6mwt"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "nombre_chutes_12_mois",
@@ -1498,28 +2590,52 @@
       "category": "Fonctionnel",
       "order": 10,
       "rangeMin": 0,
-      "rangeMax": 50
+      "rangeMax": 50,
+      "aliases": [
+        "chutes",
+        "nombre de chutes"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "peur_de_chuter",
       "label": "Peur de chuter",
       "type": "BOOLEAN",
       "category": "Fonctionnel",
-      "order": 11
+      "order": 11,
+      "aliases": [
+        "peur de chuter",
+        "peur de tomber"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "step_down_test",
       "label": "Step down test (douleur / contrôle)",
       "type": "BOOLEAN",
       "category": "Fonctionnel",
-      "order": 12
+      "order": 12,
+      "aliases": [
+        "step down",
+        "step-down"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "squat_douloureux",
       "label": "Squat douloureux",
       "type": "BOOLEAN",
       "category": "Fonctionnel",
-      "order": 13
+      "order": 13,
+      "aliases": [
+        "squat",
+        "accroupissement"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "saut_unipodal_distance",
@@ -1529,21 +2645,45 @@
       "order": 14,
       "unit": "cm",
       "rangeMin": 0,
-      "rangeMax": 250
+      "rangeMax": 250,
+      "aliases": [
+        "saut unipodal",
+        "hop test",
+        "single hop"
+      ],
+      "lateralized": false,
+      "presentation": "TABLE"
     },
     {
       "key": "score_fonctionnel",
       "label": "Score fonctionnel utilisé + résultat (Oswestry, KOOS, DASH…)",
       "type": "TEXT",
       "category": "Fonctionnel",
-      "order": 15
+      "order": 15,
+      "aliases": [
+        "score fonctionnel",
+        "questionnaire",
+        "oswestry",
+        "dash",
+        "koos",
+        "womac"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     },
     {
       "key": "observation_generale",
       "label": "Observation générale / synthèse du bilan",
       "type": "TEXT",
       "category": "Fonctionnel",
-      "order": 16
+      "order": 16,
+      "aliases": [
+        "observation",
+        "observation générale",
+        "à noter"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE"
     }
   ],
   "templates": [
