@@ -55,7 +55,7 @@ function renderEvolutionHtml(current, previousBilans, catalog) {
   }
   if (groups.has(CUSTOM_CATEGORY)) { const c = groups.get(CUSTOM_CATEGORY); groups.delete(CUSTOM_CATEGORY); groups.set(CUSTOM_CATEGORY, c); }
 
-  const head = ['<th>Mesure</th']
+  const head = ['<th>Mesure</th>']
     .concat(all.map((b) => `<th>${escapeHtml(BILAN_TYPE_LABELS[b.type] || b.type)} (${formatDateFr(b.createdAt)})</th>`))
     .concat(['<th>Évolution</th>']).join('');
 

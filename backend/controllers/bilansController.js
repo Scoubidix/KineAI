@@ -46,6 +46,9 @@ exports.createBilan = async (req, res) => {
         structuredData: structuredData ?? null,
         kineId: kine.id,
         patientId: patient.id,
+        // Route dépréciée mais encore seul chemin de sauvegarde jusqu'au plan 2 :
+        // le statut par défaut BROUILLON rendrait ces bilans invisibles dans getBilans
+        status: 'ENREGISTRE',
       }
     });
 

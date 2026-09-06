@@ -24,7 +24,7 @@ exports.getPatientsWithBilans = async (req, res) => {
       where: {
         kineId: kine.id,
         isActive: true,
-        bilans: { some: { isActive: true } },
+        bilans: { some: { isActive: true, status: { not: 'BROUILLON' } } },
       },
       select: {
         id: true,
@@ -32,13 +32,13 @@ exports.getPatientsWithBilans = async (req, res) => {
         lastName: true,
         birthDate: true,
         bilans: {
-          where: { isActive: true },
+          where: { isActive: true, status: { not: 'BROUILLON' } },
           select: { createdAt: true },
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
         _count: {
-          select: { bilans: { where: { isActive: true } } },
+          select: { bilans: { where: { isActive: true, status: { not: 'BROUILLON' } } } },
         },
       },
       orderBy: { lastName: 'asc' },

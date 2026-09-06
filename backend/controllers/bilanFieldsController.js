@@ -1,6 +1,7 @@
 const prismaService = require('../services/prismaService');
 const logger = require('../utils/logger');
 const { sanitizeId } = require('../utils/logSanitizer');
+const { invalidateCatalogCache } = require('../services/bilanRenderService');
 
 const VALID_TYPES = ['NUMERIC', 'BOOLEAN', 'TEXT', 'ENUM'];
 
@@ -143,6 +144,7 @@ exports.adminCreateField = async (req, res) => {
       },
     });
 
+    invalidateCatalogCache();
     logger.info(`Champ canonique créé : ${sanitizeId(field.id)} (${key})`);
     res.status(201).json({ success: true, field });
   } catch (err) {
@@ -191,6 +193,7 @@ exports.adminUpdateField = async (req, res) => {
       },
     });
 
+    invalidateCatalogCache();
     logger.info(`Champ canonique modifié : ${sanitizeId(fieldId)}`);
     res.json({ success: true, field: updated });
   } catch (err) {
@@ -222,6 +225,7 @@ exports.adminDeleteField = async (req, res) => {
       data: { isActive: false },
     });
 
+    invalidateCatalogCache();
     logger.info(`Champ canonique désactivé : ${sanitizeId(fieldId)}`);
     res.json({ success: true, message: 'Champ désactivé' });
   } catch (err) {

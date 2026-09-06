@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
@@ -26,7 +27,7 @@ export async function fetchBilanRender(bilanId: number, options?: RenderOptions)
 export function printBilanHtml(html: string, title: string): { success: boolean; error?: string } {
   const w = window.open('', '_blank');
   if (!w) return { success: false, error: 'Autorise les fenêtres pop-up pour imprimer le bilan' };
-  // Le HTML vient du serveur ; le <style> est injecté par le moteur (aucun contenu utilisateur non échappé)
+  // Le HTML peut contenir du contenu utilisateur (bilan hérité) : à sanitizer par l'appelant avant impression
   w.document.write(html);
   w.document.close();
   w.document.title = title;
@@ -52,7 +53,8 @@ export async function downloadBilanPdf(bilanId: number, options?: RenderOptions)
     // Puppeteer désactivé sur cet environnement : impression navigateur du même document
     let render: BilanRender;
     try { render = await fetchBilanRender(bilanId, options); } catch (e) { return { success: false, error: (e as Error).message }; }
-    const full = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${render.title.replace(/</g, '&lt;')}</title><style>${render.css}</style></head><body>${render.html}</body></html>`;
+    const safeBody = DOMPurify.sanitize(render.html);
+    const full = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${render.title.replace(/</g, '&lt;')}</title><style>${render.css}</style></head><body>${safeBody}</body></html>`;
     return printBilanHtml(full, render.title);
   }
   let error = 'Génération du PDF impossible';

@@ -36,7 +36,8 @@ function renderBilanHtml({ document, legacyHtml, catalog, kineProfile, patient, 
   const parts = [renderHeader(kineProfile, bilanDate)];
 
   if (!document) {
-    parts.push(`<div class="bilan-legacy">${legacyHtml || ''}</div>`);
+    const legacyBody = legacyHtml || '<p class="bilan-empty">Ce bilan n\'a pas encore de compte-rendu.</p>';
+    parts.push(`<div class="bilan-legacy">${legacyBody}</div>`);
     return `<article class="bilan">${parts.join('')}</article>`;
   }
 

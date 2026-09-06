@@ -32,6 +32,7 @@ async function generatePdfBuffer(html) {
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
     const page = await browser.newPage();
+    await page.setJavaScriptEnabled(false); // Le HTML rendu (contrats, bilans hérités) ne doit jamais exécuter de script côté serveur
     // networkidle0 attend que toutes les ressources (dont logo) soient chargées
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
     return await page.pdf({

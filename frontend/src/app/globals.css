@@ -199,3 +199,4 @@ body {
 .bilan-preview .bilan-val { text-align: center; font-variant-numeric: tabular-nums; }
 .bilan-preview .bilan-sign { margin-top: 24px; text-align: right; }
 .bilan-preview .bilan-legacy u { text-decoration: underline; font-weight: 600; }
+.bilan-preview .bilan-empty { color: #777; font-style: italic; }

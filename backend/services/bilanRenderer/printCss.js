@@ -22,6 +22,7 @@ const PRINT_CSS = `
 .bilan-legacy u { text-decoration: underline; font-weight: 600; }
 .bilan-legacy table { border-collapse: collapse; width: 100%; }
 .bilan-legacy th, .bilan-legacy td { border: 1px solid #999; padding: 3pt 6pt; }
+.bilan-empty { color: #777; font-style: italic; }
 `;
 
 module.exports = { PRINT_CSS };
