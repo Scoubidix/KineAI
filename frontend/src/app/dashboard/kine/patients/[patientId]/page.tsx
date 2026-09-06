@@ -145,6 +145,7 @@ export default function PatientDetailPage() {
   const [editBilanHtml, setEditBilanHtml] = useState('');
   const editBilanRef = useRef<HTMLDivElement>(null);
   const [renderedBilanHtml, setRenderedBilanHtml] = useState<string | null>(null);
+  const [renderBilanError, setRenderBilanError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPatient = async () => {
@@ -198,9 +199,10 @@ export default function PatientDetailPage() {
     if (!selectedBilan || editingBilanId === selectedBilan.id) return;
     let cancelled = false;
     setRenderedBilanHtml(null);
+    setRenderBilanError(null);
     fetchBilanRender(selectedBilan.id)
       .then((r) => { if (!cancelled) setRenderedBilanHtml(r.html); })
-      .catch(() => { if (!cancelled) setRenderedBilanHtml(''); });
+      .catch((e: Error) => { if (!cancelled) setRenderBilanError(e.message); });
     return () => { cancelled = true; };
   }, [selectedBilan?.id, editingBilanId]);
 
@@ -823,7 +825,9 @@ export default function PatientDetailPage() {
                   />
                 ) : (
                   <div className="bilan-preview text-sm leading-relaxed p-4 rounded-lg border bg-white dark:bg-card max-h-[50vh] overflow-y-auto">
-                    {renderedBilanHtml === null ? (
+                    {renderBilanError ? (
+                      <p className="text-sm text-destructive text-center py-8">{renderBilanError}</p>
+                    ) : renderedBilanHtml === null ? (
                       <Loader2 className="animate-spin h-5 w-5 text-[#3899aa] mx-auto" />
                     ) : (
                       <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderedBilanHtml) }} />

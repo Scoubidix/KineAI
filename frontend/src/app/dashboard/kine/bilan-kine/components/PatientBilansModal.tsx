@@ -74,6 +74,7 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
   const [savingEdit, setSavingEdit] = useState(false);
   const editRef = useRef<HTMLDivElement>(null);
   const [renderedHtml, setRenderedHtml] = useState<string | null>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
 
   // Reset complet à la fermeture
   useEffect(() => {
@@ -116,9 +117,10 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
     if (editing || !selectedBilan) return;
     let cancelled = false;
     setRenderedHtml(null);
+    setRenderError(null);
     fetchBilanRender(selectedBilan.id)
       .then((r) => { if (!cancelled) setRenderedHtml(r.html); })
-      .catch(() => { if (!cancelled) setRenderedHtml(''); });
+      .catch((e: Error) => { if (!cancelled) setRenderError(e.message); });
     return () => { cancelled = true; };
   }, [editing, selectedBilan]);
 
@@ -450,7 +452,13 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
                 />
               ) : (
                 <div className="bilan-preview min-h-[200px] text-sm leading-relaxed text-foreground p-4 rounded-xl border border-border/50 bg-white dark:bg-card">
-                  {renderedHtml === null ? <Loader2 className="h-5 w-5 animate-spin text-[#3899aa] mx-auto" /> : <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderedHtml) }} />}
+                  {renderError ? (
+                    <p className="text-sm text-destructive text-center py-8">{renderError}</p>
+                  ) : renderedHtml === null ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-[#3899aa] mx-auto" />
+                  ) : (
+                    <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderedHtml) }} />
+                  )}
                 </div>
               )}
               {editing && (
