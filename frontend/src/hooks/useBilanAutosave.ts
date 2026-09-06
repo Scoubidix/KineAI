@@ -49,6 +49,8 @@ export function useBilanAutosave(initial: BilanRecord) {
       setSavedAt(new Date());
       setErrorMessage(null);
       setSaveState('saved');
+      // Un envoi réussi rend caduque une éventuelle relance hors ligne programmée
+      if (retryRef.current) { clearTimeout(retryRef.current); retryRef.current = null; }
     } catch (e) {
       // On remet le patch en attente pour ne rien perdre
       pendingRef.current = { ...patch, ...pendingRef.current };
@@ -57,7 +59,9 @@ export function useBilanAutosave(initial: BilanRecord) {
         setSaveState('stale');
       } else if (e instanceof TypeError) {
         setSaveState('offline');
-        retryRef.current = setTimeout(() => { void flush(); }, RETRY_OFFLINE_MS);
+        // On réarme retryRef à null une fois le timer déclenché, sinon le garde-fou
+        // ci-dessous resterait bloqué pour le reste de la vie du hook
+        retryRef.current = setTimeout(() => { retryRef.current = null; void flush(); }, RETRY_OFFLINE_MS);
       } else {
         setErrorMessage((e as Error).message);
         setSaveState('error');
@@ -67,7 +71,7 @@ export function useBilanAutosave(initial: BilanRecord) {
       const still = Object.keys(pendingRef.current).length > 0;
       setPending(still);
       // Un patch est arrivé pendant l'envoi : on repart sans attendre le debounce
-      // (sauf si on est bloqué par un 409 ou en attente d'un nouvel essai hors ligne)
+      // (sauf si on est bloqué par un 409, ou si un essai hors ligne est déjà programmé)
       if (still && !staleRef.current && !retryRef.current) void flush();
     }
   }, []);
