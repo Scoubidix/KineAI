@@ -1,7 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, User, ChevronDown, RefreshCw } from 'lucide-react';
+import { ArrowLeft, User, ChevronDown, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import PatientCombobox from '../PatientCombobox';
@@ -16,12 +15,14 @@ interface BilanEditorHeaderProps {
   saveState: SaveState;
   savedAt: Date | null;
   pending: boolean;
+  errorMessage: string | null;
   onReload: () => void;
+  onRetry: () => void;
+  onBack: () => void;
   disabled?: boolean;
 }
 
-export default function BilanEditorHeader({ record, onPatientChange, onTypeChange, saveState, savedAt, pending, onReload, disabled }: BilanEditorHeaderProps) {
-  const router = useRouter();
+export default function BilanEditorHeader({ record, onPatientChange, onTypeChange, saveState, savedAt, pending, errorMessage, onReload, onRetry, onBack, disabled }: BilanEditorHeaderProps) {
   const [patientOpen, setPatientOpen] = useState(false);
   const c = BILAN_TYPE_COLORS[record.type];
   const finalized = record.status === 'ENREGISTRE';
@@ -29,7 +30,7 @@ export default function BilanEditorHeader({ record, onPatientChange, onTypeChang
   return (
     <div className="border-b border-border/40">
       <div className="flex items-center gap-2 px-3 sm:px-4 py-2 flex-wrap">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard/kine/bilan-kine')} className="h-8 px-2"><ArrowLeft className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Bilans</span></Button>
+        <Button variant="ghost" size="sm" onClick={onBack} className="h-8 px-2"><ArrowLeft className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Bilans</span></Button>
 
         <Popover open={patientOpen} onOpenChange={setPatientOpen}>
           <PopoverTrigger asChild>
@@ -50,12 +51,28 @@ export default function BilanEditorHeader({ record, onPatientChange, onTypeChang
         </select>
 
         <span className="flex-1" />
-        {finalized ? <span className="text-[11px] font-medium rounded-full bg-green-100 text-green-700 px-2.5 py-0.5">Enregistré</span> : <SaveIndicator state={saveState} savedAt={savedAt} pending={pending} />}
+        {finalized ? (
+          <>
+            <SaveIndicator state={saveState} savedAt={savedAt} pending={pending} />
+            <span className="text-[11px] font-medium rounded-full bg-green-100 text-green-700 px-2.5 py-0.5">Enregistré</span>
+          </>
+        ) : (
+          <SaveIndicator state={saveState} savedAt={savedAt} pending={pending} />
+        )}
       </div>
       {saveState === 'stale' && (
         <div className="flex items-center justify-between gap-3 bg-amber-50 text-amber-900 text-xs px-4 py-2 border-t border-amber-200">
           <span>Ce bilan a été modifié sur un autre appareil. Recharge pour continuer : tes dernières frappes non enregistrées seront perdues.</span>
           <Button size="sm" variant="outline" onClick={onReload} className="h-7 text-xs"><RefreshCw className="h-3 w-3 mr-1" />Recharger</Button>
+        </div>
+      )}
+      {saveState === 'error' && (
+        <div className="flex items-center justify-between gap-3 bg-red-50 text-red-900 text-xs px-4 py-2 border-t border-red-200">
+          <span className="flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />Sauvegarde impossible : {errorMessage}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" variant="outline" onClick={onRetry} className="h-7 text-xs"><RefreshCw className="h-3 w-3 mr-1" />Réessayer</Button>
+            <Button size="sm" variant="outline" onClick={onReload} className="h-7 text-xs">Recharger</Button>
+          </div>
         </div>
       )}
     </div>

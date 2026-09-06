@@ -46,7 +46,18 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
   };
 
   const handleCopy = () => withText(async (text) => { await navigator.clipboard.writeText(text); toast({ title: 'Copié', description: 'Le bilan est dans le presse-papiers' }); }, 'copy');
-  const handleMail = () => withText((text, title) => { window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text)}`; }, 'mail');
+  const handleMail = () => withText(async (text, title) => {
+    // Certains clients mail tronquent ou refusent les liens mailto: trop longs :
+    // au-delà d'un seuil, on copie le texte complet et on ne met qu'un message court dans le corps.
+    if (text.length > 1800) {
+      await navigator.clipboard.writeText(text);
+      const shortBody = 'Bilan copié dans le presse-papiers : colle-le ici (Ctrl+V).';
+      window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(shortBody)}`;
+      toast({ title: 'Bilan copié, colle-le dans ton mail' });
+      return;
+    }
+    window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text)}`;
+  }, 'mail');
   const handlePdf = async () => {
     setBusy('pdf');
     try {

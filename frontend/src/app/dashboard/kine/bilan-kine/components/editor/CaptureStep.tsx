@@ -12,7 +12,16 @@ import CompareWithPreviousModal, { type SelectedBilan } from '../CompareWithPrev
 import { useMinWidth } from './useMinWidth';
 import { BILAN_TYPE_LABELS, emptyBilanDocument, type BilanPatch, type BilanRecord, type DocumentMeasurement, type TemplateItem } from '@/types/bilan';
 
-export interface StepProps { record: BilanRecord; update: (patch: BilanPatch) => void; disabled?: boolean; onBack?: () => void; onNext: () => void }
+export interface StepProps {
+  record: BilanRecord;
+  update: (patch: BilanPatch) => void;
+  // flush() renvoie Promise<boolean> (cf. useBilanAutosave) : true si tout est persisté
+  flush: () => Promise<boolean>;
+  replaceRecord: (r: BilanRecord) => void;
+  disabled?: boolean;
+  onBack?: () => void;
+  onNext: () => void;
+}
 
 const measureId = (m: DocumentMeasurement) => (m.kind === 'canonical' ? `c:${m.key}:${m.side ?? ''}` : `x:${m.label.trim().toLowerCase()}`);
 
@@ -33,6 +42,7 @@ export default function CaptureStep({ record, update, disabled, onNext }: StepPr
   const [compareOpen, setCompareOpen] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [previous, setPrevious] = useState<SelectedBilan[]>([]);
+  const notesLength = (record.rawNotes ?? '').length;
 
   const templateItems = useMemo<TemplateItem[]>(() => doc.measurements.map((m) => (m.kind === 'canonical' ? { kind: 'canonical', key: m.key } : { kind: 'custom', label: m.label })), [doc.measurements]);
   const filledCount = doc.measurements.filter((m) => m.value !== null && m.value !== '' ).length;
@@ -66,9 +76,12 @@ export default function CaptureStep({ record, update, disabled, onNext }: StepPr
       <div className="flex items-center gap-2 px-1">
         <Search className="h-3.5 w-3.5 text-[#3899aa] shrink-0" />
         <span className="text-xs font-medium text-[#3899aa] shrink-0">Motif</span>
-        <Input value={record.motif ?? ''} onChange={(e) => update({ motif: e.target.value })} placeholder="Ex : Lombalgie chronique, rééducation post-opératoire..." disabled={disabled} className="border-0 border-b border-border/60 rounded-none bg-transparent text-sm h-8 px-2 focus-visible:ring-0" />
+        <Input value={record.motif ?? ''} onChange={(e) => update({ motif: e.target.value })} placeholder="Ex : Lombalgie chronique, rééducation post-opératoire..." disabled={disabled} maxLength={500} className="border-0 border-b border-border/60 rounded-none bg-transparent text-sm h-8 px-2 focus-visible:ring-0" />
       </div>
-      <Textarea value={record.rawNotes ?? ''} onChange={(e) => update({ rawNotes: e.target.value })} placeholder={PLACEHOLDER} disabled={disabled} className="min-h-[260px] lg:min-h-[420px] text-sm leading-relaxed resize-y rounded-xl border-2 border-border/60 bg-white dark:bg-card p-4 focus-visible:ring-[#3899aa]/50" />
+      <Textarea value={record.rawNotes ?? ''} onChange={(e) => update({ rawNotes: e.target.value })} placeholder={PLACEHOLDER} disabled={disabled} maxLength={50000} className="min-h-[260px] lg:min-h-[420px] text-sm leading-relaxed resize-y rounded-xl border-2 border-border/60 bg-white dark:bg-card p-4 focus-visible:ring-[#3899aa]/50" />
+      {notesLength > 45000 && (
+        <span className="text-[10px] text-muted-foreground -mt-2 self-end px-1">{notesLength} / 50000</span>
+      )}
       {record.patientId && record.type !== 'INITIAL' && (
         <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
           <History className="h-3.5 w-3.5 text-[#3899aa]" />

@@ -3,7 +3,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ArrowLeft, ArrowRight, Sparkles, Info } from 'lucide-react';
 import MeasurementsPanel from '../MeasurementsPanel';
 import { useMinWidth } from './useMinWidth';
@@ -48,14 +48,12 @@ export default function VerificationStep({ record, update, disabled, onBack, onN
       <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2">
         <Button variant="ghost" size="sm" onClick={onBack} className="h-9"><ArrowLeft className="h-4 w-4 mr-1" />Notes</Button>
         <div className="flex items-center gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span><Button disabled className="rounded-full h-9 px-4"><Sparkles className="h-4 w-4 mr-1" />Générer le bilan</Button></span>
-              </TooltipTrigger>
-              <TooltipContent>Disponible avec la rédaction IA</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span><Button disabled className="rounded-full h-9 px-4"><Sparkles className="h-4 w-4 mr-1" />Générer le bilan</Button></span>
+            </TooltipTrigger>
+            <TooltipContent>Disponible avec la rédaction IA</TooltipContent>
+          </Tooltip>
           <Button onClick={onNext} disabled={disabled} className="btn-teal rounded-full h-9 px-4">Rédiger moi-même <ArrowRight className="h-4 w-4 ml-1" /></Button>
         </div>
       </div>

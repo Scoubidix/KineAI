@@ -68,6 +68,8 @@ export default function MeasurementsPanel({
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const previouslyCompleteRef = useRef<Set<string>>(new Set());
   const pendingCollapseRef = useRef<Set<string>>(new Set());
+  // Indices des lignes NUMERIC dont la dernière saisie était hors bornes (message d'aide local)
+  const [rangeHints, setRangeHints] = useState<Map<number, string>>(new Map());
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -138,8 +140,10 @@ export default function MeasurementsPanel({
     onChange(
       measurements.map((m, i) => {
         if (i !== index) return m;
-        if (m.kind === 'canonical') return { ...m, value: value as CanonicalValue };
-        return { ...m, value: (value ?? '') as string };
+        // Une valeur saisie par le kiné rend la mesure "manuelle", même si elle
+        // provenait d'un bilan antérieur ou d'une extraction IA.
+        if (m.kind === 'canonical') return { ...m, value: value as CanonicalValue, origin: 'manual' };
+        return { ...m, value: (value ?? '') as string, origin: 'manual' };
       }),
     );
   };
@@ -307,28 +311,48 @@ export default function MeasurementsPanel({
     index: number,
   ) => {
     switch (field.type) {
-      case 'NUMERIC':
+      case 'NUMERIC': {
+        const hint = rangeHints.get(index);
         return (
-          <div className="flex items-center gap-1.5 flex-1">
-            <Input
-              type="number"
-              value={value === null || value === undefined ? '' : (value as number)}
-              onChange={(e) => {
-                if (e.target.value === '') {
-                  handleChangeAt(index, null);
-                } else {
+          <div className="flex flex-col gap-0.5 flex-1">
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="number"
+                value={value === null || value === undefined ? '' : (value as number)}
+                onChange={(e) => {
+                  if (e.target.value === '') {
+                    handleChangeAt(index, null);
+                    setRangeHints((prev) => { if (!prev.has(index)) return prev; const next = new Map(prev); next.delete(index); return next; });
+                    return;
+                  }
                   const n = Number(e.target.value);
-                  if (!Number.isNaN(n)) handleChangeAt(index, n);
-                }
-              }}
-              min={field.rangeMin ?? undefined}
-              max={field.rangeMax ?? undefined}
-              disabled={disabled}
-              className="h-8 text-sm w-28"
-            />
-            {field.unit && <span className="text-xs text-muted-foreground shrink-0">{field.unit}</span>}
+                  if (Number.isNaN(n)) return;
+                  const { rangeMin, rangeMax } = field;
+                  const outOfRange = (rangeMin !== null && n < rangeMin) || (rangeMax !== null && n > rangeMax);
+                  if (outOfRange) {
+                    // Hors bornes : on ne persiste pas la valeur, on garde la précédente et on affiche l'aide
+                    const hintText = rangeMin !== null && rangeMax !== null
+                      ? `Entre ${rangeMin} et ${rangeMax}`
+                      : rangeMin !== null
+                      ? `Supérieur à ${rangeMin}`
+                      : `Inférieur à ${rangeMax}`;
+                    setRangeHints((prev) => new Map(prev).set(index, hintText));
+                    return;
+                  }
+                  setRangeHints((prev) => { if (!prev.has(index)) return prev; const next = new Map(prev); next.delete(index); return next; });
+                  handleChangeAt(index, n);
+                }}
+                min={field.rangeMin ?? undefined}
+                max={field.rangeMax ?? undefined}
+                disabled={disabled}
+                className="h-8 text-sm w-28"
+              />
+              {field.unit && <span className="text-xs text-muted-foreground shrink-0">{field.unit}</span>}
+            </div>
+            {hint && <span className="text-[10px] text-destructive">{hint}</span>}
           </div>
         );
+      }
       case 'BOOLEAN':
         return (
           <div className="flex items-center gap-1 flex-1">

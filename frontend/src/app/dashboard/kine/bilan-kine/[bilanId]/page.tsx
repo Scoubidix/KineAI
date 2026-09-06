@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useBilanAutosave } from '@/hooks/useBilanAutosave';
 import { getBilan, attachPatient, ApiError } from '@/utils/bilanApi';
@@ -18,14 +19,11 @@ const isStep = (s: string | null): s is EditorStep => s === 'capture' || s === '
 
 // Éditeur de bilan V1 : un état (useBilanAutosave), trois étapes
 function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialStep: EditorStep }) {
+  const router = useRouter();
   const { toast } = useToast();
   const { record, update, flush, saveState, savedAt, pending, errorMessage, reload, replaceRecord } = useBilanAutosave(initial);
   const [step, setStep] = useState<EditorStep>(initialStep);
   const locked = saveState === 'stale';
-
-  useEffect(() => {
-    if (saveState === 'error' && errorMessage) toast({ title: 'Sauvegarde impossible', description: errorMessage, variant: 'destructive' });
-  }, [saveState, errorMessage, toast]);
 
   const goTo = useCallback(async (s: EditorStep) => {
     await flush();
@@ -40,7 +38,8 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
   const handlePatientChange = async (p: PatientSummary | null) => {
     if (!p) { toast({ title: 'Patient conservé', description: 'Pour changer de patient, choisis-en un autre dans la liste' }); return; }
     try {
-      await flush();
+      const ok = await flush();
+      if (!ok) { toast({ title: 'Sauvegarde en attente', description: 'Réessaie dans un instant' }); return; }
       const updated = await attachPatient(record.id, p.id);
       replaceRecord(updated);
       toast({ title: 'Patient associé', description: `${p.firstName} ${p.lastName.toUpperCase()}` });
@@ -49,25 +48,36 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
     }
   };
 
+  const handleBack = async () => {
+    const ok = await flush();
+    if (!ok) { toast({ title: 'Sauvegarde en attente', description: 'Réessaie dans un instant' }); return; }
+    router.push('/dashboard/kine/bilan-kine');
+  };
+
   return (
-    <div className="flex flex-col min-h-full">
-      <BilanEditorHeader
-        record={record}
-        onPatientChange={handlePatientChange}
-        onTypeChange={(t: BilanType) => update({ type: t })}
-        saveState={saveState}
-        savedAt={savedAt}
-        pending={pending}
-        onReload={() => { void reload(); }}
-        disabled={locked}
-      />
-      <BilanStepper step={step} onStep={(s) => { void goTo(s); }} />
-      <div className="flex-1 min-h-0">
-        {step === 'capture' && <CaptureStep record={record} update={update} disabled={locked} onNext={() => goTo('verification')} />}
-        {step === 'verification' && <VerificationStep record={record} update={update} disabled={locked} onBack={() => goTo('capture')} onNext={() => goTo('document')} />}
-        {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked} onBack={() => goTo('verification')} />}
+    <TooltipProvider>
+      <div className="flex flex-col min-h-full">
+        <BilanEditorHeader
+          record={record}
+          onPatientChange={handlePatientChange}
+          onTypeChange={(t: BilanType) => update({ type: t })}
+          saveState={saveState}
+          savedAt={savedAt}
+          pending={pending}
+          errorMessage={errorMessage}
+          onReload={() => { void reload(); }}
+          onRetry={() => { void flush(); }}
+          onBack={() => { void handleBack(); }}
+          disabled={locked}
+        />
+        <BilanStepper step={step} onStep={(s) => { void goTo(s); }} />
+        <div className="flex-1 min-h-0">
+          {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked} onNext={() => goTo('verification')} />}
+          {step === 'verification' && <VerificationStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked} onBack={() => goTo('capture')} onNext={() => goTo('document')} />}
+          {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked} onBack={() => goTo('verification')} />}
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
 

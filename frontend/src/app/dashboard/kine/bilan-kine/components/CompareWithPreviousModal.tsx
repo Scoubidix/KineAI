@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, History, FileText, Eye } from 'lucide-react';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { useToast } from '@/hooks/use-toast';
 import {
   BilanType,
   BILAN_TYPE_LABELS,
@@ -53,6 +54,8 @@ interface CompareWithPreviousModalProps {
   onSelect: (bilans: SelectedBilan[]) => void;
 }
 
+const MAX_COMPARISON = 10;
+
 export default function CompareWithPreviousModal({
   open,
   onOpenChange,
@@ -61,6 +64,7 @@ export default function CompareWithPreviousModal({
   initialSelectedIds = [],
   onSelect,
 }: CompareWithPreviousModalProps) {
+  const { toast } = useToast();
   const [bilans, setBilans] = useState<BilanSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(false);
@@ -91,6 +95,10 @@ export default function CompareWithPreviousModal({
 
   const toggleSelected = (id: number) => {
     setSelectedIds((prev) => {
+      if (!prev.has(id) && prev.size >= MAX_COMPARISON) {
+        toast({ title: `${MAX_COMPARISON} bilans maximum en comparaison`, variant: 'destructive' });
+        return prev;
+      }
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);

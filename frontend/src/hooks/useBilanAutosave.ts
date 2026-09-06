@@ -140,7 +140,14 @@ export function useBilanAutosave(initial: BilanRecord) {
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
 
-  useEffect(() => () => clearTimers(), []);
+  useEffect(() => () => {
+    clearTimers();
+    // Dernière chance, sans attendre : un patch reste en attente et le bilan n'est pas
+    // périmé (reload requis) → on tente un envoi best-effort avant démontage, résultat ignoré.
+    if (Object.keys(pendingRef.current).length > 0 && !staleRef.current) {
+      void flush();
+    }
+  }, [flush]);
 
   return { record, update, flush, saveState, savedAt, pending, errorMessage, reload, replaceRecord };
 }
