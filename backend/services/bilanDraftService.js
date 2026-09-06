@@ -98,6 +98,9 @@ async function updateDraft({ kineId, bilanId, patch, expectedUpdatedAt }) {
   // depuis la lecture par le client. Deux requêtes (updateMany + findFirst) laisseraient une
   // fenêtre où la ligne peut disparaître ou être réécrite entre les deux, faussant le diagnostic.
   const expected = new Date(expectedUpdatedAt);
+  if (!expectedUpdatedAt || Number.isNaN(expected.getTime())) {
+    throw new DraftError('INVALID_EXPECTED_UPDATED_AT', 400, 'Version attendue manquante ou invalide');
+  }
   try {
     const updated = await prisma.bilanKine.update({
       where: { id: bilanId, kineId, isActive: true, updatedAt: expected },
