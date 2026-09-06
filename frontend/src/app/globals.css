@@ -182,3 +182,20 @@ body {
   animation: twinkle 3.5s ease-in-out infinite;
 }
 
+
+/* Aperçu bilan (moteur de rendu serveur) — miroir de backend/services/bilanRenderer/printCss.js */
+.bilan-preview .bilan-header { display: flex; justify-content: space-between; border-bottom: 2px solid #3899aa; padding-bottom: 6px; margin-bottom: 10px; }
+.bilan-preview .bilan-header-name { font-weight: 700; }
+.bilan-preview .bilan-brand { font-weight: 700; color: #3899aa; }
+.bilan-preview .bilan-title { text-align: center; font-weight: 700; letter-spacing: .04em; margin: 12px 0 4px; }
+.bilan-preview .bilan-patient { text-align: center; color: #666; margin-bottom: 10px; }
+.bilan-preview .bilan-h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: #3899aa; border-bottom: 1px solid #d9e2e5; padding-bottom: 2px; margin: 14px 0 6px; }
+.bilan-preview .bilan-section p { margin: 0 0 6px; }
+.bilan-preview .bilan-cat { font-weight: 700; margin: 8px 0 3px; }
+.bilan-preview .bilan-table { width: 100%; border-collapse: collapse; margin: 0 0 8px; }
+.bilan-preview .bilan-table th, .bilan-preview .bilan-table td { border: 1px solid #cfd8db; padding: 3px 6px; text-align: left; }
+.bilan-preview .bilan-table th { background: #eef5f7; font-weight: 600; }
+.dark .bilan-preview .bilan-table th { background: #1f2a2e; }
+.bilan-preview .bilan-val { text-align: center; font-variant-numeric: tabular-nums; }
+.bilan-preview .bilan-sign { margin-top: 24px; text-align: right; }
+.bilan-preview .bilan-legacy u { text-decoration: underline; font-weight: 600; }

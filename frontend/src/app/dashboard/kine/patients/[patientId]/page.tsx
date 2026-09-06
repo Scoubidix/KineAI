@@ -14,6 +14,8 @@ import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone
 import DOMPurify from 'dompurify';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { fetchBilanRender, downloadBilanPdf } from '@/utils/bilanExport';
+import { BilanStatus } from '@/types/bilan';
 import { useToast } from '@/hooks/use-toast';
 import QuickContactModal from '@/components/QuickContactModal';
 import { isMobileFR } from '@/lib/phone';
@@ -43,6 +45,7 @@ interface BilanSummary {
   motif: string | null;
   createdAt: string;
   updatedAt: string;
+  status: BilanStatus;
 }
 
 interface BilanFull extends BilanSummary {
@@ -141,7 +144,7 @@ export default function PatientDetailPage() {
   const [editingBilanId, setEditingBilanId] = useState<number | null>(null);
   const [editBilanHtml, setEditBilanHtml] = useState('');
   const editBilanRef = useRef<HTMLDivElement>(null);
-  const [kineProfile, setKineProfile] = useState<{ firstName: string; lastName: string; adresseCabinet?: string; rpps?: string } | null>(null);
+  const [renderedBilanHtml, setRenderedBilanHtml] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPatient = async () => {
@@ -190,21 +193,16 @@ export default function PatientDetailPage() {
     fetchBilans();
   }, [patientId]);
 
-  // Charger le profil kiné pour le PDF
+  // Charger le rendu (moteur serveur) du bilan sélectionné en lecture seule
   useEffect(() => {
-    const fetchKineProfile = async () => {
-      try {
-        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile`);
-        if (res.ok) {
-          const data = await res.json();
-          setKineProfile(data);
-        }
-      } catch (err) {
-        console.error('Erreur chargement profil kiné:', err);
-      }
-    };
-    fetchKineProfile();
-  }, []);
+    if (!selectedBilan || editingBilanId === selectedBilan.id) return;
+    let cancelled = false;
+    setRenderedBilanHtml(null);
+    fetchBilanRender(selectedBilan.id)
+      .then((r) => { if (!cancelled) setRenderedBilanHtml(r.html); })
+      .catch(() => { if (!cancelled) setRenderedBilanHtml(''); });
+    return () => { cancelled = true; };
+  }, [selectedBilan?.id, editingBilanId]);
 
   const handleViewBilan = async (bilanId: number) => {
     try {
@@ -270,85 +268,9 @@ export default function PatientDetailPage() {
     }
   };
 
-  const handleDownloadBilanPDF = (bilan: BilanFull) => {
-    if (!patient) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast({ title: 'Erreur', description: 'Autorise les fenêtres pop-up', variant: 'destructive' });
-      return;
-    }
-
-    const today = new Date(bilan.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-    const logoUrl = `${window.location.origin}/logo.png`;
-    const patientBirthDate = new Date(patient.birthDate).toLocaleDateString('fr-FR');
-
-    let headerHTML = '';
-    if (kineProfile) {
-      const name = `${kineProfile.firstName} ${kineProfile.lastName.toUpperCase()}`;
-      headerHTML = `
-        <div class="header">
-          <div class="header-left">
-            <div class="header-name">${DOMPurify.sanitize(name)}</div>
-            <div>Masseur-Kinésithérapeute D.E.</div>
-            ${kineProfile.rpps ? `<div>RPPS : ${DOMPurify.sanitize(kineProfile.rpps)}</div>` : ''}
-            ${kineProfile.adresseCabinet ? `<div>${DOMPurify.sanitize(kineProfile.adresseCabinet)}</div>` : ''}
-          </div>
-          <div class="header-right">
-            <img src="${logoUrl}" alt="Logo" class="header-logo" />
-            <div class="header-app-name">Mon Assistant Kiné</div>
-          </div>
-        </div>
-        <div class="header-separator"></div>
-      `;
-    }
-
-    const patientInfoHTML = `
-      <div class="patient-info">
-        <strong>Patient :</strong> ${DOMPurify.sanitize(patient.firstName)} ${DOMPurify.sanitize(patient.lastName.toUpperCase())}
-        &nbsp;&bull;&nbsp; Né(e) le ${patientBirthDate}
-      </div>
-    `;
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Bilan Kinésithérapique - ${DOMPurify.sanitize(patient.firstName)} ${DOMPurify.sanitize(patient.lastName)}</title>
-          <style>
-            @page { margin: 2cm; size: A4; }
-            body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6; color: #000; max-width: 21cm; margin: 0 auto; padding: 1cm; }
-            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5em; }
-            .header-left { font-size: 11pt; line-height: 1.4; }
-            .header-name { font-weight: bold; font-size: 13pt; }
-            .header-right { display: flex; align-items: center; gap: 10px; }
-            .header-logo { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
-            .header-app-name { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; font-weight: bold; color: #3899aa; }
-            .header-separator { height: 3px; background: linear-gradient(to right, #4db3c5, #1f5c6a); border: none; border-radius: 2px; margin: 0.6em 0 1.2em 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .patient-info { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; margin-bottom: 1em; padding: 0.5em 0; border-bottom: 1px solid #ccc; }
-            .bilan-date { text-align: right; font-size: 10pt; color: #555; font-family: Arial, Helvetica, sans-serif; margin-bottom: -0.5em; }
-            h1, h2, h3 { font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
-            h1 { font-size: 16pt; text-align: center; }
-            h2 { font-size: 14pt; }
-            h3 { font-size: 12pt; }
-            p, li { margin-bottom: 0.5em; text-align: justify; }
-            strong { font-weight: bold; }
-            u { text-decoration: underline; font-weight: 600; }
-            em { font-style: italic; }
-            hr { border: none; border-top: 1px solid #000; margin: 1em 0; }
-            @media print { body { padding: 0; } }
-          </style>
-        </head>
-        <body>
-          ${headerHTML}
-          <div class="bilan-date">Le ${today}</div>
-          ${patientInfoHTML}
-          ${DOMPurify.sanitize(bilan.bilanHtml)}
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    setTimeout(() => { printWindow.focus(); printWindow.print(); }, 250);
+  const handleDownloadBilanPDF = async (bilan: BilanFull) => {
+    const result = await downloadBilanPdf(bilan.id);
+    if (!result.success) toast({ title: 'Erreur', description: result.error ?? 'PDF impossible', variant: 'destructive' });
   };
 
   const refreshProgrammes = async () => {
@@ -900,10 +822,13 @@ export default function PatientDetailPage() {
                     className="min-h-[200px] max-h-[50vh] overflow-y-auto text-sm leading-relaxed p-4 rounded-lg border-2 border-[#3899aa]/40 bg-white dark:bg-card focus:outline-none"
                   />
                 ) : (
-                  <div
-                    className="text-sm leading-relaxed p-4 rounded-lg border bg-gray-50 dark:bg-gray-800/50 max-h-[50vh] overflow-y-auto"
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedBilan.bilanHtml) }}
-                  />
+                  <div className="bilan-preview text-sm leading-relaxed p-4 rounded-lg border bg-white dark:bg-card max-h-[50vh] overflow-y-auto">
+                    {renderedBilanHtml === null ? (
+                      <Loader2 className="animate-spin h-5 w-5 text-[#3899aa] mx-auto" />
+                    ) : (
+                      <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderedBilanHtml) }} />
+                    )}
+                  </div>
                 )}
               </div>
             )}

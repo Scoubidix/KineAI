@@ -27,7 +27,6 @@ export interface SelectedBilan {
   createdAt: string;
   motif: string | null;
   structuredData: StructuredData | null;
-  bilanHtml: string | null;
 }
 
 interface CompareWithPreviousModalProps {
@@ -97,7 +96,6 @@ export default function CompareWithPreviousModal({
         createdAt: b.createdAt,
         motif: b.motif,
         structuredData: json.bilan.structuredData ?? null,
-        bilanHtml: json.bilan.bilanHtml ?? null,
       });
     } finally {
       setPreviewLoadingId(null);
@@ -129,7 +127,6 @@ export default function CompareWithPreviousModal({
               createdAt: b.createdAt,
               motif: b.motif,
               structuredData: json.bilan.structuredData ?? null,
-              bilanHtml: json.bilan.bilanHtml ?? null,
             } as SelectedBilan;
           } catch {
             return null;

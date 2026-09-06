@@ -1,5 +1,59 @@
 export type BilanType = 'INITIAL' | 'INTERMEDIAIRE' | 'FINAL';
 
+export type BilanStatus = 'BROUILLON' | 'GENERE' | 'ENREGISTRE';
+
+export const BILAN_STATUS_LABELS: Record<BilanStatus, string> = {
+  BROUILLON: 'Brouillon',
+  GENERE: 'Généré',
+  ENREGISTRE: 'Enregistré',
+};
+
+// Une valeur peut être null = "ajoutée mais non encore saisie / explicitement vidée"
+// → ne sera PAS envoyée à l'IA. Les vraies valeurs (0, false, '') sont envoyées.
+export type CanonicalValue = number | boolean | string | null;
+
+// ==================== DOCUMENT V1 ====================
+// Miroir de backend/services/bilanDocument.js (source de vérité stockée dans BilanKine.document)
+
+export type Side = 'D' | 'G';
+export type Presentation = 'table' | 'narrative';
+export type Origin = 'manual' | 'extracted' | 'previous';
+
+export const BILAN_SECTION_KEYS = ['anamnese', 'antecedents', 'examen', 'limitations', 'diagnostic', 'objectifs', 'traitement'] as const;
+export type BilanSectionKey = (typeof BILAN_SECTION_KEYS)[number];
+
+export const BILAN_SECTION_TITLES: Record<BilanSectionKey, string> = {
+  anamnese: 'Identification & anamnèse',
+  antecedents: 'Antécédents',
+  examen: 'Examen clinique',
+  limitations: 'Limitations fonctionnelles',
+  diagnostic: 'Diagnostic kinésithérapique',
+  objectifs: 'Objectifs',
+  traitement: 'Traitement',
+};
+
+export interface BilanSection {
+  key: BilanSectionKey;
+  text: string;
+}
+
+export type DocumentMeasurement =
+  | { kind: 'canonical'; key: string; value: CanonicalValue; side?: Side; presentation: Presentation; origin: Origin }
+  | { kind: 'custom'; label: string; value: string; presentation: Presentation; origin: Origin };
+
+export interface BilanDocument {
+  schemaVersion: 1;
+  sections: BilanSection[];
+  measurements: DocumentMeasurement[];
+  comparison?: { previousBilanIds: number[] };
+}
+
+export const emptyBilanDocument = (): BilanDocument => ({
+  schemaVersion: 1,
+  sections: BILAN_SECTION_KEYS.map((key) => ({ key, text: '' })),
+  measurements: [],
+});
+
 export type CanonicalFieldType = 'NUMERIC' | 'BOOLEAN' | 'TEXT' | 'ENUM';
 
 export interface CanonicalField {
@@ -14,11 +68,10 @@ export interface CanonicalField {
   category: string;
   order: number;
   isActive: boolean;
+  aliases: string[];
+  lateralized: boolean;
+  presentation: 'TABLE' | 'NARRATIVE';
 }
-
-// Une valeur peut être null = "ajoutée mais non encore saisie / explicitement vidée"
-// → ne sera PAS envoyée à l'IA. Les vraies valeurs (0, false, '') sont envoyées.
-export type CanonicalValue = number | boolean | string | null;
 
 export interface CanonicalMeasurement {
   kind: 'canonical';

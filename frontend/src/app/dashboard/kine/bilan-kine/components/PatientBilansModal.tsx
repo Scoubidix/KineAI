@@ -23,7 +23,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { BilanType, BILAN_TYPE_LABELS, BILAN_TYPE_COLORS } from '@/types/bilan';
-import { generateBilanPdf, KineProfileForPdf, PatientForPdf } from '@/utils/bilanPdf';
+import { fetchBilanRender, downloadBilanPdf } from '@/utils/bilanExport';
 
 interface PatientWithBilans {
   id: number;
@@ -73,9 +73,7 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
   const [editing, setEditing] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const editRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<HTMLDivElement>(null);
-
-  const [kineProfile, setKineProfile] = useState<KineProfileForPdf | null>(null);
+  const [renderedHtml, setRenderedHtml] = useState<string | null>(null);
 
   // Reset complet à la fermeture
   useEffect(() => {
@@ -87,23 +85,6 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
       setSelectedBilan(null);
       setEditing(false);
     }
-  }, [open]);
-
-  // Charger profil kiné (pour entête PDF) à l'ouverture
-  useEffect(() => {
-    if (!open) return;
-    const fetchProfile = async () => {
-      try {
-        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile`);
-        if (res.ok) {
-          const data = await res.json();
-          setKineProfile(data);
-        }
-      } catch {
-        // silent
-      }
-    };
-    fetchProfile();
   }, [open]);
 
   // Charger les patients ayant des bilans à l'ouverture (vue search)
@@ -130,11 +111,15 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
     }
   }, [editing, selectedBilan]);
 
-  // Injection HTML dans la div de visualisation (lecture seule)
+  // Chargement du rendu (lecture seule) via le moteur serveur
   useEffect(() => {
-    if (!editing && viewRef.current && selectedBilan) {
-      viewRef.current.innerHTML = DOMPurify.sanitize(selectedBilan.bilanHtml);
-    }
+    if (editing || !selectedBilan) return;
+    let cancelled = false;
+    setRenderedHtml(null);
+    fetchBilanRender(selectedBilan.id)
+      .then((r) => { if (!cancelled) setRenderedHtml(r.html); })
+      .catch(() => { if (!cancelled) setRenderedHtml(''); });
+    return () => { cancelled = true; };
   }, [editing, selectedBilan]);
 
   const filteredPatients = patients.filter((p) =>
@@ -227,27 +212,10 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
     }
   };
 
-  const handleDownloadPdf = () => {
-    if (!selectedBilan || !selectedPatient) return;
-    const patient: PatientForPdf = {
-      firstName: selectedPatient.firstName,
-      lastName: selectedPatient.lastName,
-      birthDate: selectedPatient.birthDate,
-    };
-    // On utilise le HTML actuellement édité si on est en mode édition
-    const html =
-      editing && editRef.current
-        ? DOMPurify.sanitize(editRef.current.innerHTML)
-        : selectedBilan.bilanHtml;
-    const result = generateBilanPdf({
-      bilanHtml: html,
-      bilanDateIso: selectedBilan.createdAt,
-      kineProfile,
-      patient,
-    });
-    if (!result.success) {
-      toast({ title: 'Erreur', description: result.error ?? 'PDF impossible', variant: 'destructive' });
-    }
+  const handleDownloadPdf = async () => {
+    if (!selectedBilan) return;
+    const result = await downloadBilanPdf(selectedBilan.id);
+    if (!result.success) toast({ title: 'Erreur', description: result.error ?? 'PDF impossible', variant: 'destructive' });
   };
 
   const formatDate = (iso: string) =>
@@ -481,10 +449,9 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
                   className="min-h-[400px] text-sm leading-relaxed text-foreground p-4 rounded-xl border-2 border-[#3899aa]/40 bg-white dark:bg-card focus:outline-none focus:border-[#3899aa]/70 transition-all"
                 />
               ) : (
-                <div
-                  ref={viewRef}
-                  className="min-h-[200px] text-sm leading-relaxed text-foreground p-4 rounded-xl border border-border/50 bg-white dark:bg-card"
-                />
+                <div className="bilan-preview min-h-[200px] text-sm leading-relaxed text-foreground p-4 rounded-xl border border-border/50 bg-white dark:bg-card">
+                  {renderedHtml === null ? <Loader2 className="h-5 w-5 animate-spin text-[#3899aa] mx-auto" /> : <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderedHtml) }} />}
+                </div>
               )}
               {editing && (
                 <p className="text-[11px] text-muted-foreground mt-2 text-right">
