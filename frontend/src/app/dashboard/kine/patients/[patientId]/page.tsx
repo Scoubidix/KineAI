@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
-import { Loader2, X, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Dumbbell, Clock, Activity, MessageCircle, CheckCircle, AlertCircle, Search, Archive, ArrowLeft, ChevronRight, FileText, Download } from 'lucide-react';
+import { Loader2, Edit, Trash2, Send, Copy, Plus, User, Calendar, Mail, Phone, Dumbbell, Clock, Activity, MessageCircle, CheckCircle, AlertCircle, Search, Archive, ArrowLeft, ChevronRight, FileText, Download } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';

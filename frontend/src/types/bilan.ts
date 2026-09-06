@@ -130,8 +130,6 @@ export interface StructuredData {
   measurements: Measurement[];
 }
 
-export const EMPTY_STRUCTURED_DATA: StructuredData = { measurements: [] };
-
 export const BILAN_TYPE_LABELS: Record<BilanType, string> = {
   INITIAL: 'Initial',
   INTERMEDIAIRE: 'Intermédiaire',
