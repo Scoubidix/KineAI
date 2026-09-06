@@ -25,10 +25,12 @@ const RECOMMENDED_PLAN_BY_ASSISTANT = {
 
 // Features non-IA gatées par plan (hors ASSISTANTS_BY_PLAN, qui ne couvre que les IA).
 const FEATURE_ALLOWED_PLANS = {
-  'VIDEO_TRANSMISSION': ['PRATIQUE', 'PIONNIER', 'EXPERT']
+  'VIDEO_TRANSMISSION': ['PRATIQUE', 'PIONNIER', 'EXPERT'],
+  'BILAN_EDITOR': ['PRATIQUE', 'PIONNIER', 'EXPERT']
 };
 const RECOMMENDED_PLAN_BY_FEATURE = {
-  'VIDEO_TRANSMISSION': 'PRATIQUE'
+  'VIDEO_TRANSMISSION': 'PRATIQUE',
+  'BILAN_EDITOR': 'PRATIQUE'
 };
 
 /**
@@ -368,6 +370,9 @@ const requirePionnier = async (req, res, next) => {
   }
 };
 
+// Éditeur de bilan V1 (création de brouillon, extraction, rédaction, PDF) : réservé dès Pratique
+const requireBilanEditor = requireFeature('BILAN_EDITOR');
+
 module.exports = {
   canCreateProgramme,
   requireAssistant,
@@ -375,5 +380,6 @@ module.exports = {
   requireFeature,
   getPlanInfo,
   requireAdmin,
-  requirePionnier
+  requirePionnier,
+  requireBilanEditor
 };
