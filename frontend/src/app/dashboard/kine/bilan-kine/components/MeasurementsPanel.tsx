@@ -70,6 +70,10 @@ export default function MeasurementsPanel({
   const pendingCollapseRef = useRef<Set<string>>(new Set());
   // Indices des lignes NUMERIC dont la dernière saisie était hors bornes (message d'aide local)
   const [rangeHints, setRangeHints] = useState<Map<number, string>>(new Map());
+  // Brouillon local par ligne NUMERIC (texte tel que tapé, tant qu'il n'est pas commis) :
+  // permet de taper un nombre dont un préfixe est hors bornes (ex. "35" dans un champ 20-80,
+  // le "3" seul est < 20) sans que l'input contrôlé ne revienne écraser la frappe en cours.
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -134,6 +138,10 @@ export default function MeasurementsPanel({
 
   const handleRemoveAt = (index: number) => {
     onChange(measurements.filter((_, i) => i !== index));
+    // Les index décalent après suppression : on repart d'un état propre plutôt que
+    // de remapper les brouillons/hints (aucune ligne n'est en cours de frappe à ce moment).
+    setDrafts({});
+    setRangeHints(new Map());
   };
 
   const handleChangeAt = (index: number, value: CanonicalValue | string) => {
@@ -313,37 +321,65 @@ export default function MeasurementsPanel({
     switch (field.type) {
       case 'NUMERIC': {
         const hint = rangeHints.get(index);
+        const { rangeMin, rangeMax } = field;
+        const outOfRangeHint = () =>
+          rangeMin !== null && rangeMax !== null
+            ? `Entre ${rangeMin} et ${rangeMax}`
+            : rangeMin !== null
+            ? `Supérieur à ${rangeMin}`
+            : `Inférieur à ${rangeMax}`;
+        const clearHint = () => setRangeHints((prev) => { if (!prev.has(index)) return prev; const next = new Map(prev); next.delete(index); return next; });
+        const clearDraft = () => setDrafts((prev) => { if (!(index in prev)) return prev; const next = { ...prev }; delete next[index]; return next; });
+        const draft = drafts[index];
+        const displayValue = draft ?? (value === null || value === undefined ? '' : String(value as number));
         return (
           <div className="flex flex-col gap-0.5 flex-1">
             <div className="flex items-center gap-1.5">
               <Input
                 type="number"
-                value={value === null || value === undefined ? '' : (value as number)}
+                value={displayValue}
                 onChange={(e) => {
-                  if (e.target.value === '') {
+                  const raw = e.target.value;
+                  if (raw === '') {
                     handleChangeAt(index, null);
-                    setRangeHints((prev) => { if (!prev.has(index)) return prev; const next = new Map(prev); next.delete(index); return next; });
+                    clearHint();
+                    clearDraft();
                     return;
                   }
-                  const n = Number(e.target.value);
-                  if (Number.isNaN(n)) return;
-                  const { rangeMin, rangeMax } = field;
+                  const n = Number(raw);
+                  if (Number.isNaN(n)) {
+                    // Brouillon gardé tel quel (ex. "-" en cours de frappe), pas de commit
+                    setDrafts((prev) => ({ ...prev, [index]: raw }));
+                    return;
+                  }
                   const outOfRange = (rangeMin !== null && n < rangeMin) || (rangeMax !== null && n > rangeMax);
                   if (outOfRange) {
-                    // Hors bornes : on ne persiste pas la valeur, on garde la précédente et on affiche l'aide
-                    const hintText = rangeMin !== null && rangeMax !== null
-                      ? `Entre ${rangeMin} et ${rangeMax}`
-                      : rangeMin !== null
-                      ? `Supérieur à ${rangeMin}`
-                      : `Inférieur à ${rangeMax}`;
-                    setRangeHints((prev) => new Map(prev).set(index, hintText));
+                    // Hors bornes : le brouillon reste affiché (la frappe continue), on ne persiste pas
+                    setDrafts((prev) => ({ ...prev, [index]: raw }));
+                    setRangeHints((prev) => new Map(prev).set(index, outOfRangeHint()));
                     return;
                   }
-                  setRangeHints((prev) => { if (!prev.has(index)) return prev; const next = new Map(prev); next.delete(index); return next; });
+                  clearHint();
+                  clearDraft();
                   handleChangeAt(index, n);
                 }}
-                min={field.rangeMin ?? undefined}
-                max={field.rangeMax ?? undefined}
+                onBlur={() => {
+                  if (!(index in drafts)) return;
+                  const raw = drafts[index];
+                  const n = Number(raw);
+                  const valid = raw !== '' && !Number.isNaN(n) && !((rangeMin !== null && n < rangeMin) || (rangeMax !== null && n > rangeMax));
+                  if (valid) {
+                    // Cas défensif : un brouillon valide n'a normalement pas survécu à l'onChange
+                    // (déjà commis et effacé) — on le commet par sécurité et on efface le hint.
+                    clearHint();
+                    handleChangeAt(index, n);
+                  }
+                  // Sinon : brouillon hors bornes ou NaN abandonné, le champ revient à la
+                  // dernière valeur commise, le hint reste visible pour expliquer pourquoi.
+                  clearDraft();
+                }}
+                min={rangeMin ?? undefined}
+                max={rangeMax ?? undefined}
                 disabled={disabled}
                 className="h-8 text-sm w-28"
               />
