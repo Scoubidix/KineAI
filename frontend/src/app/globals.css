@@ -186,6 +186,8 @@ body {
 /* Aperçu bilan (moteur de rendu serveur) — miroir de backend/services/bilanRenderer/printCss.js */
 .bilan-preview .bilan-header { display: flex; justify-content: space-between; border-bottom: 2px solid #3899aa; padding-bottom: 6px; margin-bottom: 10px; }
 .bilan-preview .bilan-header-name { font-weight: 700; }
+.bilan-preview .bilan-header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+.bilan-preview .bilan-logo { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
 .bilan-preview .bilan-brand { font-weight: 700; color: #3899aa; }
 .bilan-preview .bilan-title { text-align: center; font-weight: 700; letter-spacing: .04em; margin: 12px 0 4px; }
 .bilan-preview .bilan-patient { text-align: center; color: #666; margin-bottom: 10px; }

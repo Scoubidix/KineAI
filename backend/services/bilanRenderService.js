@@ -21,6 +21,12 @@ function invalidateCatalogCache() {
   catalogCache = { fields: null, loadedAt: 0 };
 }
 
+// Logo servi par le front (public/logo.png). URL absolue : nécessaire pour Puppeteer côté serveur.
+function getLogoUrl() {
+  const base = (process.env.FRONTEND_URL || '').replace(/\/+$/, '');
+  return base ? `${base}/logo.png` : null;
+}
+
 function buildTitle(bilan) {
   const type = BILAN_TYPE_LABELS[bilan.type] || bilan.type;
   if (!bilan.patient) return `Bilan ${type}`;
@@ -67,6 +73,7 @@ async function renderForKine({ kineId, bilanId, includeEvolution = false }) {
     bilanDate: bilan.createdAt,
     previousBilans,
     includeEvolution,
+    logoUrl: getLogoUrl(),
   });
   return { html, title: buildTitle(bilan), bilan };
 }

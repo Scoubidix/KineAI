@@ -443,15 +443,18 @@ export default function PatientBilansModal({ open, onOpenChange }: PatientBilans
 
             {/* Contenu (édition ou lecture) */}
             <div className="flex-1 overflow-y-auto">
+              {/* Clés distinctes : sans elles React réutilise le même nœud DOM et le contenu injecté
+                  par innerHTML dans l'éditeur reste affiché sous l'aperçu (doublon après sauvegarde) */}
               {editing ? (
                 <div
+                  key="bilan-edit"
                   ref={editRef}
                   contentEditable
                   suppressContentEditableWarning
                   className="min-h-[400px] text-sm leading-relaxed text-foreground p-4 rounded-xl border-2 border-[#3899aa]/40 bg-white dark:bg-card focus:outline-none focus:border-[#3899aa]/70 transition-all"
                 />
               ) : (
-                <div className="bilan-preview min-h-[200px] text-sm leading-relaxed text-foreground p-4 rounded-xl border border-border/50 bg-white dark:bg-card">
+                <div key="bilan-view" className="bilan-preview min-h-[200px] text-sm leading-relaxed text-foreground p-4 rounded-xl border border-border/50 bg-white dark:bg-card">
                   {renderError ? (
                     <p className="text-sm text-destructive text-center py-8">{renderError}</p>
                   ) : renderedHtml === null ? (

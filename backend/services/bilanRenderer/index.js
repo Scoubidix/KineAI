@@ -14,9 +14,11 @@ function textToParagraphs(text) {
     .join('');
 }
 
-function renderHeader(kineProfile, bilanDate) {
+// logoUrl : URL absolue du logo (fournie par le service, ex. FRONTEND_URL/logo.png) ; absente → pas d'image
+function renderHeader(kineProfile, bilanDate, logoUrl) {
   if (!kineProfile) return '';
   const name = `${kineProfile.firstName || ''} ${(kineProfile.lastName || '').toUpperCase()}`.trim();
+  const logo = logoUrl ? `<img class="bilan-logo" src="${escapeHtml(logoUrl)}" alt="">` : '';
   return `<header class="bilan-header">
 <div class="bilan-header-left">
 <div class="bilan-header-name">${escapeHtml(name)}</div>
@@ -24,7 +26,7 @@ function renderHeader(kineProfile, bilanDate) {
 ${kineProfile.rpps ? `<div>RPPS : ${escapeHtml(kineProfile.rpps)}</div>` : ''}
 ${kineProfile.adresseCabinet ? `<div>${escapeHtml(kineProfile.adresseCabinet)}</div>` : ''}
 </div>
-<div class="bilan-header-right"><div class="bilan-brand">Mon Assistant Kiné</div><div>Le ${escapeHtml(formatDateLongFr(bilanDate))}</div></div>
+<div class="bilan-header-right">${logo}<div class="bilan-brand">Mon Assistant Kiné</div><div>Le ${escapeHtml(formatDateLongFr(bilanDate))}</div></div>
 </header>`;
 }
 
@@ -32,8 +34,8 @@ ${kineProfile.adresseCabinet ? `<div>${escapeHtml(kineProfile.adresseCabinet)}</
  * Rend le corps HTML d'un bilan (fragment, classes bilan-*, sans style inline).
  * Bilan hérité : document nul → legacyHtml inséré tel quel (à sanitizer côté client).
  */
-function renderBilanHtml({ document, legacyHtml, catalog, kineProfile, patient, bilanType, bilanDate, previousBilans = [], includeEvolution = false }) {
-  const parts = [renderHeader(kineProfile, bilanDate)];
+function renderBilanHtml({ document, legacyHtml, catalog, kineProfile, patient, bilanType, bilanDate, previousBilans = [], includeEvolution = false, logoUrl = null }) {
+  const parts = [renderHeader(kineProfile, bilanDate, logoUrl)];
 
   if (!document) {
     const legacyBody = legacyHtml || '<p class="bilan-empty">Ce bilan n\'a pas encore de compte-rendu.</p>';

@@ -817,14 +817,17 @@ export default function PatientDetailPage() {
                     <Loader2 className="animate-spin h-5 w-5 text-[#3899aa] mx-auto" />
                   </div>
                 ) : editingBilanId === selectedBilan.id ? (
+                  // Clé distincte de l'aperçu : sinon React réutilise le nœud et le innerHTML
+                  // injecté dans l'éditeur reste affiché sous le rendu (doublon après sauvegarde)
                   <div
+                    key="bilan-edit"
                     ref={editBilanRef}
                     contentEditable
                     suppressContentEditableWarning
                     className="min-h-[200px] max-h-[50vh] overflow-y-auto text-sm leading-relaxed p-4 rounded-lg border-2 border-[#3899aa]/40 bg-white dark:bg-card focus:outline-none"
                   />
                 ) : (
-                  <div className="bilan-preview text-sm leading-relaxed p-4 rounded-lg border bg-white dark:bg-card max-h-[50vh] overflow-y-auto">
+                  <div key="bilan-view" className="bilan-preview text-sm leading-relaxed p-4 rounded-lg border bg-white dark:bg-card max-h-[50vh] overflow-y-auto">
                     {renderBilanError ? (
                       <p className="text-sm text-destructive text-center py-8">{renderBilanError}</p>
                     ) : renderedBilanHtml === null ? (
