@@ -1,0 +1,112 @@
+'use client';
+
+import React, { useCallback, useEffect, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { useBilanAutosave } from '@/hooks/useBilanAutosave';
+import { getBilan, attachPatient, ApiError } from '@/utils/bilanApi';
+import type { BilanRecord, PatientSummary, BilanType } from '@/types/bilan';
+import BilanEditorHeader from '../components/editor/BilanEditorHeader';
+import BilanStepper, { type EditorStep } from '../components/editor/BilanStepper';
+import CaptureStep from '../components/editor/CaptureStep';
+import VerificationStep from '../components/editor/VerificationStep';
+import DocumentStep from '../components/editor/DocumentStep';
+
+const isStep = (s: string | null): s is EditorStep => s === 'capture' || s === 'verification' || s === 'document';
+
+// Éditeur de bilan V1 : un état (useBilanAutosave), trois étapes
+function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialStep: EditorStep }) {
+  const { toast } = useToast();
+  const { record, update, flush, saveState, savedAt, pending, errorMessage, reload, replaceRecord } = useBilanAutosave(initial);
+  const [step, setStep] = useState<EditorStep>(initialStep);
+  const locked = saveState === 'stale';
+
+  useEffect(() => {
+    if (saveState === 'error' && errorMessage) toast({ title: 'Sauvegarde impossible', description: errorMessage, variant: 'destructive' });
+  }, [saveState, errorMessage, toast]);
+
+  const goTo = useCallback(async (s: EditorStep) => {
+    await flush();
+    setStep(s);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('step', s);
+      window.history.replaceState(null, '', url.toString());
+    }
+  }, [flush]);
+
+  const handlePatientChange = async (p: PatientSummary | null) => {
+    if (!p) { toast({ title: 'Patient conservé', description: 'Pour changer de patient, choisis-en un autre dans la liste' }); return; }
+    try {
+      await flush();
+      const updated = await attachPatient(record.id, p.id);
+      replaceRecord(updated);
+      toast({ title: 'Patient associé', description: `${p.firstName} ${p.lastName.toUpperCase()}` });
+    } catch (e) {
+      toast({ title: 'Erreur', description: (e as Error).message, variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="flex flex-col min-h-full">
+      <BilanEditorHeader
+        record={record}
+        onPatientChange={handlePatientChange}
+        onTypeChange={(t: BilanType) => update({ type: t })}
+        saveState={saveState}
+        savedAt={savedAt}
+        pending={pending}
+        onReload={() => { void reload(); }}
+        disabled={locked}
+      />
+      <BilanStepper step={step} onStep={(s) => { void goTo(s); }} />
+      <div className="flex-1 min-h-0">
+        {step === 'capture' && <CaptureStep record={record} update={update} disabled={locked} onNext={() => goTo('verification')} />}
+        {step === 'verification' && <VerificationStep record={record} update={update} disabled={locked} onBack={() => goTo('capture')} onNext={() => goTo('document')} />}
+        {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked} onBack={() => goTo('verification')} />}
+      </div>
+    </div>
+  );
+}
+
+export default function BilanEditorPage() {
+  const params = useParams<{ bilanId: string }>();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { toast } = useToast();
+  const [state, setState] = useState<{ status: 'loading' } | { status: 'ready'; bilan: BilanRecord } | { status: 'error'; message: string }>({ status: 'loading' });
+
+  const bilanId = Number(params.bilanId);
+  const stepParam = searchParams.get('step');
+  const initialStep: EditorStep = isStep(stepParam) ? stepParam : 'capture';
+
+  useEffect(() => {
+    if (!Number.isInteger(bilanId) || bilanId <= 0) { setState({ status: 'error', message: 'Identifiant de bilan invalide' }); return; }
+    let cancelled = false;
+    getBilan(bilanId)
+      .then((bilan) => {
+        if (cancelled) return;
+        if (!bilan.document) {
+          toast({ title: 'Bilan en lecture seule', description: 'Les anciens bilans se consultent depuis la fiche patient.' });
+          router.replace('/dashboard/kine/bilan-kine');
+          return;
+        }
+        setState({ status: 'ready', bilan });
+      })
+      .catch((e) => { if (!cancelled) setState({ status: 'error', message: e instanceof ApiError && e.status === 404 ? 'Ce bilan n’existe pas ou ne t’appartient pas' : (e as Error).message }); });
+    return () => { cancelled = true; };
+  }, [bilanId, router, toast]);
+
+  if (state.status === 'loading') return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#3899aa]" /></div>;
+  if (state.status === 'error') {
+    return (
+      <div className="max-w-md mx-auto p-6 text-center space-y-3">
+        <p className="text-sm text-destructive">{state.message}</p>
+        <Button variant="outline" onClick={() => router.push('/dashboard/kine/bilan-kine')}>Retour aux bilans</Button>
+      </div>
+    );
+  }
+  return <BilanEditor key={state.bilan.id} initial={state.bilan} initialStep={initialStep} />;
+}
