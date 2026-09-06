@@ -109,4 +109,20 @@ describe('bilanDocument — validateDocument', () => {
     doc.comparison = { previousBilanIds: [0] };
     expect(validateDocument(doc, FIELDS).success).toBe(false);
   });
+
+  test('kind invalide → erreur', () => {
+    const doc = base();
+    doc.measurements.push({ kind: 'foo', key: 'eva_repos', value: 5, presentation: 'table', origin: 'manual' });
+    const r = validateDocument(doc, FIELDS);
+    expect(r.success).toBe(false);
+    expect(r.errors.join(' ')).toMatch(/kind/);
+  });
+
+  test('custom sans label → erreur', () => {
+    const doc = base();
+    doc.measurements.push({ kind: 'custom', value: '3 cm', presentation: 'table', origin: 'manual' });
+    const r = validateDocument(doc, FIELDS);
+    expect(r.success).toBe(false);
+    expect(r.errors.join(' ')).toMatch(/label/);
+  });
 });

@@ -66,27 +66,15 @@ function buildDocumentSchema(fieldsByKey) {
     text: z.string().max(SECTION_TEXT_MAX),
   });
 
-  const canonicalSchema = z
-    .object({
-      kind: z.literal('canonical'),
-      key: z.string().trim().min(1).max(80),
-      value: z.union([z.number(), z.boolean(), z.string().max(TEXT_VALUE_MAX), z.null()]),
-      side: z.enum(SIDES).optional(),
-      presentation: z.enum(PRESENTATIONS),
-      origin: z.enum(ORIGINS),
-    })
-    .superRefine((m, ctx) => {
-      const field = fieldsByKey.get(m.key);
-      if (!field) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `clé canonique inconnue : ${m.key}` });
-        return;
-      }
-      if (m.side && !field.lateralized) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `côté interdit sur un champ non latéralisé : ${m.key}` });
-      }
-      const err = checkCanonicalValue(field, m.value);
-      if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err });
-    });
+  // canonicalSchema must be a plain z.object (no .superRefine) for discriminatedUnion to work
+  const canonicalSchema = z.object({
+    kind: z.literal('canonical'),
+    key: z.string().trim().min(1).max(80),
+    value: z.union([z.number(), z.boolean(), z.string().max(TEXT_VALUE_MAX), z.null()]),
+    side: z.enum(SIDES).optional(),
+    presentation: z.enum(PRESENTATIONS),
+    origin: z.enum(ORIGINS),
+  });
 
   const customSchema = z.object({
     kind: z.literal('custom'),
@@ -108,13 +96,50 @@ function buildDocumentSchema(fieldsByKey) {
         }
       }),
     measurements: z
-      .array(z.union([canonicalSchema, customSchema]))
+      .array(z.discriminatedUnion('kind', [canonicalSchema, customSchema]))
       .max(MEASUREMENTS_MAX)
       .superRefine((items, ctx) => {
         const seen = new Set();
-        for (const m of items) {
+        for (let index = 0; index < items.length; index++) {
+          const m = items[index];
+
+          // Canonical-specific validation
+          if (m.kind === 'canonical') {
+            const field = fieldsByKey.get(m.key);
+            if (!field) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `clé canonique inconnue : ${m.key}`,
+                path: [index, 'key'],
+              });
+              continue;
+            }
+            if (m.side && !field.lateralized) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `côté interdit sur un champ non latéralisé : ${m.key}`,
+                path: [index, 'side'],
+              });
+            }
+            const err = checkCanonicalValue(field, m.value);
+            if (err) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: err,
+                path: [index, 'value'],
+              });
+            }
+          }
+
+          // Duplicate detection (works for both canonical and custom)
           const id = m.kind === 'canonical' ? `c:${m.key}:${m.side ?? ''}` : `x:${normalizeLabel(m.label)}`;
-          if (seen.has(id)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `mesure en double : ${id}` });
+          if (seen.has(id)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `mesure en double : ${id}`,
+              path: [index],
+            });
+          }
           seen.add(id);
         }
       }),
