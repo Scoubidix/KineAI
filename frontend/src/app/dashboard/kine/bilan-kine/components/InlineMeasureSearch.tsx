@@ -1,14 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, Search, Sparkles, X, Check } from 'lucide-react';
+import { Plus, Search, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CanonicalField } from '@/types/bilan';
 
 interface InlineMeasureSearchProps {
   fields: CanonicalField[];
-  addedKeys: Set<string>;
+  // Un champ latéralisé peut être ajouté deux fois (D puis G) : l'exclusion des
+  // résultats se fait donc via cette prédicat (fourni par le panneau), pas via
+  // une simple liste de clés déjà ajoutées.
+  isExhausted: (field: CanonicalField) => boolean;
   addedCustomLabels: Set<string>;
   onAddCanonical: (field: CanonicalField) => void;
   onAddCustom: (label: string) => void;
@@ -44,6 +47,8 @@ const scoreField = (field: CanonicalField, q: string): number => {
   if (new RegExp(`\\b${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(label)) return 80;
   // Inclus dans le label
   if (label.includes(q)) return 60;
+  // Inclus dans un alias (ex: "empty can" pour le Test de Jobe)
+  if (Array.isArray(field.aliases) && field.aliases.some((a) => a.toLowerCase().includes(q))) return 55;
   // Inclus dans la key technique
   if (key.includes(q)) return 50;
   // Inclus dans la catégorie
@@ -55,7 +60,7 @@ const scoreField = (field: CanonicalField, q: string): number => {
 
 export default function InlineMeasureSearch({
   fields,
-  addedKeys,
+  isExhausted,
   addedCustomLabels,
   onAddCanonical,
   onAddCustom,
@@ -85,11 +90,11 @@ export default function InlineMeasureSearch({
     }
     return fields
       .map((f) => ({ field: f, score: scoreField(f, q) }))
-      .filter((x) => x.score > 0)
+      .filter((x) => x.score > 0 && !isExhausted(x.field))
       .sort((a, b) => b.score - a.score || a.field.order - b.field.order || a.field.id - b.field.id)
       .slice(0, MAX_RESULTS)
       .map((x) => x.field);
-  }, [fields, q]);
+  }, [fields, q, isExhausted]);
 
   // L'option "mesure libre" est dispo dès qu'il y a du texte, même s'il y a des résultats canoniques.
   const customAvailable =
@@ -130,7 +135,7 @@ export default function InlineMeasureSearch({
   };
 
   const addCanonical = (field: CanonicalField) => {
-    if (addedKeys.has(field.key)) return;
+    if (isExhausted(field)) return;
     onAddCanonical(field);
     setSearch('');
     inputRef.current?.focus();
@@ -175,7 +180,7 @@ export default function InlineMeasureSearch({
         return;
       }
       const target = results[highlightedIndex];
-      if (target && !addedKeys.has(target.key)) {
+      if (target && !isExhausted(target)) {
         addCanonical(target);
       }
     }
@@ -229,21 +234,16 @@ export default function InlineMeasureSearch({
       {search.trim().length > 0 && (
         <div className="space-y-0.5">
           {results.map((f, idx) => {
-            const alreadyAdded = addedKeys.has(f.key);
-            const isHighlighted = idx === highlightedIndex && !alreadyAdded;
+            const isHighlighted = idx === highlightedIndex;
             return (
               <button
                 key={f.id}
                 type="button"
-                onMouseEnter={() => !alreadyAdded && setHighlightedIndex(idx)}
+                onMouseEnter={() => setHighlightedIndex(idx)}
                 onClick={() => addCanonical(f)}
-                disabled={alreadyAdded || disabled}
+                disabled={disabled}
                 className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${
-                  alreadyAdded
-                    ? 'opacity-50 cursor-not-allowed'
-                    : isHighlighted
-                    ? 'bg-[#3899aa]/15'
-                    : 'hover:bg-[#3899aa]/10'
+                  isHighlighted ? 'bg-[#3899aa]/15' : 'hover:bg-[#3899aa]/10'
                 }`}
               >
                 <div className="flex-1 min-w-0">
@@ -256,14 +256,7 @@ export default function InlineMeasureSearch({
                     {f.type === 'ENUM' && f.options ? ` · ${f.options.join(' / ')}` : ''}
                   </p>
                 </div>
-                {alreadyAdded ? (
-                  <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground shrink-0">
-                    <Check className="w-3 h-3" />
-                    Ajoutée
-                  </span>
-                ) : (
-                  <Plus className="w-3.5 h-3.5 text-[#3899aa] shrink-0" />
-                )}
+                <Plus className="w-3.5 h-3.5 text-[#3899aa] shrink-0" />
               </button>
             );
           })}

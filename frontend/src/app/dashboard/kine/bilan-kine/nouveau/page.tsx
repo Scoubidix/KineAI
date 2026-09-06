@@ -19,7 +19,7 @@ import MeasurementsPanel from '../components/MeasurementsPanel';
 import CompareWithPreviousModal, { SelectedBilan } from '../components/CompareWithPreviousModal';
 import TemplateEditorModal from '../components/TemplateEditorModal';
 import BilanDetailView from '../components/BilanDetailView';
-import { BilanType, StructuredData, EMPTY_STRUCTURED_DATA, BILAN_TYPE_LABELS, BILAN_TYPE_COLORS, CanonicalField, TemplateItem } from '@/types/bilan';
+import { BilanType, StructuredData, EMPTY_STRUCTURED_DATA, BILAN_TYPE_LABELS, BILAN_TYPE_COLORS, CanonicalField, TemplateItem, DocumentMeasurement } from '@/types/bilan';
 
 interface PatientOption {
   id: number;
@@ -30,6 +30,18 @@ interface PatientOption {
 
 const isValidBilanType = (t: string | null): t is BilanType =>
   t === 'INITIAL' || t === 'INTERMEDIAIRE' || t === 'FINAL';
+
+// Pont temporaire (page supprimée au plan 2b) : le panneau parle DocumentMeasurement, la page StructuredData.
+// Les côtés (D/G) sont perdus dans ce pont : acceptable, la page disparaît au plan suivant.
+const toDocMeasurements = (d: StructuredData): DocumentMeasurement[] =>
+  d.measurements.map((m) => (m.kind === 'canonical'
+    ? { kind: 'canonical', key: m.key, value: m.value, presentation: 'table', origin: 'manual' }
+    : { kind: 'custom', label: m.label, value: m.value, presentation: 'table', origin: 'manual' }));
+const fromDocMeasurements = (ms: DocumentMeasurement[]): StructuredData => ({
+  measurements: ms.map((m) => (m.kind === 'canonical'
+    ? { kind: 'canonical', key: m.key, value: m.value }
+    : { kind: 'custom', label: m.label, value: m.value })),
+});
 
 export default function BilanKinePage() {
   const searchParams = useSearchParams();
@@ -999,8 +1011,8 @@ Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de cha
           {/* Panneau mesures cliniques */}
           <div className="mt-3">
             <MeasurementsPanel
-              structuredData={structuredData}
-              onChange={setStructuredData}
+              measurements={toDocMeasurements(structuredData)}
+              onChange={(ms) => setStructuredData(fromDocMeasurements(ms))}
               disabled={isGenerating}
             />
           </div>

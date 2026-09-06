@@ -505,7 +505,7 @@ export default function TemplateEditorModal({
               <div className="mb-2">
                 <InlineMeasureSearch
                   fields={fields}
-                  addedKeys={addedKeys}
+                  isExhausted={(field) => addedKeys.has(field.key)}
                   addedCustomLabels={addedCustomLabels}
                   onAddCanonical={handleAddCanonical}
                   onAddCustom={handleAddCustom}

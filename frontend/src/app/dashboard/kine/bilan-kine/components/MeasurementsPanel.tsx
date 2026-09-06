@@ -16,21 +16,26 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import { useToast } from '@/hooks/use-toast';
 import {
   CanonicalField,
-  StructuredData,
+  DocumentMeasurement,
   CanonicalValue,
-  EMPTY_STRUCTURED_DATA,
-  Measurement,
+  Side,
+  Presentation,
   BilanTemplate,
 } from '@/types/bilan';
 import InlineMeasureSearch from './InlineMeasureSearch';
 import ApplyTemplateModal from './ApplyTemplateModal';
+import SideSelector from './SideSelector';
+import PresentationToggle from './PresentationToggle';
 
 interface MeasurementsPanelProps {
-  structuredData: StructuredData;
-  onChange: (data: StructuredData) => void;
+  measurements: DocumentMeasurement[];
+  onChange: (next: DocumentMeasurement[]) => void;
   disabled?: boolean;
+  // Étape Vérification du flux de rédaction : interrupteur Tableau/Littérature visible.
+  showPresentation?: boolean;
 }
 
 const CUSTOM_CATEGORY = 'Mesures libres';
@@ -45,25 +50,24 @@ const isCanonicalFilled = (v: CanonicalValue): boolean => {
 };
 
 interface RowWithIndex {
-  measurement: Measurement;
-  index: number; // index dans data.measurements (clé pour les handlers)
+  measurement: DocumentMeasurement;
+  index: number; // index dans measurements (clé pour les handlers)
   field?: CanonicalField; // résolu pour les canoniques
 }
 
 export default function MeasurementsPanel({
-  structuredData,
+  measurements,
   onChange,
   disabled = false,
+  showPresentation = false,
 }: MeasurementsPanelProps) {
+  const { toast } = useToast();
   const [fields, setFields] = useState<CanonicalField[]>([]);
   const [applyTemplateOpen, setApplyTemplateOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const previouslyCompleteRef = useRef<Set<string>>(new Set());
   const pendingCollapseRef = useRef<Set<string>>(new Set());
-
-  const data = structuredData ?? EMPTY_STRUCTURED_DATA;
-  const measurements = data.measurements;
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -81,80 +85,117 @@ export default function MeasurementsPanel({
 
   const fieldsByKey = useMemo(() => new Map(fields.map((f) => [f.key, f])), [fields]);
 
-  const addedKeys = useMemo(
+  // Identité d'une mesure canonique = (key, side). Un champ latéralisé peut donc
+  // exister deux fois dans measurements (D puis G).
+  const addedCanonical = useMemo(
     () =>
       new Set(
         measurements
           .filter((m) => m.kind === 'canonical')
-          .map((m) => (m as Extract<Measurement, { kind: 'canonical' }>).key),
+          .map((m) => `${(m as Extract<DocumentMeasurement, { kind: 'canonical' }>).key}|${(m as Extract<DocumentMeasurement, { kind: 'canonical' }>).side ?? ''}`),
       ),
     [measurements],
   );
+  const hasCanonical = (key: string, side?: Side) => addedCanonical.has(`${key}|${side ?? ''}`);
+  // Un champ est "complet" (plus proposable) si non latéralisé et présent, ou latéralisé avec D et G présents.
+  const isFieldExhausted = (field: CanonicalField) =>
+    field.lateralized
+      ? hasCanonical(field.key, 'D') && hasCanonical(field.key, 'G')
+      : hasCanonical(field.key) || hasCanonical(field.key, 'D') || hasCanonical(field.key, 'G');
+
   const addedCustomLabels = useMemo(
     () =>
       new Set(
         measurements
           .filter((m) => m.kind === 'custom')
-          .map((m) => (m as Extract<Measurement, { kind: 'custom' }>).label.trim().toLowerCase()),
+          .map((m) => (m as Extract<DocumentMeasurement, { kind: 'custom' }>).label.trim().toLowerCase()),
       ),
     [measurements],
   );
 
   const handleAddCanonical = (field: CanonicalField) => {
-    if (addedKeys.has(field.key)) return;
-    onChange({
-      measurements: [...measurements, { kind: 'canonical', key: field.key, value: null }],
-    });
+    if (isFieldExhausted(field)) return;
+    let side: Side | undefined;
+    if (field.lateralized) side = !hasCanonical(field.key, 'D') ? 'D' : 'G';
+    const presentation: Presentation = field.presentation === 'NARRATIVE' ? 'narrative' : 'table';
+    onChange([
+      ...measurements,
+      { kind: 'canonical', key: field.key, value: null, ...(side ? { side } : {}), presentation, origin: 'manual' },
+    ]);
   };
 
   const handleAddCustom = (label: string) => {
     const trimmed = label.trim();
     if (!trimmed || addedCustomLabels.has(trimmed.toLowerCase())) return;
-    onChange({
-      measurements: [...measurements, { kind: 'custom', label: trimmed, value: '' }],
-    });
+    onChange([...measurements, { kind: 'custom', label: trimmed, value: '', presentation: 'table', origin: 'manual' }]);
   };
 
   const handleRemoveAt = (index: number) => {
-    onChange({ measurements: measurements.filter((_, i) => i !== index) });
+    onChange(measurements.filter((_, i) => i !== index));
   };
 
   const handleChangeAt = (index: number, value: CanonicalValue | string) => {
-    onChange({
-      measurements: measurements.map((m, i) => {
+    onChange(
+      measurements.map((m, i) => {
         if (i !== index) return m;
         if (m.kind === 'canonical') return { ...m, value: value as CanonicalValue };
         return { ...m, value: (value ?? '') as string };
       }),
-    });
+    );
+  };
+
+  const handleSideAt = (index: number, side: Side | undefined) => {
+    const m = measurements[index];
+    if (m.kind !== 'canonical') return;
+    if (hasCanonical(m.key, side) && (m.side ?? undefined) !== side) {
+      toast({ title: 'Déjà saisi', description: 'Cette mesure existe déjà de ce côté', variant: 'destructive' });
+      return;
+    }
+    onChange(
+      measurements.map((x, i) => {
+        if (i !== index || x.kind !== 'canonical') return x;
+        const { side: _previous, ...rest } = x;
+        return side ? { ...rest, side } : rest;
+      }),
+    );
+  };
+
+  const handlePresentationAt = (index: number, presentation: Presentation) => {
+    onChange(measurements.map((x, i) => (i === index ? { ...x, presentation } : x)));
   };
 
   // Application non-destructive d'un template : ajoute les items du template
   // qui ne sont pas déjà dans measurements, à la fin, dans l'ordre du template.
   // Les valeurs déjà saisies dans le bilan en cours ne sont jamais touchées.
   const handleApplyTemplate = (template: BilanTemplate) => {
-    const existingKeys = new Set(addedKeys);
+    const seenKeys = new Set<string>();
     const existingLabels = new Set(addedCustomLabels);
-    const toAdd: Measurement[] = [];
+    const toAdd: DocumentMeasurement[] = [];
     const touchedCategories = new Set<string>();
 
     for (const item of template.items) {
       if (item.kind === 'canonical') {
-        if (existingKeys.has(item.key)) continue;
-        existingKeys.add(item.key);
-        toAdd.push({ kind: 'canonical', key: item.key, value: null });
-        const cat = fieldsByKey.get(item.key)?.category ?? UNKNOWN_CATEGORY;
-        touchedCategories.add(cat);
+        const field = fieldsByKey.get(item.key);
+        if (seenKeys.has(item.key) || (field && isFieldExhausted(field))) continue;
+        seenKeys.add(item.key);
+        toAdd.push({
+          kind: 'canonical',
+          key: item.key,
+          value: null,
+          presentation: field?.presentation === 'NARRATIVE' ? 'narrative' : 'table',
+          origin: 'manual',
+        });
+        touchedCategories.add(field?.category ?? UNKNOWN_CATEGORY);
       } else {
         const labelKey = item.label.trim().toLowerCase();
         if (existingLabels.has(labelKey)) continue;
         existingLabels.add(labelKey);
-        toAdd.push({ kind: 'custom', label: item.label, value: '' });
+        toAdd.push({ kind: 'custom', label: item.label, value: '', presentation: 'table', origin: 'manual' });
         touchedCategories.add(CUSTOM_CATEGORY);
       }
     }
 
-    onChange({ measurements: [...measurements, ...toAdd] });
+    onChange([...measurements, ...toAdd]);
 
     // Une catégorie où on vient d'ajouter des mesures vides ne doit plus être
     // collapsed (sinon le user ne voit pas où ses nouvelles mesures sont arrivées).
@@ -332,6 +373,13 @@ export default function MeasurementsPanel({
     }
   };
 
+  const renderOriginBadge = (origin: DocumentMeasurement['origin']) =>
+    origin !== 'manual' && (
+      <span className="text-[10px] rounded bg-muted px-1 text-muted-foreground shrink-0">
+        {origin === 'extracted' ? 'IA' : 'précédent'}
+      </span>
+    );
+
   const renderRow = (row: RowWithIndex) => {
     const m = row.measurement;
     if (m.kind === 'canonical') {
@@ -357,7 +405,18 @@ export default function MeasurementsPanel({
       return (
         <div key={`row-${row.index}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/40">
           <span className="text-sm font-medium w-36 sm:w-56 shrink-0 truncate">{row.field.label}</span>
+          {row.field.lateralized && (
+            <SideSelector value={m.side} onChange={(s) => handleSideAt(row.index, s)} disabled={disabled} />
+          )}
           {renderCanonicalInput(row.field, m.value, row.index)}
+          {showPresentation && (
+            <PresentationToggle
+              value={m.presentation}
+              onChange={(p) => handlePresentationAt(row.index, p)}
+              disabled={disabled}
+            />
+          )}
+          {renderOriginBadge(m.origin)}
           <Button
             type="button"
             variant="ghost"
@@ -384,6 +443,14 @@ export default function MeasurementsPanel({
           disabled={disabled}
           className="h-8 text-sm flex-1"
         />
+        {showPresentation && (
+          <PresentationToggle
+            value={m.presentation}
+            onChange={(p) => handlePresentationAt(row.index, p)}
+            disabled={disabled}
+          />
+        )}
+        {renderOriginBadge(m.origin)}
         <Button
           type="button"
           variant="ghost"
@@ -441,7 +508,7 @@ export default function MeasurementsPanel({
 
       <InlineMeasureSearch
         fields={fields}
-        addedKeys={addedKeys}
+        isExhausted={isFieldExhausted}
         addedCustomLabels={addedCustomLabels}
         onAddCanonical={handleAddCanonical}
         onAddCustom={handleAddCustom}
@@ -486,7 +553,7 @@ export default function MeasurementsPanel({
                 <AlertDialogFooter>
                   <AlertDialogCancel>Annuler</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => onChange({ measurements: [] })}
+                    onClick={() => onChange([])}
                     className="bg-red-600 hover:bg-red-700"
                   >
                     Tout supprimer
