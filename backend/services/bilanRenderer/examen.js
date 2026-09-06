@@ -5,7 +5,9 @@ const UNKNOWN_CATEGORY = 'Autres';
 
 /**
  * Tableaux de l'examen clinique, une table par catégorie (ordre d'apparition des mesures).
- * Colonnes D/G dès qu'une mesure latéralisée est présente dans la catégorie.
+ * Colonnes D/G dès qu'une mesure latéralisée est présente dans la catégorie ; une mesure non
+ * latéralisée de la même catégorie s'affiche alors sur une cellule unique (colspan="2"), jamais
+ * sous "D" (elle n'a pas de côté).
  * Ignore les mesures narratives et les valeurs non saisies. Retourne '' si rien à afficher.
  */
 function renderExamenHtml(measurements, catalog) {
@@ -27,9 +29,10 @@ function renderExamenHtml(measurements, catalog) {
     if (!field) continue;
     const category = field.category || UNKNOWN_CATEGORY;
     const g = groups.get(category) || { lateral: false, rows: new Map() };
-    const row = g.rows.get(m.key) || { label: field.label, byside: {}, single: null };
+    const row = g.rows.get(m.key) || { label: field.label, byside: {}, single: null, lateral: false };
     if (field.lateralized && m.side) {
       row.byside[m.side] = formatValue(field, m.value);
+      row.lateral = true;
       g.lateral = true;
     } else {
       row.single = formatValue(field, m.value);
@@ -49,8 +52,12 @@ function renderExamenHtml(measurements, catalog) {
     const rows = [...g.rows.values()].map((r) => {
       const label = `<td>${escapeHtml(r.label)}</td>`;
       if (g.lateral) {
-        // Une mesure non latéralisée dans une catégorie latérale s'affiche sur la colonne D (valeur unique)
-        const d = r.byside && r.byside.D ? r.byside.D : r.single;
+        // Une mesure non latéralisée dans une catégorie latérale n'a pas de côté : elle occupe
+        // les deux colonnes (colspan) plutôt que d'être affichée à tort sous "D".
+        if (!r.lateral) {
+          return `<tr>${label}<td class="bilan-val" colspan="2">${escapeHtml(r.single ?? '—')}</td></tr>`;
+        }
+        const d = r.byside && r.byside.D ? r.byside.D : null;
         const gauche = r.byside && r.byside.G ? r.byside.G : null;
         return `<tr>${label}<td class="bilan-val">${d ? escapeHtml(d) : '—'}</td><td class="bilan-val">${gauche ? escapeHtml(gauche) : '—'}</td></tr>`;
       }
