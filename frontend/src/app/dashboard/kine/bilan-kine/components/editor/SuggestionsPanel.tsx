@@ -48,7 +48,7 @@ export default function SuggestionsPanel({ candidates, rejectedCount, measuremen
 
   const confidenceIcon = (n: number) => {
     const cls = n >= 0.85 ? 'text-emerald-600' : n >= 0.6 ? 'text-amber-500' : 'text-muted-foreground';
-    return <Tooltip><TooltipTrigger asChild><span className="inline-flex"><HelpCircle className={`h-3.5 w-3.5 ${cls}`} /></span></TooltipTrigger><TooltipContent>Confiance {Math.round(n * 100)} %</TooltipContent></Tooltip>;
+    return <Tooltip><TooltipTrigger asChild><button type="button" tabIndex={0} aria-label={`Confiance ${Math.round(n * 100)} %`} className="inline-flex p-0 bg-transparent border-0 cursor-default"><HelpCircle className={`h-3.5 w-3.5 ${cls}`} /></button></TooltipTrigger><TooltipContent>Confiance {Math.round(n * 100)} %</TooltipContent></Tooltip>;
   };
 
   return (
