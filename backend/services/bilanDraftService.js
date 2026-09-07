@@ -160,6 +160,7 @@ async function removeBilan({ kineId, bilanId }) {
 
 module.exports = {
   DraftError,
+  PATIENT_SELECT,
   BILAN_TYPES,
   DRAFT_STATUSES,
   createDraft,
