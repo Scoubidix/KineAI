@@ -28,6 +28,8 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
   // État IA, non persisté (spec §9.2) : candidats d'extraction, appel en cours, avertissements de rédaction
   const [candidates, setCandidates] = useState<ExtractionCandidate[] | null>(null);
   const [rejectedCount, setRejectedCount] = useState(0);
+  // Notes telles qu'analysées : pilote « Ré-analyser » (primaire seulement si elles ont changé)
+  const [analyzedNotes, setAnalyzedNotes] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState<AiBusy>(null);
   const [warnings, setWarnings] = useState<SectionWarnings>({});
   // Garde de réentrance : `aiBusy` n'est posé qu'après le flush, une fenêtre où un double clic
@@ -52,6 +54,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
       const r = await extractBilan(record.id);
       setCandidates(r.candidates);
       setRejectedCount(r.rejected);
+      setAnalyzedNotes(record.rawNotes ?? '');
       await goTo('verification');
     } catch (e) { handleAiError(e, 'Analyse impossible'); }
     finally { setAiBusy(null); aiLockRef.current = false; }
@@ -126,7 +129,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
         />
         <BilanStepper step={step} onStep={(s) => { void goTo(s); }} />
         <div className="flex-1 min-h-0">
-          {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('verification')} onAnalyze={() => { void handleAnalyze(); }} analyzing={aiBusy === 'extract'} />}
+          {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('verification')} onAnalyze={() => { void handleAnalyze(); }} analyzing={aiBusy === 'extract'} analyzed={candidates !== null} notesChanged={candidates !== null && (record.rawNotes ?? '') !== (analyzedNotes ?? '')} />}
           {step === 'verification' && <VerificationStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onNext={() => goTo('document')} candidates={candidates} rejectedCount={rejectedCount} onCandidatesChange={setCandidates} onAnalyze={() => { void handleAnalyze(); }} onCompose={() => handleCompose()} aiBusy={aiBusy} />}
           {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('verification')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} />}
         </div>

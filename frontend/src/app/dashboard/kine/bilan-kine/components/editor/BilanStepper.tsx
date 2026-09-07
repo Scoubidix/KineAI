@@ -4,8 +4,8 @@ import { Check } from 'lucide-react';
 
 export type EditorStep = 'capture' | 'verification' | 'document';
 export const STEPS: { key: EditorStep; label: string }[] = [
-  { key: 'capture', label: 'Capture' },
-  { key: 'verification', label: 'Vérification' },
+  { key: 'capture', label: 'Notes' },
+  { key: 'verification', label: 'Mesures' },
   { key: 'document', label: 'Document' },
 ];
 

@@ -18,6 +18,6 @@ export default function ExamenPreview({ bilanId, refreshKey, evolution }: Examen
   }, [bilanId, refreshKey, evolution]);
   if (error) return <p className="text-sm text-destructive p-3">{error}</p>;
   if (html === null) return <div className="flex justify-center p-6"><Loader2 className="h-5 w-5 animate-spin text-[#3899aa]" /></div>;
-  if (html === '') return <p className="text-sm text-muted-foreground italic p-3">Aucune mesure en tableau. Ajoute des mesures à l’étape Vérification.</p>;
+  if (html === '') return <p className="text-sm text-muted-foreground italic p-3">Aucune mesure en tableau. Ajoute des mesures à l’étape Mesures.</p>;
   return <div className="bilan-preview text-sm p-3" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }} />;
 }

@@ -170,7 +170,7 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
         )}
       </div>
       <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2 flex-wrap">
-        <Button variant="ghost" size="sm" onClick={onBack} className="h-9"><ArrowLeft className="h-4 w-4 mr-1" />Vérification</Button>
+        <Button variant="ghost" size="sm" onClick={onBack} className="h-9"><ArrowLeft className="h-4 w-4 mr-1" />Mesures</Button>
         <div className="flex items-center gap-2 ml-auto">
           <Button size="sm" variant="outline" onClick={handleCopy} disabled={busy !== null} className="h-9 rounded-full"><Copy className="h-3.5 w-3.5 sm:mr-1" /><span className="hidden sm:inline">Copier</span></Button>
           <Button size="sm" variant="outline" onClick={handleMail} disabled={busy !== null} className="h-9 rounded-full"><Mail className="h-3.5 w-3.5 sm:mr-1" /><span className="hidden sm:inline">Mail</span></Button>

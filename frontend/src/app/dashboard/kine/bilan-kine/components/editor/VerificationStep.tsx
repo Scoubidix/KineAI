@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { ArrowLeft, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Loader2, Save } from 'lucide-react';
 import MeasurementsPanel from '../MeasurementsPanel';
 import SuggestionsPanel from './SuggestionsPanel';
 import HighlightedNotes from './HighlightedNotes';
+import TemplateEditorModal from '../TemplateEditorModal';
 import { useMinWidth } from './useMinWidth';
-import { emptyBilanDocument, type AiBusy, type DocumentMeasurement, type ExtractionCandidate } from '@/types/bilan';
+import { emptyBilanDocument, type AiBusy, type DocumentMeasurement, type ExtractionCandidate, type TemplateItem } from '@/types/bilan';
 import type { StepProps } from './CaptureStep';
 
 export interface VerificationStepProps extends StepProps {
@@ -30,6 +31,8 @@ export default function VerificationStep({ record, update, disabled, onBack, onN
   const pending = candidates?.length ?? 0;
   const anyText = doc.sections.some((s) => s.text.trim() !== '');
   const setMeasurements = (measurements: DocumentMeasurement[]) => update({ document: { ...doc, measurements } });
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const templateItems = useMemo<TemplateItem[]>(() => doc.measurements.map((m) => (m.kind === 'canonical' ? { kind: 'canonical', key: m.key } : { kind: 'custom', label: m.label })), [doc.measurements]);
 
   // Clic croisé desktop : extrait ↔ suggestion
   const focus = (id: string, target: 'cand' | 'quote') => {
@@ -62,7 +65,10 @@ export default function VerificationStep({ record, update, disabled, onBack, onN
         <SuggestionsPanel candidates={candidates} rejectedCount={rejectedCount} measurements={doc.measurements} onMeasurementsChange={setMeasurements} onCandidatesChange={onCandidatesChange} disabled={disabled} activeId={activeId} onFocusQuote={(id) => focus(id, 'quote')} />
       )}
       <div className="flex flex-col gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">Mesures · côté et présentation</span>
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Mesures · côté et présentation</span>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setSaveTemplateOpen(true)} disabled={disabled || templateItems.length === 0} className="h-7 text-xs"><Save className="h-3 w-3 mr-1" />Sauvegarder le template</Button>
+        </div>
         <MeasurementsPanel measurements={doc.measurements} onChange={setMeasurements} disabled={disabled} showPresentation />
       </div>
     </div>
@@ -86,6 +92,7 @@ export default function VerificationStep({ record, update, disabled, onBack, onN
           <Button onClick={handleGenerateClick} disabled={disabled || !hasNotes} className="btn-teal rounded-full h-9 px-4">{aiBusy === 'compose' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}Générer le bilan <ArrowRight className="h-4 w-4 ml-1" /></Button>
         </div>
       </div>
+      <TemplateEditorModal open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen} mode="private" template={null} initialItems={templateItems} onSaved={() => {}} />
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
