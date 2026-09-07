@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ArrowLeft, Copy, Mail, Download, Check, Eye, Pencil, UserPlus, Loader2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ArrowLeft, Copy, Mail, Download, Check, Eye, Pencil, UserPlus, Loader2, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useMinWidth } from './useMinWidth';
 import SectionCard from './SectionCard';
@@ -32,7 +34,7 @@ export interface DocumentStepProps {
 
 const FLUSH_PENDING_TOAST = { title: 'Sauvegarde en attente, réessaie dans un instant' };
 
-export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack }: DocumentStepProps) {
+export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited }: DocumentStepProps) {
   const wide = useMinWidth(1024);
   const { toast } = useToast();
   const doc = record.document ?? emptyBilanDocument();
@@ -43,7 +45,16 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
   const hasPrevious = (doc.comparison?.previousBilanIds?.length ?? 0) > 0;
   const finalized = record.status === 'ENREGISTRE';
 
-  const setSection = (key: string, text: string) => update({ document: { ...doc, sections: doc.sections.map((s) => (s.key === key ? { ...s, text } : s)) } });
+  const hasNotes = (record.rawNotes ?? '').trim().length > 0;
+  const anyText = doc.sections.some((s) => s.text.trim() !== '');
+  const [composeConfirmOpen, setComposeConfirmOpen] = useState(false);
+  const composeAll = () => { setComposeConfirmOpen(false); void onCompose(); };
+  const handleComposeClick = () => { if (anyText) setComposeConfirmOpen(true); else composeAll(); };
+
+  const setSection = (key: BilanSectionKey, text: string) => {
+    update({ document: { ...doc, sections: doc.sections.map((s) => (s.key === key ? { ...s, text } : s)) } });
+    onSectionEdited(key);
+  };
 
   const withText = async (action: (text: string, title: string) => Promise<void> | void, kind: 'copy' | 'mail') => {
     setBusy(kind);
@@ -104,10 +115,19 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
 
   const sections = (
     <div className="flex flex-col gap-3">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1">Compte-rendu</span>
+      <div className="flex items-center justify-between px-1 gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Compte-rendu</span>
+        <Tooltip>
+          <TooltipTrigger asChild><span><Button variant="outline" size="sm" onClick={handleComposeClick} disabled={disabled || !hasNotes || aiBusy !== null} className="h-7 text-xs rounded-full">{aiBusy === 'compose' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}Rédiger avec l’IA</Button></span></TooltipTrigger>
+          <TooltipContent>{hasNotes ? 'Rédige les 7 sections à partir de tes notes et de tes mesures' : 'Saisis des notes à l’étape Capture pour utiliser l’IA'}</TooltipContent>
+        </Tooltip>
+      </div>
       {BILAN_SECTION_KEYS.map((key) => {
         const s = doc.sections.find((x) => x.key === key);
-        return <SectionCard key={key} sectionKey={key} title={BILAN_SECTION_TITLES[key]} text={s?.text ?? ''} onChange={(t) => setSection(key, t)} disabled={disabled} />;
+        return (
+          <SectionCard key={key} sectionKey={key} title={BILAN_SECTION_TITLES[key]} text={s?.text ?? ''} onChange={(t) => setSection(key, t)} disabled={disabled}
+            canRegenerate={hasNotes} onRegenerate={() => { void onCompose([key]); }} regenerating={aiBusy === key} warning={warnings[key]} onDismissWarning={() => onSectionEdited(key)} />
+        );
       })}
     </div>
   );
@@ -158,6 +178,18 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
           {saveButton}
         </div>
       </div>
+      <AlertDialog open={composeConfirmOpen} onOpenChange={setComposeConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remplacer les sections déjà rédigées ?</AlertDialogTitle>
+            <AlertDialogDescription>La rédaction IA écrit les 7 sections à partir de tes notes et de tes mesures. Les textes actuels seront écrasés.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={composeAll} className="btn-teal">Rédiger</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <BilanPreviewModal open={previewOpen} onOpenChange={setPreviewOpen} bilanId={record.id} evolution={evolution} />
     </div>
   );
