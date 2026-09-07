@@ -76,7 +76,7 @@ export default function SuggestionsPanel({ candidates, rejectedCount, measuremen
                 <>
                   <span className="text-[11px] text-amber-700">Actuellement : {fmt(conflict)}</span>
                   <span className="flex-1" />
-                  <Button size="sm" variant="outline" onClick={() => accept(c)} disabled={disabled} className="h-7 text-xs">Remplacer</Button>
+                  <Button size="sm" variant="outline" onClick={() => accept(c)} disabled={disabled} className="h-7 text-xs">{c.warning === 'out_of_range' ? 'Vider et ressaisir' : 'Remplacer'}</Button>
                   <Button size="sm" variant="ghost" onClick={() => remove(c.id)} disabled={disabled} className="h-7 text-xs">Garder l’actuelle</Button>
                 </>
               ) : (

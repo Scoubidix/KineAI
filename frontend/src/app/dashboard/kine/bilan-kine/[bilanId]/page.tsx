@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,9 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
   const [rejectedCount, setRejectedCount] = useState(0);
   const [aiBusy, setAiBusy] = useState<AiBusy>(null);
   const [warnings, setWarnings] = useState<SectionWarnings>({});
+  // Garde de réentrance : `aiBusy` n'est posé qu'après le flush, une fenêtre où un double clic
+  // lancerait deux appels IA (closure périmée). Le ref, lui, est synchrone.
+  const aiLockRef = useRef(false);
   const FLUSH_PENDING = { title: 'Sauvegarde en attente', description: 'Réessaie dans un instant' };
 
   const handleAiError = (e: unknown, title: string) => {
@@ -41,8 +44,9 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
 
   // Extraction : flush d'abord (le serveur lit les notes en base), puis étape Vérification
   const handleAnalyze = async () => {
-    if (aiBusy) return;
-    if (!(await flush())) { toast(FLUSH_PENDING); return; }
+    if (aiLockRef.current) return;
+    aiLockRef.current = true;
+    if (!(await flush())) { toast(FLUSH_PENDING); aiLockRef.current = false; return; }
     setAiBusy('extract');
     try {
       const r = await extractBilan(record.id);
@@ -50,13 +54,14 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
       setRejectedCount(r.rejected);
       await goTo('verification');
     } catch (e) { handleAiError(e, 'Analyse impossible'); }
-    finally { setAiBusy(null); }
+    finally { setAiBusy(null); aiLockRef.current = false; }
   };
 
   // Rédaction : flush, appel, puis l'état local est remplacé par le bilan renvoyé (sections écrites, statut GENERE)
   const handleCompose = async (sections?: BilanSectionKey[]): Promise<boolean> => {
-    if (aiBusy) return false;
-    if (!(await flush())) { toast(FLUSH_PENDING); return false; }
+    if (aiLockRef.current) return false;
+    aiLockRef.current = true;
+    if (!(await flush())) { toast(FLUSH_PENDING); aiLockRef.current = false; return false; }
     setAiBusy(sections && sections.length === 1 ? sections[0] : 'compose');
     try {
       const r = await composeBilan(record.id, sections);
@@ -69,7 +74,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
       });
       return true;
     } catch (e) { handleAiError(e, 'Rédaction impossible'); return false; }
-    finally { setAiBusy(null); }
+    finally { setAiBusy(null); aiLockRef.current = false; }
   };
 
   const clearWarning = (key: BilanSectionKey) => setWarnings((prev) => { if (!(key in prev)) return prev; const next = { ...prev }; delete next[key]; return next; });

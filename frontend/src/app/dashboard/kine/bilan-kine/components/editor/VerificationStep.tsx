@@ -28,6 +28,7 @@ export default function VerificationStep({ record, update, disabled, onBack, onN
   const [confirmOpen, setConfirmOpen] = useState(false);
   const hasNotes = (record.rawNotes ?? '').trim().length > 0;
   const pending = candidates?.length ?? 0;
+  const anyText = doc.sections.some((s) => s.text.trim() !== '');
   const setMeasurements = (measurements: DocumentMeasurement[]) => update({ document: { ...doc, measurements } });
 
   // Clic croisé desktop : extrait ↔ suggestion
@@ -40,7 +41,7 @@ export default function VerificationStep({ record, update, disabled, onBack, onN
     setConfirmOpen(false);
     if (await onCompose()) onNext();
   };
-  const handleGenerateClick = () => { if (pending > 0) setConfirmOpen(true); else void generate(); };
+  const handleGenerateClick = () => { if (pending > 0 || anyText) setConfirmOpen(true); else void generate(); };
 
   const notes = (
     <div className="flex flex-col gap-2">
@@ -88,8 +89,12 @@ export default function VerificationStep({ record, update, disabled, onBack, onN
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{pending} suggestion{pending > 1 ? 's' : ''} non traitée{pending > 1 ? 's' : ''}</AlertDialogTitle>
-            <AlertDialogDescription>Elles seront ignorées : seules les mesures acceptées entrent dans le bilan. Tu pourras revenir à cette étape ensuite.</AlertDialogDescription>
+            <AlertDialogTitle>{anyText ? 'Remplacer les sections déjà rédigées ?' : `${pending} suggestion${pending > 1 ? 's' : ''} non traitée${pending > 1 ? 's' : ''}`}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {anyText
+                ? `La rédaction IA écrit les 7 sections à partir de tes notes et de tes mesures. Les textes actuels seront écrasés.${pending > 0 ? ' Les suggestions non traitées seront ignorées : seules les mesures acceptées entrent dans le bilan.' : ''}`
+                : 'Elles seront ignorées : seules les mesures acceptées entrent dans le bilan. Tu pourras revenir à cette étape ensuite.'}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Revenir aux suggestions</AlertDialogCancel>

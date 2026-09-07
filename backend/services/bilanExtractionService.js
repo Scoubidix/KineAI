@@ -64,7 +64,7 @@ const EXTRACTION_JSON_SCHEMA = {
             kind: { type: 'string', enum: ['canonical', 'custom'] },
             key: { type: ['string', 'null'] },
             label: { type: ['string', 'null'] },
-            value: { type: ['string', 'number', 'boolean', 'null'] },
+            value: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'null' }] },
             side: { type: ['string', 'null'], enum: ['D', 'G', null] },
             quote: { type: 'string' },
             confidence: { type: 'number' },
@@ -207,6 +207,10 @@ function normalize({ candidates, notes, catalog, document }) {
   return { candidates: out, rejected };
 }
 
+// Un JSON malformé peut contenir un extrait des notes (données de santé) dans le message
+// d'erreur V8 : jamais dans les logs.
+const safeErrorLabel = (err) => (err instanceof SyntaxError ? 'JSON invalide' : err.message);
+
 async function callExtraction(messages) {
   const { content } = await llmService.chatCompletion({ iaType: 'bilan_extract', messages, jsonSchema: EXTRACTION_JSON_SCHEMA });
   return parseExtractionOutput(content);
@@ -234,11 +238,11 @@ async function extractForBilan({ kineId, bilanId }) {
   try {
     output = await callExtraction(messages);
   } catch (err) {
-    logger.warn(`Extraction bilan ${bilanId} : premier essai invalide (${err.message}), nouvel essai`);
+    logger.warn(`Extraction bilan ${bilanId} : premier essai invalide (${safeErrorLabel(err)}), nouvel essai`);
     try {
       output = await callExtraction(messages);
     } catch (err2) {
-      logger.error(`Extraction bilan ${bilanId} : échec après retry (${err2.message})`);
+      logger.error(`Extraction bilan ${bilanId} : échec après retry (${safeErrorLabel(err2)})`);
       throw new DraftError('EXTRACTION_FAILED', 502, 'L’analyse des notes a échoué, réessaie dans un instant');
     }
   }

@@ -112,6 +112,10 @@ function checkNumbers(text, allowed) {
   return numbersIn(text).every((n) => allowed.has(n)) ? null : 'unverified_number';
 }
 
+// Un JSON malformé peut contenir un extrait des notes (données de santé) dans le message
+// d'erreur V8 : jamais dans les logs.
+const safeErrorLabel = (err) => (err instanceof SyntaxError ? 'JSON invalide' : err.message);
+
 async function callCompose(messages, jsonSchema) {
   const { content } = await llmService.chatCompletion({ iaType: 'bilan_compose', messages, jsonSchema });
   return parseComposeOutput(content);
@@ -142,11 +146,11 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
   try {
     output = await callCompose(messages, jsonSchema);
   } catch (err) {
-    logger.warn(`Rédaction bilan ${bilanId} : premier essai invalide (${err.message}), nouvel essai`);
+    logger.warn(`Rédaction bilan ${bilanId} : premier essai invalide (${safeErrorLabel(err)}), nouvel essai`);
     try {
       output = await callCompose(messages, jsonSchema);
     } catch (err2) {
-      logger.error(`Rédaction bilan ${bilanId} : échec après retry (${err2.message})`);
+      logger.error(`Rédaction bilan ${bilanId} : échec après retry (${safeErrorLabel(err2)})`);
       throw new DraftError('COMPOSE_FAILED', 502, 'La rédaction a échoué, réessaie dans un instant');
     }
   }
@@ -176,7 +180,7 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
   try {
     updated = await prisma.bilanKine.update({ where: { ...where, updatedAt: fresh.updatedAt }, data, include: { patient: { select: PATIENT_SELECT } } });
   } catch (err) {
-    if (err && err.code === 'P2025') throw new DraftError('STALE_DRAFT', 409, 'Ce bilan a été modifié pendant la rédaction, recharge-le');
+    if (err && err.code === 'P2025') throw new DraftError('STALE_DRAFT', 409, 'Ce bilan a été modifié pendant la rédaction, recharge-le', { updatedAt: fresh.updatedAt });
     throw err;
   }
 
