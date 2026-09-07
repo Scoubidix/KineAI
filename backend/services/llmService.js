@@ -33,6 +33,16 @@ const GENERATION_CONFIG = {
     openai: { model: 'gpt-4o-mini', max_tokens: 500, temperature: 0.7, presence_penalty: 0, frequency_penalty: 0 },
     mistral: { model: MISTRAL_MODEL, max_tokens: 500, temperature: 0.7, presence_penalty: 0, frequency_penalty: 0 },
   },
+  // Bilan V1 (extraction des mesures / rédaction des sections) : sortie JSON, température 0,
+  // pénalités 0 (on veut une transcription fidèle, pas de la variété lexicale).
+  bilan_extract: {
+    openai: { model: 'gpt-4.1-mini', max_tokens: 4000, temperature: 0, presence_penalty: 0, frequency_penalty: 0 },
+    mistral: { model: MISTRAL_MODEL, max_tokens: 4000, temperature: 0, presence_penalty: 0, frequency_penalty: 0 },
+  },
+  bilan_compose: {
+    openai: { model: 'gpt-4.1-mini', max_tokens: 3000, temperature: 0, presence_penalty: 0, frequency_penalty: 0 },
+    mistral: { model: MISTRAL_MODEL, max_tokens: 3000, temperature: 0, presence_penalty: 0, frequency_penalty: 0 },
+  },
   default: {
     openai: { model: 'gpt-4o-mini', max_tokens: 1000, temperature: 0.7 },
     mistral: { model: MISTRAL_MODEL, max_tokens: 1000, temperature: 0.7 },
@@ -68,13 +78,16 @@ function resolveConfig(iaType, provider) {
 /**
  * Génère une complétion de chat via le provider de génération actif.
  * @param {Object} p
- * @param {string} p.iaType - clé de GENERATION_CONFIG (basique, biblio, clinique, admin, followup, admin_message)
+ * @param {string} p.iaType - clé de GENERATION_CONFIG (basique, biblio, clinique, admin, followup, admin_message, bilan_extract, bilan_compose)
  * @param {Array} p.messages - messages OpenAI-style ({role, content})
  * @param {boolean} [p.stream=false] - active le streaming
  * @param {Function} [p.onToken] - callback(delta) appelé par token en mode streaming
+ * @param {{name: string, schema: object}} [p.jsonSchema] - sortie JSON contrainte : json_schema strict (OpenAI)
+ *   ou json_object (Mistral). L'appelant valide toujours le JSON reçu (Zod). Incompatible avec stream.
  * @returns {Promise<{content: string, usage: object|null, model: string, provider: string}>}
  */
-async function chatCompletion({ iaType, messages, stream = false, onToken }) {
+async function chatCompletion({ iaType, messages, stream = false, onToken, jsonSchema }) {
+  if (jsonSchema && stream) throw new Error('jsonSchema est incompatible avec le streaming');
   const provider = resolveProvider();
   const client = provider === 'mistral' ? getMistralClient() : openaiClient;
   const cfg = resolveConfig(iaType, provider);
@@ -89,6 +102,12 @@ async function chatCompletion({ iaType, messages, stream = false, onToken }) {
     presence_penalty: cfg.presence_penalty ?? 0.1,
     frequency_penalty: cfg.frequency_penalty ?? 0.1,
   };
+  if (jsonSchema) {
+    // Mistral (API compatible OpenAI) ne supporte pas json_schema strict : json_object + Zod côté appelant
+    params.response_format = provider === 'mistral'
+      ? { type: 'json_object' }
+      : { type: 'json_schema', json_schema: { name: jsonSchema.name, strict: true, schema: jsonSchema.schema } };
+  }
 
   if (!stream) {
     const completion = await client.chat.completions.create(params);
