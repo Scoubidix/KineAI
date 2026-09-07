@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "fields": [
     {
       "key": "eva_repos",
@@ -511,7 +511,12 @@
       "type": "BOOLEAN",
       "category": "Genou",
       "order": 9,
-      "aliases": [],
+      "aliases": [
+        "interligne articulaire",
+        "interligne",
+        "palpation interligne",
+        "douleur interligne"
+      ],
       "lateralized": true,
       "presentation": "TABLE"
     },
@@ -969,7 +974,13 @@
       "type": "TEXT",
       "category": "Cicatrice/Trophicité",
       "order": 6,
-      "aliases": [],
+      "aliases": [
+        "trophicité",
+        "trophicite",
+        "troubles trophiques",
+        "état cutané",
+        "etat cutane"
+      ],
       "lateralized": false,
       "presentation": "NARRATIVE"
     },
@@ -1098,7 +1109,13 @@
       "unit": "°",
       "rangeMin": 0,
       "rangeMax": 80,
-      "aliases": [],
+      "aliases": [
+        "rotation cervicale d",
+        "rotation cervicale dt",
+        "rotation cou droite",
+        "rotation tête droite",
+        "rotation tete droite"
+      ],
       "lateralized": false,
       "presentation": "TABLE"
     },
@@ -1111,7 +1128,13 @@
       "unit": "°",
       "rangeMin": 0,
       "rangeMax": 80,
-      "aliases": [],
+      "aliases": [
+        "rotation cervicale g",
+        "rotation cervicale gche",
+        "rotation cou gauche",
+        "rotation tête gauche",
+        "rotation tete gauche"
+      ],
       "lateralized": false,
       "presentation": "TABLE"
     },
@@ -1124,7 +1147,13 @@
       "unit": "°",
       "rangeMin": 0,
       "rangeMax": 45,
-      "aliases": [],
+      "aliases": [
+        "inclinaison cervicale d",
+        "inclinaison latérale droite",
+        "inclinaison laterale droite",
+        "latéroflexion cervicale droite",
+        "lateroflexion droite"
+      ],
       "lateralized": false,
       "presentation": "TABLE"
     },
@@ -1137,7 +1166,13 @@
       "unit": "°",
       "rangeMin": 0,
       "rangeMax": 45,
-      "aliases": [],
+      "aliases": [
+        "inclinaison cervicale g",
+        "inclinaison latérale gauche",
+        "inclinaison laterale gauche",
+        "latéroflexion cervicale gauche",
+        "lateroflexion gauche"
+      ],
       "lateralized": false,
       "presentation": "TABLE"
     },
@@ -1600,7 +1635,12 @@
         "4/5",
         "5/5"
       ],
-      "aliases": [],
+      "aliases": [
+        "quadriceps",
+        "quadri",
+        "force quadriceps",
+        "cotation quadriceps"
+      ],
       "lateralized": true,
       "presentation": "TABLE"
     },
@@ -1618,7 +1658,12 @@
         "4/5",
         "5/5"
       ],
-      "aliases": [],
+      "aliases": [
+        "ischio-jambiers",
+        "ischios",
+        "ischio jambiers",
+        "force ischios"
+      ],
       "lateralized": true,
       "presentation": "TABLE"
     },
@@ -1636,7 +1681,12 @@
         "4/5",
         "5/5"
       ],
-      "aliases": [],
+      "aliases": [
+        "moyen fessier",
+        "moyen glutéal",
+        "moyen gluteal",
+        "abducteurs de hanche"
+      ],
       "lateralized": true,
       "presentation": "TABLE"
     },
@@ -1654,7 +1704,12 @@
         "4/5",
         "5/5"
       ],
-      "aliases": [],
+      "aliases": [
+        "grand fessier",
+        "grand glutéal",
+        "grand gluteal",
+        "extenseurs de hanche"
+      ],
       "lateralized": true,
       "presentation": "TABLE"
     },
@@ -1672,7 +1727,13 @@
         "4/5",
         "5/5"
       ],
-      "aliases": [],
+      "aliases": [
+        "psoas",
+        "ilio-psoas",
+        "iliopsoas",
+        "fléchisseurs de hanche",
+        "flechisseurs de hanche"
+      ],
       "lateralized": true,
       "presentation": "TABLE"
     },
@@ -1690,7 +1751,13 @@
         "4/5",
         "5/5"
       ],
-      "aliases": [],
+      "aliases": [
+        "tibial antérieur",
+        "tibial anterieur",
+        "releveurs",
+        "releveur du pied",
+        "jambier antérieur"
+      ],
       "lateralized": true,
       "presentation": "TABLE"
     },
@@ -1708,7 +1775,13 @@
         "4/5",
         "5/5"
       ],
-      "aliases": [],
+      "aliases": [
+        "fibulaires",
+        "éverseurs",
+        "everseurs",
+        "péroniers",
+        "peroniers"
+      ],
       "lateralized": true,
       "presentation": "TABLE"
     },
@@ -1726,7 +1799,13 @@
         "4/5",
         "5/5"
       ],
-      "aliases": [],
+      "aliases": [
+        "triceps sural",
+        "mollet",
+        "gastrocnémiens",
+        "gastrocnemiens",
+        "soléaire"
+      ],
       "lateralized": true,
       "presentation": "TABLE"
     },
@@ -1761,7 +1840,12 @@
         "4/5",
         "5/5"
       ],
-      "aliases": [],
+      "aliases": [
+        "deltoïde",
+        "deltoide",
+        "force deltoïde",
+        "abducteurs d'épaule"
+      ],
       "lateralized": true,
       "presentation": "TABLE"
     },
@@ -1779,7 +1863,12 @@
         "4/5",
         "5/5"
       ],
-      "aliases": [],
+      "aliases": [
+        "biceps brachial",
+        "biceps",
+        "fléchisseurs du coude",
+        "flechisseurs du coude"
+      ],
       "lateralized": true,
       "presentation": "TABLE"
     },
@@ -1797,7 +1886,11 @@
         "4/5",
         "5/5"
       ],
-      "aliases": [],
+      "aliases": [
+        "triceps brachial",
+        "triceps",
+        "extenseurs du coude"
+      ],
       "lateralized": true,
       "presentation": "TABLE"
     },
