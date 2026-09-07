@@ -35,39 +35,50 @@ const latestOf = <T extends { createdAt: string }>(items: T[]): T | undefined =>
 
 /**
  * Bilan de référence d'un bilan de suivi (patient rattaché, type ≠ INITIAL) :
- * - si `document.comparison` existe : le plus récent des bilans sélectionnés ;
- * - sinon : le dernier bilan ENREGISTRE du patient, et `onAutoSelect` est appelé une seule fois
- *   pour que l'étape pose `comparison` et pré-remplisse les lignes.
+ * - si `document.comparison` existe : le plus récent des bilans sélectionnés (peut être vide,
+ *   sélection volontairement vidée par le kiné → aucune référence) ;
+ * - sinon (`hasComparison` faux) : le dernier bilan ENREGISTRE du patient, et `onAutoSelect` est
+ *   appelé une seule fois pour que l'étape pose `comparison` et pré-remplisse les lignes.
  */
-export function usePreviousReference(args: { patientId: number | null; type: BilanType; excludeId: number; comparisonIds: number[] | undefined; onAutoSelect: (ref: ReferenceBilan) => void }) {
-  const { patientId, type, excludeId, comparisonIds, onAutoSelect } = args;
+export function usePreviousReference(args: { patientId: number | null; type: BilanType; excludeId: number; hasComparison: boolean; comparisonIds: number[] | undefined; onAutoSelect: (ref: ReferenceBilan) => void }) {
+  const { patientId, type, excludeId, hasComparison, comparisonIds, onAutoSelect } = args;
   const [reference, setReference] = useState<ReferenceBilan | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [knownKeys, setKnownKeys] = useState<Set<string> | null>(null);
   const autoDoneRef = useRef(false);
   const onAutoSelectRef = useRef(onAutoSelect);
   onAutoSelectRef.current = onAutoSelect;
   const idsKey = (comparisonIds ?? []).join(',');
 
   useEffect(() => {
-    if (!patientId || type === 'INITIAL') { setReference(null); return; }
+    if (!patientId || type === 'INITIAL') { setReference(null); setLoading(false); return; }
     let cancelled = false;
     setLoading(true);
+    setError(false);
     (async () => {
-      const list = await fetchJson<{ bilans: BilanSummary[] }>(`${API}/api/patients/${patientId}/bilans`);
-      if (!list || cancelled) return;
       const ids = idsKey ? idsKey.split(',').map(Number) : [];
+      if (hasComparison && ids.length === 0) { if (!cancelled) setReference(null); return; }
+      const [list, fieldsResult] = await Promise.all([
+        fetchJson<{ bilans: BilanSummary[] }>(`${API}/api/patients/${patientId}/bilans`),
+        fetchJson<{ fields: { key: string }[] }>(`${API}/api/bilan-fields`),
+      ]);
+      if (cancelled) return;
+      if (fieldsResult) setKnownKeys(new Set(fieldsResult.fields.map((f) => f.key)));
+      if (!list) { setError(true); return; }
       const others = list.bilans.filter((b) => b.id !== excludeId);
       const pool = ids.length ? others.filter((b) => ids.includes(b.id)) : others.filter((b) => b.status === 'ENREGISTRE');
       const latest = latestOf(pool);
-      if (!latest) { if (!cancelled) setReference(null); return; }
+      if (!latest) { setReference(null); return; }
       const ref = await fetchReference(patientId, latest);
-      if (cancelled || !ref) return;
+      if (cancelled) return;
+      if (!ref) { setError(true); return; }
       setReference(ref);
-      if (!ids.length && !autoDoneRef.current) { autoDoneRef.current = true; onAutoSelectRef.current(ref); }
+      if (!hasComparison && !ids.length && !autoDoneRef.current) { autoDoneRef.current = true; onAutoSelectRef.current(ref); }
     })().finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [patientId, type, excludeId, idsKey]);
+  }, [patientId, type, excludeId, hasComparison, idsKey]);
 
   const previousValues = useMemo(() => (reference ? toPreviousValues(reference.measurements) : undefined), [reference]);
-  return { reference, loading, previousValues };
+  return { reference, loading, error, previousValues, knownKeys };
 }

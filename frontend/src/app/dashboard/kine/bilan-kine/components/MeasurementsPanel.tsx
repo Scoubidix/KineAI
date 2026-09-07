@@ -462,7 +462,7 @@ export default function MeasurementsPanel({
     return String(v);
   };
   const renderPrevious = (m: DocumentMeasurement, unit?: string | null) => {
-    const v = previousValues?.get(measurementIdentity(m));
+    const v = previousValues?.get(measurementIdentity(m)) ?? (m.kind === 'canonical' && m.side ? previousValues?.get(`c:${m.key}:`) : undefined);
     return v === undefined ? null : <span title="Valeur du bilan de référence" className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">préc. {formatPrevious(v, unit)}</span>;
   };
 

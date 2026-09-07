@@ -73,11 +73,14 @@ export function findQuoteRanges(notes: string, quotes: { id: string; quote: stri
 /**
  * Lignes du bilan de référence absentes du document, ajoutées VIDES (origine « previous ») :
  * le kiné ressaisit la mesure du jour, la valeur antérieure s'affiche à côté de la ligne.
+ * `knownKeys`, si fourni, filtre les lignes canoniques dont la clé n'existe plus au catalogue
+ * (le validateur serveur rejette toute clé inconnue) ; les lignes libres passent toujours.
  */
-export function addReferenceRows(current: DocumentMeasurement[], reference: DocumentMeasurement[]): DocumentMeasurement[] {
+export function addReferenceRows(current: DocumentMeasurement[], reference: DocumentMeasurement[], knownKeys?: Set<string>): DocumentMeasurement[] {
   const seen = new Set(current.map(measurementIdentity));
   const added: DocumentMeasurement[] = [];
   for (const m of reference) {
+    if (m.kind === 'canonical' && knownKeys && !knownKeys.has(m.key)) continue;
     const id = measurementIdentity(m);
     if (seen.has(id)) continue;
     seen.add(id);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -38,19 +38,37 @@ export default function VerificationStep({ record, update, disabled, onBack, onN
   const templateItems = useMemo<TemplateItem[]>(() => doc.measurements.map((m) => (m.kind === 'canonical' ? { kind: 'canonical', key: m.key } : { kind: 'custom', label: m.label })), [doc.measurements]);
   const [compareOpen, setCompareOpen] = useState(false);
   const isFollowUp = !!record.patientId && record.type !== 'INITIAL';
-  // Pose la sélection (évolution PDF) et ajoute les lignes de la référence, vides, à ressaisir
+  // Pose la sélection (évolution PDF) et ajoute les lignes de la référence, vides, à ressaisir.
+  // knownKeys null (catalogue non chargé) → aucune ligne canonique ajoutée (Set vide), les
+  // lignes libres passent toujours ; comparison est posé dans tous les cas.
   const applyReference = (ref: ReferenceBilan, ids: number[]) =>
-    update({ document: { ...doc, measurements: addReferenceRows(doc.measurements, ref.measurements), comparison: { previousBilanIds: ids } } });
-  const { reference, loading: referenceLoading, previousValues } = usePreviousReference({
-    patientId: record.patientId, type: record.type, excludeId: record.id, comparisonIds: doc.comparison?.previousBilanIds,
+    update({ document: { ...doc, measurements: addReferenceRows(doc.measurements, ref.measurements, knownKeys ?? new Set()), comparison: { previousBilanIds: ids } } });
+  const { reference, loading: referenceLoading, error: referenceError, previousValues, knownKeys } = usePreviousReference({
+    patientId: record.patientId, type: record.type, excludeId: record.id, hasComparison: doc.comparison !== undefined, comparisonIds: doc.comparison?.previousBilanIds,
     onAutoSelect: (ref) => applyReference(ref, [ref.id]),
   });
   const handleCompareSelect = (bilans: SelectedBilan[]) => {
-    if (bilans.length === 0) { update({ document: { ...doc, comparison: undefined } }); return; }
+    if (bilans.length === 0) {
+      update({
+        document: {
+          ...doc,
+          comparison: { previousBilanIds: [] },
+          measurements: doc.measurements.filter((m) => !(m.origin === 'previous' && (m.value === null || m.value === ''))),
+        },
+      });
+      return;
+    }
     const latest = [...bilans].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
     applyReference({ id: latest.id, type: latest.type, createdAt: latest.createdAt, measurements: latest.measurements }, bilans.map((b) => b.id));
   };
   const extraCount = Math.max((doc.comparison?.previousBilanIds?.length ?? 1) - 1, 0);
+
+  // Bilan repassé en INITIAL : la comparaison n'a plus de sens, on la retire (les lignes déjà
+  // ajoutées restent, le kiné les retire s'il veut).
+  useEffect(() => {
+    if (record.type === 'INITIAL' && doc.comparison !== undefined) update({ document: { ...doc, comparison: undefined } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [record.type]);
 
   // Clic croisé desktop : extrait ↔ suggestion
   const focus = (id: string, target: 'cand' | 'quote') => {
@@ -91,6 +109,7 @@ export default function VerificationStep({ record, update, disabled, onBack, onN
           <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground px-1">
             <History className="h-3.5 w-3.5 text-[#3899aa]" />
             {referenceLoading ? <span>Recherche du bilan de référence…</span>
+              : referenceError ? <span>Bilans antérieurs indisponibles pour le moment</span>
               : reference ? <span>Référence : {BILAN_TYPE_LABELS[reference.type]} du {new Date(reference.createdAt).toLocaleDateString('fr-FR')}{extraCount > 0 && ` (+${extraCount} pour l’évolution)`}</span>
               : <span>Aucun bilan antérieur enregistré pour ce patient</span>}
             <Button type="button" variant="link" size="sm" onClick={() => setCompareOpen(true)} disabled={disabled} className="h-6 px-1 text-xs">{reference ? 'Changer' : 'Choisir'}</Button>
