@@ -5,6 +5,8 @@ const { PRINT_CSS } = require('../services/bilanRenderer');
 const { generatePdfBuffer, PDF_ERROR_CODES } = require('../services/pdfService');
 const { sanitizeId } = require('../utils/logSanitizer');
 const draftService = require('../services/bilanDraftService');
+const extractionService = require('../services/bilanExtractionService');
+const composeService = require('../services/bilanComposeService');
 
 /**
  * GET /api/bilans/patients-with-bilans
@@ -245,5 +247,33 @@ exports.deleteBilan = async (req, res) => {
     res.json({ success: true, deleted });
   } catch (err) {
     sendDraftError(res, err, 'suppression du bilan');
+  }
+};
+
+/** POST /api/bilans/:id/extract — candidats mesures depuis les notes (rien n'est écrit) */
+exports.extractBilan = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const { candidates, rejected } = await extractionService.extractForBilan({ kineId, bilanId });
+    res.json({ success: true, candidates, rejected });
+  } catch (err) {
+    sendDraftError(res, err, 'analyse des notes');
+  }
+};
+
+/** POST /api/bilans/:id/compose — rédaction des sections (toutes ou celles demandées) */
+exports.composeBilan = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const { bilan, warnings } = await composeService.composeForBilan({ kineId, bilanId, sections: req.body.sections, uid: req.uid });
+    res.json({ success: true, bilan, warnings });
+  } catch (err) {
+    sendDraftError(res, err, 'rédaction du bilan');
   }
 };
