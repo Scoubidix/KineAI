@@ -4,13 +4,16 @@ import React, { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { ArrowLeft, ArrowRight, Sparkles, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Loader2, Save, History } from 'lucide-react';
 import MeasurementsPanel from '../MeasurementsPanel';
 import SuggestionsPanel from './SuggestionsPanel';
 import HighlightedNotes from './HighlightedNotes';
 import TemplateEditorModal from '../TemplateEditorModal';
+import CompareWithPreviousModal, { type SelectedBilan } from '../CompareWithPreviousModal';
 import { useMinWidth } from './useMinWidth';
-import { emptyBilanDocument, type AiBusy, type DocumentMeasurement, type ExtractionCandidate, type TemplateItem } from '@/types/bilan';
+import { addReferenceRows } from './suggestions';
+import { usePreviousReference, type ReferenceBilan } from './usePreviousReference';
+import { emptyBilanDocument, BILAN_TYPE_LABELS, type AiBusy, type DocumentMeasurement, type ExtractionCandidate, type TemplateItem } from '@/types/bilan';
 import type { StepProps } from './CaptureStep';
 
 export interface VerificationStepProps extends StepProps {
@@ -33,6 +36,21 @@ export default function VerificationStep({ record, update, disabled, onBack, onN
   const setMeasurements = (measurements: DocumentMeasurement[]) => update({ document: { ...doc, measurements } });
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const templateItems = useMemo<TemplateItem[]>(() => doc.measurements.map((m) => (m.kind === 'canonical' ? { kind: 'canonical', key: m.key } : { kind: 'custom', label: m.label })), [doc.measurements]);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const isFollowUp = !!record.patientId && record.type !== 'INITIAL';
+  // Pose la sélection (évolution PDF) et ajoute les lignes de la référence, vides, à ressaisir
+  const applyReference = (ref: ReferenceBilan, ids: number[]) =>
+    update({ document: { ...doc, measurements: addReferenceRows(doc.measurements, ref.measurements), comparison: { previousBilanIds: ids } } });
+  const { reference, loading: referenceLoading, previousValues } = usePreviousReference({
+    patientId: record.patientId, type: record.type, excludeId: record.id, comparisonIds: doc.comparison?.previousBilanIds,
+    onAutoSelect: (ref) => applyReference(ref, [ref.id]),
+  });
+  const handleCompareSelect = (bilans: SelectedBilan[]) => {
+    if (bilans.length === 0) { update({ document: { ...doc, comparison: undefined } }); return; }
+    const latest = [...bilans].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    applyReference({ id: latest.id, type: latest.type, createdAt: latest.createdAt, measurements: latest.measurements }, bilans.map((b) => b.id));
+  };
+  const extraCount = Math.max((doc.comparison?.previousBilanIds?.length ?? 1) - 1, 0);
 
   // Clic croisé desktop : extrait ↔ suggestion
   const focus = (id: string, target: 'cand' | 'quote') => {
@@ -69,7 +87,16 @@ export default function VerificationStep({ record, update, disabled, onBack, onN
           <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Mesures · côté et présentation</span>
           <Button type="button" variant="ghost" size="sm" onClick={() => setSaveTemplateOpen(true)} disabled={disabled || templateItems.length === 0} className="h-7 text-xs"><Save className="h-3 w-3 mr-1" />Sauvegarder le template</Button>
         </div>
-        <MeasurementsPanel measurements={doc.measurements} onChange={setMeasurements} disabled={disabled} showPresentation />
+        {isFollowUp && (
+          <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground px-1">
+            <History className="h-3.5 w-3.5 text-[#3899aa]" />
+            {referenceLoading ? <span>Recherche du bilan de référence…</span>
+              : reference ? <span>Référence : {BILAN_TYPE_LABELS[reference.type]} du {new Date(reference.createdAt).toLocaleDateString('fr-FR')}{extraCount > 0 && ` (+${extraCount} pour l’évolution)`}</span>
+              : <span>Aucun bilan antérieur enregistré pour ce patient</span>}
+            <Button type="button" variant="link" size="sm" onClick={() => setCompareOpen(true)} disabled={disabled} className="h-6 px-1 text-xs">{reference ? 'Changer' : 'Choisir'}</Button>
+          </div>
+        )}
+        <MeasurementsPanel measurements={doc.measurements} onChange={setMeasurements} disabled={disabled} showPresentation previousValues={previousValues} />
       </div>
     </div>
   );
@@ -93,6 +120,9 @@ export default function VerificationStep({ record, update, disabled, onBack, onN
         </div>
       </div>
       <TemplateEditorModal open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen} mode="private" template={null} initialItems={templateItems} onSaved={() => {}} />
+      {record.patientId && (
+        <CompareWithPreviousModal open={compareOpen} onOpenChange={setCompareOpen} patientId={record.patientId} excludeId={record.id} initialSelectedIds={doc.comparison?.previousBilanIds ?? []} onSelect={handleCompareSelect} />
+      )}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

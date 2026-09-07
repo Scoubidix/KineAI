@@ -29,6 +29,7 @@ import InlineMeasureSearch from './InlineMeasureSearch';
 import ApplyTemplateModal from './ApplyTemplateModal';
 import SideSelector from './SideSelector';
 import PresentationToggle from './PresentationToggle';
+import { measurementIdentity } from './editor/suggestions';
 
 interface MeasurementsPanelProps {
   measurements: DocumentMeasurement[];
@@ -36,6 +37,8 @@ interface MeasurementsPanelProps {
   disabled?: boolean;
   // Étape Vérification du flux de rédaction : interrupteur Tableau/Littérature visible.
   showPresentation?: boolean;
+  /** Bilan de suivi : valeur du bilan de référence par identité de mesure, affichée « préc. … » */
+  previousValues?: Map<string, CanonicalValue>;
 }
 
 const CUSTOM_CATEGORY = 'Mesures libres';
@@ -60,6 +63,7 @@ export default function MeasurementsPanel({
   onChange,
   disabled = false,
   showPresentation = false,
+  previousValues,
 }: MeasurementsPanelProps) {
   const { toast } = useToast();
   const [fields, setFields] = useState<CanonicalField[]>([]);
@@ -452,6 +456,16 @@ export default function MeasurementsPanel({
       </span>
     );
 
+  const formatPrevious = (v: CanonicalValue, unit?: string | null): string => {
+    if (typeof v === 'boolean') return v ? 'Positif' : 'Négatif';
+    if (typeof v === 'number') return unit ? (unit.startsWith('/') ? `${v}${unit}` : `${v} ${unit}`) : String(v);
+    return String(v);
+  };
+  const renderPrevious = (m: DocumentMeasurement, unit?: string | null) => {
+    const v = previousValues?.get(measurementIdentity(m));
+    return v === undefined ? null : <span title="Valeur du bilan de référence" className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">préc. {formatPrevious(v, unit)}</span>;
+  };
+
   const renderRow = (row: RowWithIndex) => {
     const m = row.measurement;
     if (m.kind === 'canonical') {
@@ -481,6 +495,7 @@ export default function MeasurementsPanel({
             <SideSelector value={m.side} onChange={(s) => handleSideAt(row.index, s)} disabled={disabled} />
           )}
           {renderCanonicalInput(row.field, m.value, row.index)}
+          {renderPrevious(m, row.field.unit)}
           {showPresentation && (
             <PresentationToggle
               value={m.presentation}
@@ -515,6 +530,7 @@ export default function MeasurementsPanel({
           disabled={disabled}
           className="h-8 text-sm flex-1"
         />
+        {renderPrevious(m)}
         {showPresentation && (
           <PresentationToggle
             value={m.presentation}
