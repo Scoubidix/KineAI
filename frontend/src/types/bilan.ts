@@ -91,6 +91,38 @@ export type BilanPatch = Partial<Pick<BilanRecord, 'rawNotes' | 'motif' | 'type'
 
 export type CanonicalFieldType = 'NUMERIC' | 'BOOLEAN' | 'TEXT' | 'ENUM';
 
+// ==================== IA (plan 3) ====================
+
+/** Candidat renvoyé par POST /api/bilans/:id/extract, déjà normalisé côté serveur (jamais écrit sans validation). */
+export interface ExtractionCandidate {
+  /** Même identité que les mesures : `c:<key>:<side|''>` ou `x:<label normalisé>` */
+  id: string;
+  kind: 'canonical' | 'custom';
+  key?: string;
+  label: string;
+  fieldType: CanonicalFieldType;
+  unit: string | null;
+  lateralized: boolean;
+  value: CanonicalValue;
+  side: Side | null;
+  presentation: Presentation;
+  /** Extrait exact des notes qui justifie la valeur */
+  quote: string;
+  confidence: number;
+  status: 'new' | 'conflict';
+  existingValue?: CanonicalValue;
+  warning?: 'out_of_range';
+}
+
+export interface ExtractionResult { candidates: ExtractionCandidate[]; rejected: number }
+
+export type SectionWarnings = Partial<Record<BilanSectionKey, 'unverified_number'>>;
+
+export interface ComposeResult { bilan: BilanRecord; warnings: SectionWarnings }
+
+/** Appel IA en cours dans l'éditeur : extraction, rédaction complète, ou régénération d'une section */
+export type AiBusy = null | 'extract' | 'compose' | BilanSectionKey;
+
 export interface CanonicalField {
   id: number;
   key: string;

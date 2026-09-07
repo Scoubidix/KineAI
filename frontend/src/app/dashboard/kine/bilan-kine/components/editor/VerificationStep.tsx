@@ -8,9 +8,19 @@ import { ArrowLeft, ArrowRight, Sparkles, Info } from 'lucide-react';
 import MeasurementsPanel from '../MeasurementsPanel';
 import { useMinWidth } from './useMinWidth';
 import { emptyBilanDocument, type DocumentMeasurement } from '@/types/bilan';
+import type { AiBusy, ExtractionCandidate } from '@/types/bilan';
 import type { StepProps } from './CaptureStep';
 
-export default function VerificationStep({ record, update, disabled, onBack, onNext }: StepProps) {
+export interface VerificationStepProps extends StepProps {
+  candidates: ExtractionCandidate[] | null; // null = aucune analyse lancée
+  rejectedCount: number;
+  onCandidatesChange: (next: ExtractionCandidate[]) => void;
+  onAnalyze: () => void;
+  onCompose: () => Promise<boolean>; // true si rédigé → l'étape passe à Document
+  aiBusy: AiBusy;
+}
+
+export default function VerificationStep({ record, update, disabled, onBack, onNext }: VerificationStepProps) {
   const wide = useMinWidth(1024);
   const doc = record.document ?? emptyBilanDocument();
   // Met à jour les mesures du document

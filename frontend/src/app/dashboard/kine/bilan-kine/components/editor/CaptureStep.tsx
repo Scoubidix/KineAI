@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Search, History, Save, PenLine, Mic, Disc, ArrowRight } from 'lucide-react';
+import { Search, History, Save, PenLine, Mic, Disc, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
 import MeasurementsPanel from '../MeasurementsPanel';
 import TemplateEditorModal from '../TemplateEditorModal';
 import CompareWithPreviousModal, { type SelectedBilan } from '../CompareWithPreviousModal';
@@ -36,13 +36,16 @@ const PLACEHOLDER = `Note tes observations en vrac...
 
 Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. ATCD : hernie discale L4-L5 opérée 2018. Douleur bas du dos irradiant fesse droite, EVA 5/10 repos 7/10 effort. Flexion lombaire limitée 40°, Lasègue négatif, paravertébraux contracturés...`;
 
-export default function CaptureStep({ record, update, disabled, onNext }: StepProps) {
+export interface CaptureStepProps extends StepProps { onAnalyze: () => void; analyzing: boolean }
+
+export default function CaptureStep({ record, update, disabled, onNext, onAnalyze, analyzing }: CaptureStepProps) {
   const wide = useMinWidth(1024);
   const doc = record.document ?? emptyBilanDocument();
   const [compareOpen, setCompareOpen] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [previous, setPrevious] = useState<SelectedBilan[]>([]);
   const notesLength = (record.rawNotes ?? '').length;
+  const hasNotes = (record.rawNotes ?? '').trim().length > 0;
 
   const templateItems = useMemo<TemplateItem[]>(() => doc.measurements.map((m) => (m.kind === 'canonical' ? { kind: 'canonical', key: m.key } : { kind: 'custom', label: m.label })), [doc.measurements]);
   const filledCount = doc.measurements.filter((m) => m.value !== null && m.value !== '' ).length;
@@ -123,8 +126,13 @@ export default function CaptureStep({ record, update, disabled, onNext }: StepPr
         )}
       </div>
       <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2">
-        <span className="text-[11px] text-muted-foreground hidden sm:inline">Saisis tes notes et tes mesures, puis vérifie avant de rédiger</span>
-        <Button onClick={onNext} disabled={disabled} className="btn-teal rounded-full px-5 h-9 ml-auto">Vérifier <ArrowRight className="h-4 w-4 ml-1" /></Button>
+        <span className="text-[11px] text-muted-foreground hidden sm:inline">L’analyse repère les tests et mesures cités dans tes notes ; tu valides ensuite</span>
+        <div className="flex items-center gap-2 ml-auto">
+          <Button variant="ghost" size="sm" onClick={onNext} disabled={disabled} className="h-9">Passer sans analyser</Button>
+          <Button onClick={onAnalyze} disabled={disabled || !hasNotes} className="btn-teal rounded-full px-5 h-9">
+            {analyzing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}Analyser les notes <ArrowRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
       </div>
 
       <TemplateEditorModal open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen} mode="private" template={null} initialItems={templateItems} onSaved={() => {}} />

@@ -14,10 +14,21 @@ import BilanPreviewModal from './BilanPreviewModal';
 import PatientCombobox from '../PatientCombobox';
 import { attachPatient, finalizeBilan, ApiError } from '@/utils/bilanApi';
 import { fetchBilanRender, downloadBilanPdf, bilanRenderToText } from '@/utils/bilanExport';
-import { BILAN_SECTION_KEYS, BILAN_SECTION_TITLES, emptyBilanDocument, type BilanPatch, type BilanRecord, type PatientSummary } from '@/types/bilan';
+import { BILAN_SECTION_KEYS, BILAN_SECTION_TITLES, emptyBilanDocument, type AiBusy, type BilanPatch, type BilanRecord, type BilanSectionKey, type PatientSummary, type SectionWarnings } from '@/types/bilan';
 
 // flush() renvoie Promise<boolean> (cf. useBilanAutosave) : true si tout est persisté
-export interface DocumentStepProps { record: BilanRecord; update: (patch: BilanPatch) => void; flush: () => Promise<boolean>; replaceRecord: (r: BilanRecord) => void; disabled?: boolean; onBack: () => void }
+export interface DocumentStepProps {
+  record: BilanRecord;
+  update: (patch: BilanPatch) => void;
+  flush: () => Promise<boolean>;
+  replaceRecord: (r: BilanRecord) => void;
+  disabled?: boolean;
+  onBack: () => void;
+  onCompose: (sections?: BilanSectionKey[]) => Promise<boolean>;
+  aiBusy: AiBusy;
+  warnings: SectionWarnings;
+  onSectionEdited: (key: BilanSectionKey) => void;
+}
 
 const FLUSH_PENDING_TOAST = { title: 'Sauvegarde en attente, réessaie dans un instant' };
 

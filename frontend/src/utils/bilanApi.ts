@@ -1,5 +1,5 @@
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import type { BilanListItem, BilanPatch, BilanRecord, BilanStatus, BilanType } from '@/types/bilan';
+import type { BilanListItem, BilanPatch, BilanRecord, BilanSectionKey, BilanStatus, BilanType, ComposeResult, ExtractionResult } from '@/types/bilan';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -88,4 +88,16 @@ export async function finalizeBilan(id: number): Promise<BilanRecord> {
 export async function deleteBilan(id: number): Promise<'hard' | 'soft'> {
   const r = await call<{ deleted: 'hard' | 'soft' }>(`/${id}`, { method: 'DELETE' });
   return r.deleted;
+}
+
+/** Analyse des notes : candidats cités, rien n'est écrit dans le bilan. */
+export async function extractBilan(id: number): Promise<ExtractionResult> {
+  const r = await call<ExtractionResult>(`/${id}/extract`, jsonInit('POST'));
+  return { candidates: r.candidates, rejected: r.rejected };
+}
+
+/** Rédaction IA : toutes les sections (défaut) ou celles demandées. Renvoie le bilan mis à jour. */
+export async function composeBilan(id: number, sections?: BilanSectionKey[]): Promise<ComposeResult> {
+  const r = await call<ComposeResult>(`/${id}/compose`, jsonInit('POST', sections ? { sections } : {}));
+  return { bilan: r.bilan, warnings: r.warnings ?? {} };
 }
