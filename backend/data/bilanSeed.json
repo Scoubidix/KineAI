@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "fields": [
     {
       "key": "eva_repos",
@@ -662,7 +662,7 @@
         "slr",
         "straight leg raise"
       ],
-      "lateralized": false,
+      "lateralized": true,
       "presentation": "TABLE"
     },
     {
@@ -2348,7 +2348,7 @@
         "slump",
         "slump test"
       ],
-      "lateralized": false,
+      "lateralized": true,
       "presentation": "TABLE"
     },
     {
@@ -2363,7 +2363,7 @@
         "lasègue inversé",
         "fémoral"
       ],
-      "lateralized": false,
+      "lateralized": true,
       "presentation": "TABLE"
     },
     {
@@ -2391,7 +2391,7 @@
         "si",
         "provocation si"
       ],
-      "lateralized": false,
+      "lateralized": true,
       "presentation": "TABLE"
     },
     {
@@ -2403,7 +2403,7 @@
       "aliases": [
         "spurling"
       ],
-      "lateralized": false,
+      "lateralized": true,
       "presentation": "TABLE"
     },
     {
@@ -2431,7 +2431,7 @@
         "ulnt",
         "neurodynamique médian"
       ],
-      "lateralized": false,
+      "lateralized": true,
       "presentation": "TABLE"
     },
     {
@@ -2623,7 +2623,7 @@
         "unipodal",
         "équilibre unipodal"
       ],
-      "lateralized": false,
+      "lateralized": true,
       "presentation": "TABLE"
     },
     {
@@ -2714,7 +2714,7 @@
         "step down",
         "step-down"
       ],
-      "lateralized": false,
+      "lateralized": true,
       "presentation": "TABLE"
     },
     {
@@ -2744,7 +2744,7 @@
         "hop test",
         "single hop"
       ],
-      "lateralized": false,
+      "lateralized": true,
       "presentation": "TABLE"
     },
     {

@@ -41,6 +41,7 @@ Règles absolues :
 - Pour chaque candidat, "quote" est l'extrait EXACT des notes (copié tel quel, 3 à 80 caractères) qui contient la valeur.
 - "side" vaut "D" ou "G" uniquement si le côté est écrit (droite, gauche, D, G, dt, gche…), sinon null.
 - Utilise "kind":"canonical" avec la "key" du catalogue quand le test ou la mesure correspond à un champ (par son libellé ou l'un de ses alias). Sinon "kind":"custom" avec un "label" court et "key":null.
+- "key" est recopiée EXACTEMENT depuis le catalogue (copier-coller, même si son orthographe te semble fautive : c'est un identifiant, pas un mot). "label" reprend le libellé du catalogue pour un canonical, un libellé court pour un custom.
 - Valeurs : nombre pour NUMERIC (sans unité), true/false pour BOOLEAN (positif = true, négatif = false), une des options exactes pour ENUM, texte court pour TEXT et custom.
 - Un même champ noté à droite et à gauche donne deux candidats.
 - "confidence" entre 0 et 1 : 0.9 ou plus si la correspondance est évidente, 0.5 si le libellé est ambigu.
@@ -142,8 +143,44 @@ const isFilled = (v) => v !== null && v !== undefined && !(typeof v === 'string'
 /**
  * Normalisation déterministe (spec §6.1, règles 1 à 9). Pure : aucune I/O.
  */
+// Le modèle « corrige » volontiers une clé (orthographe, accent, alias employé comme clé, préfixe
+// test_ ajouté ou retiré). Avant de retomber en mesure libre, on résout la clé ou le libellé
+// proposés contre les clés, libellés et alias du catalogue, tous normalisés. Déterministe.
+const keyForm = (s) => normalizeText(String(s ?? '').replace(/_/g, ' '));
+const TEST_PREFIX = /^test (de |du |d')?/;
+
+function buildFieldIndex(fields) {
+  const index = new Map();
+  const add = (name, field) => { const k = keyForm(name); if (k && !index.has(k)) index.set(k, field); };
+  for (const f of fields) {
+    add(f.key, f);
+    add(f.label, f);
+    for (const a of Array.isArray(f.aliases) ? f.aliases : []) add(a, f);
+  }
+  return index;
+}
+
+function resolveField(index, ...names) {
+  for (const name of names) {
+    const k = keyForm(name);
+    if (!k) continue;
+    if (index.has(k)) return index.get(k);
+    const stripped = k.replace(TEST_PREFIX, '');
+    if (stripped !== k && index.has(stripped)) return index.get(stripped);
+  }
+  return undefined;
+}
+
+// Libellé lisible pour une mesure libre sans libellé proposé : jamais la clé brute
+function humanizeKey(key) {
+  const s = String(key ?? '').replace(/_/g, ' ').trim();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+}
+
 function normalize({ candidates, notes, catalog, document }) {
-  const fieldsByKey = new Map(catalog.filter((f) => f.isActive !== false).map((f) => [f.key, f]));
+  const activeFields = catalog.filter((f) => f.isActive !== false);
+  const fieldsByKey = new Map(activeFields.map((f) => [f.key, f]));
+  const fieldIndex = buildFieldIndex(activeFields);
   const notesNorm = normalizeText(notes);
   const existing = new Map((document?.measurements || []).map((m) => [identityOf(m), m]));
   const kept = new Map();
@@ -154,7 +191,9 @@ function normalize({ candidates, notes, catalog, document }) {
     const quote = String(raw.quote || '').trim();
     if (!quote || quote.length > QUOTE_MAX || !notesNorm.includes(normalizeText(quote))) { rejected += 1; continue; }
 
-    const field = raw.kind === 'canonical' && raw.key ? fieldsByKey.get(raw.key) : undefined;
+    // Clé exacte d'abord, puis résolution tolérante (clé « corrigée », alias, libellé), y compris
+    // pour un candidat déclaré custom dont le libellé désigne en fait un champ du catalogue.
+    const field = (raw.kind === 'canonical' && raw.key ? fieldsByKey.get(raw.key) : undefined) || resolveField(fieldIndex, raw.key, raw.label);
     let c;
     if (field) {
       let value;
@@ -180,7 +219,7 @@ function normalize({ candidates, notes, catalog, document }) {
       };
     } else {
       // Règle 1 : clé inconnue/inactive, ou custom déclaré → mesure libre
-      const label = String(raw.label || raw.key || '').trim();
+      const label = String(raw.label || humanizeKey(raw.key)).trim();
       const value = toText(raw.value);
       if (!label || label.length > LABEL_MAX || value === undefined) { rejected += 1; continue; }
       c = { kind: 'custom', label, fieldType: 'TEXT', unit: null, lateralized: false, value, side: null, presentation: 'table', quote, confidence: raw.confidence };
