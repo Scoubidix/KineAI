@@ -54,7 +54,7 @@ export default function SuggestionsPanel({ candidates, rejectedCount, measuremen
   return (
     <div className="rounded-xl border border-[#3899aa]/40 bg-[#3899aa]/5 p-3 flex flex-col gap-2" aria-label="Suggestions issues des notes">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="text-xs font-semibold text-[#3899aa]">{candidates.length} suggestion{candidates.length > 1 ? 's' : ''}{rejectedCount > 0 && <span className="font-normal text-muted-foreground"> · {rejectedCount} écartée{rejectedCount > 1 ? 's' : ''} faute de citation</span>}</span>
+        <span className="text-xs font-semibold text-[#3899aa]">{candidates.length} suggestion{candidates.length > 1 ? 's' : ''}{rejectedCount > 0 && <span className="font-normal text-muted-foreground"> · {rejectedCount} écartée{rejectedCount > 1 ? 's' : ''} (sans citation, non évaluée ou hors périmètre)</span>}</span>
         <Button size="sm" variant="outline" onClick={acceptAll} disabled={disabled || acceptable.length === 0} className="h-7 text-xs rounded-full"><CheckCheck className="h-3.5 w-3.5 mr-1" />Tout accepter ({acceptable.length})</Button>
       </div>
       {candidates.length === 0 && <p className="text-xs text-muted-foreground italic">Aucune mesure reconnue dans les notes.</p>}

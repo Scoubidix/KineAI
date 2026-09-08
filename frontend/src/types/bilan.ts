@@ -116,7 +116,8 @@ export interface ExtractionCandidate {
 
 export interface ExtractionResult { candidates: ExtractionCandidate[]; rejected: number }
 
-export type SectionWarnings = Partial<Record<BilanSectionKey, 'unverified_number'>>;
+export type SectionWarning = 'unverified_number' | 'table_duplicate';
+export type SectionWarnings = Partial<Record<BilanSectionKey, SectionWarning>>;
 
 export interface ComposeResult { bilan: BilanRecord; warnings: SectionWarnings }
 

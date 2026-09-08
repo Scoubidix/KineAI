@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { RefreshCw, Loader2, AlertTriangle, X } from 'lucide-react';
-import type { BilanSectionKey } from '@/types/bilan';
+import type { BilanSectionKey, SectionWarning } from '@/types/bilan';
 
 interface SectionCardProps {
   sectionKey: BilanSectionKey;
@@ -17,9 +17,14 @@ interface SectionCardProps {
   canRegenerate: boolean;
   onRegenerate?: () => void;
   regenerating?: boolean;
-  warning?: 'unverified_number';
+  warning?: SectionWarning;
   onDismissWarning?: () => void;
 }
+
+const WARNING_TEXT: Record<SectionWarning, string> = {
+  unverified_number: 'Chiffre à vérifier : un nombre de ce texte n\'apparaît ni dans tes notes ni dans tes mesures.',
+  table_duplicate: 'Déjà dans le tableau : ce texte reprend une valeur de l\'examen clinique. Reformule ou régénère.',
+};
 
 export default function SectionCard({ sectionKey, title, text, onChange, disabled, canRegenerate, onRegenerate, regenerating, warning, onDismissWarning }: SectionCardProps) {
   const empty = text.trim() === '';
@@ -34,10 +39,10 @@ export default function SectionCard({ sectionKey, title, text, onChange, disable
           <TooltipContent>{canRegenerate ? 'Régénérer avec l’IA' : 'Saisis des notes pour utiliser l’IA'}</TooltipContent>
         </Tooltip>
       </div>
-      {warning === 'unverified_number' && (
+      {warning && (
         <div role="status" className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 px-3 py-1.5 text-[11px]">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1">Chiffre à vérifier : un nombre de ce texte n’apparaît ni dans tes notes ni dans tes mesures.</span>
+          <span className="flex-1">{WARNING_TEXT[warning]}</span>
           {onDismissWarning && <button type="button" onClick={onDismissWarning} aria-label="Masquer l’avertissement" className="p-0.5"><X className="h-3 w-3" /></button>}
         </div>
       )}
