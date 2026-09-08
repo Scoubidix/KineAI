@@ -16,7 +16,7 @@ const SECTION_TEXT_MAX = 5000;
 const SECTION_GUIDE = {
   anamnese: 'identité fonctionnelle (âge, profession, activités), motif, histoire de la plainte, attentes du patient',
   antecedents: 'antécédents médicaux et chirurgicaux, traitements en cours',
-  examen: 'synthèse clinique qualitative (observation, palpation, tests), sans dresser de liste de chiffres',
+  examen: 'ce que le tableau ne dit pas : observation, palpation, qualité et tolérance du mouvement, comportement douloureux ; aucune valeur chiffrée de mesure',
   limitations: 'retentissement fonctionnel, activités limitées, restrictions de participation',
   diagnostic: 'diagnostic kinésithérapique : déficiences, limitations, hypothèses',
   objectifs: 'objectifs de rééducation à court et moyen terme',
@@ -29,7 +29,7 @@ Règles absolues :
 - Interdiction d'écrire un chiffre qui n'apparaît pas dans les notes ou dans les mesures fournies.
 - Si les notes ne contiennent rien pour une section, renvoie une chaîne vide "" pour cette section. Ne commente jamais une absence d'information.
 - Pas de titre, pas de puces, pas de retour à la ligne superflu : un ou deux paragraphes courts par section.
-- Ne recopie pas les mesures chiffrées sous forme de liste : elles figurent déjà dans un tableau à part du document.`;
+- Les mesures listées comme « déjà présentées en tableau » ne doivent être ni citées ni chiffrées dans le texte : le document les affiche à part.`;
 
 // Mesures narratives renseignées, formatées « Libellé (côté) : valeur unité »
 function formatNarrativeMeasurements(measurements, catalog) {
@@ -54,7 +54,28 @@ function formatNarrativeMeasurements(measurements, catalog) {
   return lines;
 }
 
-function buildComposeMessages({ type, motif, rawNotes, lines, keys }) {
+// Mesures présentées en tableau : libellés (pour l'exclusion explicite dans le prompt) et
+// nombres (pour le contrôle de doublon). Une valeur booléenne n'apporte aucun nombre.
+function tableMeasurementSummary(measurements, catalog) {
+  const byKey = new Map((catalog || []).map((f) => [f.key, f]));
+  const labels = [];
+  const numbers = new Set();
+  for (const m of measurements || []) {
+    if (m.presentation !== 'table') continue;
+    if (m.value === null || m.value === undefined || (typeof m.value === 'string' && m.value.trim() === '')) continue;
+    const label = m.kind === 'canonical' ? (byKey.get(m.key)?.label ?? m.key) : m.label;
+    const side = m.side ? ` (${m.side === 'D' ? 'droite' : 'gauche'})` : '';
+    labels.push(`${label}${side}`);
+    if (typeof m.value !== 'boolean') for (const n of numbersIn(String(m.value))) numbers.add(n);
+  }
+  return { labels, numbers };
+}
+
+function checkTableDuplicate(text, numbers) {
+  return numbersIn(text).some((n) => numbers.has(n)) ? 'table_duplicate' : null;
+}
+
+function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys }) {
   const user = [
     `Type de bilan : ${BILAN_TYPE_LABELS[type] || type}`,
     `Motif : ${motif || '(non renseigné)'}`,
@@ -66,6 +87,9 @@ function buildComposeMessages({ type, motif, rawNotes, lines, keys }) {
     '',
     'Mesures à intégrer en prose (déjà validées par le kiné) :',
     lines.length ? lines.map((l) => `- ${l}`).join('\n') : '(aucune)',
+    '',
+    'Mesures déjà présentées en tableau (ne les cite pas, ni leur valeur) :',
+    tableLabels.length ? tableLabels.map((l) => `- ${l}`).join('\n') : '(aucune)',
     '',
     'Sections à rédiger (clé : titre — contenu attendu) :',
     keys.map((k) => `- ${k} : ${SECTION_TITLES[k]} — ${SECTION_GUIDE[k]}`).join('\n'),
@@ -139,7 +163,8 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
 
   const catalog = await getCatalog();
   const lines = formatNarrativeMeasurements(bilan.document.measurements, catalog);
-  const messages = buildComposeMessages({ type: bilan.type, motif: bilan.motif, rawNotes: notes, lines, keys });
+  const table = tableMeasurementSummary(bilan.document.measurements, catalog);
+  const messages = buildComposeMessages({ type: bilan.type, motif: bilan.motif, rawNotes: notes, lines, tableLabels: table.labels, keys });
   const jsonSchema = buildComposeJsonSchema(keys);
 
   let output;
@@ -161,7 +186,7 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
   for (const k of keys) {
     const t = String(output.sections[k] ?? '').trim().slice(0, SECTION_TEXT_MAX);
     texts[k] = t;
-    const w = checkNumbers(t, allowed);
+    const w = checkNumbers(t, allowed) || checkTableDuplicate(t, table.numbers);
     if (w) warnings[k] = w;
   }
 
@@ -192,10 +217,12 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
 
 module.exports = {
   formatNarrativeMeasurements,
+  tableMeasurementSummary,
   buildComposeMessages,
   buildComposeJsonSchema,
   parseComposeOutput,
   numbersIn,
   checkNumbers,
+  checkTableDuplicate,
   composeForBilan,
 };
