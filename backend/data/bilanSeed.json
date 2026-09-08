@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "fields": [
     {
       "key": "eva_repos",
@@ -85,7 +85,8 @@
         "flessum"
       ],
       "lateralized": true,
-      "presentation": "TABLE"
+      "presentation": "TABLE",
+      "description": "0 = extension complète ; valeur négative = flessum, déficit d'extension (ex. -5 pour 5° manquants) ; valeur positive = recurvatum."
     },
     {
       "key": "flexion_epaule",
@@ -167,7 +168,8 @@
         "rotation externe coude au corps"
       ],
       "lateralized": true,
-      "presentation": "TABLE"
+      "presentation": "TABLE",
+      "description": "Épaule, coude au corps (RE1), en degrés. Ne pas confondre avec la rotation externe de hanche."
     },
     {
       "key": "test_neer",
@@ -707,7 +709,8 @@
         "accident le"
       ],
       "lateralized": false,
-      "presentation": "NARRATIVE"
+      "presentation": "NARRATIVE",
+      "description": "Date de la lésion ou de l'intervention qui motive ce bilan, pas les antécédents anciens."
     },
     {
       "key": "protocole_chirurgical",
@@ -722,7 +725,8 @@
         "consignes chirurgien"
       ],
       "lateralized": false,
-      "presentation": "NARRATIVE"
+      "presentation": "NARRATIVE",
+      "description": "Consignes du chirurgien (délais, restrictions). Les valeurs citées sont des limites, pas des mesures du patient."
     },
     {
       "key": "profession_activites",
@@ -826,7 +830,7 @@
         "douleur la nuit"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "NARRATIVE"
     },
     {
       "key": "localisation_douleur",
@@ -840,7 +844,8 @@
         "douleur située"
       ],
       "lateralized": false,
-      "presentation": "NARRATIVE"
+      "presentation": "NARRATIVE",
+      "description": "Siège de la douleur actuelle (région, face, point). Fourmillements et engourdissements relèvent de Paresthésies et Sensibilité."
     },
     {
       "key": "type_douleur",
@@ -891,7 +896,8 @@
         "score dn4"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "TABLE",
+      "description": "Score DN4 sur 10 ; 4 et plus évoque une douleur neuropathique."
     },
     {
       "key": "etat_cicatrice",
@@ -925,7 +931,7 @@
         "cicatrice adhérente"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "NARRATIVE"
     },
     {
       "key": "chaleur_locale",
@@ -938,7 +944,7 @@
         "chaleur locale"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "NARRATIVE"
     },
     {
       "key": "rougeur_locale",
@@ -952,7 +958,7 @@
         "erytheme"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "NARRATIVE"
     },
     {
       "key": "signe_du_godet",
@@ -966,7 +972,7 @@
         "œdème prenant le godet"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "NARRATIVE"
     },
     {
       "key": "troubles_trophiques",
@@ -1190,7 +1196,8 @@
         "menton-sternum"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "TABLE",
+      "description": "Distance restante menton-sternum en flexion cervicale complète, en cm (0 = contact)."
     },
     {
       "key": "indice_schober",
@@ -1206,7 +1213,8 @@
         "indice de schober"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "TABLE",
+      "description": "Valeur finale en cm après flexion (10 cm au départ, normale ≥ 15)."
     },
     {
       "key": "distance_doigt_sol",
@@ -1317,7 +1325,8 @@
         "ri hanche"
       ],
       "lateralized": true,
-      "presentation": "TABLE"
+      "presentation": "TABLE",
+      "description": "Hanche, en degrés."
     },
     {
       "key": "rotation_externe_hanche",
@@ -1333,7 +1342,8 @@
         "re hanche"
       ],
       "lateralized": true,
-      "presentation": "TABLE"
+      "presentation": "TABLE",
+      "description": "Hanche, en degrés. Ne pas confondre avec la RE1 d'épaule."
     },
     {
       "key": "flexion_dorsale_cheville",
@@ -1384,7 +1394,8 @@
         "lunge test"
       ],
       "lateralized": true,
-      "presentation": "TABLE"
+      "presentation": "TABLE",
+      "description": "Distance orteils-mur en cm, genou au contact du mur, par côté."
     },
     {
       "key": "inversion_cheville",
@@ -1465,7 +1476,8 @@
         "extension coude"
       ],
       "lateralized": true,
-      "presentation": "TABLE"
+      "presentation": "TABLE",
+      "description": "0 = extension complète ; valeur négative = flessum (déficit) ; valeur positive = recurvatum."
     },
     {
       "key": "pronation_avant_bras",
@@ -2388,7 +2400,6 @@
       "aliases": [
         "sacro-iliaque",
         "sacro iliaque",
-        "si",
         "provocation si"
       ],
       "lateralized": true,
@@ -2464,7 +2475,8 @@
         "engourdissements"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "NARRATIVE",
+      "description": "Présence de fourmillements ou d'engourdissements (oui / non). Le territoire se note dans Sensibilité."
     },
     {
       "key": "sensibilite",
@@ -2479,7 +2491,8 @@
         "dermatome"
       ],
       "lateralized": false,
-      "presentation": "NARRATIVE"
+      "presentation": "NARRATIVE",
+      "description": "Territoires d'hypoesthésie ou de paresthésies (dermatome, doigts, face…)."
     },
     {
       "key": "reflexes_osteotendineux",
@@ -2523,7 +2536,7 @@
         "incontinence"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "NARRATIVE"
     },
     {
       "key": "boiterie",
@@ -2537,7 +2550,7 @@
         "marche boiteuse"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "NARRATIVE"
     },
     {
       "key": "analyse_marche",
@@ -2587,7 +2600,8 @@
         "distance de marche"
       ],
       "lateralized": false,
-      "presentation": "NARRATIVE"
+      "presentation": "NARRATIVE",
+      "description": "Distance ou durée de marche possible, en texte (ex. 500 m, 20 min)."
     },
     {
       "key": "montee_descente_escaliers",
@@ -2624,7 +2638,8 @@
         "équilibre unipodal"
       ],
       "lateralized": true,
-      "presentation": "TABLE"
+      "presentation": "TABLE",
+      "description": "Temps de tenue en secondes, par côté. Si impossible, le noter en texte, pas en 0."
     },
     {
       "key": "tug_secondes",
@@ -2641,7 +2656,8 @@
         "get up and go"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "TABLE",
+      "description": "Timed Up and Go en secondes."
     },
     {
       "key": "tinetti_score",
@@ -2656,7 +2672,8 @@
         "tinetti"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "TABLE",
+      "description": "Score total sur 28 (équilibre et marche)."
     },
     {
       "key": "test_6_minutes_marche",
@@ -2689,7 +2706,8 @@
         "nombre de chutes"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "TABLE",
+      "description": "Nombre de chutes sur les 12 derniers mois."
     },
     {
       "key": "peur_de_chuter",
@@ -2702,7 +2720,7 @@
         "peur de tomber"
       ],
       "lateralized": false,
-      "presentation": "TABLE"
+      "presentation": "NARRATIVE"
     },
     {
       "key": "step_down_test",
@@ -2777,6 +2795,40 @@
       ],
       "lateralized": false,
       "presentation": "NARRATIVE"
+    },
+    {
+      "key": "poids",
+      "label": "Poids",
+      "type": "NUMERIC",
+      "category": "Généralités",
+      "order": 1,
+      "unit": "kg",
+      "rangeMin": 20,
+      "rangeMax": 250,
+      "aliases": [
+        "poids",
+        "pese",
+        "pèse"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE",
+      "description": "Poids en kg rapporté ou mesuré."
+    },
+    {
+      "key": "taille",
+      "label": "Taille",
+      "type": "NUMERIC",
+      "category": "Généralités",
+      "order": 2,
+      "unit": "cm",
+      "rangeMin": 100,
+      "rangeMax": 230,
+      "aliases": [
+        "taille"
+      ],
+      "lateralized": false,
+      "presentation": "NARRATIVE",
+      "description": "Taille en cm."
     }
   ],
   "templates": [
