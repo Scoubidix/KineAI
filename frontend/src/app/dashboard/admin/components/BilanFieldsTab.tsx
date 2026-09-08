@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -39,6 +40,7 @@ interface AdminBilanField {
   aliases: string[];
   lateralized: boolean;
   presentation: 'TABLE' | 'NARRATIVE';
+  description: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,6 +60,7 @@ interface FieldFormState {
   aliases: string[];
   lateralized: boolean;
   presentation: 'TABLE' | 'NARRATIVE';
+  description: string;
 }
 
 const EMPTY_FORM: FieldFormState = {
@@ -74,6 +77,7 @@ const EMPTY_FORM: FieldFormState = {
   aliases: [],
   lateralized: false,
   presentation: 'TABLE',
+  description: '',
 };
 
 const TYPE_LABELS: Record<CanonicalFieldType, string> = {
@@ -135,6 +139,7 @@ export default function BilanFieldsTab() {
       aliases: Array.isArray(f.aliases) ? f.aliases : [],
       lateralized: !!f.lateralized,
       presentation: f.presentation ?? 'TABLE',
+      description: f.description ?? '',
     });
     setOptionDraft('');
     setAliasDraft('');
@@ -174,6 +179,7 @@ export default function BilanFieldsTab() {
         aliases: form.aliases,
         lateralized: form.lateralized,
         presentation: form.presentation,
+        description: form.description.trim() || null,
       };
       if (isEdit) {
         payload.isActive = form.isActive;
@@ -330,6 +336,9 @@ export default function BilanFieldsTab() {
                                 <span className="rounded bg-muted px-1.5">{f.presentation === 'NARRATIVE' ? 'Littérature' : 'Tableau'}</span>
                                 {Array.isArray(f.aliases) && f.aliases.length > 0 && <span>alias : {f.aliases.join(', ')}</span>}
                               </div>
+                              {f.description && (
+                                <div className="text-xs text-muted-foreground mt-1">{f.description}</div>
+                              )}
                             </td>
                             <td className="px-3 py-2">
                               {f.isActive ? (
@@ -551,6 +560,17 @@ export default function BilanFieldsTab() {
                 </div>
               )}
             </div>
+            <div>
+              <Label className="text-xs">Description (convention, périmètre)</Label>
+              <Textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="ex: Hanche, en degrés, genou fléchi"
+                maxLength={300}
+                className="text-sm"
+              />
+            </div>
+
             <div className="flex items-center gap-3">
               <Switch checked={form.lateralized} onCheckedChange={(c) => setForm({ ...form, lateralized: c })} />
               <Label>Latéralisé (D / G)</Label>

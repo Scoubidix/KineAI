@@ -139,6 +139,7 @@ export interface CanonicalField {
   aliases: string[];
   lateralized: boolean;
   presentation: 'TABLE' | 'NARRATIVE';
+  description: string | null;
 }
 
 // ⚠️ Hérité : sert uniquement à lire structuredData des bilans antérieurs à la V1. Les nouveaux bilans utilisent BilanDocument.

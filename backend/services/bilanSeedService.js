@@ -10,6 +10,7 @@ const KEY_RE = /^[a-z][a-z0-9_]*$/;
 const PRESENTATIONS = ['TABLE', 'NARRATIVE'];
 const ALIAS_MAX_LEN = 60;
 const ALIASES_MAX = 10;
+const DESCRIPTION_MAX_LEN = 300;
 
 /**
  * Lit et parse le fichier de seed. Renvoie null si absent/illisible/JSON invalide.
@@ -67,6 +68,9 @@ function validateSeed(data) {
     }
     if (f.presentation !== undefined && !PRESENTATIONS.includes(f.presentation)) {
       errors.push(`field.presentation invalide (TABLE|NARRATIVE) pour ${f.key}`);
+    }
+    if (f.description !== undefined && f.description !== null && (typeof f.description !== 'string' || f.description.length > DESCRIPTION_MAX_LEN)) {
+      errors.push(`field.description invalide (chaîne ≤ ${DESCRIPTION_MAX_LEN}) pour ${f.key}`);
     }
     if (!FIELD_TYPES.includes(f.type)) {
       errors.push(`field.type invalide pour ${f.key} : ${f.type}`);
@@ -132,7 +136,9 @@ async function runBilanSeed({ prisma, data } = {}) {
   await prisma.$transaction(async (tx) => {
     await tx.bilanCanonicalField.deleteMany({});
     await tx.bilanTemplate.deleteMany({ where: { isPublic: true, kineId: null } });
-    await tx.bilanCanonicalField.createMany({ data: data.fields });
+    await tx.bilanCanonicalField.createMany({
+      data: data.fields.map((f) => ({ ...f, description: f.description ?? null })),
+    });
     for (const t of data.templates) {
       await tx.bilanTemplate.create({
         data: {

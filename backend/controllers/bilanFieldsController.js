@@ -107,6 +107,11 @@ function validateFieldPayload(body, { isUpdate = false } = {}) {
     return { error: 'presentation doit valoir TABLE ou NARRATIVE', code: 'INVALID_PRESENTATION' };
   }
 
+  const { description } = body;
+  if (description !== undefined && description !== null && (typeof description !== 'string' || description.length > 300)) {
+    return { error: 'description doit être une chaîne de 300 caractères max', code: 'INVALID_DESCRIPTION' };
+  }
+
   return null;
 }
 
@@ -119,7 +124,7 @@ exports.adminCreateField = async (req, res) => {
     if (validation) return res.status(400).json({ success: false, ...validation });
 
     const prisma = prismaService.getInstance();
-    const { key, label, type, unit, rangeMin, rangeMax, options, category, order, aliases, lateralized, presentation } = req.body;
+    const { key, label, type, unit, rangeMin, rangeMax, options, category, order, aliases, lateralized, presentation, description } = req.body;
 
     const existing = await prisma.bilanCanonicalField.findUnique({ where: { key } });
     if (existing) {
@@ -141,6 +146,7 @@ exports.adminCreateField = async (req, res) => {
         aliases: aliases ?? [],
         lateralized: lateralized ?? false,
         presentation: presentation ?? 'TABLE',
+        description: description ?? null,
       },
     });
 
@@ -173,7 +179,7 @@ exports.adminUpdateField = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Champ non trouvé', code: 'FIELD_NOT_FOUND' });
     }
 
-    const { label, type, unit, rangeMin, rangeMax, options, category, order, isActive, aliases, lateralized, presentation } = req.body;
+    const { label, type, unit, rangeMin, rangeMax, options, category, order, isActive, aliases, lateralized, presentation, description } = req.body;
 
     const updated = await prisma.bilanCanonicalField.update({
       where: { id: fieldId },
@@ -190,6 +196,7 @@ exports.adminUpdateField = async (req, res) => {
         ...(aliases !== undefined && { aliases }),
         ...(lateralized !== undefined && { lateralized }),
         ...(presentation !== undefined && { presentation }),
+        ...(description !== undefined && { description }),
       },
     });
 

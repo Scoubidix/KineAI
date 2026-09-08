@@ -490,7 +490,7 @@ export default function MeasurementsPanel({
       }
       return (
         <div key={`row-${row.index}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/40">
-          <span className="text-sm font-medium w-36 sm:w-56 shrink-0 truncate">{row.field.label}</span>
+          <span className="text-sm font-medium w-36 sm:w-56 shrink-0 truncate" title={row.field.description ?? undefined}>{row.field.label}</span>
           {row.field.lateralized && (
             <SideSelector value={m.side} onChange={(s) => handleSideAt(row.index, s)} disabled={disabled} />
           )}

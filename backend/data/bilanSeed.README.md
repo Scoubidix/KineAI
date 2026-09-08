@@ -49,7 +49,8 @@ vérité unique**.
   "isActive": false,           // OPTIONNEL — défaut true ; false = champ masqué au kiné
   "aliases": ["jobe", "empty can"],   // OPTIONNEL — synonymes écrits/oraux (≤ 10, ≤ 60 car.), en minuscules
   "lateralized": true,                // OPTIONNEL — défaut false ; true = se saisit en D et/ou G
-  "presentation": "TABLE"             // OPTIONNEL — TABLE (défaut) | NARRATIVE (transmis au rédacteur IA)
+  "presentation": "TABLE",             // OPTIONNEL — TABLE (défaut) | NARRATIVE (transmis au rédacteur IA)
+  "description": "Hanche, en degrés." // OPTIONNEL — ≤ 300 caractères, convention de mesure / périmètre / unité
 }
 ```
 
@@ -66,6 +67,7 @@ vérité unique**.
 | `aliases` | Optionnel. Tableau de 0 à 10 chaînes non vides, ≤ 60 caractères, en minuscules. Servent à la reconnaissance dans les notes et à la recherche. |
 | `lateralized` | Optionnel, booléen, défaut `false`. Vrai pour toute mesure prise d'un côté (amplitudes de membre, force, tests d'épaule, genou, hanche, cheville, coude, poignet). |
 | `presentation` | Optionnel, `TABLE` (défaut) ou `NARRATIVE`. `NARRATIVE` pour les champs `TEXT` (anamnèse) : ils sont rédigés en prose et non en tableau. |
+| `description` | Optionnel. Chaîne ≤ 300 caractères. Convention de mesure, périmètre ou unité (ex. « Hanche, en degrés, genou fléchi »). Envoyée au modèle d'extraction et affichée au kiné en info-bulle. |
 
 ### Détails selon `type`
 

@@ -790,6 +790,7 @@ model BilanCanonicalField {
   aliases      Json               @default("[]") // string[] : synonymes écrits et oraux (extraction, recherche)
   lateralized  Boolean            @default(false) // la mesure se saisit en D et/ou G
   presentation FieldPresentation  @default(TABLE)
+  description  String?            @db.VarChar(300) // convention de mesure, périmètre, unité : envoyé au modèle et affiché au kiné
   isActive     Boolean            @default(true)
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
