@@ -1,0 +1,320 @@
+[
+  {
+    "id": "note-01",
+    "title": "courte, lombalgie",
+    "motif": null,
+    "notes": "Lombalgie chronique depuis 3 mois. EVA 4 repos, 7 effort. Schober 13 cm, DDS 25 cm. Lasègue négatif D et G. Sonnette +. ATCD : hernie L4-L5 opérée 2018.",
+    "expect": [
+      "eva_repos=4",
+      "eva_effort=7",
+      "indice_schober=13",
+      "distance_doigt_sol=25",
+      "test_laseuge:D=false",
+      "test_laseuge:G=false",
+      "signe_de_la_sonnette=true"
+    ],
+    "forbid": [
+      "antecedents"
+    ],
+    "forbidValues": [],
+    "customContains": []
+  },
+  {
+    "id": "note-02",
+    "title": "courte, genou post-op, fautes et abréviations",
+    "motif": null,
+    "notes": "LCA D opéré le 12/06 (DIDT). flexion 95° ext -5. lachman non testé (post op). choc rotulien +. circonf sus rot 42 D / 39 G. quadri 3/5, IJ 4/5. cicatrice propre. marche 2 CA",
+    "expect": [
+      "flexion_genou:D=95",
+      "extension_genou:D=-5",
+      "choc_rotulien:D=true",
+      "circonference_susrotulienne:D=42",
+      "circonference_susrotulienne:G=39",
+      "testing_quadriceps:D=3/5",
+      "testing_ischio_jambiers:D=4/5",
+      "etat_cicatrice=Propre / fermée",
+      "aides_techniques=2 cannes anglaises"
+    ],
+    "forbid": [
+      "test_lachman"
+    ],
+    "forbidValues": [],
+    "customContains": []
+  },
+  {
+    "id": "note-03",
+    "title": "épaule, abréviations kiné",
+    "motif": null,
+    "notes": "Ep G douloureuse depuis 2 mois, conflit ss-acromial ? EVA nuit 6, réveils nocturnes oui. Elev 120, abd 100, RE1 45°. Jobe +, Neer +, Hawkins +, palm up -, Yergason -. RI main-dos : L1. Pas d'irradiation. Travaille en caisse (gestes répétitifs bras en l'air).",
+    "expect": [
+      "flexion_epaule:G=120",
+      "abduction_epaule:G=100",
+      "rotation_externe_1:G=45",
+      "test_jobe:G=true",
+      "test_neer:G=true",
+      "test_hawkins_kennedy:G=true",
+      "test_speed:G=false",
+      "test_yergason:G=false",
+      "eva_nuit=6",
+      "douleur_nocturne=true",
+      "rotation_interne_main_dos:G=~l1"
+    ],
+    "forbid": [
+      "profession_activites"
+    ],
+    "forbidValues": [],
+    "customContains": []
+  },
+  {
+    "id": "note-04",
+    "title": "cervicalgie, longue, quelques fautes",
+    "motif": null,
+    "notes": "Cervicalgie D depuis 6 semaines avec irradiation bras D jusqu'au pouce et index, paresthesies intermitentes. DN4 4/10. Spurling positif à D, négatif G. Distraction cervicale soulage (positive). ULNT1 + à D, - à G. Flex cerv 35°, ext 40°, rot D 50, rot G 70, inclinaison D 25, G 40. Endurance flechisseurs profonds 18 s. ROT bicipital diminué à D, tricipital normal. Pas de trouble sphinctérien. Travail sur écran 8h/j. Traitement : paracétamol + kétoprofène.",
+    "expect": [
+      "dn4_score=4",
+      "test_spurling:D=true",
+      "test_spurling:G=false",
+      "test_distraction_cervicale=true",
+      "test_ulnt1:D=true",
+      "test_ulnt1:G=false",
+      "flexion_cervicale=35",
+      "extension_cervicale=40",
+      "rotation_cervicale_droite=50",
+      "rotation_cervicale_gauche=70",
+      "inclinaison_cervicale_droite=25",
+      "inclinaison_cervicale_gauche=40",
+      "endurance_flechisseurs_profonds=18",
+      "paresthesies=true",
+      "troubles_sphincteriens=false"
+    ],
+    "forbid": [],
+    "forbidValues": [],
+    "customContains": []
+  },
+  {
+    "id": "note-05",
+    "title": "cheville aiguë, style télégraphique",
+    "motif": null,
+    "notes": "entorse LLE G il y a 5j, oedeme malléole ext, fig 8 : 58 vs 53 côté sain. tiroir ant + , varus forcé douloureux +, squeeze -, kleiger -, thompson neg. palpation LTFA très douloureuse. appui monopodal impossible. 2 cannes anglaises, boite.",
+    "expect": [
+      "circonference_cheville_huit:G=58",
+      "tiroir_anterieur_cheville:G=true",
+      "test_inversion_forcee:G=true",
+      "squeeze_test:G=false",
+      "test_kleiger:G=false",
+      "test_thompson:G=false",
+      "douleur_palpation_lle:G=true",
+      "boiterie=true",
+      "aides_techniques=2 cannes anglaises"
+    ],
+    "forbid": [
+      "appui_monopodal_secondes"
+    ],
+    "forbidValues": [],
+    "customContains": [
+      "monopodal"
+    ]
+  },
+  {
+    "id": "note-06",
+    "title": "gériatrie, chutes",
+    "motif": null,
+    "notes": "Mme R. 82 ans, vit seule, 2 chutes cette année dont une avec fracture du poignet G en mars. Peur de tomber ++. TUG 18 s. Tinetti 19/28. TM6 : 240 m avec pause. Appui unipodal 4 s à D, 3 s à G. Escaliers marche par marche avec la rampe. Déambulateur à l'extérieur, rien à la maison.",
+    "expect": [
+      "nombre_chutes_12_mois=2",
+      "peur_de_chuter=true",
+      "tug_secondes=18",
+      "tinetti_score=19",
+      "test_6_minutes_marche=240",
+      "appui_monopodal_secondes:D=4",
+      "appui_monopodal_secondes:G=3"
+    ],
+    "forbid": [
+      "date_lesion_chirurgie"
+    ],
+    "forbidValues": [],
+    "customContains": []
+  },
+  {
+    "id": "note-07",
+    "title": "hanche, sans ponctuation, fautes",
+    "motif": null,
+    "notes": "coxartrose D flechion hanche 90 abd 20 RI 10 douloureuse RE 30 fadir + faber + trendelenbourg + thomas + douleur trochanter non moyen fessier 3/5 grand fessier 4/5 perimetre de marche 500m canne simple objectif remarcher sans canne",
+    "expect": [
+      "flexion_hanche:D=90",
+      "abduction_hanche:D=20",
+      "rotation_interne_hanche:D=10",
+      "rotation_externe_hanche:D=30",
+      "test_fadir:D=true",
+      "test_faber:D=true",
+      "signe_trendelenburg:D=true",
+      "test_thomas:D=true",
+      "douleur_palpation_grand_trochanter:D=false",
+      "testing_moyen_fessier:D=3/5",
+      "testing_grand_fessier:D=4/5",
+      "aides_techniques=1 canne",
+      "perimetre_marche=~500"
+    ],
+    "forbid": [
+      "rotation_externe_1"
+    ],
+    "forbidValues": [],
+    "customContains": []
+  },
+  {
+    "id": "note-08",
+    "title": "poignet, canal carpien",
+    "motif": null,
+    "notes": "Syndrome du canal carpien D probable. Phalen + et Tinel + au poignet D, Finkelstein -. Jamar 22 kg D contre 34 kg G. Paresthésies nocturnes des 3 premiers doigts. EVA 3 en journée, 6 la nuit. EMG prévu le 20/09.",
+    "expect": [
+      "test_phalen:D=true",
+      "signe_tinel:D=true",
+      "test_finkelstein:D=false",
+      "force_prehension:D=22",
+      "force_prehension:G=34",
+      "paresthesies=true",
+      "eva_repos=3",
+      "eva_nuit=6"
+    ],
+    "forbid": [
+      "localisation_douleur"
+    ],
+    "forbidValues": [],
+    "customContains": []
+  },
+  {
+    "id": "note-09",
+    "title": "longue et complexe, PTG, beaucoup de chiffres non-mesures",
+    "motif": null,
+    "notes": "PTG G posée le 14/08/2026, vu à J+21. Protocole chir : pas de flexion forcée au-delà de 90° avant 6 semaines, appui complet autorisé. 68 ans, 92 kg, diabète type 2, HTA traitée. Douleur : EVA 5 repos, 8 à l'effort, 6 la nuit avec 2 réveils. Flexion 85°, extension -8 (flessum). Cicatrice propre et fermée, chaleur locale oui, rougeur non, godet + en pré-tibial. Circonférence sus-rotulienne 48 G vs 44 D. Quadri 2/5, IJ 3/5, rotule hypomobile. Marche avec 2 CA, périmètre 100 m, escaliers impossibles pour le moment. Ancienne pratique de la randonnée, souhaite reprendre. Objectifs à 6 semaines : marche sans aide, flexion 110.",
+    "expect": [
+      "eva_repos=5",
+      "eva_effort=8",
+      "eva_nuit=6",
+      "douleur_nocturne=true",
+      "flexion_genou:G=85",
+      "extension_genou:G=-8",
+      "etat_cicatrice=Propre / fermée",
+      "chaleur_locale=true",
+      "rougeur_locale=false",
+      "signe_du_godet=true",
+      "circonference_susrotulienne:G=48",
+      "circonference_susrotulienne:D=44",
+      "testing_quadriceps:G=2/5",
+      "testing_ischio_jambiers:G=3/5",
+      "mobilite_rotule:G=Hypomobile",
+      "aides_techniques=2 cannes anglaises",
+      "montee_descente_escaliers=Impossible",
+      "poids=92"
+    ],
+    "forbid": [
+      "profession_activites",
+      "protocole_chirurgical"
+    ],
+    "forbidValues": [
+      68,
+      110,
+      90,
+      21
+    ],
+    "customContains": []
+  },
+  {
+    "id": "note-10",
+    "title": "ultra courte, dictée télégraphique",
+    "motif": null,
+    "notes": "genou D EVA 2 flex 130 ext 0 lachman - mcmurray + interligne int douloureux",
+    "expect": [
+      "eva_repos=2",
+      "flexion_genou:D=130",
+      "extension_genou:D=0",
+      "test_lachman:D=false",
+      "test_mcmurray:D=true",
+      "palpation_interligne_articulaire_genou:D=true"
+    ],
+    "forbid": [],
+    "forbidValues": [],
+    "customContains": []
+  },
+  {
+    "id": "transcript-01",
+    "title": "dictée post-séance, épaule (monologue)",
+    "motif": null,
+    "notes": "alors bilan initial monsieur B cinquante-quatre ans peintre en bâtiment douleur épaule droite depuis environ trois mois apparue progressivement pas de traumatisme il me dit que ça le réveille la nuit quand il dort dessus euh eva au repos je dirais trois à l'effort sept la nuit six donc on note douleur nocturne oui à l'examen élévation antérieure active cent trente degrés abduction cent dix rotation externe coude au corps quarante-cinq degrés rotation interne main dans le dos il arrive à L trois test de job positif test de haut kince positif nier positif palm up négatif yergason négatif pas d'appréhension antérieure euh testing du deltoïde quatre sur cinq pas de déficit neuro par contre paresthésies non antécédents une tendinite du coude il y a cinq ans traité par infiltration objectif il veut pouvoir reprendre le travail en hauteur",
+    "expect": [
+      "eva_repos=3",
+      "eva_effort=7",
+      "eva_nuit=6",
+      "douleur_nocturne=true",
+      "flexion_epaule:D=130",
+      "abduction_epaule:D=110",
+      "rotation_externe_1:D=45",
+      "test_jobe:D=true",
+      "test_hawkins_kennedy:D=true",
+      "test_neer:D=true",
+      "test_speed:D=false",
+      "test_yergason:D=false",
+      "test_apprehension_anterieure:D=false",
+      "testing_deltoide:D=4/5",
+      "paresthesies=false",
+      "rotation_interne_main_dos:D=~3"
+    ],
+    "forbid": [],
+    "forbidValues": [
+      54
+    ],
+    "customContains": []
+  },
+  {
+    "id": "transcript-02",
+    "title": "séance enregistrée, lombalgie (dialogue kiné / patient)",
+    "motif": null,
+    "notes": "kiné bon alors vous me dites que ça a commencé quand\npatient il y a trois semaines en soulevant une caisse au boulot je suis cariste\nkiné d'accord et là au repos vous êtes à combien sur dix\npatient au repos quatre peut-être et quand je me penche ça monte à huit\nkiné ok on va mesurer je vous mets les repères penchez vous en avant je mesure schober treize centimètres et demi doigts sol trente centimètres allongez vous on va tester la jambe droite je lève je lève dites moi quand ça tire\npatient là ça tire derrière le genou\nkiné ça descend dans la jambe ou ça reste au niveau de la cuisse\npatient ça reste dans la fesse et la cuisse\nkiné donc lasègue plutôt négatif à droite on essaie à gauche\npatient aïe là oui ça descend jusqu'au mollet\nkiné ok lasègue positif à gauche euh non pardon je m'embrouille c'est la jambe droite que je tiens là donc positif à droite négatif à gauche extension lombaire vingt degrés douloureuse pas de trouble urinaire\npatient non non\nkiné pas de fourmis dans les pieds\npatient si un peu dans le pied droit le soir\nkiné ok paresthésies oui sonnette on appuie là\npatient oui c'est là que ça fait mal\nkiné signe de la sonnette positif bon on va commencer par du dérobé euh du décordage et de la marche",
+    "expect": [
+      "eva_repos=4",
+      "eva_effort=8",
+      "indice_schober=13.5",
+      "distance_doigt_sol=30",
+      "extension_lombaire=20",
+      "test_laseuge:D=true",
+      "test_laseuge:G=false",
+      "troubles_sphincteriens=false",
+      "paresthesies=true",
+      "signe_de_la_sonnette=true"
+    ],
+    "forbid": [],
+    "forbidValues": [],
+    "customContains": []
+  },
+  {
+    "id": "transcript-03",
+    "title": "dictée avec erreurs de reconnaissance, genou",
+    "motif": null,
+    "notes": "bilan intermédiaire madame L genou gauche ligamentoplastie le douze juin on est à six semaines eva un au repos quatre à l'effort flexion cent cinq degrés extension moins deux circonférence sus rotulienne quarante-deux à gauche quarante à droite circonférence de cuisse quarante-huit contre cinquante et un lâche man non réalisé consigne du chirurgien choc rotulien négatif quadriceps trois sur cinq ischio quatre sur cinq mobilité de la rotule normale marche sans canne légère boiterie escaliers marche par marche pas de douleur la nuit elle reprend le travail la semaine prochaine assistante maternelle objectif reprise de la course à trois mois",
+    "expect": [
+      "eva_repos=1",
+      "eva_effort=4",
+      "flexion_genou:G=105",
+      "extension_genou:G=-2",
+      "circonference_susrotulienne:G=42",
+      "circonference_susrotulienne:D=40",
+      "circonference_cuisse:G=48",
+      "circonference_cuisse:D=51",
+      "choc_rotulien:G=false",
+      "testing_quadriceps:G=3/5",
+      "testing_ischio_jambiers:G=4/5",
+      "mobilite_rotule:G=Normale",
+      "aides_techniques=Aucune",
+      "boiterie=true",
+      "montee_descente_escaliers=Marche par marche",
+      "douleur_nocturne=false"
+    ],
+    "forbid": [
+      "test_lachman"
+    ],
+    "forbidValues": [
+      6
+    ],
+    "customContains": []
+  }
+]

@@ -3,7 +3,8 @@
     "start": "prisma migrate deploy && node index.js",
     "postinstall": "prisma generate",
     "test": "jest --verbose",
-    "test:watch": "jest --watch --verbose"
+    "test:watch": "jest --watch --verbose",
+    "eval:extraction": "node eval/extraction/run.js"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
