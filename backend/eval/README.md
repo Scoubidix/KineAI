@@ -5,6 +5,9 @@ Jeu d'évaluation manuel de `services/bilanExtractionService.extractFromText`, c
 Ce n'est pas un test Jest : c'est non déterministe, ça coûte des appels réseau au provider,
 et ça n'entre donc jamais dans `npm test` ni dans une CI.
 
+⚠️ Corpus synthétique uniquement : ne jamais pointer le harnais sur de vraies notes patient — la
+sortie (et `--json`) contient des extraits verbatim.
+
 ## ⚠️ Coût
 
 Chaque cas déclenche **un appel réel au provider** (OpenAI ou Mistral selon `.env`).

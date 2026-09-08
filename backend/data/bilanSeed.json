@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "fields": [
     {
       "key": "eva_repos",
@@ -1584,7 +1584,7 @@
         "main dos",
         "ri main dos"
       ],
-      "lateralized": false,
+      "lateralized": true,
       "presentation": "NARRATIVE"
     },
     {

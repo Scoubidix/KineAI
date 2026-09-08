@@ -32,14 +32,21 @@ function isNotAssessed(quote) {
 }
 
 // Preuve d'une valeur numérique dans la citation : ses chiffres (13.5 / 13,5 / 13), ou un mot-nombre
-// français (transcriptions : « quarante-deux », « treize et demi »).
-const NUMBER_WORD_RE = /\b(?:zero|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante|soixante|cent|cents|mille|demi|demie|moitie|virgule)\b/;
+// français (transcriptions : « quarante-deux », « treize et demi »). Liste réduite aux mots-nombres
+// sans ambiguïté : « un/une/demi/virgule » servent aussi de déterminants ou de liaisons courantes
+// et ne prouvent rien à eux seuls (« une douleur », « une seconde »).
+const NUMBER_WORD_RE = /\b(?:zero|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante|soixante|cent|cents|mille)\b/;
 function quoteSupportsNumber(quote, value) {
   const q = normalizeText(quote).replace(/,/g, '.');
   const abs = Math.abs(value);
   const forms = new Set([String(abs), abs.toFixed(1), String(Math.trunc(abs))]);
-  for (const f of forms) {
-    if (new RegExp(`(?<![\\d.])${f.replace('.', '\\.')}(?![\\d])`).test(q)) return true;
+  // Une citation qui contient déjà un chiffre doit prouver la valeur par ses chiffres : le repli
+  // mot-nombre ne sert que pour une transcription sans aucun chiffre.
+  if (/\d/.test(q)) {
+    for (const f of forms) {
+      if (new RegExp(`(?<![\\d.])${f.replace('.', '\\.')}(?![\\d])`).test(q)) return true;
+    }
+    return false;
   }
   return NUMBER_WORD_RE.test(q);
 }
@@ -80,7 +87,7 @@ Règles absolues :
 - Un même champ noté à droite et à gauche donne deux candidats.
 - "confidence" entre 0 et 1 : 0.9 ou plus si la correspondance est évidente, 0.5 si le libellé est ambigu.
 - Chaque champ porte une "category" (région ou domaine). Quand plusieurs champs ont des libellés proches (rotation externe de hanche / RE1 d'épaule), choisis d'après la région dont parle le contexte immédiat ; en cas de doute, confiance 0.5. Lis la "description" quand elle existe : elle fixe la convention (signe, unité, périmètre).
-- Ignore tout ce qui n'est ni un test, ni une mesure, ni une information d'anamnèse du catalogue.`;
+- Ignore tout ce qui n'est ni un test ni une mesure du catalogue. L'anamnèse (profession, antécédents, traitements, examens, objectifs) n'est pas à extraire : elle est rédigée à part.`;
 
 // Schéma strict (OpenAI) : tous les champs requis, nullables quand optionnels
 const EXTRACTION_JSON_SCHEMA = {

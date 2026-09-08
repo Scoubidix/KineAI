@@ -54,25 +54,50 @@ function formatNarrativeMeasurements(measurements, catalog) {
   return lines;
 }
 
-// Mesures présentées en tableau : libellés (pour l'exclusion explicite dans le prompt) et
-// nombres (pour le contrôle de doublon). Une valeur booléenne n'apporte aucun nombre.
+// Texte comparable : sans diacritiques, minuscules, espaces normalisés (même règle que l'extraction)
+function normalizeText(s) {
+  return String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Mots trop génériques pour signer une mesure à eux seuls (bruit de libellé, pas de sens clinique isolé)
+const TOKEN_STOPWORDS = new Set(['test', 'des', 'les', 'aux', 'par', 'sur', 'pour', 'avec', 'sans']);
+
+// Mesures présentées en tableau : libellés (pour l'exclusion explicite dans le prompt) et, par mesure
+// renseignée, les mots significatifs de son libellé (hors côté) + ses nombres — pour le contrôle de
+// doublon par co-occurrence dans une même phrase (checkTableDuplicate). Une valeur booléenne n'apporte
+// aucun nombre.
 function tableMeasurementSummary(measurements, catalog) {
   const byKey = new Map((catalog || []).map((f) => [f.key, f]));
   const labels = [];
-  const numbers = new Set();
+  const entries = [];
   for (const m of measurements || []) {
     if (m.presentation !== 'table') continue;
     if (m.value === null || m.value === undefined || (typeof m.value === 'string' && m.value.trim() === '')) continue;
     const label = m.kind === 'canonical' ? (byKey.get(m.key)?.label ?? m.key) : m.label;
     const side = m.side ? ` (${m.side === 'D' ? 'droite' : 'gauche'})` : '';
     labels.push(`${label}${side}`);
-    if (typeof m.value !== 'boolean') for (const n of numbersIn(String(m.value))) numbers.add(n);
+    const tokens = new Set(normalizeText(label).split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !TOKEN_STOPWORDS.has(w)));
+    const numbers = typeof m.value === 'boolean' ? new Set() : new Set(numbersIn(String(m.value)));
+    entries.push({ tokens, numbers });
   }
-  return { labels, numbers };
+  return { labels, entries };
 }
 
-function checkTableDuplicate(text, numbers) {
-  return numbersIn(text).some((n) => numbers.has(n)) ? 'table_duplicate' : null;
+// Doublon avec un tableau : la même phrase doit porter à la fois un nombre de la mesure ET un mot
+// de son libellé (évite le faux positif « EVA 5 » / « douleur depuis 5 ans » : un nombre commun ne
+// suffit pas sans rapport de sens).
+function checkTableDuplicate(text, entries) {
+  for (const raw of String(text || '').split(/[.!?;\n]+/)) {
+    const phrase = normalizeText(raw);
+    if (!phrase) continue;
+    const numbers = numbersIn(phrase);
+    if (!numbers.length) continue;
+    for (const entry of entries) {
+      if (!numbers.some((n) => entry.numbers.has(n))) continue;
+      if ([...entry.tokens].some((t) => new RegExp(`\\b${t}\\b`).test(phrase))) return 'table_duplicate';
+    }
+  }
+  return null;
 }
 
 function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys }) {
@@ -186,7 +211,7 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
   for (const k of keys) {
     const t = String(output.sections[k] ?? '').trim().slice(0, SECTION_TEXT_MAX);
     texts[k] = t;
-    const w = checkNumbers(t, allowed) || checkTableDuplicate(t, table.numbers);
+    const w = checkNumbers(t, allowed) || checkTableDuplicate(t, table.entries);
     if (w) warnings[k] = w;
   }
 

@@ -13,6 +13,7 @@ const PRINT_CSS = `
 .bilan-patient { text-align: center; color: #444; font-size: 10.5pt; margin-bottom: 10pt; }
 .bilan-h2 { font-size: 10.5pt; text-transform: uppercase; letter-spacing: .06em; color: #3899aa; border-bottom: 1px solid #d9e2e5; padding-bottom: 2pt; margin: 14pt 0 6pt; break-after: avoid; }
 .bilan-section p { margin: 0 0 6pt; text-align: justify; }
+.bilan-observations { font-style: italic; }
 .bilan-cat { font-size: 10.5pt; font-weight: 700; margin: 8pt 0 3pt; break-after: avoid; }
 .bilan-table { width: 100%; border-collapse: collapse; font-size: 10pt; margin: 0 0 8pt; break-inside: avoid; }
 .bilan-table th, .bilan-table td { border: 1px solid #cfd8db; padding: 3pt 6pt; text-align: left; vertical-align: top; }

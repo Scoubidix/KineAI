@@ -78,5 +78,5 @@ async function runCase(c, catalog) {
   const errors = ok.reduce((s, r) => s + r.forbidden.length + r.forbiddenValues.length + r.customMissing.length, 0);
   console.log(`\nRappel moyen ${(avg * 100).toFixed(1)} % sur ${ok.length} cas · ${errors} interdit(s) au total`);
   if (jsonOut) require('fs').writeFileSync(jsonOut, JSON.stringify({ date: new Date().toISOString(), provider: process.env.GENERATION_PROVIDER || 'openai', results }, null, 2));
-  process.exit(errors > 0 ? 1 : 0);
+  process.exit(errors > 0 || results.length === 0 || results.some((r) => r.error) ? 1 : 0);
 })();

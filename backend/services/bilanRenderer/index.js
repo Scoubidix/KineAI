@@ -1,6 +1,6 @@
 const { SECTION_KEYS, SECTION_TITLES } = require('../bilanDocument');
 const { escapeHtml, formatDateFr, formatDateLongFr, formatValue, getMeasurements, BILAN_TYPE_LABELS } = require('./format');
-const { renderExamenHtml } = require('./examen');
+const { renderExamenHtml, renderNarrativeFallbackHtml } = require('./examen');
 const { renderEvolutionHtml } = require('./evolution');
 const { PRINT_CSS } = require('./printCss');
 
@@ -55,13 +55,20 @@ function renderBilanHtml({ document, legacyHtml, catalog, kineProfile, patient, 
   const sectionsByKey = new Map((document.sections || []).map((s) => [s.key, s.text]));
   const measurements = getMeasurements({ document });
   const examenHtml = renderExamenHtml(measurements, catalog);
+  const narrativeFallbackHtml = renderNarrativeFallbackHtml(measurements, catalog);
 
   for (const key of SECTION_KEYS) {
     const text = (sectionsByKey.get(key) || '').trim();
     if (key === 'examen') {
-      // Les tableaux d'abord, puis la synthèse libre de l'examen
+      // Les tableaux d'abord, puis la synthèse libre de l'examen (rédigée par l'IA, ou à
+      // défaut le repli déterministe des mesures narratives : jamais les deux à la fois, le
+      // rédacteur a déjà eu ces mesures en entrée quand il a produit du texte)
       if (examenHtml) parts.push(examenHtml);
-      if (text) parts.push(`<section class="bilan-section">${examenHtml ? '' : `<h2 class="bilan-h2">${escapeHtml(SECTION_TITLES[key])}</h2>`}${textToParagraphs(text)}</section>`);
+      if (text) {
+        parts.push(`<section class="bilan-section">${examenHtml ? '' : `<h2 class="bilan-h2">${escapeHtml(SECTION_TITLES[key])}</h2>`}${textToParagraphs(text)}</section>`);
+      } else if (narrativeFallbackHtml) {
+        parts.push(`<section class="bilan-section">${examenHtml ? '' : `<h2 class="bilan-h2">${escapeHtml(SECTION_TITLES.examen)}</h2>`}${narrativeFallbackHtml}</section>`);
+      }
       continue;
     }
     if (!text) continue;

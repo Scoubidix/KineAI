@@ -69,4 +69,36 @@ function renderExamenHtml(measurements, catalog) {
   return `<section class="bilan-examen"><h2 class="bilan-h2">Examen clinique</h2>${sections.join('')}</section>`;
 }
 
-module.exports = { renderExamenHtml, CUSTOM_CATEGORY };
+/**
+ * Repli imprimé pour les mesures narratives renseignées (chaleur, rougeur, godet, boiterie,
+ * poids…) : sans rédaction IA, le document ne doit pas les perdre. Une ligne par mesure,
+ * « Libellé (droite|gauche) : valeur », jointes en un seul paragraphe. Retourne '' si aucune
+ * mesure narrative n'est renseignée.
+ */
+function renderNarrativeFallbackHtml(measurements, catalog) {
+  const fieldsByKey = new Map(catalog.map((f) => [f.key, f]));
+  const items = [];
+
+  for (const m of measurements) {
+    if (m.presentation !== 'narrative') continue;
+    if (!isFilled(m.value)) continue;
+
+    const side = m.side === 'D' ? ' (droite)' : m.side === 'G' ? ' (gauche)' : '';
+    let label;
+    let value;
+    if (m.kind === 'canonical') {
+      const field = fieldsByKey.get(m.key);
+      label = field ? field.label : m.key;
+      value = field ? formatValue(field, m.value) : String(m.value);
+    } else {
+      label = m.label;
+      value = String(m.value);
+    }
+    items.push(`${escapeHtml(label)}${side} : ${escapeHtml(value)}`);
+  }
+
+  if (items.length === 0) return '';
+  return `<p class="bilan-observations">${items.join('. ')}.</p>`;
+}
+
+module.exports = { renderExamenHtml, renderNarrativeFallbackHtml, CUSTOM_CATEGORY };

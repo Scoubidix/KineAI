@@ -66,7 +66,7 @@ vérité unique**.
 | `isActive` | Optionnel, booléen. Défaut `true`. Mets `false` pour livrer un champ **désactivé** (masqué au kiné mais conservé — sa `key` reste valide). |
 | `aliases` | Optionnel. Tableau de 0 à 10 chaînes non vides, ≤ 60 caractères, en minuscules. Servent à la reconnaissance dans les notes et à la recherche. |
 | `lateralized` | Optionnel, booléen, défaut `false`. Vrai pour toute mesure prise d'un côté (amplitudes de membre, force, tests d'épaule, genou, hanche, cheville, coude, poignet). |
-| `presentation` | Optionnel, `TABLE` (défaut) ou `NARRATIVE`. `NARRATIVE` pour les champs `TEXT` (anamnèse) : ils sont rédigés en prose et non en tableau. |
+| `presentation` | Optionnel, `TABLE` (défaut) ou `NARRATIVE`. `NARRATIVE` = intégré en prose par le rédacteur (par défaut : champs `TEXT`, observations booléennes comme chaleur ou rougeur, poids et taille) ; `TABLE` = tableau de l'examen clinique. Le kiné peut basculer chaque mesure. |
 | `description` | Optionnel. Chaîne ≤ 300 caractères. Convention de mesure, périmètre ou unité (ex. « Hanche, en degrés, genou fléchi »). Envoyée au modèle d'extraction et affichée au kiné en info-bulle. |
 
 ### Détails selon `type`
