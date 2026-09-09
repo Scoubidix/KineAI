@@ -48,6 +48,9 @@ function quoteSupportsNumber(quote, value) {
     }
     return false;
   }
+  // « un / une » : déterminants la plupart du temps, mais seule preuve possible de la valeur 1
+  // dans une dictée (« eva un au repos ») : acceptés uniquement pour cette valeur.
+  if (abs === 1 && /\b(?:un|une)\b/.test(q)) return true;
   return NUMBER_WORD_RE.test(q);
 }
 
