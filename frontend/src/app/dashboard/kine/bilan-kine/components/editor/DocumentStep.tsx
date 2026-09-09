@@ -3,20 +3,17 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ArrowLeft, Copy, Mail, Download, Check, Eye, Pencil, UserPlus, Loader2, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useMinWidth } from './useMinWidth';
-import SectionCard from './SectionCard';
-import ExamenPreview from './ExamenPreview';
+import DocumentSheet from './DocumentSheet';
 import BilanPreviewModal from './BilanPreviewModal';
 import PatientCombobox from '../PatientCombobox';
 import { attachPatient, finalizeBilan, ApiError } from '@/utils/bilanApi';
 import { fetchBilanRender, downloadBilanPdf, bilanRenderToText } from '@/utils/bilanExport';
-import { BILAN_SECTION_KEYS, BILAN_SECTION_TITLES, emptyBilanDocument, type AiBusy, type BilanPatch, type BilanRecord, type BilanSectionKey, type PatientSummary, type SectionWarnings } from '@/types/bilan';
+import { emptyBilanDocument, type AiBusy, type BilanPatch, type BilanRecord, type BilanSectionKey, type PatientSummary, type SectionWarnings } from '@/types/bilan';
 
 // flush() renvoie Promise<boolean> (cf. useBilanAutosave) : true si tout est persisté
 export interface DocumentStepProps {
@@ -35,7 +32,6 @@ export interface DocumentStepProps {
 const FLUSH_PENDING_TOAST = { title: 'Sauvegarde en attente, réessaie dans un instant' };
 
 export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited }: DocumentStepProps) {
-  const wide = useMinWidth(1024);
   const { toast } = useToast();
   const doc = record.document ?? emptyBilanDocument();
   const [evolution, setEvolution] = useState(false);
@@ -113,37 +109,26 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
     } catch (e) { toast({ title: 'Erreur', description: (e as Error).message, variant: 'destructive' }); setBusy(null); }
   };
 
-  const sections = (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between px-1 gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Compte-rendu</span>
-        <Tooltip>
-          <TooltipTrigger asChild><span><Button variant="outline" size="sm" onClick={handleComposeClick} disabled={disabled || !hasNotes || aiBusy !== null} className="h-7 text-xs rounded-full">{aiBusy === 'compose' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}Rédiger avec l’IA</Button></span></TooltipTrigger>
-          <TooltipContent>{hasNotes ? 'Rédige les 7 sections à partir de tes notes et de tes mesures' : 'Saisis des notes à l’étape Capture pour utiliser l’IA'}</TooltipContent>
-        </Tooltip>
+  // Barre d'outils au-dessus de la page : rédaction IA, évolution, retour aux mesures, aperçu
+  const toolbar = (
+    <div className="mx-auto w-full max-w-[794px] flex items-center justify-between gap-2 flex-wrap px-1">
+      <Tooltip>
+        <TooltipTrigger asChild><span><Button variant="outline" size="sm" onClick={handleComposeClick} disabled={disabled || !hasNotes || aiBusy !== null} className="h-8 text-xs rounded-full">{aiBusy === 'compose' ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}Rédiger avec l’IA</Button></span></TooltipTrigger>
+        <TooltipContent>{hasNotes ? 'Rédige les 7 sections à partir de tes notes et de tes mesures' : 'Saisis des notes à l’étape Notes pour utiliser l’IA'}</TooltipContent>
+      </Tooltip>
+      <div className="flex items-center gap-2 flex-wrap">
+        {hasPrevious && <label className="flex items-center gap-1.5 text-xs"><Switch checked={evolution} onCheckedChange={setEvolution} />Inclure l’évolution</label>}
+        <Button variant="ghost" size="sm" onClick={onBack} className="h-8 text-xs"><Pencil className="h-3.5 w-3.5 mr-1" />Modifier les mesures</Button>
+        <Button variant="ghost" size="sm" onClick={() => setPreviewOpen(true)} className="h-8 text-xs"><Eye className="h-3.5 w-3.5 mr-1" />Aperçu A4</Button>
       </div>
-      {BILAN_SECTION_KEYS.map((key) => {
-        const s = doc.sections.find((x) => x.key === key);
-        return (
-          <SectionCard key={key} sectionKey={key} title={BILAN_SECTION_TITLES[key]} text={s?.text ?? ''} onChange={(t) => setSection(key, t)} disabled={disabled}
-            canRegenerate={hasNotes} onRegenerate={() => { void onCompose([key]); }} regenerating={aiBusy === key} warning={warnings[key]} onDismissWarning={() => onSectionEdited(key)} />
-        );
-      })}
     </div>
   );
 
-  const examen = (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between px-1 gap-2 flex-wrap">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Examen clinique</span>
-        <div className="flex items-center gap-2">
-          {hasPrevious && <label className="flex items-center gap-1.5 text-xs"><Switch checked={evolution} onCheckedChange={setEvolution} />Inclure l’évolution</label>}
-          <Button variant="outline" size="sm" onClick={onBack} className="h-7 text-xs"><Pencil className="h-3 w-3 mr-1" />Modifier</Button>
-          <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)} className="h-7 text-xs"><Eye className="h-3 w-3 mr-1" />Aperçu A4</Button>
-        </div>
-      </div>
-      <div className="rounded-lg border border-border/60 bg-white dark:bg-card"><ExamenPreview bilanId={record.id} refreshKey={record.updatedAt} evolution={evolution} /></div>
-    </div>
+  // La page telle qu'elle sera imprimée : en-tête, titre, patient et tableaux rendus par le serveur,
+  // paragraphes des sections éditables en place
+  const sheet = (
+    <DocumentSheet bilanId={record.id} refreshKey={record.updatedAt} evolution={evolution} doc={doc} onSectionChange={setSection} disabled={disabled}
+      canRegenerate={hasNotes} onRegenerate={(key) => { void onCompose([key]); }} aiBusy={aiBusy} warnings={warnings} onDismissWarning={onSectionEdited} />
   );
 
   const saveButton = finalized ? (
@@ -160,14 +145,7 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 px-3 sm:px-4 py-3">
-        {wide ? <div className="grid grid-cols-[1.15fr_1fr] gap-4">{sections}{examen}</div> : (
-          <Tabs defaultValue="cr">
-            <TabsList className="grid grid-cols-3 w-full mb-3"><TabsTrigger value="cr">Compte-rendu</TabsTrigger><TabsTrigger value="examen">Examen</TabsTrigger><TabsTrigger value="apercu" onClick={() => setPreviewOpen(true)}>Aperçu</TabsTrigger></TabsList>
-            <TabsContent value="cr">{sections}</TabsContent>
-            <TabsContent value="examen">{examen}</TabsContent>
-            <TabsContent value="apercu"><p className="text-xs text-muted-foreground p-3">L’aperçu s’ouvre en plein écran.</p></TabsContent>
-          </Tabs>
-        )}
+        <div className="flex flex-col gap-3 bg-muted/30 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4">{toolbar}{sheet}</div>
       </div>
       <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2 flex-wrap">
         <Button variant="ghost" size="sm" onClick={onBack} className="h-9"><ArrowLeft className="h-4 w-4 mr-1" />Mesures</Button>

@@ -203,3 +203,15 @@ body {
 .bilan-preview .bilan-sign { margin-top: 24px; text-align: right; }
 .bilan-preview .bilan-legacy u { text-decoration: underline; font-weight: 600; }
 .bilan-preview .bilan-empty { color: #777; font-style: italic; }
+.bilan-preview .bilan-observations { font-style: italic; }
+
+/* Page du bilan (étape Document) : mise en page d'impression, paragraphes éditables en place */
+.bilan-page { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14.5px; line-height: 1.5; }
+.bilan-page .bilan-header { font-size: 13px; }
+.bilan-page .bilan-header-name { font-size: 16px; }
+.bilan-page .bilan-title { font-size: 19px; }
+.bilan-page .bilan-h2 { font-size: 14px; }
+.bilan-page .bilan-editable { font: inherit; color: inherit; line-height: 1.5; text-align: justify; margin: 0 0 6px; min-height: 1.5em; }
+.bilan-page .bilan-editable::placeholder { color: #999; font-style: italic; text-align: left; }
+.bilan-page .bilan-fallback { color: #555; }
+.bilan-page .bilan-fallback p::after { content: " (repris automatiquement à l’impression tant que cette section est vide)"; font-size: 12px; color: #999; font-style: normal; }
