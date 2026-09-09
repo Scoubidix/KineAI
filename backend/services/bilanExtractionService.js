@@ -304,6 +304,33 @@ function normalize({ candidates, notes, catalog, document }) {
   return { candidates: out, rejected };
 }
 
+/**
+ * Acceptation automatique (spec flux deux étapes §5.2 étape 3). Pure : ne mute pas `document`.
+ * Un candidat `new` sans avertissement entre au document : il remplit la ligne vide de même
+ * identité (présentation de la ligne conservée) ou s'ajoute en fin de liste. `conflict` et
+ * `out_of_range` restent en suspens, pour le tiroir du front.
+ * @returns {{ document: object, accepted: {id: string, quote: string}[], pending: object[] }}
+ */
+function applyCandidates(document, candidates) {
+  const measurements = [...(document.measurements || [])];
+  const accepted = [];
+  const pending = [];
+  for (const c of candidates) {
+    if (c.status !== 'new' || c.warning) { pending.push(c); continue; }
+    const idx = measurements.findIndex((m) => identityOf(m) === c.id);
+    if (idx === -1) {
+      measurements.push(c.kind === 'canonical'
+        ? { kind: 'canonical', key: c.key, value: c.value, ...(c.side ? { side: c.side } : {}), presentation: c.presentation, origin: 'extracted' }
+        : { kind: 'custom', label: c.label, value: String(c.value), presentation: c.presentation, origin: 'extracted' });
+    } else {
+      const row = measurements[idx];
+      measurements[idx] = { ...row, value: row.kind === 'custom' ? String(c.value) : c.value, origin: 'extracted' };
+    }
+    accepted.push({ id: c.id, quote: c.quote });
+  }
+  return { document: { ...document, measurements }, accepted, pending };
+}
+
 // Un JSON malformé peut contenir un extrait des notes (données de santé) dans le message
 // d'erreur V8 : jamais dans les logs.
 const safeErrorLabel = (err) => (err instanceof SyntaxError ? 'JSON invalide' : err.message);
@@ -361,6 +388,7 @@ module.exports = {
   buildExtractionMessages,
   parseExtractionOutput,
   normalize,
+  applyCandidates,
   extractFromText,
   extractForBilan,
   EXTRACTION_JSON_SCHEMA,
