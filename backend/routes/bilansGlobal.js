@@ -50,6 +50,8 @@ router.delete('/:id', authenticate, crudWriteLimiter, bilansGlobalController.del
 // la rédaction écrit les sections demandées en check-and-set (409 STALE_DRAFT).
 router.post('/:id/extract', authenticate, gptLimiter, requireBilanEditor, bilansGlobalController.extractBilan);
 router.post('/:id/compose', authenticate, gptLimiter, requireBilanEditor, validate(composeSchema), bilansGlobalController.composeBilan);
+// « Rédiger avec l'IA » en un appel : extraction, acceptation automatique, rédaction (spec flux deux étapes §5)
+router.post('/:id/compose-from-notes', authenticate, gptLimiter, requireBilanEditor, bilansGlobalController.composeBilanFromNotes);
 
 // Rendu HTML (tout plan : un kiné rétrogradé lit toujours ses bilans)
 router.get('/:id/render', authenticate, bilansGlobalController.renderBilan);

@@ -277,3 +277,17 @@ exports.composeBilan = async (req, res) => {
     sendDraftError(res, err, 'rédaction du bilan');
   }
 };
+
+/** POST /api/bilans/:id/compose-from-notes — extraction + acceptation automatique + rédaction des 7 sections, une écriture */
+exports.composeBilanFromNotes = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const { bilan, warnings, accepted, pending, rejected } = await composeService.composeFromNotesForBilan({ kineId, bilanId, uid: req.uid });
+    res.json({ success: true, bilan, warnings, accepted, pending, rejected });
+  } catch (err) {
+    sendDraftError(res, err, 'rédaction depuis les notes');
+  }
+};
