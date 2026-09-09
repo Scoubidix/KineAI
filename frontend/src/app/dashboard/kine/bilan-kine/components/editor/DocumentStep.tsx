@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -166,8 +166,10 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
 
   // Mobile : la barre repliée du tiroir est aussi le pied de page d'actions (une seule rangée).
   // L'hôte existe dès que le tiroir a rendu sa mise en page mobile (même rendu que `wide`).
+  // useLayoutEffect : résolu avant la peinture, pour ne jamais laisser passer une frame avec
+  // le pied de page de repli affiché en même temps que la barre repliée du tiroir.
   const [actionsHost, setActionsHost] = useState<HTMLElement | null>(null);
-  useEffect(() => { setActionsHost(wide ? null : document.getElementById(DRAWER_ACTIONS_ID)); }, [wide]);
+  useLayoutEffect(() => { setActionsHost(wide ? null : document.getElementById(DRAWER_ACTIONS_ID)); }, [wide]);
 
   const actions = (
     <>
@@ -184,7 +186,7 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
         <div className="flex flex-col gap-3 bg-muted/30 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4">{toolbar}{banner}{sheet}</div>
       </div>
       {actionsHost ? createPortal(actions, actionsHost) : (
-        <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2 flex-wrap">
+        <div className="sticky bottom-12 lg:bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2 flex-wrap">
           <Button variant="ghost" size="sm" onClick={onBack} className="h-9"><ArrowLeft className="h-4 w-4 mr-1" />Notes</Button>
           <div className="flex items-center gap-2 ml-auto">{actions}</div>
         </div>
