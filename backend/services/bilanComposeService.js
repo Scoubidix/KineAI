@@ -10,6 +10,7 @@ const { getCatalog } = require('./bilanRenderService');
 const { SECTION_KEYS, SECTION_TITLES } = require('./bilanDocument');
 const { DraftError, PATIENT_SELECT } = require('./bilanDraftService');
 const { BILAN_TYPE_LABELS } = require('./bilanRenderer/format');
+const extractionService = require('./bilanExtractionService');
 
 const SECTION_TEXT_MAX = 5000;
 
@@ -184,25 +185,14 @@ async function callCompose(messages, jsonSchema) {
 }
 
 /**
- * Rédige les sections demandées (défaut : les 7) et les écrit dans le document.
- * @throws {DraftError} BILAN_NOT_FOUND | LEGACY_BILAN | NOTES_REQUIRED | COMPOSE_FAILED | STALE_DRAFT
+ * Appel du modèle et contrôles, sans accès base : partagé par composeForBilan et
+ * composeFromNotesForBilan. Renvoie les textes tronqués et les avertissements par section.
+ * @throws {DraftError} COMPOSE_FAILED
  */
-async function composeForBilan({ kineId, bilanId, sections, uid }) {
-  const prisma = prismaService.getInstance();
-  const where = { id: bilanId, kineId, isActive: true };
-  const bilan = await prisma.bilanKine.findFirst({ where, select: { id: true, type: true, status: true, rawNotes: true, motif: true, document: true } });
-  if (!bilan) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
-  if (!bilan.document) throw new DraftError('LEGACY_BILAN', 400, 'Les anciens bilans ne peuvent pas être rédigés par l’IA');
-  const notes = (bilan.rawNotes || '').trim();
-  if (!notes) throw new DraftError('NOTES_REQUIRED', 400, 'Saisis des notes avant de lancer la rédaction');
-
-  // Ordre canonique, doublons ignorés, clés inconnues ignorées (déjà filtrées par Zod en route)
-  const keys = Array.isArray(sections) && sections.length ? SECTION_KEYS.filter((k) => sections.includes(k)) : SECTION_KEYS;
-
-  const catalog = await getCatalog();
-  const lines = formatNarrativeMeasurements(bilan.document.measurements, catalog);
-  const table = tableMeasurementSummary(bilan.document.measurements, catalog);
-  const messages = buildComposeMessages({ type: bilan.type, motif: bilan.motif, rawNotes: notes, lines, tableLabels: table.labels, keys });
+async function composeSections({ bilanId, type, motif, notes, document, catalog, keys }) {
+  const lines = formatNarrativeMeasurements(document.measurements, catalog);
+  const table = tableMeasurementSummary(document.measurements, catalog);
+  const messages = buildComposeMessages({ type, motif, rawNotes: notes, lines, tableLabels: table.labels, keys });
   const jsonSchema = buildComposeJsonSchema(keys);
 
   let output;
@@ -218,7 +208,7 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
     }
   }
 
-  const allowed = new Set([...numbersIn(notes), ...numbersIn(bilan.motif), ...lines.flatMap(numbersIn)]);
+  const allowed = new Set([...numbersIn(notes), ...numbersIn(motif), ...lines.flatMap(numbersIn)]);
   const texts = {};
   const warnings = {};
   for (const k of keys) {
@@ -227,30 +217,95 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
     const w = checkNumbers(t, allowed) || checkTableDuplicate(t, table.entries);
     if (w) warnings[k] = w;
   }
+  return { texts, warnings };
+}
+
+// Lecture et gardes communes aux deux rédactions
+async function loadBilanForCompose(prisma, where) {
+  const bilan = await prisma.bilanKine.findFirst({ where, select: { id: true, type: true, status: true, rawNotes: true, motif: true, document: true, updatedAt: true } });
+  if (!bilan) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
+  if (!bilan.document) throw new DraftError('LEGACY_BILAN', 400, 'Les anciens bilans ne peuvent pas être rédigés par l’IA');
+  if (bilan.status === 'ENREGISTRE') throw new DraftError('ALREADY_FINALIZED', 409, 'Ce bilan est déjà enregistré');
+  const notes = (bilan.rawNotes || '').trim();
+  if (!notes) throw new DraftError('NOTES_REQUIRED', 400, 'Saisis des notes avant de lancer la rédaction');
+  return { bilan, notes };
+}
+
+const applySections = (document, texts) => ({
+  ...document,
+  sections: document.sections.map((s) => (texts[s.key] !== undefined ? { ...s, text: texts[s.key] } : s)),
+});
+
+// Écriture check-and-set sur updatedAt. `generated` : des sections sont écrites → BROUILLON passe
+// GENERE et le temps gagné est compté (une seule fois par bilan). Non bloquant.
+async function writeDocument({ prisma, where, updatedAt, status, document, uid, generated }) {
+  const firstGeneration = generated && status === 'BROUILLON';
+  const data = firstGeneration ? { document, status: 'GENERE' } : { document };
+  let updated;
+  try {
+    updated = await prisma.bilanKine.update({ where: { ...where, updatedAt }, data, include: { patient: { select: PATIENT_SELECT } } });
+  } catch (err) {
+    if (err && err.code === 'P2025') throw new DraftError('STALE_DRAFT', 409, 'Ce bilan a été modifié pendant la rédaction, recharge-le', { updatedAt });
+    throw err;
+  }
+  if (firstGeneration) activityService.logActivity(uid, 'BILAN_GENERATED');
+  return updated;
+}
+
+/**
+ * Rédige les sections demandées (défaut : les 7) et les écrit dans le document.
+ * @throws {DraftError} BILAN_NOT_FOUND | LEGACY_BILAN | ALREADY_FINALIZED | NOTES_REQUIRED | COMPOSE_FAILED | STALE_DRAFT
+ */
+async function composeForBilan({ kineId, bilanId, sections, uid }) {
+  const prisma = prismaService.getInstance();
+  const where = { id: bilanId, kineId, isActive: true };
+  const { bilan, notes } = await loadBilanForCompose(prisma, where);
+
+  // Ordre canonique, doublons ignorés, clés inconnues ignorées (déjà filtrées par Zod en route)
+  const keys = Array.isArray(sections) && sections.length ? SECTION_KEYS.filter((k) => sections.includes(k)) : SECTION_KEYS;
+  const catalog = await getCatalog();
+  const { texts, warnings } = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: bilan.document, catalog, keys });
 
   // L'appel IA a duré plusieurs secondes : on relit la version la plus fraîche et on ne
   // remplace que les sections demandées, en check-and-set sur updatedAt (comme l'autosave).
   const fresh = await prisma.bilanKine.findFirst({ where, select: { status: true, document: true, updatedAt: true } });
   if (!fresh || !fresh.document) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
-  const document = {
-    ...fresh.document,
-    sections: fresh.document.sections.map((s) => (texts[s.key] !== undefined ? { ...s, text: texts[s.key] } : s)),
-  };
-  const firstGeneration = fresh.status === 'BROUILLON';
-  const data = firstGeneration ? { document, status: 'GENERE' } : { document };
-
-  let updated;
-  try {
-    updated = await prisma.bilanKine.update({ where: { ...where, updatedAt: fresh.updatedAt }, data, include: { patient: { select: PATIENT_SELECT } } });
-  } catch (err) {
-    if (err && err.code === 'P2025') throw new DraftError('STALE_DRAFT', 409, 'Ce bilan a été modifié pendant la rédaction, recharge-le', { updatedAt: fresh.updatedAt });
-    throw err;
-  }
-
-  // Temps gagné : une seule fois par bilan (première rédaction, BROUILLON → GENERE). Non bloquant.
-  if (firstGeneration) activityService.logActivity(uid, 'BILAN_GENERATED');
+  if (fresh.status === 'ENREGISTRE') throw new DraftError('ALREADY_FINALIZED', 409, 'Ce bilan est déjà enregistré');
+  const updated = await writeDocument({ prisma, where, updatedAt: fresh.updatedAt, status: fresh.status, document: applySections(fresh.document, texts), uid, generated: true });
   logger.info(`Rédaction bilan ${bilanId} : ${keys.length} section(s), ${Object.keys(warnings).length} avertissement(s)`);
   return { bilan: updated, warnings };
+}
+
+/**
+ * « Rédiger avec l'IA » en un appel : extraction, acceptation automatique, rédaction des 7 sections,
+ * une seule écriture. Check-and-set sur l'updatedAt lu au départ : le front a flushé et verrouille
+ * l'édition pendant l'appel ; toute autre modification (autre appareil) → STALE_DRAFT.
+ * @throws {DraftError} BILAN_NOT_FOUND | LEGACY_BILAN | ALREADY_FINALIZED | NOTES_REQUIRED | EXTRACTION_FAILED | COMPOSE_FAILED | STALE_DRAFT
+ */
+async function composeFromNotesForBilan({ kineId, bilanId, uid }) {
+  const prisma = prismaService.getInstance();
+  const where = { id: bilanId, kineId, isActive: true };
+  const { bilan, notes } = await loadBilanForCompose(prisma, where);
+  const catalog = await getCatalog();
+
+  const { candidates, rejected } = await extractionService.extractFromText({ rawNotes: notes, motif: bilan.motif, catalog, document: bilan.document, logContext: `bilan ${bilanId}` });
+  const { document: withMeasures, accepted, pending } = extractionService.applyCandidates(bilan.document, candidates);
+  const base = { prisma, where, updatedAt: bilan.updatedAt, status: bilan.status, uid };
+
+  let composed;
+  try {
+    composed = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: withMeasures, catalog, keys: SECTION_KEYS });
+  } catch (err) {
+    // Les mesures acceptées ne sont pas perdues : écrites seules, le kiné relance la rédaction
+    if (err instanceof DraftError && err.code === 'COMPOSE_FAILED' && accepted.length > 0) {
+      await writeDocument({ ...base, document: withMeasures, generated: false });
+      throw new DraftError('COMPOSE_FAILED', 502, 'Mesures ajoutées, mais la rédaction a échoué : réessaie dans un instant', { measurementsSaved: true });
+    }
+    throw err;
+  }
+  const updated = await writeDocument({ ...base, document: applySections(withMeasures, composed.texts), generated: true });
+  logger.info(`Rédaction depuis les notes bilan ${bilanId} : ${accepted.length} acceptée(s), ${pending.length} en suspens, ${rejected} rejetée(s), ${Object.keys(composed.warnings).length} avertissement(s)`);
+  return { bilan: updated, warnings: composed.warnings, accepted, pending, rejected };
 }
 
 module.exports = {
@@ -263,4 +318,5 @@ module.exports = {
   checkNumbers,
   checkTableDuplicate,
   composeForBilan,
+  composeFromNotesForBilan,
 };
