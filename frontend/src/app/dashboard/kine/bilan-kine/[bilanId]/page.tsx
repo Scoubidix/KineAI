@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useBilanAutosave } from '@/hooks/useBilanAutosave';
-import { getBilan, attachPatient, extractBilan, composeBilan, ApiError, StaleDraftError } from '@/utils/bilanApi';
+import { getBilan, attachPatient, extractBilan, composeBilan, composeBilanFromNotes, ApiError, StaleDraftError } from '@/utils/bilanApi';
 import type { AiBusy, BilanRecord, BilanSectionKey, ExtractionCandidate, PatientSummary, BilanType, SectionWarnings } from '@/types/bilan';
 import BilanEditorHeader from '../components/editor/BilanEditorHeader';
 import BilanStepper, { type EditorStep } from '../components/editor/BilanStepper';
@@ -54,6 +54,57 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
     requestAnimationFrame(() => document.getElementById(DRAWER_SUGGESTIONS_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
 
+  // Citations des mesures acceptées automatiquement à la dernière rédaction (session)
+  const [quotes, setQuotes] = useState<Map<string, string>>(new Map());
+  // Bandeau de la page Document : résultat de la dernière rédaction (session)
+  const [lastRun, setLastRun] = useState<{ extracted: number; pending: number } | null>(null);
+  // Empreinte des mesures à la dernière rédaction : si elles changent, Examen et Diagnostic sont signalées
+  const composedMeasurementsRef = useRef<string | null>(null);
+  const fingerprint = (r: BilanRecord) => JSON.stringify(r.document?.measurements ?? []);
+  useEffect(() => {
+    const ref = composedMeasurementsRef.current;
+    if (ref === null) return;
+    const current = fingerprint(record);
+    if (current === ref) return;
+    composedMeasurementsRef.current = current; // un seul signalement par modification
+    const sections = record.document?.sections ?? [];
+    setWarnings((prev) => {
+      const next: SectionWarnings = { ...prev };
+      for (const k of ['examen', 'diagnostic'] as const) {
+        const text = sections.find((s) => s.key === k)?.text ?? '';
+        if (text.trim() !== '' && !next[k]) next[k] = 'measures_changed';
+      }
+      return next;
+    });
+  }, [record]);
+
+  const handleComposeFromNotes = async () => {
+    if (aiLockRef.current) return;
+    aiLockRef.current = true;
+    if (!(await flush())) { toast(FLUSH_PENDING); aiLockRef.current = false; return; }
+    setAiBusy('compose_from_notes');
+    try {
+      const r = await composeBilanFromNotes(record.id);
+      replaceRecord(r.bilan);
+      setWarnings(r.warnings);
+      setCandidates(r.pending);
+      setRejectedCount(r.rejected);
+      setQuotes(new Map(r.accepted.map((a) => [a.id, a.quote])));
+      setLastRun({ extracted: r.accepted.length + r.pending.length, pending: r.pending.length });
+      composedMeasurementsRef.current = fingerprint(r.bilan);
+      await goTo('document');
+    } catch (e) {
+      // Rédaction en échec après l'écriture des mesures : rien n'est perdu, on montre le tableau
+      if (e instanceof ApiError && e.code === 'COMPOSE_FAILED' && e.body.measurementsSaved === true) {
+        toast({ title: 'Mesures ajoutées, rédaction impossible', description: 'Tes mesures sont dans le tableau. Relance « Rédiger avec l’IA » dans un instant.', variant: 'destructive' });
+        await reload();
+        await goTo('document');
+        return;
+      }
+      handleAiError(e, 'Rédaction impossible');
+    } finally { setAiBusy(null); aiLockRef.current = false; }
+  };
+
   const handleAiError = (e: unknown, title: string) => {
     if (e instanceof StaleDraftError) { toast({ title: 'Bilan modifié ailleurs', description: 'Rechargement de la dernière version…' }); void reload(); return; }
     if (e instanceof ApiError && e.status === 429) { toast({ title: 'Trop de demandes', description: 'Patiente une minute avant de relancer l’IA', variant: 'destructive' }); return; }
@@ -85,6 +136,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
     try {
       const r = await composeBilan(record.id, sections);
       replaceRecord(r.bilan);
+      composedMeasurementsRef.current = fingerprint(r.bilan);
       setWarnings((prev) => {
         if (!sections) return r.warnings;
         const next: SectionWarnings = { ...prev };
@@ -97,9 +149,6 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
   };
 
   const clearWarning = (key: BilanSectionKey) => setWarnings((prev) => { if (!(key in prev)) return prev; const next = { ...prev }; delete next[key]; return next; });
-
-  // Rédaction depuis Notes (provisoire jusqu'à la Task 5) : compose puis passage à l'étape Document
-  const composeThenDocument = async () => { if (await handleCompose()) await goTo('document'); };
 
   const goTo = useCallback(async (s: EditorStep) => {
     await flush();
@@ -149,10 +198,10 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
         <BilanStepper step={step} onStep={(s) => { void goTo(s); }} />
         <div className="flex-1 min-h-0 flex">
           <div className="flex-1 min-w-0 pb-12 lg:pb-0">
-            {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('document')} onCompose={() => { void composeThenDocument(); }} composing={aiBusy === 'compose'} />}
-            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} />}
+            {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('document')} onCompose={() => { void handleComposeFromNotes(); }} composing={aiBusy === 'compose_from_notes'} />}
+            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} onComposeFromNotes={() => { void handleComposeFromNotes(); }} lastRun={lastRun} onVerify={openSuggestions} onDismissRun={() => setLastRun(null)} />}
           </div>
-          <MeasuresDrawer record={record} update={update} disabled={locked || aiBusy !== null} candidates={candidates} rejectedCount={rejectedCount} onCandidatesChange={setCandidates} onAnalyze={() => { void handleAnalyze(); }} aiBusy={aiBusy} open={drawerOpen} onOpenChange={setDrawer} wide={wide} />
+          <MeasuresDrawer record={record} update={update} disabled={locked || aiBusy !== null} candidates={candidates} rejectedCount={rejectedCount} onCandidatesChange={setCandidates} onAnalyze={() => { void handleAnalyze(); }} aiBusy={aiBusy} open={drawerOpen} onOpenChange={setDrawer} wide={wide} quotes={quotes} />
         </div>
       </div>
     </TooltipProvider>

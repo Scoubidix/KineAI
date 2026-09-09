@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, Activity, Layers, ChevronDown, CheckCircle2, Plus } from 'lucide-react';
+import { X, Activity, Layers, ChevronDown, CheckCircle2, Plus, Quote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -39,6 +39,8 @@ interface MeasurementsPanelProps {
   showPresentation?: boolean;
   /** Bilan de suivi : valeur du bilan de référence par identité de mesure, affichée « préc. … » */
   previousValues?: Map<string, CanonicalValue>;
+  /** Citation des notes à l'origine de la valeur (mesures acceptées automatiquement), par identité de mesure */
+  quotes?: Map<string, string>;
 }
 
 const CUSTOM_CATEGORY = 'Mesures libres';
@@ -64,6 +66,7 @@ export default function MeasurementsPanel({
   disabled = false,
   showPresentation = false,
   previousValues,
+  quotes,
 }: MeasurementsPanelProps) {
   const { toast } = useToast();
   const [fields, setFields] = useState<CanonicalField[]>([]);
@@ -456,6 +459,13 @@ export default function MeasurementsPanel({
       </span>
     );
 
+  const renderQuote = (m: DocumentMeasurement) => {
+    const q = quotes?.get(measurementIdentity(m));
+    return q === undefined ? null : (
+      <span title={`D’après tes notes : « ${q} »`} aria-label={`D’après tes notes : ${q}`} className="inline-flex shrink-0 text-muted-foreground"><Quote className="h-3 w-3" /></span>
+    );
+  };
+
   const formatPrevious = (v: CanonicalValue, unit?: string | null): string => {
     if (typeof v === 'boolean') return v ? 'Positif' : 'Négatif';
     if (typeof v === 'number') return unit ? (unit.startsWith('/') ? `${v}${unit}` : `${v} ${unit}`) : String(v);
@@ -504,6 +514,7 @@ export default function MeasurementsPanel({
             />
           )}
           {renderOriginBadge(m.origin)}
+          {renderQuote(m)}
           <Button
             type="button"
             variant="ghost"
@@ -539,6 +550,7 @@ export default function MeasurementsPanel({
           />
         )}
         {renderOriginBadge(m.origin)}
+        {renderQuote(m)}
         <Button
           type="button"
           variant="ghost"

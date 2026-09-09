@@ -116,13 +116,22 @@ export interface ExtractionCandidate {
 
 export interface ExtractionResult { candidates: ExtractionCandidate[]; rejected: number }
 
-export type SectionWarning = 'unverified_number' | 'table_duplicate';
+export type SectionWarning = 'unverified_number' | 'table_duplicate' | 'measures_changed';
 export type SectionWarnings = Partial<Record<BilanSectionKey, SectionWarning>>;
 
 export interface ComposeResult { bilan: BilanRecord; warnings: SectionWarnings }
 
-/** Appel IA en cours dans l'éditeur : extraction, rédaction complète, ou régénération d'une section */
-export type AiBusy = null | 'extract' | 'compose' | BilanSectionKey;
+/** Réponse de « Rédiger avec l'IA » : bilan rédigé, mesures acceptées (avec leur citation) et candidats en suspens */
+export interface ComposeFromNotesResult {
+  bilan: BilanRecord;
+  warnings: SectionWarnings;
+  accepted: { id: string; quote: string }[];
+  pending: ExtractionCandidate[];
+  rejected: number;
+}
+
+/** Appel IA en cours dans l'éditeur : extraction, rédaction complète (depuis les notes ou non), ou régénération d'une section */
+export type AiBusy = null | 'extract' | 'compose' | 'compose_from_notes' | BilanSectionKey;
 
 export interface CanonicalField {
   id: number;

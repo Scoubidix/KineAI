@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Copy, Mail, Download, Check, Eye, UserPlus, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Copy, Mail, Download, Check, Eye, UserPlus, Loader2, Sparkles, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import DocumentSheet from './DocumentSheet';
 import BilanPreviewModal from './BilanPreviewModal';
@@ -27,11 +27,16 @@ export interface DocumentStepProps {
   aiBusy: AiBusy;
   warnings: SectionWarnings;
   onSectionEdited: (key: BilanSectionKey) => void;
+  /** « Rédiger avec l'IA » (7 sections) : extraction + acceptation + rédaction */
+  onComposeFromNotes: () => void;
+  lastRun: { extracted: number; pending: number } | null;
+  onVerify: () => void;
+  onDismissRun: () => void;
 }
 
 const FLUSH_PENDING_TOAST = { title: 'Sauvegarde en attente, réessaie dans un instant' };
 
-export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited }: DocumentStepProps) {
+export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited, onComposeFromNotes, lastRun, onVerify, onDismissRun }: DocumentStepProps) {
   const { toast } = useToast();
   const doc = record.document ?? emptyBilanDocument();
   const [evolution, setEvolution] = useState(false);
@@ -44,7 +49,7 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
   const hasNotes = (record.rawNotes ?? '').trim().length > 0;
   const anyText = doc.sections.some((s) => s.text.trim() !== '');
   const [composeConfirmOpen, setComposeConfirmOpen] = useState(false);
-  const composeAll = () => { setComposeConfirmOpen(false); void onCompose(); };
+  const composeAll = () => { setComposeConfirmOpen(false); onComposeFromNotes(); };
   const handleComposeClick = () => { if (anyText) setComposeConfirmOpen(true); else composeAll(); };
 
   const setSection = (key: BilanSectionKey, text: string) => {
@@ -113,13 +118,27 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
   const toolbar = (
     <div className="mx-auto w-full max-w-[794px] flex items-center justify-between gap-2 flex-wrap px-1">
       <Tooltip>
-        <TooltipTrigger asChild><span><Button variant="outline" size="sm" onClick={handleComposeClick} disabled={disabled || !hasNotes || aiBusy !== null} className="h-8 text-xs rounded-full">{aiBusy === 'compose' ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}Rédiger avec l’IA</Button></span></TooltipTrigger>
+        <TooltipTrigger asChild><span><Button variant="outline" size="sm" onClick={handleComposeClick} disabled={disabled || !hasNotes || aiBusy !== null} className="h-8 text-xs rounded-full">{aiBusy === 'compose_from_notes' ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}Rédiger avec l’IA</Button></span></TooltipTrigger>
         <TooltipContent>{hasNotes ? 'Rédige les 7 sections à partir de tes notes et de tes mesures' : 'Saisis des notes à l’étape Notes pour utiliser l’IA'}</TooltipContent>
       </Tooltip>
       <div className="flex items-center gap-2 flex-wrap">
         {hasPrevious && <label className="flex items-center gap-1.5 text-xs"><Switch checked={evolution} onCheckedChange={setEvolution} />Inclure l’évolution</label>}
         <Button variant="ghost" size="sm" onClick={() => setPreviewOpen(true)} className="h-8 text-xs"><Eye className="h-3.5 w-3.5 mr-1" />Aperçu A4</Button>
       </div>
+    </div>
+  );
+
+  // Bandeau de résultat de la dernière rédaction IA : nombre de mesures extraites, à vérifier ou non
+  const plural = (n: number, s: string) => `${n} ${s}${n > 1 ? 's' : ''}`;
+  const banner = lastRun && (
+    <div role="status" className="mx-auto w-full max-w-[794px] flex items-center gap-2 rounded-lg border border-[#3899aa]/40 bg-[#3899aa]/5 px-3 py-2 text-xs">
+      <Sparkles className="h-3.5 w-3.5 text-[#3899aa] shrink-0" />
+      <span className="flex-1">
+        {lastRun.extracted === 0 ? 'Aucune mesure reconnue dans les notes' : `${plural(lastRun.extracted, 'mesure')} extraite${lastRun.extracted > 1 ? 's' : ''}${lastRun.pending > 0 ? `, ${lastRun.pending} à vérifier` : ''}`}
+      </span>
+      {lastRun.pending > 0
+        ? <Button size="sm" onClick={onVerify} className="btn-teal h-7 text-xs rounded-full">Vérifier</Button>
+        : <button type="button" onClick={onDismissRun} aria-label="Fermer" className="p-0.5 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
     </div>
   );
 
@@ -144,7 +163,7 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 px-3 sm:px-4 py-3">
-        <div className="flex flex-col gap-3 bg-muted/30 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4">{toolbar}{sheet}</div>
+        <div className="flex flex-col gap-3 bg-muted/30 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4">{toolbar}{banner}{sheet}</div>
       </div>
       <div className="sticky bottom-12 lg:bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2 flex-wrap">
         <Button variant="ghost" size="sm" onClick={onBack} className="h-9"><ArrowLeft className="h-4 w-4 mr-1" />Notes</Button>

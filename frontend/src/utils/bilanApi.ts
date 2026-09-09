@@ -1,5 +1,5 @@
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import type { BilanListItem, BilanPatch, BilanRecord, BilanSectionKey, BilanStatus, BilanType, ComposeResult, ExtractionResult } from '@/types/bilan';
+import type { BilanListItem, BilanPatch, BilanRecord, BilanSectionKey, BilanStatus, BilanType, ComposeFromNotesResult, ComposeResult, ExtractionResult } from '@/types/bilan';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -10,12 +10,15 @@ export class ApiError extends Error {
   details?: string[];
   /** Délai suggéré (ms) avant de réessayer, lu depuis l'en-tête Retry-After (429). */
   retryAfterMs?: number;
-  constructor(message: string, code: string, status: number, details?: string[], retryAfterMs?: number) {
+  /** Corps JSON brut de la réponse : champs métier supplémentaires (ex. measurementsSaved sur COMPOSE_FAILED) */
+  body: Record<string, unknown>;
+  constructor(message: string, code: string, status: number, details?: string[], retryAfterMs?: number, body: Record<string, unknown> = {}) {
     super(message);
     this.code = code;
     this.status = status;
     this.details = details;
     this.retryAfterMs = retryAfterMs;
+    this.body = body;
   }
 }
 
@@ -40,7 +43,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     const retryAfterMs = retryAfterHeader && !Number.isNaN(Number(retryAfterHeader))
       ? Number(retryAfterHeader) * 1000
       : undefined;
-    throw new ApiError(message, code, res.status, json.details as string[] | undefined, retryAfterMs);
+    throw new ApiError(message, code, res.status, json.details as string[] | undefined, retryAfterMs, json);
   }
   return json as T;
 }
@@ -100,4 +103,10 @@ export async function extractBilan(id: number): Promise<ExtractionResult> {
 export async function composeBilan(id: number, sections?: BilanSectionKey[]): Promise<ComposeResult> {
   const r = await call<ComposeResult>(`/${id}/compose`, jsonInit('POST', sections ? { sections } : {}));
   return { bilan: r.bilan, warnings: r.warnings ?? {} };
+}
+
+/** « Rédiger avec l'IA » : extraction, acceptation automatique, rédaction des 7 sections, en un appel. */
+export async function composeBilanFromNotes(id: number): Promise<ComposeFromNotesResult> {
+  const r = await call<ComposeFromNotesResult>(`/${id}/compose-from-notes`, jsonInit('POST'));
+  return { bilan: r.bilan, warnings: r.warnings ?? {}, accepted: r.accepted ?? [], pending: r.pending ?? [], rejected: r.rejected ?? 0 };
 }

@@ -28,12 +28,14 @@ export interface MeasuresDrawerProps {
   onOpenChange: (open: boolean) => void;
   /** ≥ 1024 px : side sheet coplanaire + rail ; sinon bottom sheet. Calculé une fois dans le shell. */
   wide: boolean;
+  /** Citations des mesures acceptées automatiquement, par identité de mesure, le temps de la session */
+  quotes: Map<string, string>;
 }
 
 // Tiroir Mesures (spec flux deux étapes §4) : la surface unique des mesures, montée dans le shell,
 // visible aux deux étapes. Desktop : Material 3 « standard side sheet » réduit en rail.
 // Mobile : « standard bottom sheet » replié en barre. Deux états, jamais absent de l'écran.
-export default function MeasuresDrawer({ record, update, disabled, candidates, rejectedCount, onCandidatesChange, onAnalyze, aiBusy, open, onOpenChange, wide }: MeasuresDrawerProps) {
+export default function MeasuresDrawer({ record, update, disabled, candidates, rejectedCount, onCandidatesChange, onAnalyze, aiBusy, open, onOpenChange, wide, quotes }: MeasuresDrawerProps) {
   const doc = record.document ?? emptyBilanDocument();
   const hasNotes = (record.rawNotes ?? '').trim().length > 0;
   const pending = candidates?.length ?? 0;
@@ -103,7 +105,7 @@ export default function MeasuresDrawer({ record, update, disabled, candidates, r
           <Button type="button" variant="link" size="sm" onClick={() => setCompareOpen(true)} disabled={disabled} className="h-6 px-1 text-xs">{reference ? 'Changer' : 'Choisir'}</Button>
         </div>
       )}
-      <MeasurementsPanel measurements={doc.measurements} onChange={setMeasurements} disabled={disabled} showPresentation previousValues={previousValues} />
+      <MeasurementsPanel measurements={doc.measurements} onChange={setMeasurements} disabled={disabled} showPresentation previousValues={previousValues} quotes={quotes} />
     </div>
   );
 
