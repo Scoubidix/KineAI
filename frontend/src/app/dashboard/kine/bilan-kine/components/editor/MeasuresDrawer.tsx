@@ -120,7 +120,7 @@ export default function MeasuresDrawer({ record, update, disabled, candidates, r
 
   if (wide) {
     return (
-      <aside aria-label="Mesures du bilan" className={`shrink-0 border-l border-border/40 bg-background flex flex-col lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100dvh-4rem)] transition-[width] duration-200 ${open ? 'w-[380px]' : 'w-10'}`}>
+      <aside aria-label="Mesures du bilan" className={`shrink-0 border-l border-border/40 bg-background flex flex-col lg:sticky lg:top-14 lg:self-start lg:max-h-[calc(100dvh-3.5rem)] transition-[width] duration-200 ${open ? 'w-[380px]' : 'w-10'}`}>
         {open ? (
           <>
             <div className="flex items-center gap-2 px-3 py-2 border-b border-border/40">
@@ -145,7 +145,7 @@ export default function MeasuresDrawer({ record, update, disabled, candidates, r
   }
 
   return (
-    <div role="region" aria-label="Mesures du bilan" className={`fixed inset-x-0 bottom-0 z-30 bg-background border-t border-border/40 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] flex flex-col transition-[height] duration-200 ${open ? 'h-[calc(100dvh-4rem)]' : 'h-12'}`}>
+    <div role="region" aria-label="Mesures du bilan" className={`fixed inset-x-0 bottom-0 z-30 bg-background border-t border-border/40 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] flex flex-col transition-[height] duration-200 ${open ? 'h-[calc(100dvh-3.5rem)]' : 'h-12'}`}>
       <div className="flex items-center gap-2 px-3 h-12 shrink-0">
         <button ref={toggleRef} type="button" aria-expanded={open} aria-label={open ? 'Replier les mesures' : 'Ouvrir les mesures'} onClick={() => onOpenChange(!open)} className="flex items-center gap-2 flex-1 min-w-0 h-full text-left">
           <span className="h-1 w-8 rounded-full bg-border shrink-0" aria-hidden />

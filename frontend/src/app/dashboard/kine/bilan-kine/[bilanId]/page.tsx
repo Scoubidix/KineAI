@@ -51,7 +51,8 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
   };
   const openSuggestions = () => {
     setDrawer(true);
-    requestAnimationFrame(() => document.getElementById(DRAWER_SUGGESTIONS_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    // Double rAF : le nœud du tiroir n'existe qu'après le commit React de l'ouverture (commit après l'état, puis défilement)
+    requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(DRAWER_SUGGESTIONS_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' })));
   };
 
   // Citations des mesures acceptées automatiquement à la dernière rédaction (session)
@@ -97,10 +98,14 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
       // Rédaction en échec après l'écriture des mesures : rien n'est perdu, on montre le tableau
       if (e instanceof ApiError && e.code === 'COMPOSE_FAILED' && e.body.measurementsSaved === true) {
         toast({ title: 'Mesures ajoutées, rédaction impossible', description: 'Tes mesures sont dans le tableau. Relance « Rédiger avec l’IA » dans un instant.', variant: 'destructive' });
-        await reload();
+        // Le bandeau et les suggestions de la précédente tentative ne décrivent plus ce bilan
+        setLastRun(null);
+        setCandidates(null);
+        try { await reload(); } catch (err) { handleAiError(err, 'Rechargement impossible'); return; }
         await goTo('document');
         return;
       }
+      if (e instanceof ApiError && e.code === 'EXTRACTION_FAILED') { handleAiError(e, 'Analyse impossible'); return; }
       handleAiError(e, 'Rédaction impossible');
     } finally { setAiBusy(null); aiLockRef.current = false; }
   };
@@ -193,7 +198,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
           onReload={() => { void reload(); }}
           onRetry={() => { void flush(); }}
           onBack={() => { void handleBack(); }}
-          disabled={locked}
+          disabled={locked || aiBusy !== null}
         />
         <BilanStepper step={step} onStep={(s) => { void goTo(s); }} />
         <div className="flex-1 min-h-0 flex">
