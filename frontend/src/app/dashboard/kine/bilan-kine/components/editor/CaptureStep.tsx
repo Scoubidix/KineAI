@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Search, PenLine, Mic, Disc, ArrowRight, Sparkles, Loader2, RefreshCw } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Search, PenLine, Mic, Disc, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
 import type { BilanPatch, BilanRecord } from '@/types/bilan';
 
 export interface StepProps {
@@ -23,42 +24,25 @@ const PLACEHOLDER = `Note tes observations en vrac...
 Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. ATCD : hernie discale L4-L5 opérée 2018. Douleur bas du dos irradiant fesse droite, EVA 5/10 repos 7/10 effort. Flexion lombaire limitée 40°, Lasègue négatif, paravertébraux contracturés...`;
 
 export interface CaptureStepProps extends StepProps {
-  onAnalyze: () => void;
-  analyzing: boolean;
-  /** Une analyse a déjà été faite : les suggestions sont en mémoire à l'étape Mesures */
-  analyzed: boolean;
-  /** Les notes ont changé depuis cette analyse */
-  notesChanged: boolean;
+  /** « Rédiger avec l'IA » : extraction + acceptation + rédaction, puis étape Document */
+  onCompose: () => void;
+  composing: boolean;
 }
 
 // Étape 1 : la source seule (notes écrites aujourd'hui, dictée et transcription demain).
-// Les mesures se saisissent à l'étape suivante, à partir des suggestions de l'analyse.
-export default function CaptureStep({ record, update, disabled, onNext, onAnalyze, analyzing, analyzed, notesChanged }: CaptureStepProps) {
+// Les mesures se saisissent ou se corrigent dans le tiroir, disponible ici comme à l'étape Document.
+export default function CaptureStep({ record, update, disabled, onNext, onCompose, composing }: CaptureStepProps) {
   const notesLength = (record.rawNotes ?? '').length;
   const hasNotes = (record.rawNotes ?? '').trim().length > 0;
+  const anyText = (record.document?.sections ?? []).some((s) => s.text.trim() !== '');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const handleComposeClick = () => { if (anyText) setConfirmOpen(true); else onCompose(); };
+  const hint = hasNotes
+    ? 'L’IA extrait les mesures de tes notes et rédige le bilan ; tu vérifies ensuite'
+    : 'Écris tes notes, ou saisis directement les mesures dans le tiroir';
 
   const modeChip = (icon: React.ReactNode, label: string, active: boolean) => (
     <span title={active ? undefined : 'Bientôt disponible'} className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ${active ? 'bg-[#3899aa]/15 text-[#3899aa]' : 'text-muted-foreground opacity-60'}`}>{icon}{label}</span>
-  );
-
-  // Trois états du pied de page : jamais analysé / analysé et notes inchangées / analysé puis notes modifiées
-  const analyzeIsPrimary = !analyzed || notesChanged;
-  const hint = !analyzed
-    ? 'L’analyse repère les tests et mesures cités dans tes notes ; tu valides ensuite'
-    : notesChanged ? 'Notes modifiées depuis l’analyse : relance-la pour des suggestions à jour' : 'Suggestions prêtes à l’étape Mesures';
-
-  const analyzeButton = (primary: boolean) => (
-    <Button onClick={onAnalyze} disabled={disabled || !hasNotes} variant={primary ? 'default' : 'ghost'} size={primary ? 'default' : 'sm'} className={primary ? 'btn-teal rounded-full px-5 h-9' : 'h-9'}>
-      {analyzing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : analyzed ? <RefreshCw className="h-4 w-4 mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
-      {analyzed ? 'Ré-analyser les notes' : 'Analyser les notes'}
-      {primary && <ArrowRight className="h-4 w-4 ml-1" />}
-    </Button>
-  );
-  const continueButton = (primary: boolean) => (
-    <Button onClick={onNext} disabled={disabled} variant={primary ? 'default' : 'ghost'} size={primary ? 'default' : 'sm'} className={primary ? 'btn-teal rounded-full px-5 h-9' : 'h-9'}>
-      {analyzed ? 'Continuer' : 'Continuer sans analyser'}
-      {primary && <ArrowRight className="h-4 w-4 ml-1" />}
-    </Button>
   );
 
   return (
@@ -81,12 +65,33 @@ export default function CaptureStep({ record, update, disabled, onNext, onAnalyz
           <span className="text-[10px] text-muted-foreground -mt-2 self-end px-1">{notesLength} / 50000</span>
         )}
       </div>
-      <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2">
+      <div className="sticky bottom-12 lg:bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2">
         <span className="text-[11px] text-muted-foreground hidden sm:inline">{hint}</span>
         <div className="flex items-center gap-2 ml-auto">
-          {analyzeIsPrimary ? <>{continueButton(false)}{analyzeButton(true)}</> : <>{analyzeButton(false)}{continueButton(true)}</>}
+          {hasNotes ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={onNext} disabled={disabled} className="h-9">Rédiger moi-même</Button>
+              <Button onClick={handleComposeClick} disabled={disabled || composing} className="btn-teal rounded-full px-5 h-9">
+                {composing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}Rédiger avec l’IA<ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </>
+          ) : (
+            <Button onClick={onNext} disabled={disabled} className="btn-teal rounded-full px-5 h-9">Continuer<ArrowRight className="h-4 w-4 ml-1" /></Button>
+          )}
         </div>
       </div>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remplacer les sections déjà rédigées ?</AlertDialogTitle>
+            <AlertDialogDescription>La rédaction IA écrit les 7 sections à partir de tes notes et de tes mesures. Les textes actuels seront écrasés.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setConfirmOpen(false); onCompose(); }} className="btn-teal">Rédiger</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

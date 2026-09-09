@@ -2,10 +2,9 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 
-export type EditorStep = 'capture' | 'verification' | 'document';
+export type EditorStep = 'capture' | 'document';
 export const STEPS: { key: EditorStep; label: string }[] = [
   { key: 'capture', label: 'Notes' },
-  { key: 'verification', label: 'Mesures' },
   { key: 'document', label: 'Document' },
 ];
 

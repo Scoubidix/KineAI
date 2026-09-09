@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Copy, Mail, Download, Check, Eye, Pencil, UserPlus, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Copy, Mail, Download, Check, Eye, UserPlus, Loader2, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import DocumentSheet from './DocumentSheet';
 import BilanPreviewModal from './BilanPreviewModal';
@@ -118,7 +118,6 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
       </Tooltip>
       <div className="flex items-center gap-2 flex-wrap">
         {hasPrevious && <label className="flex items-center gap-1.5 text-xs"><Switch checked={evolution} onCheckedChange={setEvolution} />Inclure l’évolution</label>}
-        <Button variant="ghost" size="sm" onClick={onBack} className="h-8 text-xs"><Pencil className="h-3.5 w-3.5 mr-1" />Modifier les mesures</Button>
         <Button variant="ghost" size="sm" onClick={() => setPreviewOpen(true)} className="h-8 text-xs"><Eye className="h-3.5 w-3.5 mr-1" />Aperçu A4</Button>
       </div>
     </div>
@@ -147,8 +146,8 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
       <div className="flex-1 px-3 sm:px-4 py-3">
         <div className="flex flex-col gap-3 bg-muted/30 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4">{toolbar}{sheet}</div>
       </div>
-      <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2 flex-wrap">
-        <Button variant="ghost" size="sm" onClick={onBack} className="h-9"><ArrowLeft className="h-4 w-4 mr-1" />Mesures</Button>
+      <div className="sticky bottom-12 lg:bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2 flex-wrap">
+        <Button variant="ghost" size="sm" onClick={onBack} className="h-9"><ArrowLeft className="h-4 w-4 mr-1" />Notes</Button>
         <div className="flex items-center gap-2 ml-auto">
           <Button size="sm" variant="outline" onClick={handleCopy} disabled={busy !== null} className="h-9 rounded-full"><Copy className="h-3.5 w-3.5 sm:mr-1" /><span className="hidden sm:inline">Copier</span></Button>
           <Button size="sm" variant="outline" onClick={handleMail} disabled={busy !== null} className="h-9 rounded-full"><Mail className="h-3.5 w-3.5 sm:mr-1" /><span className="hidden sm:inline">Mail</span></Button>

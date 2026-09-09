@@ -14,15 +14,13 @@ interface SuggestionsPanelProps {
   onMeasurementsChange: (next: DocumentMeasurement[]) => void;
   onCandidatesChange: (next: ExtractionCandidate[]) => void;
   disabled?: boolean;
-  activeId: string | null;
-  onFocusQuote: (id: string) => void;
 }
 
 const fmt = (v: CanonicalValue): string => (typeof v === 'boolean' ? (v ? 'Positif' : 'Négatif') : v === null ? '—' : String(v));
 
-// Bloc « Suggestions » de l'étape Vérification (spec §9.2) : chaque candidat est accepté ou rejeté
+// Bloc « Suggestions » du tiroir Mesures : chaque candidat est accepté ou rejeté
 // explicitement ; « Tout accepter » ignore les conflits et les latéralisés dont le côté n'est pas résolu.
-export default function SuggestionsPanel({ candidates, rejectedCount, measurements, onMeasurementsChange, onCandidatesChange, disabled, activeId, onFocusQuote }: SuggestionsPanelProps) {
+export default function SuggestionsPanel({ candidates, rejectedCount, measurements, onMeasurementsChange, onCandidatesChange, disabled }: SuggestionsPanelProps) {
   const [sides, setSides] = useState<Record<string, Side | null>>({});
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const sideOf = (c: ExtractionCandidate): Side | null => (c.id in sides ? sides[c.id] : c.side);
@@ -60,7 +58,7 @@ export default function SuggestionsPanel({ candidates, rejectedCount, measuremen
       {candidates.length === 0 && <p className="text-xs text-muted-foreground italic">Aucune mesure reconnue dans les notes.</p>}
       <ul className="flex flex-col gap-1.5">
         {rows.map(({ c, side, conflict }) => (
-          <li key={c.id} id={`cand-${c.id}`} className={`rounded-lg border bg-white dark:bg-card p-2 flex flex-col gap-1.5 ${activeId === c.id ? 'border-[#3899aa]' : 'border-border/60'}`}>
+          <li key={c.id} className="rounded-lg border border-border/60 bg-white dark:bg-card p-2 flex flex-col gap-1.5">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium">{c.label}</span>
               {c.kind === 'custom' && <span className="rounded bg-muted px-1.5 text-[10px]">Mesure libre</span>}
@@ -70,7 +68,7 @@ export default function SuggestionsPanel({ candidates, rejectedCount, measuremen
               <span className="flex-1" />
               {c.lateralized && <SideSelector value={side ?? undefined} onChange={(s) => setSide(c, s)} disabled={disabled} />}
             </div>
-            <button type="button" onClick={() => onFocusQuote(c.id)} className="text-left text-[11px] italic text-muted-foreground inline-flex items-center gap-1 hover:text-foreground"><Quote className="h-3 w-3 shrink-0" />« {c.quote} »</button>
+            <span className="text-left text-[11px] italic text-muted-foreground inline-flex items-center gap-1"><Quote className="h-3 w-3 shrink-0" />« {c.quote} »</span>
             <div className="flex items-center gap-1.5 flex-wrap">
               {conflict !== undefined ? (
                 <>

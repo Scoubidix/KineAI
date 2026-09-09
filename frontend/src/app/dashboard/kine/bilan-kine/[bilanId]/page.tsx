@@ -12,12 +12,13 @@ import type { AiBusy, BilanRecord, BilanSectionKey, ExtractionCandidate, Patient
 import BilanEditorHeader from '../components/editor/BilanEditorHeader';
 import BilanStepper, { type EditorStep } from '../components/editor/BilanStepper';
 import CaptureStep from '../components/editor/CaptureStep';
-import VerificationStep from '../components/editor/VerificationStep';
 import DocumentStep from '../components/editor/DocumentStep';
+import MeasuresDrawer, { DRAWER_SUGGESTIONS_ID } from '../components/editor/MeasuresDrawer';
+import { useMinWidth } from '../components/editor/useMinWidth';
 
-const isStep = (s: string | null): s is EditorStep => s === 'capture' || s === 'verification' || s === 'document';
+const isStep = (s: string | null): s is EditorStep => s === 'capture' || s === 'document';
 
-// Éditeur de bilan V1 : un état (useBilanAutosave), trois étapes
+// Éditeur de bilan V1 : un état (useBilanAutosave), deux étapes, tiroir Mesures
 function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialStep: EditorStep }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -28,14 +29,30 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
   // État IA, non persisté (spec §9.2) : candidats d'extraction, appel en cours, avertissements de rédaction
   const [candidates, setCandidates] = useState<ExtractionCandidate[] | null>(null);
   const [rejectedCount, setRejectedCount] = useState(0);
-  // Notes telles qu'analysées : pilote « Ré-analyser » (primaire seulement si elles ont changé)
-  const [analyzedNotes, setAnalyzedNotes] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState<AiBusy>(null);
   const [warnings, setWarnings] = useState<SectionWarnings>({});
   // Garde de réentrance : `aiBusy` n'est posé qu'après le flush, une fenêtre où un double clic
   // lancerait deux appels IA (closure périmée). Le ref, lui, est synchrone.
   const aiLockRef = useRef(false);
   const FLUSH_PENDING = { title: 'Sauvegarde en attente', description: 'Réessaie dans un instant' };
+
+  const wide = useMinWidth(1024);
+  // Tiroir Mesures : état mémorisé par navigateur ; sans valeur, ouvert sur grand écran (≥ 1280)
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('bilan.drawer.open');
+      setDrawerOpen(v === null ? window.matchMedia('(min-width: 1280px)').matches : v === '1');
+    } catch { /* stockage indisponible : replié */ }
+  }, []);
+  const setDrawer = (open: boolean) => {
+    setDrawerOpen(open);
+    try { localStorage.setItem('bilan.drawer.open', open ? '1' : '0'); } catch { /* ignoré */ }
+  };
+  const openSuggestions = () => {
+    setDrawer(true);
+    requestAnimationFrame(() => document.getElementById(DRAWER_SUGGESTIONS_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
 
   const handleAiError = (e: unknown, title: string) => {
     if (e instanceof StaleDraftError) { toast({ title: 'Bilan modifié ailleurs', description: 'Rechargement de la dernière version…' }); void reload(); return; }
@@ -44,7 +61,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
     toast({ title, description: (e as Error).message, variant: 'destructive' });
   };
 
-  // Extraction : flush d'abord (le serveur lit les notes en base), puis étape Vérification
+  // Extraction : flush d'abord (le serveur lit les notes en base), puis ouverture du tiroir Mesures
   const handleAnalyze = async () => {
     if (aiLockRef.current) return;
     aiLockRef.current = true;
@@ -54,8 +71,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
       const r = await extractBilan(record.id);
       setCandidates(r.candidates);
       setRejectedCount(r.rejected);
-      setAnalyzedNotes(record.rawNotes ?? '');
-      await goTo('verification');
+      openSuggestions();
     } catch (e) { handleAiError(e, 'Analyse impossible'); }
     finally { setAiBusy(null); aiLockRef.current = false; }
   };
@@ -81,6 +97,9 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
   };
 
   const clearWarning = (key: BilanSectionKey) => setWarnings((prev) => { if (!(key in prev)) return prev; const next = { ...prev }; delete next[key]; return next; });
+
+  // Rédaction depuis Notes (provisoire jusqu'à la Task 5) : compose puis passage à l'étape Document
+  const composeThenDocument = async () => { if (await handleCompose()) await goTo('document'); };
 
   const goTo = useCallback(async (s: EditorStep) => {
     await flush();
@@ -128,10 +147,12 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
           disabled={locked}
         />
         <BilanStepper step={step} onStep={(s) => { void goTo(s); }} />
-        <div className="flex-1 min-h-0">
-          {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('verification')} onAnalyze={() => { void handleAnalyze(); }} analyzing={aiBusy === 'extract'} analyzed={candidates !== null} notesChanged={candidates !== null && (record.rawNotes ?? '') !== (analyzedNotes ?? '')} />}
-          {step === 'verification' && <VerificationStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onNext={() => goTo('document')} candidates={candidates} rejectedCount={rejectedCount} onCandidatesChange={setCandidates} onAnalyze={() => { void handleAnalyze(); }} onCompose={() => handleCompose()} aiBusy={aiBusy} />}
-          {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('verification')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} />}
+        <div className="flex-1 min-h-0 flex">
+          <div className="flex-1 min-w-0 pb-12 lg:pb-0">
+            {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('document')} onCompose={() => { void composeThenDocument(); }} composing={aiBusy === 'compose'} />}
+            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} />}
+          </div>
+          <MeasuresDrawer record={record} update={update} disabled={locked || aiBusy !== null} candidates={candidates} rejectedCount={rejectedCount} onCandidatesChange={setCandidates} onAnalyze={() => { void handleAnalyze(); }} aiBusy={aiBusy} open={drawerOpen} onOpenChange={setDrawer} wide={wide} />
         </div>
       </div>
     </TooltipProvider>
@@ -147,7 +168,7 @@ export default function BilanEditorPage() {
 
   const bilanId = Number(params.bilanId);
   const stepParam = searchParams.get('step');
-  const initialStep: EditorStep = isStep(stepParam) ? stepParam : 'capture';
+  const initialStep: EditorStep = stepParam === 'verification' ? 'document' : isStep(stepParam) ? stepParam : 'capture';
 
   useEffect(() => {
     if (!Number.isInteger(bilanId) || bilanId <= 0) { setState({ status: 'error', message: 'Identifiant de bilan invalide' }); return; }

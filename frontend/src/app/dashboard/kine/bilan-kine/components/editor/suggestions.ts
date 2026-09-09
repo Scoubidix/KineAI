@@ -37,39 +37,6 @@ export function formatCandidateValue(c: ExtractionCandidate): string {
   return c.value;
 }
 
-// Forme « plate » d'un texte (NFD sans diacritiques, minuscules) avec la correspondance
-// index plat → index dans la chaîne NFD, pour retrouver un extrait à la casse et aux accents près.
-function flatten(text: string): { plain: string; map: number[]; nfd: string } {
-  const nfd = text.normalize('NFD');
-  let plain = '';
-  const map: number[] = [];
-  for (let i = 0; i < nfd.length; i += 1) {
-    const code = nfd.charCodeAt(i);
-    if (code >= 0x300 && code <= 0x36f) continue;
-    plain += nfd[i].toLowerCase();
-    map.push(i);
-  }
-  return { plain, map, nfd };
-}
-
-/** Positions (dans `notes.normalize('NFD')`) des extraits cités, triées, sans chevauchement. */
-export function findQuoteRanges(notes: string, quotes: { id: string; quote: string }[]): { id: string; start: number; end: number }[] {
-  const { plain, map } = flatten(notes);
-  const ranges: { id: string; start: number; end: number }[] = [];
-  for (const q of quotes) {
-    const needle = flatten(q.quote.trim()).plain;
-    if (!needle) continue;
-    const idx = plain.indexOf(needle);
-    if (idx === -1) continue;
-    ranges.push({ id: q.id, start: map[idx], end: map[idx + needle.length - 1] + 1 });
-  }
-  ranges.sort((a, b) => a.start - b.start);
-  const out: typeof ranges = [];
-  let cursor = 0;
-  for (const r of ranges) { if (r.start >= cursor) { out.push(r); cursor = r.end; } }
-  return out;
-}
-
 /**
  * Lignes du bilan de référence absentes du document, ajoutées VIDES (origine « previous ») :
  * le kiné ressaisit la mesure du jour, la valeur antérieure s'affiche à côté de la ligne.
