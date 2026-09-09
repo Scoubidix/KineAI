@@ -13,23 +13,33 @@ const { BILAN_TYPE_LABELS } = require('./bilanRenderer/format');
 
 const SECTION_TEXT_MAX = 5000;
 
+const { STYLE_PRINCIPLES, STYLE_EXAMPLES } = require('../data/bilanStyleExamples');
+
 const SECTION_GUIDE = {
-  anamnese: 'identité fonctionnelle (âge, profession, activités), motif, histoire de la plainte, attentes du patient',
-  antecedents: 'antécédents médicaux et chirurgicaux, traitements en cours',
-  examen: 'ce que le tableau ne dit pas : observation, palpation, qualité et tolérance du mouvement, comportement douloureux ; aucune valeur chiffrée de mesure',
-  limitations: 'retentissement fonctionnel, activités limitées, restrictions de participation',
-  diagnostic: 'diagnostic kinésithérapique : déficiences, limitations, hypothèses',
-  objectifs: 'objectifs de rééducation à court et moyen terme',
-  traitement: 'moyens et plan de traitement envisagés',
+  anamnese: 'commence par le motif de consultation et son ancienneté tels qu\'écrits dans les notes (ex. « consulte pour une lombalgie évoluant depuis trois mois »), puis qui est le patient (âge, profession, activités), histoire de la plainte, attentes',
+  antecedents: 'antécédents et traitements réellement rapportés, en une phrase',
+  examen: 'synthèse interprétative : ce que les signes et les tests, nommés sans leurs valeurs, suggèrent ensemble (observation, palpation, qualité du mouvement, tests positifs ou négatifs qui orientent)',
+  limitations: 'uniquement les limitations d\'activité et restrictions de participation rapportées dans les notes ; sinon chaîne vide',
+  diagnostic: 'hypothèse kinésithérapique : déficiences, limitations, restrictions, deux ou trois dominantes, pronostic prudent',
+  objectifs: 'uniquement les objectifs formulés dans les notes ou par le patient, à court, moyen et long terme ; sinon chaîne vide',
+  traitement: 'uniquement le plan, le protocole ou les consignes présents dans les notes ; sinon chaîne vide',
 };
 
-const SYSTEM_PROMPT = `Tu rédiges des comptes-rendus de bilan pour un kinésithérapeute, en français, à la troisième personne, en prose médicale neutre et concise. Tu renvoies uniquement un objet JSON {"sections":{...}} avec exactement les clés demandées.
+const SYSTEM_PROMPT = `Tu rédiges des bilans diagnostiques kinésithérapiques (BDK) pour un kinésithérapeute, en français. Tu renvoies uniquement un objet JSON {"sections":{...}} avec exactement les clés demandées.
 Règles absolues :
 - Tu n'utilises QUE les informations présentes dans les notes, le motif et les mesures fournies. Interdiction d'inventer, de supposer ou de compléter.
 - Interdiction d'écrire un chiffre qui n'apparaît pas dans les notes ou dans les mesures fournies.
-- Si les notes ne contiennent rien pour une section, renvoie une chaîne vide "" pour cette section. Ne commente jamais une absence d'information.
-- Pas de titre, pas de puces, pas de retour à la ligne superflu : un ou deux paragraphes courts par section.
-- Les mesures listées comme « déjà présentées en tableau » ne doivent être ni citées ni chiffrées dans le texte : le document les affiche à part.`;
+- Si les notes ne contiennent rien pour une section, renvoie une chaîne vide "" pour cette section. Si elles ne contiennent que des mesures, une phrase de synthèse suffit.
+- Pas de titre, pas de puces, pas de retour à la ligne superflu.
+- Les mesures listées comme « déjà présentées en tableau » ne doivent pas être chiffrées dans le texte ; un test peut être nommé quand il sert le raisonnement.
+Style attendu :
+${STYLE_PRINCIPLES.map((p) => `- ${p}`).join('\n')}
+Des exemples de style te sont fournis : imite leur forme, leur longueur et leur façon de raisonner ; ne reprends jamais leur contenu, qui concerne d'autres patients. Leurs sections sont toutes remplies parce que leurs notes l'étaient : si les notes ne disent rien pour une section, en particulier limitations, objectifs et traitement, laisse-la vide plutôt que de proposer un plan.`;
+
+// Exemples de style limités aux sections demandées (les autres n'apportent rien et coûtent des tokens)
+function formatStyleExamples(keys) {
+  return STYLE_EXAMPLES.map((ex) => [`Exemple — ${ex.title} :`, ...keys.map((k) => `[${SECTION_TITLES[k]}] ${ex.sections[k]}`)].join('\n')).join('\n\n');
+}
 
 // Mesures narratives renseignées, formatées « Libellé (côté) : valeur unité »
 function formatNarrativeMeasurements(measurements, catalog) {
@@ -118,6 +128,9 @@ function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys 
     '',
     'Sections à rédiger (clé : titre — contenu attendu) :',
     keys.map((k) => `- ${k} : ${SECTION_TITLES[k]} — ${SECTION_GUIDE[k]}`).join('\n'),
+    '',
+    'Exemples de style (forme à imiter, contenu à ne jamais reprendre) :',
+    formatStyleExamples(keys),
   ].join('\n');
   return [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: user }];
 }
