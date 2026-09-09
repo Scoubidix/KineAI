@@ -199,7 +199,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
         <div className="flex-1 min-h-0 flex">
           <div className="flex-1 min-w-0 pb-12 lg:pb-0">
             {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('document')} onCompose={() => { void handleComposeFromNotes(); }} composing={aiBusy === 'compose_from_notes'} />}
-            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} onComposeFromNotes={() => { void handleComposeFromNotes(); }} lastRun={lastRun} onVerify={openSuggestions} onDismissRun={() => setLastRun(null)} />}
+            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} onComposeFromNotes={() => { void handleComposeFromNotes(); }} lastRun={lastRun} onVerify={openSuggestions} onDismissRun={() => setLastRun(null)} wide={wide} />}
           </div>
           <MeasuresDrawer record={record} update={update} disabled={locked || aiBusy !== null} candidates={candidates} rejectedCount={rejectedCount} onCandidatesChange={setCandidates} onAnalyze={() => { void handleAnalyze(); }} aiBusy={aiBusy} open={drawerOpen} onOpenChange={setDrawer} wide={wide} quotes={quotes} />
         </div>

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -10,6 +11,7 @@ import { ArrowLeft, Copy, Mail, Download, Check, Eye, UserPlus, Loader2, Sparkle
 import { useToast } from '@/hooks/use-toast';
 import DocumentSheet from './DocumentSheet';
 import BilanPreviewModal from './BilanPreviewModal';
+import { DRAWER_ACTIONS_ID } from './MeasuresDrawer';
 import PatientCombobox from '../PatientCombobox';
 import { attachPatient, finalizeBilan, ApiError } from '@/utils/bilanApi';
 import { fetchBilanRender, downloadBilanPdf, bilanRenderToText } from '@/utils/bilanExport';
@@ -32,11 +34,13 @@ export interface DocumentStepProps {
   lastRun: { extracted: number; pending: number } | null;
   onVerify: () => void;
   onDismissRun: () => void;
+  /** ≥ 1024 px : pied de page classique. Sinon, les actions se fondent dans la barre repliée du tiroir. */
+  wide: boolean;
 }
 
 const FLUSH_PENDING_TOAST = { title: 'Sauvegarde en attente, réessaie dans un instant' };
 
-export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited, onComposeFromNotes, lastRun, onVerify, onDismissRun }: DocumentStepProps) {
+export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited, onComposeFromNotes, lastRun, onVerify, onDismissRun, wide }: DocumentStepProps) {
   const { toast } = useToast();
   const doc = record.document ?? emptyBilanDocument();
   const [evolution, setEvolution] = useState(false);
@@ -150,14 +154,28 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
   );
 
   const saveButton = finalized ? (
-    <Button disabled className="rounded-full h-9 px-4"><Check className="h-4 w-4 mr-1" />Enregistré</Button>
+    <Button disabled aria-label="Enregistré" className="rounded-full h-9 px-4"><Check className="h-4 w-4 lg:mr-1" /><span className="hidden lg:inline">Enregistré</span></Button>
   ) : record.patient ? (
-    <Button onClick={doFinalize} disabled={disabled || busy !== null} className="btn-teal rounded-full h-9 px-4">{busy === 'save' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}Enregistrer pour {record.patient.firstName}</Button>
+    <Button onClick={doFinalize} disabled={disabled || busy !== null} aria-label={`Enregistrer pour ${record.patient.firstName}`} className="btn-teal rounded-full h-9 px-4">{busy === 'save' ? <Loader2 className="h-4 w-4 lg:mr-1 animate-spin" /> : <Check className="h-4 w-4 lg:mr-1" />}<span className="hidden lg:inline">Enregistrer pour {record.patient.firstName}</span></Button>
   ) : (
     <Popover open={attachOpen} onOpenChange={setAttachOpen}>
-      <PopoverTrigger asChild><Button disabled={disabled || busy !== null} className="btn-teal rounded-full h-9 px-4"><UserPlus className="h-4 w-4 mr-1" />Associer à un patient</Button></PopoverTrigger>
+      <PopoverTrigger asChild><Button disabled={disabled || busy !== null} aria-label="Associer à un patient" className="btn-teal rounded-full h-9 px-4"><UserPlus className="h-4 w-4 lg:mr-1" /><span className="hidden lg:inline">Associer à un patient</span></Button></PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-3"><p className="text-xs text-muted-foreground mb-2">Le bilan sera enregistré pour ce patient</p><PatientCombobox value={null} onChange={handleAttachAndFinalize} /></PopoverContent>
     </Popover>
+  );
+
+  // Mobile : la barre repliée du tiroir est aussi le pied de page d'actions (une seule rangée).
+  // L'hôte existe dès que le tiroir a rendu sa mise en page mobile (même rendu que `wide`).
+  const [actionsHost, setActionsHost] = useState<HTMLElement | null>(null);
+  useEffect(() => { setActionsHost(wide ? null : document.getElementById(DRAWER_ACTIONS_ID)); }, [wide]);
+
+  const actions = (
+    <>
+      <Button size="sm" variant="outline" onClick={handleCopy} disabled={busy !== null} aria-label="Copier" className="h-9 rounded-full"><Copy className="h-3.5 w-3.5 lg:mr-1" /><span className="hidden lg:inline">Copier</span></Button>
+      <Button size="sm" variant="outline" onClick={handleMail} disabled={busy !== null} aria-label="Envoyer par mail" className="h-9 rounded-full"><Mail className="h-3.5 w-3.5 lg:mr-1" /><span className="hidden lg:inline">Mail</span></Button>
+      <Button size="sm" variant="outline" onClick={handlePdf} disabled={busy !== null} aria-label="Télécharger le PDF" className="h-9 rounded-full">{busy === 'pdf' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5 lg:mr-1" />}<span className="hidden lg:inline">PDF</span></Button>
+      {saveButton}
+    </>
   );
 
   return (
@@ -165,15 +183,12 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
       <div className="flex-1 px-3 sm:px-4 py-3">
         <div className="flex flex-col gap-3 bg-muted/30 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4">{toolbar}{banner}{sheet}</div>
       </div>
-      <div className="sticky bottom-12 lg:bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2 flex-wrap">
-        <Button variant="ghost" size="sm" onClick={onBack} className="h-9"><ArrowLeft className="h-4 w-4 mr-1" />Notes</Button>
-        <div className="flex items-center gap-2 ml-auto">
-          <Button size="sm" variant="outline" onClick={handleCopy} disabled={busy !== null} className="h-9 rounded-full"><Copy className="h-3.5 w-3.5 sm:mr-1" /><span className="hidden sm:inline">Copier</span></Button>
-          <Button size="sm" variant="outline" onClick={handleMail} disabled={busy !== null} className="h-9 rounded-full"><Mail className="h-3.5 w-3.5 sm:mr-1" /><span className="hidden sm:inline">Mail</span></Button>
-          <Button size="sm" variant="outline" onClick={handlePdf} disabled={busy !== null} className="h-9 rounded-full">{busy === 'pdf' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5 sm:mr-1" />}<span className="hidden sm:inline">PDF</span></Button>
-          {saveButton}
+      {actionsHost ? createPortal(actions, actionsHost) : (
+        <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2 flex-wrap">
+          <Button variant="ghost" size="sm" onClick={onBack} className="h-9"><ArrowLeft className="h-4 w-4 mr-1" />Notes</Button>
+          <div className="flex items-center gap-2 ml-auto">{actions}</div>
         </div>
-      </div>
+      )}
       <AlertDialog open={composeConfirmOpen} onOpenChange={setComposeConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
