@@ -90,6 +90,7 @@ def create_app(transcriber_factory=None, load_on_startup=True) -> FastAPI:
         authorization = request.headers.get("authorization", "")
         expected = f"Bearer {token}".encode()
         if not token or not secrets.compare_digest(authorization.encode("latin-1", "ignore"), expected):
+            log.warning("jeton refusé")
             raise HTTPException(status_code=401, detail="jeton invalide")
         if state["transcriber"] is None:
             return JSONResponse({"error": "loading"}, status_code=503, headers={"Retry-After": "10"})

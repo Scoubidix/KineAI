@@ -41,7 +41,11 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
   const [confirmOpen, setConfirmOpen] = useState(false);
   const handleComposeClick = () => { if (anyText) setConfirmOpen(true); else onCompose(); };
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const caretPos = () => { const el = textareaRef.current; return el && document.activeElement === el ? el.selectionStart : (record.rawNotes ?? '').length; };
+  // Dernière position de caret connue : le clic sur « Dicter » (mousedown neutralisé) garde en général
+  // le focus sur le textarea, mais on retombe ici si le focus a bougé entre-temps (ex. clavier virtuel).
+  const lastCaretRef = useRef<number | null>(null);
+  const rememberCaret = (e: React.SyntheticEvent<HTMLTextAreaElement>) => { lastCaretRef.current = e.currentTarget.selectionStart; };
+  const caretPos = () => { const el = textareaRef.current; return el && document.activeElement === el ? el.selectionStart : (lastCaretRef.current ?? (record.rawNotes ?? '').length); };
   const dictating = dictation.state.status === 'recording' || dictation.state.inFlight > 0;
   const hint = dictating
     ? 'Transcription en cours…'
@@ -67,7 +71,7 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
           <span className="text-xs font-medium text-[#3899aa] shrink-0">Motif</span>
           <Input value={record.motif ?? ''} onChange={(e) => update({ motif: e.target.value })} placeholder="Ex : Lombalgie chronique, rééducation post-opératoire..." disabled={disabled} maxLength={500} className="border-0 border-b border-border/60 rounded-none bg-transparent text-sm h-8 px-2 focus-visible:ring-0" />
         </div>
-        <Textarea ref={textareaRef} value={record.rawNotes ?? ''} onChange={(e) => update({ rawNotes: e.target.value })} placeholder={PLACEHOLDER} disabled={disabled} maxLength={50000} className="min-h-[320px] lg:min-h-[480px] text-sm leading-relaxed resize-y rounded-xl border-2 border-border/60 bg-white dark:bg-card p-4 focus-visible:ring-[#3899aa]/50" />
+        <Textarea ref={textareaRef} value={record.rawNotes ?? ''} onChange={(e) => update({ rawNotes: e.target.value })} onSelect={rememberCaret} onBlur={rememberCaret} placeholder={PLACEHOLDER} disabled={disabled} maxLength={50000} className="min-h-[320px] lg:min-h-[480px] text-sm leading-relaxed resize-y rounded-xl border-2 border-border/60 bg-white dark:bg-card p-4 focus-visible:ring-[#3899aa]/50" />
         <DictationBar state={dictation.state} disabled={!!disabled} onStart={() => { void dictation.start(caretPos()); }} onStop={dictation.stop} onRetry={dictation.retryFailed} onIgnore={dictation.ignoreFailed} />
         {notesLength > 45000 && (
           <span className="text-[10px] text-muted-foreground -mt-2 self-end px-1">{notesLength} / 50000</span>

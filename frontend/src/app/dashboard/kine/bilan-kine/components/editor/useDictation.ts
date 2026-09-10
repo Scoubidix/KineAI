@@ -12,6 +12,7 @@ export interface DictationState {
   available: boolean;          // worker configuré et prêt (statut serveur)
   supported: boolean;          // MediaRecorder + format audio disponibles
   status: 'idle' | 'recording';
+  starting: boolean;           // start() en cours (avant que le micro soit acquis) : évite un double départ
   elapsedMs: number;
   level: number;               // 0..1
   inFlight: number;            // segments envoyés, pas encore revenus (toutes prises)
@@ -42,10 +43,12 @@ export interface UseDictationArgs {
 }
 
 export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: UseDictationArgs) {
-  const [state, setState] = useState<DictationState>({ available: false, supported: true, status: 'idle', elapsedMs: 0, level: 0, inFlight: 0, failed: 0, permissionDenied: false });
+  const [state, setState] = useState<DictationState>({ available: false, supported: true, status: 'idle', starting: false, elapsedMs: 0, level: 0, inFlight: 0, failed: 0, permissionDenied: false });
   const patch = useCallback((p: Partial<DictationState>) => setState((s) => ({ ...s, ...p })), []);
 
   const recorderRef = useRef<DictationRecorder | null>(null);
+  const startingRef = useRef(false);   // start() en vol (avant que recorderRef soit posé) : bloque un second départ
+  const availableRef = useRef(false);  // dernière disponibilité connue, lue en synchrone dans start()
   const currentRef = useRef<Take | null>(null);       // prise en cours d'enregistrement
   const takesRef = useRef(new Set<Take>());           // prises vivantes (segments en vol ou en échec)
   const notesRef = useRef(notes);
@@ -73,12 +76,27 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
     knownRef.current = notes;
   }, [notes]);
 
+  // Statut du worker : mis en cache 30 s côté serveur (cf. bilanApi). Rafraîchi au montage, puis
+  // toutes les 30 s tant qu'indisponible (le worker peut redémarrer pendant la session), et avant
+  // chaque tentative de départ si la dernière valeur connue est « indisponible ».
+  const refreshAvailability = useCallback(async () => {
+    const ok = await getDictationStatus().catch(() => false);
+    availableRef.current = ok;
+    patch({ available: ok });
+    return ok;
+  }, [patch]);
+
   useEffect(() => {
     patch({ supported: pickMimeType() !== null });
-    let cancelled = false;
-    getDictationStatus().then((ok) => { if (!cancelled) patch({ available: ok }); }).catch(() => { if (!cancelled) patch({ available: false }); });
-    return () => { cancelled = true; };
   }, [patch]);
+
+  useEffect(() => { void refreshAvailability(); }, [refreshAvailability]);
+
+  useEffect(() => {
+    if (state.available) return;
+    const timer = setInterval(() => { void refreshAvailability(); }, 30_000);
+    return () => clearInterval(timer);
+  }, [state.available, refreshAvailability]);
 
   // Insère les segments contigus prêts d'une prise, puis retire la prise si elle est terminée
   const drain = useCallback((take: Take) => {
@@ -142,10 +160,16 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
   }, [patch]);
 
   const start = useCallback(async (caretPos: number) => {
-    if (!enabled || recorderRef.current) return;
+    if (!enabled || startingRef.current || recorderRef.current) return;
+    if (!availableRef.current) {
+      const ok = await refreshAvailability();
+      if (!ok) return;
+    }
     const mimeType = pickMimeType();
     if (!mimeType) { patch({ supported: false }); return; }
     const take: Take = { id: crypto.randomUUID(), mimeType, anchor: Math.min(Math.max(caretPos, 0), notesRef.current.length), started: true, nextIndex: 0, results: new Map(), failed: new Map(), lastText: '', inFlight: 0, recording: true };
+    startingRef.current = true;
+    patch({ starting: true });
     const rec = new DictationRecorder(mimeType, {
       onSegment: (blob, index) => { void sendSegment(take, blob, index); },
       onLevel: (level) => patch({ level }),
@@ -161,17 +185,19 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
       // NotAllowedError/SecurityError : permission refusée. NotFoundError/NotReadableError : pas de micro
       // utilisable, meme message que « permission refusée » côté UI. Autre chose : format non supporté.
       if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'SecurityError' || e.name === 'NotFoundError' || e.name === 'NotReadableError')) {
-        patch({ permissionDenied: true });
+        patch({ permissionDenied: true, starting: false });
       } else {
-        patch({ supported: false });
+        patch({ supported: false, starting: false });
       }
+      startingRef.current = false;
       return;
     }
     takesRef.current.add(take);
     currentRef.current = take;
     recorderRef.current = rec;
-    patch({ status: 'recording', elapsedMs: 0, permissionDenied: false });
-  }, [enabled, sendSegment, stop, drain, patch]);
+    startingRef.current = false;
+    patch({ status: 'recording', starting: false, elapsedMs: 0, permissionDenied: false });
+  }, [enabled, sendSegment, stop, drain, patch, refreshAvailability]);
 
   const retryFailed = useCallback(() => {
     for (const take of takesRef.current) {

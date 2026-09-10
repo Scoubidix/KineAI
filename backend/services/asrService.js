@@ -6,7 +6,8 @@ const { DICTATION_VOCABULARY } = require('../data/dictationVocabulary');
 
 const HEALTH_CACHE_MS = 30_000;
 const HEALTH_TIMEOUT_MS = 3_000;
-const REQUEST_TIMEOUT_MS = 60_000;
+// Sur un flavor CPU partagé, un segment de 45 s peut demander 30 s de file + 45 s de calcul
+const REQUEST_TIMEOUT_MS = Number(process.env.ASR_REQUEST_TIMEOUT_MS) || 90_000;
 const PREV_TEXT_MAX_WORDS = 80;
 const PROMPT_MAX_WORDS = 200;
 

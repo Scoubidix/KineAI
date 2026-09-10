@@ -39,18 +39,21 @@ export class DictationRecorder {
   constructor(mimeType: string, private cb: RecorderCallbacks) { this.mimeType = mimeType; }
 
   async start(): Promise<void> {
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Créé de façon synchrone, avant le premier await, pour rester dans le geste utilisateur du
+    // clic : Safari iOS crée sinon l'AudioContext à l'état "suspended" et le vumètre reste muet.
+    this.ctx = new AudioContext();
     try {
-      this.ctx = new AudioContext();
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const source = this.ctx.createMediaStreamSource(this.stream);
       this.analyser = this.ctx.createAnalyser();
       this.analyser.fftSize = 1024;
       source.connect(this.analyser);
+      if (this.ctx.state === 'suspended') await this.ctx.resume();
       this.takeStart = Date.now();
       this.startSegment();
       this.timer = setInterval(() => this.sample(), LEVEL_INTERVAL_MS);
     } catch (e) {
-      // Échec après l'obtention du micro (AudioContext, MediaRecorder...) : tout libérer avant de relayer l'erreur
+      // Échec après la création du contexte (permission micro refusée, MediaRecorder...) : tout libérer avant de relayer l'erreur
       if (this.timer) clearInterval(this.timer);
       this.stream?.getTracks().forEach((t) => t.stop());
       void this.ctx?.close();
@@ -104,6 +107,7 @@ export class DictationRecorder {
     const now = Date.now();
     this.cb.onLevel(Math.min(1, rms * 8));
     this.cb.onTick(now - this.takeStart);
+    if (this.stopping) return; // après l'arrêt, plus aucune rotation de segment
     // Plancher de bruit : minimum glissant du RMS sur toute la prise ; les 10 premiers échantillons
     // servent uniquement à l'initialiser avant d'activer la détection de silence.
     this.sampleCount += 1;

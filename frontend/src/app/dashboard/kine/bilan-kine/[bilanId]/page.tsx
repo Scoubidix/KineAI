@@ -190,7 +190,11 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
     }
   };
 
+  // Prise en cours ou segments pas encore revenus : quitter maintenant les perdrait
+  const dictating = dictation.state.status === 'recording' || dictation.state.inFlight > 0;
+
   const handleBack = async () => {
+    if (dictating) { toast({ title: 'Transcription en cours', description: 'Attends la fin de la dictée avant de quitter' }); return; }
     const ok = await flush();
     if (!ok) { toast({ title: 'Sauvegarde en attente', description: 'Réessaie dans un instant' }); return; }
     router.push('/dashboard/kine/bilan-kine');
@@ -210,7 +214,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
           onReload={() => { void reload(); }}
           onRetry={() => { void flush(); }}
           onBack={() => { void handleBack(); }}
-          disabled={locked || aiBusy !== null}
+          disabled={locked || aiBusy !== null || dictating}
         />
         <BilanStepper step={step} onStep={(s) => { void goTo(s); }} />
         <div className="flex-1 min-h-0 flex">

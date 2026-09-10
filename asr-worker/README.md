@@ -74,17 +74,39 @@ de fond au démarrage, le serveur écoute dès le lancement), `"ok"` (code `200`
 
 ## Déploiement (Clever Cloud)
 
-- Runtime Python 3.12
+- Runtime Python 3.13 (`CC_PYTHON_VERSION=3.13` — le lock `requirements.lock` a été figé sous
+  3.13.7, à utiliser tel quel)
+- `CC_PIP_REQUIREMENTS_FILE=requirements.lock` : indique à Clever Cloud d'installer le lock, pas
+  `requirements.txt`. `requirements.txt` reste le fichier de dev (inclut tests, edge-tts, jiwer,
+  inutiles — et plus lourds — en production)
 - `CC_RUN_COMMAND=uvicorn app:app --host 0.0.0.0 --port 8080 --workers 1`
 - `CC_POST_BUILD_HOOK=python download_model.py` (télécharge le modèle dans `./models` au build,
   pour que les instances ajoutées par le scaling démarrent sans réseau)
 - `ASR_MODEL_PATH=./models/large-v3-turbo`
-- Health check : `/healthz`
+- `CC_HEALTH_CHECK_PATH=/healthz` — répond `503 {"status": "loading"}` pendant 30 à 90 s après le
+  démarrage (chargement du modèle en tâche de fond, cf. « Lancement local » ci-dessus) : le health
+  check de déploiement doit tolérer cette fenêtre (Clever Cloud attend le premier `2xx`, mais le
+  délai avant qu'il arrive dépend de sa propre config de retry/timeout — à vérifier au premier
+  déploiement).
 - Flavor : M
 - Scaling : 1 → 3 instances
 - Dimensionnement : `ASR_SLOTS × ASR_THREADS` ne doit pas dépasser le nombre de vCPU du flavor
   (chaque place tourne `ASR_THREADS` threads CPU, et `ASR_SLOTS` places peuvent tourner en
   parallèle via `num_workers` faster-whisper).
+
+### Dimensionnement avant ouverture sur staging
+
+Le RTF du bench ci-dessous (0,26-0,37) a été mesuré sur un poste de développement (i7 de bureau),
+pas sur le flavor Clever Cloud réel. Avant d'ouvrir la fonctionnalité sur staging, relancer le
+bench HTTP contre le worker déployé :
+
+```bash
+python eval/bench.py --url https://<worker> --concurrency 2 --only dictee-01
+```
+
+Si le RTF mesuré dépasse 0,7, augmenter `ASR_REQUEST_TIMEOUT_MS` côté backend (défaut 90 000 ms)
+et/ou réduire `MAX_SEGMENT_MS` dans `dictationRecorder.ts` (front) pour raccourcir les segments
+envoyés.
 
 ## Bench
 

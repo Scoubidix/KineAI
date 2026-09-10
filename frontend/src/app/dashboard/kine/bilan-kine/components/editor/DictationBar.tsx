@@ -29,7 +29,8 @@ export default function DictationBar({ state, disabled, onStart, onStop, onRetry
       <Tooltip>
         <TooltipTrigger asChild>
           <span>
-            <Button type="button" size="sm" variant={recording ? 'destructive' : 'outline'} onClick={recording ? onStop : onStart} disabled={disabled || unavailable} aria-pressed={recording} className="h-8 rounded-full text-xs">
+            {/* Empêche le mousedown de déplacer le focus hors du textarea avant le clic : sinon caretPos() ne peut plus lire la sélection */}
+            <Button type="button" size="sm" variant={recording ? 'destructive' : 'outline'} onMouseDown={(e) => e.preventDefault()} onClick={recording ? onStop : onStart} disabled={disabled || unavailable || state.starting} aria-pressed={recording} className="h-8 rounded-full text-xs">
               {recording ? <Square className="h-3.5 w-3.5 mr-1" /> : <Mic className="h-3.5 w-3.5 mr-1" />}{recording ? `Arrêter · ${mmss(state.elapsedMs)}` : 'Dicter'}
             </Button>
           </span>

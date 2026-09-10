@@ -141,6 +141,8 @@ const corsOptions = {
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  // Le front lit ce délai pour réessayer la dictée et l'autosave (sinon invisible cross-origin)
+  exposedHeaders: ['Retry-After'],
   credentials: true, // Important pour les cookies et JWT
   optionsSuccessStatus: 200 // Pour les anciens navigateurs
 };
