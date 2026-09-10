@@ -70,13 +70,16 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
   onAutoStopRef.current = onAutoStop;
 
   const refreshCounts = useCallback(() => {
-    let inFlight = 0; let failed = 0; let done = 0; let total: number | null = 0; let correcting = false;
+    let inFlight = 0; let failed = 0; let done = 0; let total: number | null = 0; let correcting = false; let recording = false;
     for (const t of takesRef.current) {
       inFlight += t.inFlight; failed += t.failed.size; done += t.results.size;
       if (t.total === null) total = null; else if (total !== null) total += t.total;
       if (t.correcting) correcting = true;
+      // Une prise encore `recording` compte comme enregistrement même à 0 segment en vol : entre stop()
+      // (qui vide recorderRef tout de suite) et le dernier `dataavailable` du recorder, sinon la phase
+      // clignoterait sur idle le temps que le dernier segment parte.
+      if (t.recording) recording = true;
     }
-    const recording = recorderRef.current !== null;
     const phase: DictationState['phase'] = recording ? 'recording' : correcting ? 'correcting' : (inFlight > 0 || failed > 0) ? 'transcribing' : 'idle';
     patch({ inFlight, failed, segmentsDone: done, segmentsTotal: total, phase });
   }, [patch]);
@@ -122,14 +125,23 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
     if (!raw) { takesRef.current.delete(take); refreshCounts(); return; }
     take.correcting = true;
     refreshCounts();
+    // Sans délai, une requête qui ne répond jamais bloquerait la prise et son texte ne serait jamais inséré.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60_000);
     let text = raw;
-    try { text = (await correctDictation(bilanId, { text: raw, mode: 'dictation' })).text || raw; } catch { /* texte brut */ }
-    const r = insertSegment(notesRef.current, take.anchor, text, true);
-    const delta = r.notes.length - notesRef.current.length;
-    for (const other of takesRef.current) if (other !== take && other.anchor >= take.anchor) other.anchor += delta;
-    if (r.notes !== notesRef.current) { knownRef.current = r.notes; notesRef.current = r.notes; setNotesRef.current(r.notes); }
-    takesRef.current.delete(take);
-    refreshCounts();
+    try {
+      text = (await correctDictation(bilanId, { text: raw, mode: 'dictation' }, controller.signal)).text || raw;
+    } catch {
+      text = raw;
+    } finally {
+      clearTimeout(timer);
+      const r = insertSegment(notesRef.current, take.anchor, text, true);
+      const delta = r.notes.length - notesRef.current.length;
+      for (const other of takesRef.current) if (other !== take && other.anchor >= take.anchor) other.anchor += delta;
+      if (r.notes !== notesRef.current) { knownRef.current = r.notes; notesRef.current = r.notes; setNotesRef.current(r.notes); }
+      takesRef.current.delete(take);
+      refreshCounts();
+    }
   }, [bilanId, refreshCounts]);
 
   const sendSegment = useCallback(async (take: Take, blob: Blob, index: number) => {

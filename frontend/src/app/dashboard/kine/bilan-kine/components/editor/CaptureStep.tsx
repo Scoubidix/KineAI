@@ -58,7 +58,9 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
   const rememberCaret = (e: React.SyntheticEvent<HTMLTextAreaElement>) => { lastCaretRef.current = e.currentTarget.selectionStart; };
   const caretPos = () => { const el = textareaRef.current; return el && document.activeElement === el ? el.selectionStart : (lastCaretRef.current ?? (record.rawNotes ?? '').length); };
   const dictating = dictation.state.phase !== 'idle';
-  const hint = dictating
+  const hint = dictation.state.phase === 'correcting'
+    ? 'Correction des termes en cours…'
+    : dictating
     ? 'Transcription en cours…'
     : hasNotes
     ? 'L’IA extrait les mesures de tes notes et rédige le bilan ; tu vérifies ensuite'

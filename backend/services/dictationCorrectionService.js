@@ -1,6 +1,7 @@
 // Passe de correction de la dictée : le modèle propose des opérations (remplacer un terme, supprimer
 // une hésitation ou un fragment auto-corrigé), le serveur les applique sous gardes déterministes.
-// Le texte ne peut être ni réécrit ni allongé par construction ; tout doute → texte brut.
+// Le texte n'est jamais réécrit librement : chaque remplacement ajoute au plus un mot par rapport à
+// « from », les suppressions sont plafonnées à 20 % du texte ; tout doute → texte brut.
 const { z } = require('zod');
 const logger = require('../utils/logger');
 const llmService = require('./llmService');
@@ -10,6 +11,10 @@ const { EXTRA_TERMS } = require('../data/dictationExtraTerms');
 
 const MODES = ['dictation', 'session'];
 const FILLERS = ['euh', 'hum', 'bah', 'ben', 'hein', 'voilà', 'donc voilà'];
+// Marqueurs d'auto-correction : le spec définit le fragment supprimable comme celui que le locuteur
+// corrige lui-même juste après (« à droite, non pardon, » puis « à gauche ») ; sans l'un de ces mots
+// dans le fragment ou juste après, on ne supprime rien (côté sûr).
+const SELF_CORRECTION_MARKERS = ['non', 'pardon', 'plutôt', 'enfin', 'excuse', 'excusez', 'reprends', 'rectifie', 'correction'];
 // Mots-nombres français : jamais supprimés ni remplacés (même liste que le bench du worker)
 const NUMBER_WORDS = new Set(['zéro', 'un', 'une', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix',
   'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'vingt', 'vingts', 'trente', 'quarante', 'cinquante', 'soixante',
@@ -40,7 +45,9 @@ function fold(s) {
 // mais `from` est toujours comparé sous sa forme pliée, donc l'autre côté de la comparaison doit l'être aussi.
 const FILLERS_FOLDED = new Set(FILLERS.map(fold));
 const NUMBER_WORDS_FOLDED = new Set([...NUMBER_WORDS].map(fold));
+const SELF_CORRECTION_MARKERS_FOLDED = new Set(SELF_CORRECTION_MARKERS.map(fold));
 const hasNumberWord = (s) => tokens(fold(s)).some((w) => w.split('-').some((p) => NUMBER_WORDS_FOLDED.has(p)));
+const hasSelfCorrectionMarker = (s) => tokens(fold(s)).some((w) => SELF_CORRECTION_MARKERS_FOLDED.has(w));
 
 // Motif d'un groupe de mots de contexte (before/after) : chaque mot entier, ponctuation collée tolérée, espaces souples
 const group = (s) => tokens(fold(s)).map((w) => `${escapeRe(w)}${PUNCT_TAIL}`).join('\\s+');
@@ -98,8 +105,14 @@ function applyOps(text, ops, mode) {
     const before = normSpaces(op.before); const after = normSpaces(op.after);
     const fromTokens = tokens(from);
     let ok = (op.op === 'replace' || op.op === 'delete') && fromTokens.length > 0 && !hasDigit(from) && !hasNumberWord(from);
-    if (ok && op.op === 'replace') ok = to.length > 0 && !hasDigit(to) && tokens(to).length <= MAX_TO_WORDS;
-    if (ok && op.op === 'delete') ok = FILLERS_FOLDED.has(fold(from).replace(PUNCT, '').trim()) || (mode === 'dictation' && fromTokens.length >= 2);
+    // Ajout borné à un mot de plus que « from » (en plus du plafond absolu MAX_TO_WORDS) : un remplacement
+    // ne peut pas servir à insérer une phrase entière.
+    if (ok && op.op === 'replace') ok = to.length > 0 && !hasDigit(to) && tokens(to).length <= MAX_TO_WORDS && tokens(to).length <= fromTokens.length + 1;
+    if (ok && op.op === 'delete') {
+      const isFiller = FILLERS_FOLDED.has(normSpaces(fold(from).replace(PUNCT, ' ')));
+      const isSelfCorrection = mode === 'dictation' && fromTokens.length >= 2 && (hasSelfCorrectionMarker(from) || hasSelfCorrectionMarker(after));
+      ok = isFiller || isSelfCorrection;
+    }
     const pos = ok ? locate(current, before, from, after) : null;
     if (!pos) { ignored += 1; continue; }
     const [start, wordsEnd, tailEnd] = pos;
@@ -120,7 +133,7 @@ Tu ne réécris jamais le texte : tu renvoies uniquement un objet JSON { "ops": 
 Chaque opération :
 - { "op": "replace", "before": "…", "from": "…", "after": "…", "to": "…" } : remplacer « from » (le terme mal transcrit, tel qu'écrit) par « to » (le terme correct, du vocabulaire fourni ou un terme médical évident). « to » doit être différent de « from » : ne liste jamais un mot déjà correct.
 - { "op": "delete", "before": "…", "from": "…", "after": "…", "to": "" } : supprimer « from ».
-« before » : le ou les deux mots qui précèdent immédiatement « from » dans le texte ; « after » : le ou les deux mots qui le suivent immédiatement (vide en début ou fin de texte). Ils servent à retrouver l'endroit exact.
+« before » : le ou les deux mots qui précèdent immédiatement « from » dans le texte ; « after » : le ou les deux mots qui le suivent immédiatement (vide en début ou fin de texte). Ils servent à retrouver l'endroit exact. Si le fragment apparaît plusieurs fois dans le texte, choisis le contexte qui le distingue.
 Exemple — texte : « Test de lâchement négatif. Chobet à 13 centimètres, euh, Lasègue négatif. » → { "ops": [ { "op": "replace", "before": "Test de", "from": "lâchement", "after": "négatif.", "to": "Lachman" }, { "op": "replace", "before": "", "from": "Chobet", "after": "à 13", "to": "Schober" }, { "op": "delete", "before": "centimètres,", "from": "euh,", "after": "Lasègue", "to": "" } ] }
 Autorisé : corriger un terme médical, un test, un muscle, une technique, un sigle ou un nom propre mal transcrit ; supprimer une hésitation isolée (« euh », « hum », « bah », « ben », « hein », « voilà »).
 En mode dictée seulement : supprimer un fragment que le locuteur corrige lui-même juste après (« à droite, non pardon, » quand il dit ensuite « à gauche »).
@@ -189,6 +202,6 @@ async function correct({ text, mode, catalog }) {
 }
 
 module.exports = {
-  MODES, FILLERS, NUMBER_WORDS, MAX_OPS, applyOps, numbersGuard, fold,
+  MODES, applyOps, numbersGuard,
   buildVocabulary, buildCorrectionMessages, parseOps, correct, CORRECTION_JSON_SCHEMA,
 };

@@ -5,10 +5,11 @@ const multer = require('multer');
 
 const bilansGlobalController = require('../controllers/bilansGlobalController');
 const { authenticate } = require('../middleware/authenticate');
-const { pdfGenerationLimiter, crudWriteLimiter, gptLimiter, dictationLimiter } = require('../middleware/rateLimiter');
+const { pdfGenerationLimiter, crudWriteLimiter, gptLimiter, dictationLimiter, dictationCorrectLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validate');
 const { requireBilanEditor } = require('../middleware/authorization');
 const { SECTION_KEYS } = require('../services/bilanDocument');
+const { MODES } = require('../services/dictationCorrectionService');
 
 // Routes globales (non scopées à un patient)
 router.get('/patients-with-bilans', authenticate, bilansGlobalController.getPatientsWithBilans);
@@ -64,9 +65,9 @@ router.post('/:id/compose', authenticate, gptLimiter, requireBilanEditor, valida
 router.post('/:id/compose-from-notes', authenticate, gptLimiter, requireBilanEditor, bilansGlobalController.composeBilanFromNotes);
 // Un segment de dictée → texte, rien n'est écrit ; l'autosave du front porte le texte dans rawNotes.
 router.post('/:id/dictation', authenticate, dictationLimiter, requireBilanEditor, dictationAudio, bilansGlobalController.transcribeDictation);
-const correctDictationSchema = z.object({ text: z.string().max(20000), mode: z.enum(['dictation', 'session']) });
+const correctDictationSchema = z.object({ text: z.string().max(20000), mode: z.enum(MODES) });
 // Passe de correction à la fin de la prise (spec correction §3) : rien n'est écrit, texte brut renvoyé sur échec
-router.post('/:id/dictation/correct', authenticate, dictationLimiter, requireBilanEditor, validate(correctDictationSchema), bilansGlobalController.correctDictation);
+router.post('/:id/dictation/correct', authenticate, dictationCorrectLimiter, requireBilanEditor, validate(correctDictationSchema), bilansGlobalController.correctDictation);
 
 // Rendu HTML (tout plan : un kiné rétrogradé lit toujours ses bilans)
 router.get('/:id/render', authenticate, bilansGlobalController.renderBilan);

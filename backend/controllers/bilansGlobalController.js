@@ -338,9 +338,16 @@ exports.correctDictation = async (req, res) => {
     const bilan = await prismaService.getInstance().bilanKine.findFirst({ where: { id: bilanId, kineId, isActive: true }, select: { document: true } });
     if (!bilan) throw new draftService.DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
     if (!bilan.document) throw new draftService.DraftError('LEGACY_BILAN', 400, 'Les anciens bilans ne peuvent pas être dictés');
-    const catalog = await bilanRenderService.getCatalog();
-    const r = await dictationCorrectionService.correct({ text: req.body.text, mode: req.body.mode, catalog });
-    res.json({ success: true, text: r.text, applied: r.applied, ignored: r.ignored });
+    try {
+      const catalog = await bilanRenderService.getCatalog();
+      const r = await dictationCorrectionService.correct({ text: req.body.text, mode: req.body.mode, catalog });
+      return res.json({ success: true, text: r.text, applied: r.applied, ignored: r.ignored });
+    } catch (err) {
+      if (err instanceof draftService.DraftError) throw err;
+      // Repli silencieux (spec correction §3) : toute panne de la passe de correction renvoie le texte brut, jamais d'erreur au kiné
+      logger.warn(`Correction dictée : passe en échec (${err?.name}: ${err?.message})`);
+      return res.json({ success: true, text: req.body.text, applied: 0, ignored: 0 });
+    }
   } catch (err) {
     sendDraftError(res, err, 'correction de la dictée');
   }

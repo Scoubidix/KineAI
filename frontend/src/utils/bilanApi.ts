@@ -132,7 +132,7 @@ export async function transcribeDictationSegment(id: number, input: { blob: Blob
 }
 
 /** Passe de correction d'une prise (termes, hésitations) : renvoie le texte brut si le serveur n'a rien pu corriger. */
-export async function correctDictation(id: number, input: { text: string; mode: 'dictation' | 'session' }): Promise<{ text: string; applied: number; ignored: number }> {
-  const r = await call<{ text: string; applied: number; ignored: number }>(`/${id}/dictation/correct`, jsonInit('POST', input));
+export async function correctDictation(id: number, input: { text: string; mode: 'dictation' | 'session' }, signal?: AbortSignal): Promise<{ text: string; applied: number; ignored: number }> {
+  const r = await call<{ text: string; applied: number; ignored: number }>(`/${id}/dictation/correct`, { ...jsonInit('POST', input), signal });
   return { text: r.text ?? input.text, applied: r.applied ?? 0, ignored: r.ignored ?? 0 };
 }

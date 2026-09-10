@@ -237,6 +237,10 @@ Beaucoup d'« extra(s) » par ailleurs (mesures canoniques légitimes non listé
 (`backend/services/dictationCorrectionService.correct`, mode `dictation`) avant l'extraction, sur
 les mêmes transcriptions que ci-dessus.
 
+Pendant une prise, du clic sur « Arrêter » à l'insertion, le texte n'existe qu'en mémoire du
+navigateur (pas d'autosauvegarde incrémentale) : d'où le délai de 60 s posé côté front sur l'appel
+de correction, pour ne jamais laisser une requête sans réponse bloquer indéfiniment l'insertion.
+
 Un premier run de référence (2026-09-10, prompt initial) montrait la passe **abandonnée** (garde
 « plafond d'opérations ») sur 8 des 10 dictées : le modèle proposait 14 à 25 opérations par
 dictée, très au-dessus du plafond (~1 op/15 mots). Diagnostic : le modèle « retypait » le texte en
@@ -244,11 +248,19 @@ opérations *identiques* (`from` = `to`, ex. `dictee-01` proposait 34 opération
 correction réelle) et, sur `dictee-03` cabinet, la réponse était tronquée à `max_tokens`. Deux
 correctifs appliqués : (1) prompt système reformulé (consigne « 0 à 5 opérations », exemple
 concret, « to » doit différer de « from »), (2) `applyOps` écarte désormais les opérations
-identiques (`from`/`to` identiques une fois pliés — casse/accents ignorés) **avant** de compter
+identiques (`from`/`to` strictement égaux une fois les espaces normalisés) **avant** de compter
 vers le plafond, au lieu de les laisser saturer le compte d'opérations.
 
 Run de référence après ces deux correctifs, 2026-09-10 (mêmes fichiers audio, même provider
 `mistral-medium-3-5`) :
+
+⚠️ Le tableau ci-dessous a été mesuré sous l'ancienne règle de filtrage (comparaison pliée —
+casse/accents ignorés), qui ne pouvait laisser passer que des opérations ne différant que par la
+casse ou l'accentuation ; la règle livrée compare `from`/`to` en stricte égalité. La revue finale
+a en plus ajouté l'ajout borné (un remplacement ne peut pas allonger le texte de plus d'un mot) et
+le marqueur d'auto-correction (une suppression de fragment en mode dictée exige désormais « non »,
+« pardon », etc. dans le fragment ou juste après) après ce run : les chiffres ci-dessous sont donc
+à rafraîchir avec un nouveau run.
 
 | Cas | Opérations clean (appliquées/ignorées) | Termes clean avant→après | Rappel clean sans/avec correction | Opérations cabinet (appliquées/ignorées) | Termes cabinet avant→après | Rappel cabinet sans/avec correction |
 |---|---|---|---|---|---|---|

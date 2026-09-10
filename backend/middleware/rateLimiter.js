@@ -188,6 +188,24 @@ const dictationLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter dédié à la passe de correction de dictée (10/min par utilisateur), séparé du limiteur
+ * de segments audio : la correction est un seul appel par prise, pas un flux continu de segments.
+ */
+const dictationCorrectLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: 'Trop de corrections de dictée', details: 'Patiente une minute avant de reprendre', retryAfter: 60 },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'dictation-correct'),
+  handler: (req, res) => {
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Correction de dictée - User: ${safeUser}`);
+    res.status(429).json({ error: 'Trop de corrections de dictée', details: 'Patiente une minute avant de reprendre', retryAfter: 60 });
+  }
+});
+
+/**
  * Rate limiter pour les ecritures CRUD (POST/PUT/DELETE)
  * 30 ecritures par minute par utilisateur — protege contre le spam
  * sans bloquer la navigation (GET non limite)
@@ -737,6 +755,7 @@ module.exports = {
   gptLimiter,
   gptHeavyLimiter,
   dictationLimiter,
+  dictationCorrectLimiter,
   crudWriteLimiter,
   pdfGenerationLimiter,
   authLimiter,

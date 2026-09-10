@@ -30,7 +30,7 @@ export default function DictationBar({ state, disabled, onStart, onStop, onImpor
   };
   const tooltip = !state.supported ? 'Ton navigateur ne permet pas l’enregistrement audio'
     : !state.available ? 'Dictée indisponible pour le moment'
-    : recording ? 'Arrêter la dictée' : 'Dicter tes notes : le texte s’ajoute au fil de la dictée';
+    : recording ? 'Arrêter la dictée' : 'Dicter tes notes : le texte s’insère d’un bloc à la fin de la prise';
   const bars = [0.15, 0.3, 0.5, 0.7, 0.9];
   return (
     <div className="flex items-center gap-3 px-1 flex-wrap" aria-live="polite">
@@ -63,7 +63,7 @@ export default function DictationBar({ state, disabled, onStart, onStop, onImpor
         </div>
       )}
       {recording && state.inFlight > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Transcription… ({state.inFlight})</span>}
-      {state.phase === 'transcribing' && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Transcription… {state.segmentsTotal === null ? `(${state.segmentsDone})` : `${state.segmentsDone} sur ${state.segmentsTotal}`}</span>}
+      {state.phase === 'transcribing' && state.inFlight > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Transcription… {state.segmentsTotal === null ? `(${state.segmentsDone})` : `${state.segmentsDone} sur ${state.segmentsTotal}`}</span>}
       {state.phase === 'correcting' && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Correction des termes…</span>}
       {state.permissionDenied && <span className="text-[11px] text-destructive">Autorise le micro dans ton navigateur pour dicter</span>}
       {state.failed > 0 && (
