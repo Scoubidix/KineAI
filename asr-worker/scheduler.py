@@ -45,12 +45,21 @@ class Scheduler:
         try:
             await asyncio.wait_for(asyncio.shield(fut), timeout)
         except asyncio.TimeoutError:
-            self._heap = [e for e in self._heap if e[2] is not fut]
-            heapq.heapify(self._heap)
-            if fut.done():          # place attribuée juste avant l'expiration : on la rend
-                self.release()
+            self._discard(fut)
             raise Busy(5)
+        except asyncio.CancelledError:
+            # L'appelant a annulé son attente (ex. requête abandonnée) : ne pas garder
+            # la place au chaud pour un futur que plus personne n'écoute.
+            self._discard(fut)
+            raise
         return time.monotonic() - t0
+
+    def _discard(self, fut) -> None:
+        """Retire fut de la file ; si une place lui avait déjà été transmise, on la rend."""
+        self._heap = [e for e in self._heap if e[2] is not fut]
+        heapq.heapify(self._heap)
+        if fut.done():          # place attribuée juste avant l'expiration/l'annulation : on la rend
+            self.release()
 
     def release(self) -> None:
         """Rend une place : transmise directement à la tête de file, sinon libérée."""

@@ -14,8 +14,10 @@ python -m venv .venv
 ASR_WORKER_TOKEN=dev-token .venv/Scripts/python.exe -m uvicorn app:app --port 8100
 ```
 
-Le premier appel de `/healthz` répond `503 {"status": "loading"}` pendant le chargement du modèle
-(quelques dizaines de secondes sur CPU), puis `200 {"status": "ok", ...}` une fois prêt.
+Le modèle se charge en tâche de fond dès le démarrage du serveur (le port écoute tout de suite) :
+`/healthz` répond `503 {"status": "loading"}` pendant le chargement (quelques secondes à quelques
+dizaines de secondes sur CPU selon l'état du cache disque), puis `200 {"status": "ok", ...}` une
+fois prêt. `/v1/transcribe` répond aussi `503` (en-tête `Retry-After: 10`) pendant ce temps.
 
 ## Tests
 
@@ -29,7 +31,7 @@ cd asr-worker
 | Variable | Rôle | Défaut |
 |---|---|---|
 | `ASR_WORKER_TOKEN` | Jeton Bearer requis par `/v1/transcribe` (obligatoire, pas de défaut) | — |
-| `ASR_SLOTS` | Nombre de transcriptions simultanées (places de l'ordonnanceur) | `2` |
+| `ASR_SLOTS` | Nombre de transcriptions simultanées (places de l'ordonnanceur, et `num_workers` faster-whisper — la parallélisation réelle) | `2` |
 | `ASR_THREADS` | Threads CPU par transcription (`cpu_threads` de faster-whisper) | `2` |
 | `ASR_MODEL` | Nom du modèle faster-whisper | `large-v3-turbo` |
 | `ASR_MODEL_PATH` | Chemin local du modèle (si prétéléchargé par `download_model.py`) | — (résolution HF) |
@@ -67,8 +69,8 @@ saturées — en-tête `Retry-After`).
 { "status": "ok", "model": "large-v3-turbo", "slots": 2, "busy": 0, "queued": 0 }
 ```
 
-`status` vaut `"loading"` (code `503`) tant que le modèle n'est pas chargé, `"ok"` (code `200`)
-ensuite.
+`status` vaut `"loading"` (code `503`) tant que le modèle n'est pas chargé (chargement en tâche
+de fond au démarrage, le serveur écoute dès le lancement), `"ok"` (code `200`) ensuite.
 
 ## Déploiement (Clever Cloud)
 
@@ -80,6 +82,9 @@ ensuite.
 - Health check : `/healthz`
 - Flavor : M
 - Scaling : 1 → 3 instances
+- Dimensionnement : `ASR_SLOTS × ASR_THREADS` ne doit pas dépasser le nombre de vCPU du flavor
+  (chaque place tourne `ASR_THREADS` threads CPU, et `ASR_SLOTS` places peuvent tourner en
+  parallèle via `num_workers` faster-whisper).
 
 ## Bench
 

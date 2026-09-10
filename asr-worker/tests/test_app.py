@@ -1,6 +1,7 @@
 import io
 import os
 import struct
+import time
 import wave
 
 import pytest
@@ -43,7 +44,12 @@ def client():
 
 
 def test_healthz_ok_once_loaded(client):
+    # Le chargement se fait en tâche de fond : laisser jusqu'à 1s pour qu'elle s'exécute.
+    deadline = time.monotonic() + 1.0
     r = client.get("/healthz")
+    while r.status_code != 200 and time.monotonic() < deadline:
+        time.sleep(0.02)
+        r = client.get("/healthz")
     assert r.status_code == 200
     assert r.json() == {"status": "ok", "model": "large-v3-turbo", "slots": 1, "busy": 0, "queued": 0}
 
@@ -90,6 +96,23 @@ def test_too_large_body_is_413(client):
     big = b"\0" * (8 * 1024 * 1024 + 1)
     r = client.post("/v1/transcribe", files={"audio": ("a.wav", big, "audio/wav")}, headers=AUTH)
     assert r.status_code == 413
+
+
+def test_large_multipart_upload_stays_in_memory(client):
+    # Dépasse l'ancien seuil de spool Starlette (1 Mio) : doit rester traité sans toucher le
+    # disque (spool_max_size relevé à MAX_BYTES + 1 dans app.py) et fonctionner normalement.
+    big_wav = wav_bytes(seconds=25.0, rate=48000)   # ~2.3 Mio, < 8 Mio, < 60 s
+    assert len(big_wav) > 2 * 1024 * 1024
+    r = client.post("/v1/transcribe", files={"audio": ("a.wav", big_wav, "audio/wav")}, headers=AUTH)
+    assert r.status_code == 200
+
+
+def test_content_length_over_limit_is_413_before_auth_parse(client):
+    over_limit = str(9 * 1024 * 1024)
+    r = client.post("/v1/transcribe", headers={"Authorization": "Bearer nope", "Content-Length": over_limit}, content=b"")
+    assert r.status_code == 401                   # jeton vérifié avant la taille annoncée
+    r = client.post("/v1/transcribe", headers={"Authorization": "Bearer test-token", "Content-Length": over_limit}, content=b"")
+    assert r.status_code == 413                    # rejeté sur Content-Length, sans lire le corps
 
 
 def test_healthz_503_while_loading():

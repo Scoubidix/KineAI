@@ -47,9 +47,12 @@ def decode_audio(data: bytes, max_seconds: float) -> np.ndarray:
 
 
 class Transcriber:
-    def __init__(self, model="large-v3-turbo", device="cpu", compute_type="int8", threads=2, model_path=None):
+    def __init__(self, model="large-v3-turbo", device="cpu", compute_type="int8", threads=2, workers=1, model_path=None):
         self.model_name = model
-        self.model = WhisperModel(model_path or model, device=device, compute_type=compute_type, cpu_threads=int(threads))
+        self.model = WhisperModel(
+            model_path or model, device=device, compute_type=compute_type,
+            cpu_threads=int(threads), num_workers=int(workers),
+        )
 
     def transcribe(self, pcm: np.ndarray, language: str = "fr", prompt: str = "") -> str:
         segments, _ = self.model.transcribe(

@@ -62,3 +62,19 @@ def test_batch_refused_when_queue_full():
         s.release()
         await t
     run(main())
+
+
+def test_cancelled_waiter_does_not_leak_slot():
+    async def main():
+        s = Scheduler(slots=1)
+        await s.acquire("interactive")           # occupe l'unique place
+        t = asyncio.create_task(s.acquire("interactive"))
+        await asyncio.sleep(0.01)                 # entre en file d'attente
+        assert s.queued == 1
+        t.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await t
+        assert s.queued == 0                      # retiré de la file, pas de futur fantôme
+        s.release()                                # rend la place initiale
+        assert s.free == 1                         # personne ne l'a récupérée
+    run(main())

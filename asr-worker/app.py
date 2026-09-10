@@ -5,9 +5,10 @@ import os
 import secrets
 import time
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+import starlette.formparsers
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from scheduler import Busy, Scheduler
@@ -17,6 +18,10 @@ MAX_BYTES = 8 * 1024 * 1024
 MAX_SECONDS = 60.0
 MAX_PROMPT_WORDS = 200
 PRIORITIES = ("interactive", "batch")
+
+# L'audio ne doit jamais toucher le disque : au-delà d'1 Mio, Starlette spoolerait
+# le multipart dans un fichier temporaire avant même nos vérifications (jeton, taille).
+starlette.formparsers.MultiPartParser.spool_max_size = MAX_BYTES + 1
 
 logging.basicConfig(level=os.environ.get("ASR_LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("asr")
@@ -28,6 +33,7 @@ def default_transcriber_factory():
         device=os.environ.get("ASR_DEVICE", "cpu"),
         compute_type=os.environ.get("ASR_COMPUTE_TYPE", "int8"),
         threads=os.environ.get("ASR_THREADS", "2"),
+        workers=os.environ.get("ASR_SLOTS", "2"),  # num_workers ctranslate2 = places de l'ordonnanceur
         model_path=os.environ.get("ASR_MODEL_PATH") or None,
     )
 
@@ -41,14 +47,21 @@ def create_app(transcriber_factory=None, load_on_startup=True) -> FastAPI:
     state = {"transcriber": None}
     factory = transcriber_factory or default_transcriber_factory
 
+    async def _load():
+        t0 = time.monotonic()
+        state["transcriber"] = await asyncio.get_running_loop().run_in_executor(None, factory)
+        log.info("modèle %s chargé en %.1fs, %d place(s)", model_name, time.monotonic() - t0, slots)
+
     @asynccontextmanager
     async def lifespan(_app):
-        if load_on_startup:
-            t0 = time.monotonic()
-            # Chargement hors boucle d'événements : /healthz répond « loading » pendant ce temps
-            state["transcriber"] = await asyncio.get_running_loop().run_in_executor(None, factory)
-            log.info("modèle %s chargé en %.1fs, %d place(s)", model_name, time.monotonic() - t0, slots)
+        # Chargement en tâche de fond : le lifespan rend la main tout de suite pour que le
+        # socket écoute et que /healthz (puis /v1/transcribe) répondent « loading » pendant ce temps.
+        load_task = asyncio.create_task(_load()) if load_on_startup else None
         yield
+        if load_task is not None:
+            load_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await load_task
         pool.shutdown(wait=False)
 
     app = FastAPI(title="asr-worker", lifespan=lifespan)
@@ -60,17 +73,30 @@ def create_app(transcriber_factory=None, load_on_startup=True) -> FastAPI:
         return JSONResponse(body, status_code=200 if ready else 503)
 
     @app.post("/v1/transcribe")
-    async def transcribe(
-        audio: UploadFile = File(...),
-        language: str = Form("fr"),
-        prompt: str = Form(""),
-        priority: str = Form("interactive"),
-        authorization: str = Header(""),
-    ):
-        if not token or not secrets.compare_digest(authorization, f"Bearer {token}"):
+    async def transcribe(request: Request):
+        # Jeton en bytes (jamais en str) : un en-tête non-ASCII ne doit jamais lever
+        # (hmac.compare_digest refuse les str non-ASCII), juste être refusé en 401.
+        authorization = request.headers.get("authorization", "")
+        expected = f"Bearer {token}".encode()
+        if not token or not secrets.compare_digest(authorization.encode("latin-1", "ignore"), expected):
             raise HTTPException(status_code=401, detail="jeton invalide")
         if state["transcriber"] is None:
             return JSONResponse({"error": "loading"}, status_code=503, headers={"Retry-After": "10"})
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                too_big = int(content_length) > MAX_BYTES + 64 * 1024
+            except ValueError:
+                too_big = False
+            if too_big:  # rejeté avant même de lire le corps
+                raise HTTPException(status_code=413, detail="audio trop volumineux")
+        form = await request.form()
+        audio = form.get("audio")
+        if audio is None or not hasattr(audio, "read"):
+            raise HTTPException(status_code=422, detail="audio manquant")
+        language = str(form.get("language") or "fr")
+        prompt = str(form.get("prompt") or "")
+        priority = str(form.get("priority") or "interactive")
         if priority not in PRIORITIES:
             raise HTTPException(status_code=422, detail="priority invalide")
         data = await audio.read()
