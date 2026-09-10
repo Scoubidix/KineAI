@@ -110,3 +110,23 @@ export async function composeBilanFromNotes(id: number): Promise<ComposeFromNote
   const r = await call<ComposeFromNotesResult>(`/${id}/compose-from-notes`, jsonInit('POST'));
   return { bilan: r.bilan, warnings: r.warnings ?? {}, accepted: r.accepted ?? [], pending: r.pending ?? [], rejected: r.rejected ?? 0 };
 }
+
+/** Le worker de dictée est-il configuré et prêt ? (résultat mis en cache 30 s côté serveur) */
+export async function getDictationStatus(): Promise<boolean> {
+  const r = await call<{ available: boolean }>('/dictation/status');
+  return r.available === true;
+}
+
+export interface DictationSegmentResult { text: string; audioSeconds: number; processingSeconds: number }
+
+/** Transcrit un segment audio de dictée (rien n'est écrit : le texte est inséré dans les notes côté client). */
+export async function transcribeDictationSegment(id: number, input: { blob: Blob; mimeType: string; takeId: string; index: number; prevText: string }): Promise<DictationSegmentResult> {
+  const form = new FormData();
+  form.append('audio', input.blob, 'segment');
+  form.append('takeId', input.takeId);
+  form.append('index', String(input.index));
+  form.append('prevText', input.prevText.slice(0, 600));
+  form.append('mimeType', input.mimeType);
+  const r = await call<DictationSegmentResult>(`/${id}/dictation`, { method: 'POST', body: form });
+  return { text: r.text ?? '', audioSeconds: r.audioSeconds ?? 0, processingSeconds: r.processingSeconds ?? 0 };
+}
