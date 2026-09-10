@@ -231,6 +231,45 @@ Les chiffres ci-dessus sont le run de référence après correction (même date,
 Beaucoup d'« extra(s) » par ailleurs (mesures canoniques légitimes non listées dans `expect`, ex.
 `etat_cicatrice`, `reflexes_osteotendineux`) : à relire au cas par cas, pas des erreurs en soi.
 
+### Correction
+
+`npm run eval:dictation -- --correct` ajoute une passe de correction
+(`backend/services/dictationCorrectionService.correct`, mode `dictation`) avant l'extraction, sur
+les mêmes transcriptions que ci-dessus. Run de référence du 2026-09-10 (mêmes fichiers audio,
+même provider `mistral-medium-3-5`) :
+
+| Cas | Opérations clean (appliquées/ignorées) | Termes clean avant→après | Rappel clean sans/avec correction | Opérations cabinet (appliquées/ignorées) | Termes cabinet avant→après | Rappel cabinet sans/avec correction |
+|---|---|---|---|---|---|---|
+| dictee-01 | 0/19 — abandonnée (plafond) | 3→3 | 92 % / 92 % | 0/20 — abandonnée (plafond) | 3→3 | 92 % / 92 % |
+| dictee-02 | 0/9 | 0→0 | 100 % / 100 % | 0/25 — abandonnée (plafond) | 0→0 | 100 % / 100 % |
+| dictee-03 | 0/16 — abandonnée (plafond) | 0→0 | 86 % / 79 % | 0/14 — abandonnée (plafond) | 0→0 | 79 % / 93 % |
+| dictee-04 | 1/6 | 4→4 | 100 % / 100 % | 0/16 — abandonnée (plafond) | 3→3 | 100 % / 100 % |
+| dictee-05 | 1/7 | 4→4 | 100 % / 100 % | 0/15 — abandonnée (plafond) | 4→4 | 100 % / 100 % |
+
+Rappel moyen : clean 95,5 % sans correction → 94,0 % avec ; cabinet 94,0 % sans correction →
+96,9 % avec. 0 interdit dans les quatre runs (avec et sans correction, deux variantes).
+
+« Abandonnée (plafond) » : la garde `applyOps` (`dictationCorrectionService.js`, environ une
+opération autorisée par tranche de 15 mots, plafond bas `MIN_OPS_ALLOWED=3`) rejette la totalité
+des opérations proposées d'un coup dès que leur nombre dépasse ce plafond — c'est le cas sur 8 des
+10 dictées : le modèle en propose 14 à 25 pour 146-210 mots, largement au-dessus du plafond. Sur
+les 2 dictées où la passe aboutit (`dictee-04`/`dictee-05` clean, 1 opération appliquée chacune,
+le reste ignoré individuellement), le rappel était déjà à 100 % et n'a pas bougé.
+
+Effet observé sur les termes de référence (`TERMES`, mêmes 18 termes que le bench du worker) :
+**identique avant/après sur les 10 dictées**, y compris `dictee-01`/`dictee-04`/`dictee-05` où des
+opérations existent — la correction ne cible pas les mots qui manquent aux `TERMES` (Lasègue,
+Schober, etc.), et les 2 dictées avec correction effective (`dictee-04`/`dictee-05` clean) ont
+justement 0 opération sur un terme de la liste.
+
+Rappel : `dictee-03` bouge dans les deux sens sans qu'aucune opération n'ait été appliquée dans
+l'un ou l'autre variant (passe abandonnée les deux fois) — clean baisse de 86 % à 79 %
+(`douleur_nocturne` devient manquant, en plus de `eva_repos`/`extension_genou:D` déjà manquants),
+cabinet monte de 79 % à 93 % (`testing_ischio_jambiers:D` n'est plus manquant). Le texte soumis à
+l'extraction est le même dans les deux runs (brut, correction sans effet) : l'écart vient de la
+non-déterminisme de l'appel d'extraction lui-même (température non nulle), pas de la correction.
+Noté tel quel, sans correction du harnais ni retouche.
+
 ### Amorce de vocabulaire : essai A/B du 10 sept. 2026
 
 Whisper ne garde que les 224 derniers tokens du prompt. L'amorce actuelle (75 mots, 180 tokens)

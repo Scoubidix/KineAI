@@ -113,10 +113,18 @@ npm run eval:dictation                        # 5 cas, variante clean (défaut)
 npm run eval:dictation -- --variant cabinet    # variante cabinet (bruit de salle)
 npm run eval:dictation -- --only dictee-03     # un seul cas
 npm run eval:dictation -- --json out.json      # + dump JSON des résultats
+npm run eval:dictation -- --correct            # passe de correction avant extraction, 1 appel de plus par cas
 ```
 
 ⚠️ Coût : comme `eval:extraction`, chaque cas déclenche un appel réel au provider — 5 appels par
-variante (~0,05 €). Lancer une seule fois par variante, pas en boucle.
+variante (~0,05 €), le double avec `--correct` (10 appels : correction + extraction par cas).
+Lancer une seule fois par variante, pas en boucle.
+
+`--correct` fait passer chaque transcription par `services/dictationCorrectionService.correct`
+(mode `dictation`, catalogue = même seed) avant l'extraction, et affiche pour chaque cas le nombre
+d'opérations appliquées/ignorées ainsi que les « termes » (`TERMES`, même liste que le bench du
+worker) retrouvés dans le texte avant et après correction — un comptage textuel simple (inclusion,
+insensible à la casse), pas un score d'extraction.
 
 Si un fichier `asr-worker/eval/out/dictee-0N_<variante>.txt` est absent, le cas correspondant est
 signalé `ABSENT` et compte en erreur (rappel non calculé) — relancer `asr-worker/eval/bench.py`
