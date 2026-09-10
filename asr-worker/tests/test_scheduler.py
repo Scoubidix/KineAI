@@ -27,14 +27,14 @@ def test_interactive_goes_before_batch():
             await s.acquire(priority)
             order.append(priority)
             await asyncio.sleep(0.01)
-            s.release()
+            s.release(priority)
 
         t1 = asyncio.create_task(waiter("batch"))
         await asyncio.sleep(0.01)              # batch en file d'abord
         t2 = asyncio.create_task(waiter("interactive"))
         await asyncio.sleep(0.01)
         assert s.queued == 2
-        s.release()                            # libère la place initiale
+        s.release("batch")                     # libère la place initiale
         await asyncio.gather(t1, t2)
         assert order == ["interactive", "batch"]
     run(main())
@@ -59,7 +59,7 @@ def test_batch_refused_when_queue_full():
         await asyncio.sleep(0.01)
         with pytest.raises(Busy):
             await s.acquire("batch")
-        s.release()
+        s.release("batch")
         await t
     run(main())
 
@@ -77,4 +77,21 @@ def test_cancelled_waiter_does_not_leak_slot():
         assert s.queued == 0                      # retiré de la file, pas de futur fantôme
         s.release()                                # rend la place initiale
         assert s.free == 1                         # personne ne l'a récupérée
+    run(main())
+
+
+def test_one_slot_stays_reserved_for_interactive():
+    async def main():
+        s = Scheduler(slots=2)                 # batch_max_slots = 1 par défaut
+        await s.acquire("batch")
+        t = asyncio.create_task(s.acquire("batch"))
+        await asyncio.sleep(0.01)
+        assert s.queued == 1 and s.free == 1   # la seconde batch attend malgré une place libre
+        assert await s.acquire("interactive") == 0.0   # la dictée prend la place réservée
+        s.release("interactive")
+        await asyncio.sleep(0.01)
+        assert s.queued == 1 and s.free == 1   # toujours réservée : la batch reste en file
+        s.release("batch")
+        await t                                # la première batch finie, la seconde démarre
+        assert s.busy_batch == 1 and s.queued == 0
     run(main())

@@ -44,7 +44,9 @@ def create_app(transcriber_factory=None, load_on_startup=True) -> FastAPI:
     slots = int(os.environ.get("ASR_SLOTS", "2"))
     model_name = os.environ.get("ASR_MODEL", "large-v3-turbo")
     token = os.environ.get("ASR_WORKER_TOKEN", "")
-    sched = Scheduler(slots, float(os.environ.get("ASR_INTERACTIVE_WAIT_MAX", "30")), int(os.environ.get("ASR_BATCH_QUEUE_MAX", "20")))
+    # Une place reste réservée aux dictées : les batch (séance) n'en occupent que ASR_BATCH_MAX_SLOTS
+    sched = Scheduler(slots, float(os.environ.get("ASR_INTERACTIVE_WAIT_MAX", "30")), int(os.environ.get("ASR_BATCH_QUEUE_MAX", "20")),
+                      int(os.environ.get("ASR_BATCH_MAX_SLOTS", str(max(1, slots - 1)))))
     pool = ThreadPoolExecutor(max_workers=slots)
     state = {"transcriber": None, "load_error": None}
     factory = transcriber_factory or default_transcriber_factory
@@ -134,7 +136,7 @@ def create_app(transcriber_factory=None, load_on_startup=True) -> FastAPI:
         try:
             text = await loop.run_in_executor(pool, state["transcriber"].transcribe, pcm, language, prompt)
         finally:
-            sched.release()
+            sched.release(priority)
         processing = time.monotonic() - t0
         audio_seconds = len(pcm) / SAMPLE_RATE
         # Jamais le texte ni le prompt dans les logs (données de santé)

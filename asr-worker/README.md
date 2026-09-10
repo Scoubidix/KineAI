@@ -56,6 +56,7 @@ cd asr-worker
 | `ASR_COMPUTE_TYPE` | Quantification faster-whisper | `int8` |
 | `ASR_INTERACTIVE_WAIT_MAX` | Attente max (s) d'une requête `interactive` en file avant `503 Busy` | `30` |
 | `ASR_BATCH_QUEUE_MAX` | Taille max de la file `batch` avant refus `503 Busy` | `20` |
+| `ASR_BATCH_MAX_SLOTS` | Places que les requêtes `batch` (séance) peuvent occuper en même temps : le reste est réservé aux dictées `interactive` | `ASR_SLOTS − 1` (au moins 1) |
 
 ## Contrat HTTP
 
