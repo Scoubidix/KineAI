@@ -81,12 +81,17 @@ function numbersGuard(raw, corrected) {
 function applyOps(text, ops, mode) {
   const raw = String(text ?? '');
   const wordCount = tokens(raw).length;
-  const giveUp = (why) => { logger.warn(`Correction dictée abandonnée : ${why} (${ops.length} opération(s), ${wordCount} mots)`); return { text: raw, applied: 0, ignored: ops.length }; };
-  if (ops.length > Math.max(MIN_OPS_ALLOWED, Math.floor(wordCount / WORDS_PER_OP))) return giveUp('plafond d’opérations');
+  const giveUp = (why, ignoredCount) => { logger.warn(`Correction dictée abandonnée : ${why} (${ops.length} opération(s), ${wordCount} mots)`); return { text: raw, applied: 0, ignored: ignoredCount ?? ops.length }; };
+  // Le modèle recopie parfois le texte en opérations identiques (from === to) : elles ne changent rien, on les écarte avant le plafond.
+  const isIdentity = (op) => op.op === 'replace' && fold(normSpaces(op.from)) === fold(normSpaces(op.to));
+  let identityIgnored = 0;
+  const realOps = [];
+  for (const op of ops) { if (isIdentity(op)) identityIgnored += 1; else realOps.push(op); }
+  if (realOps.length > Math.max(MIN_OPS_ALLOWED, Math.floor(wordCount / WORDS_PER_OP))) return giveUp('plafond d’opérations', ops.length);
 
   let current = raw;
-  let applied = 0; let ignored = 0; let deletedWords = 0;
-  for (const op of ops) {
+  let applied = 0; let ignored = identityIgnored; let deletedWords = 0;
+  for (const op of realOps) {
     const from = normSpaces(op.from); const to = normSpaces(op.to);
     const before = normSpaces(op.before); const after = normSpaces(op.after);
     const fromTokens = tokens(from);
@@ -108,14 +113,16 @@ function applyOps(text, ops, mode) {
   return { text: current, applied, ignored };
 }
 
-const SYSTEM_PROMPT = `Tu corriges la transcription automatique d'une dictée de kinésithérapeute (bilan de patient), en français.
-Tu renvoies uniquement un objet JSON { "ops": [...] }. Chaque opération est :
-- { "op": "replace", "before": "...", "from": "...", "after": "...", "to": "..." } : remplacer le fragment « from » (un terme mal transcrit) par « to », le terme correct (un terme du vocabulaire fourni, ou un terme médical évident) ;
-- { "op": "delete", "before": "...", "from": "...", "after": "...", "to": "" } : supprimer le fragment « from ».
-« before » et « after » : jusqu'à deux mots exacts qui précèdent et suivent le fragment dans le texte (vides en début ou fin de texte). « from » : le fragment exact, tel qu'écrit.
+const SYSTEM_PROMPT = `Tu relis la transcription automatique d'une dictée de kinésithérapeute (bilan de patient), en français, pour y repérer les rares termes mal transcrits et les hésitations.
+Tu ne réécris jamais le texte : tu renvoies uniquement un objet JSON { "ops": [...] } listant les corrections à appliquer. Une dictée correcte a besoin de 0 à 5 opérations ; s'il n'y a rien à corriger, renvoie { "ops": [] }.
+Chaque opération :
+- { "op": "replace", "before": "…", "from": "…", "after": "…", "to": "…" } : remplacer « from » (le terme mal transcrit, tel qu'écrit) par « to » (le terme correct, du vocabulaire fourni ou un terme médical évident). « to » doit être différent de « from » : ne liste jamais un mot déjà correct.
+- { "op": "delete", "before": "…", "from": "…", "after": "…", "to": "" } : supprimer « from ».
+« before » : le ou les deux mots qui précèdent immédiatement « from » dans le texte ; « after » : le ou les deux mots qui le suivent immédiatement (vide en début ou fin de texte). Ils servent à retrouver l'endroit exact.
+Exemple — texte : « Test de lâchement négatif. Chobet à 13 centimètres, euh, Lasègue négatif. » → { "ops": [ { "op": "replace", "before": "Test de", "from": "lâchement", "after": "négatif.", "to": "Lachman" }, { "op": "replace", "before": "", "from": "Chobet", "after": "à 13", "to": "Schober" }, { "op": "delete", "before": "centimètres,", "from": "euh,", "after": "Lasègue", "to": "" } ] }
 Autorisé : corriger un terme médical, un test, un muscle, une technique, un sigle ou un nom propre mal transcrit ; supprimer une hésitation isolée (« euh », « hum », « bah », « ben », « hein », « voilà »).
 En mode dictée seulement : supprimer un fragment que le locuteur corrige lui-même juste après (« à droite, non pardon, » quand il dit ensuite « à gauche »).
-Interdit : reformuler, ajouter un mot, corriger la grammaire ou la ponctuation, modifier ou supprimer un nombre (en chiffres ou en lettres), une unité, une date. En cas de doute, ne rien faire : renvoyer { "ops": [] }.`;
+Interdit : reformuler, ajouter un mot, corriger la grammaire, la casse ou la ponctuation, modifier ou supprimer un nombre (en chiffres ou en lettres), une unité, une date. En cas de doute, ne rien faire.`;
 
 const CORRECTION_JSON_SCHEMA = {
   name: 'dictation_correction',
