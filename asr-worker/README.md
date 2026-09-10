@@ -14,6 +14,23 @@ python -m venv .venv
 ASR_WORKER_TOKEN=dev-token .venv/Scripts/python.exe -m uvicorn app:app --port 8100
 ```
 
+Sous PowerShell (Windows), les variables se posent avec `$env:` :
+
+```powershell
+cd asr-worker
+$env:ASR_WORKER_TOKEN = "dev-token"
+$env:ASR_MODEL_PATH = "$HOME\.cache\huggingface\hub\models--mobiuslabsgmbh--faster-whisper-large-v3-turbo\snapshots\0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
+$env:HF_HUB_OFFLINE = "1"
+.venv\Scripts\python.exe -m uvicorn app:app --port 8100
+```
+
+`ASR_MODEL_PATH` + `HF_HUB_OFFLINE=1` évitent que faster-whisper interroge Hugging Face au démarrage :
+le dépôt `mobiuslabsgmbh/faster-whisper-large-v3-turbo` a été déplacé vers
+`dropbox-dash/faster-whisper-large-v3-turbo`, et sans ces variables la résolution du nom
+`large-v3-turbo` passe par le réseau et peut retélécharger 1,6 Go dans un nouveau dossier de cache.
+Le chemin ci-dessus est le snapshot déjà présent sur le poste de développement (adapter le hash si le
+cache change : `ls ~/.cache/huggingface/hub/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots`).
+
 Le modèle se charge en tâche de fond dès le démarrage du serveur (le port écoute tout de suite) :
 `/healthz` répond `503 {"status": "loading"}` pendant le chargement (quelques secondes à quelques
 dizaines de secondes sur CPU selon l'état du cache disque), puis `200 {"status": "ok", ...}` une
