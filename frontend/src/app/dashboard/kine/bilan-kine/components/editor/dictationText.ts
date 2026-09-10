@@ -42,17 +42,3 @@ export function shiftAnchor(prev: string, next: string, pos: number): number {
   if (i >= pos) return pos;
   return Math.max(0, pos + (next.length - prev.length));
 }
-
-/**
- * Segments insérables maintenant : contigus à partir de `nextIndex`, un échec définitif étant sauté.
- * Renvoie les textes dans l'ordre et le prochain index attendu.
- */
-export function drainReady(nextIndex: number, results: Map<number, string>, failed: Set<number>): { texts: string[]; nextIndex: number } {
-  const texts: string[] = [];
-  let i = nextIndex;
-  while (results.has(i) || failed.has(i)) {
-    if (results.has(i)) texts.push(results.get(i) as string);
-    i += 1;
-  }
-  return { texts, nextIndex: i };
-}

@@ -167,7 +167,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
   const clearWarning = (key: BilanSectionKey) => setWarnings((prev) => { if (!(key in prev)) return prev; const next = { ...prev }; delete next[key]; return next; });
 
   const goTo = useCallback(async (s: EditorStep) => {
-    if (dictation.state.status === 'recording') { dictation.stop(); toast({ title: 'Dictée arrêtée' }); }
+    if (dictation.state.phase === 'recording') { dictation.stop(); toast({ title: 'Dictée arrêtée' }); }
     await flush();
     setStep(s);
     if (typeof window !== 'undefined') {
@@ -175,7 +175,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
       url.searchParams.set('step', s);
       window.history.replaceState(null, '', url.toString());
     }
-  }, [flush, dictation.state.status, dictation.stop, toast]);
+  }, [flush, dictation.state.phase, dictation.stop, toast]);
 
   const handlePatientChange = async (p: PatientSummary | null) => {
     if (!p) { toast({ title: 'Patient conservé', description: 'Pour changer de patient, choisis-en un autre dans la liste' }); return; }
@@ -191,7 +191,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
   };
 
   // Prise en cours ou segments pas encore revenus : quitter maintenant les perdrait
-  const dictating = dictation.state.status === 'recording' || dictation.state.inFlight > 0;
+  const dictating = dictation.state.phase !== 'idle';
 
   const handleBack = async () => {
     if (dictating) { toast({ title: 'Transcription en cours', description: 'Attends la fin de la dictée avant de quitter' }); return; }

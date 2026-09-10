@@ -1,8 +1,8 @@
 'use client';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ApiError, getDictationStatus, transcribeDictationSegment } from '@/utils/bilanApi';
+import { ApiError, correctDictation, getDictationStatus, transcribeDictationSegment } from '@/utils/bilanApi';
 import { DictationRecorder, pickMimeType } from './dictationRecorder';
-import { drainReady, insertSegment, shiftAnchor } from './dictationText';
+import { cleanSegment, insertSegment, shiftAnchor } from './dictationText';
 import { decodeToMono16k, encodeWav, sliceAtSilences, TARGET_RATE } from './audioSlicer';
 
 export const MAX_TAKE_MS = 10 * 60 * 1000;
@@ -12,12 +12,14 @@ const RETRY_DELAY_MS = 2_000;
 export interface DictationState {
   available: boolean;          // worker configuré et prêt (statut serveur)
   supported: boolean;          // MediaRecorder + format audio disponibles
-  status: 'idle' | 'recording';
+  phase: 'idle' | 'recording' | 'transcribing' | 'correcting';
   starting: boolean;           // start() en cours (avant que le micro soit acquis) : évite un double départ
   elapsedMs: number;
   level: number;               // 0..1
   inFlight: number;            // segments envoyés, pas encore revenus (toutes prises)
   failed: number;              // segments en échec définitif, en attente de Réessayer / Ignorer
+  segmentsDone: number;        // segments transcrits (toutes prises vivantes)
+  segmentsTotal: number | null; // total connu (prises arrêtées) ; null tant qu'une prise vivante n'a pas de total
   permissionDenied: boolean;
   importing: boolean;          // décodage et découpe d'un fichier importé en cours
 }
@@ -30,13 +32,14 @@ interface Take {
   id: string;
   mimeType: string;
   anchor: number;
-  started: boolean;            // vrai jusqu'à la première insertion (séparateur de début de prise)
-  nextIndex: number;
   results: Map<number, string>;
   failed: Map<number, Blob>;
   lastText: string;            // dernier segment revenu : contexte du suivant
   inFlight: number;
   recording: boolean;
+  sent: number;                 // segments envoyés
+  total: number | null;         // total de segments, connu à l'arrêt de la prise
+  correcting: boolean;          // passe de correction en cours avant insertion unique
 }
 
 export interface UseDictationArgs {
@@ -48,7 +51,7 @@ export interface UseDictationArgs {
 }
 
 export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: UseDictationArgs) {
-  const [state, setState] = useState<DictationState>({ available: false, supported: true, status: 'idle', starting: false, elapsedMs: 0, level: 0, inFlight: 0, failed: 0, permissionDenied: false, importing: false });
+  const [state, setState] = useState<DictationState>({ available: false, supported: true, phase: 'idle', starting: false, elapsedMs: 0, level: 0, inFlight: 0, failed: 0, segmentsDone: 0, segmentsTotal: null, permissionDenied: false, importing: false });
   const patch = useCallback((p: Partial<DictationState>) => setState((s) => ({ ...s, ...p })), []);
 
   const recorderRef = useRef<DictationRecorder | null>(null);
@@ -67,9 +70,15 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
   onAutoStopRef.current = onAutoStop;
 
   const refreshCounts = useCallback(() => {
-    let inFlight = 0; let failed = 0;
-    for (const t of takesRef.current) { inFlight += t.inFlight; failed += t.failed.size; }
-    patch({ inFlight, failed });
+    let inFlight = 0; let failed = 0; let done = 0; let total: number | null = 0; let correcting = false;
+    for (const t of takesRef.current) {
+      inFlight += t.inFlight; failed += t.failed.size; done += t.results.size;
+      if (t.total === null) total = null; else if (total !== null) total += t.total;
+      if (t.correcting) correcting = true;
+    }
+    const recording = recorderRef.current !== null;
+    const phase: DictationState['phase'] = recording ? 'recording' : correcting ? 'correcting' : (inFlight > 0 || failed > 0) ? 'transcribing' : 'idle';
+    patch({ inFlight, failed, segmentsDone: done, segmentsTotal: total, phase });
   }, [patch]);
 
   // Éditions du kiné pendant la dictée : chaque ancre vivante suit. En layout effect pour s'exécuter
@@ -103,31 +112,25 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
     return () => clearInterval(timer);
   }, [state.available, refreshAvailability]);
 
-  // Insère les segments contigus prêts d'une prise, puis retire la prise si elle est terminée
-  const drain = useCallback((take: Take) => {
-    const { texts, nextIndex } = drainReady(take.nextIndex, take.results, new Set(take.failed.keys()));
-    take.nextIndex = nextIndex;
-    if (texts.length > 0) {
-      let current = notesRef.current;
-      let pos = take.anchor;
-      for (const t of texts) {
-        const r = insertSegment(current, pos, t, take.started);
-        if (r.notes !== current) take.started = false;
-        current = r.notes; pos = r.pos;
-      }
-      const delta = current.length - notesRef.current.length;
-      // Les autres prises vivantes placées après cette insertion se décalent
-      for (const other of takesRef.current) if (other !== take && other.anchor >= take.anchor) other.anchor += delta;
-      take.anchor = pos;
-      if (current !== notesRef.current) {
-        knownRef.current = current;   // notre propre écriture : pas une édition du kiné
-        notesRef.current = current;
-        setNotesRef.current(current);
-      }
-    }
-    if (!take.recording && take.inFlight === 0 && take.failed.size === 0) takesRef.current.delete(take);
+  // Prise terminée (plus rien en vol, aucun échec en attente, enregistrement arrêté) : assemblage,
+  // correction, insertion unique à l'ancre. Sur échec de la correction, le texte brut est inséré.
+  const finalizeTake = useCallback(async (take: Take) => {
+    // Prise pas encore prête (segment en vol, échec en attente, encore en enregistrement) : juste
+    // rafraîchir les compteurs (ex. un segment revenu pendant l'enregistrement, ou un échec à signaler).
+    if (take.recording || take.inFlight > 0 || take.failed.size > 0 || take.correcting) { refreshCounts(); return; }
+    const raw = cleanSegment([...take.results.entries()].sort((a, b) => a[0] - b[0]).map(([, t]) => t).join(' '));
+    if (!raw) { takesRef.current.delete(take); refreshCounts(); return; }
+    take.correcting = true;
     refreshCounts();
-  }, [refreshCounts]);
+    let text = raw;
+    try { text = (await correctDictation(bilanId, { text: raw, mode: 'dictation' })).text || raw; } catch { /* texte brut */ }
+    const r = insertSegment(notesRef.current, take.anchor, text, true);
+    const delta = r.notes.length - notesRef.current.length;
+    for (const other of takesRef.current) if (other !== take && other.anchor >= take.anchor) other.anchor += delta;
+    if (r.notes !== notesRef.current) { knownRef.current = r.notes; notesRef.current = r.notes; setNotesRef.current(r.notes); }
+    takesRef.current.delete(take);
+    refreshCounts();
+  }, [bilanId, refreshCounts]);
 
   const sendSegment = useCallback(async (take: Take, blob: Blob, index: number) => {
     take.inFlight += 1;
@@ -151,18 +154,19 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
       }
     }
     take.inFlight -= 1;
-    drain(take);
-  }, [bilanId, drain, refreshCounts]);
+    void finalizeTake(take);
+  }, [bilanId, finalizeTake, refreshCounts]);
 
   const stop = useCallback(() => {
     const rec = recorderRef.current;
     recorderRef.current = null;
     currentRef.current = null;
     // Le dernier segment part via onSegment, puis le recorder déclenche onStopped (enregistré dans start())
-    // une fois cet envoi effectivement lancé : c'est ce callback qui ferme la prise (recording=false, drain).
+    // une fois cet envoi effectivement lancé : c'est ce callback qui ferme la prise (recording=false, finalizeTake).
     if (rec) rec.stop();
-    patch({ status: 'idle', level: 0 });
-  }, [patch]);
+    patch({ level: 0 });
+    refreshCounts();
+  }, [patch, refreshCounts]);
 
   const start = useCallback(async (caretPos: number) => {
     if (!enabled || startingRef.current || recorderRef.current) return;
@@ -172,17 +176,17 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
     }
     const mimeType = pickMimeType();
     if (!mimeType) { patch({ supported: false }); return; }
-    const take: Take = { id: crypto.randomUUID(), mimeType, anchor: Math.min(Math.max(caretPos, 0), notesRef.current.length), started: true, nextIndex: 0, results: new Map(), failed: new Map(), lastText: '', inFlight: 0, recording: true };
+    const take: Take = { id: crypto.randomUUID(), mimeType, anchor: Math.min(Math.max(caretPos, 0), notesRef.current.length), results: new Map(), failed: new Map(), lastText: '', inFlight: 0, recording: true, sent: 0, total: null, correcting: false };
     startingRef.current = true;
     patch({ starting: true });
     const rec = new DictationRecorder(mimeType, {
-      onSegment: (blob, index) => { void sendSegment(take, blob, index); },
+      onSegment: (blob, index) => { take.sent += 1; void sendSegment(take, blob, index); },
       onLevel: (level) => patch({ level }),
       onTick: (elapsedMs) => {
         patch({ elapsedMs });
         if (elapsedMs >= MAX_TAKE_MS) { stop(); onAutoStopRef.current?.(); }
       },
-      onStopped: () => { take.recording = false; drain(take); },
+      onStopped: () => { take.recording = false; take.total = take.sent; void finalizeTake(take); },
     });
     try {
       await rec.start();
@@ -201,8 +205,9 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
     currentRef.current = take;
     recorderRef.current = rec;
     startingRef.current = false;
-    patch({ status: 'recording', starting: false, elapsedMs: 0, permissionDenied: false });
-  }, [enabled, sendSegment, stop, drain, patch, refreshAvailability]);
+    patch({ starting: false, elapsedMs: 0, permissionDenied: false });
+    refreshCounts();
+  }, [enabled, sendSegment, stop, finalizeTake, patch, refreshAvailability, refreshCounts]);
 
   // Import d'un fichier audio (mémo vocal, enregistrement de test) : même chaîne que le micro,
   // les tranches partent en parallèle comme des segments d'une prise, insérées à l'ancre du curseur.
@@ -217,17 +222,19 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
       try { pcm = await decodeToMono16k(file); } catch { return 'invalid'; }
       if (pcm.length < TARGET_RATE) return 'invalid';                       // moins d'une seconde
       if (pcm.length > (MAX_TAKE_MS / 1000) * TARGET_RATE) return 'too_long';
-      const take: Take = { id: crypto.randomUUID(), mimeType: 'audio/wav', anchor: Math.min(Math.max(caretPos, 0), notesRef.current.length), started: true, nextIndex: 0, results: new Map(), failed: new Map(), lastText: '', inFlight: 0, recording: true };
+      const take: Take = { id: crypto.randomUUID(), mimeType: 'audio/wav', anchor: Math.min(Math.max(caretPos, 0), notesRef.current.length), results: new Map(), failed: new Map(), lastText: '', inFlight: 0, recording: true, sent: 0, total: null, correcting: false };
       takesRef.current.add(take);
-      sliceAtSilences(pcm).forEach((slice, index) => { void sendSegment(take, encodeWav(slice), index); });
+      const slices = sliceAtSilences(pcm);
+      take.sent = slices.length; take.total = slices.length;
+      slices.forEach((slice, index) => { void sendSegment(take, encodeWav(slice), index); });
       take.recording = false;
-      drain(take);
+      void finalizeTake(take);
       return 'ok';
     } finally {
       importingRef.current = false;
       patch({ importing: false });
     }
-  }, [enabled, refreshAvailability, sendSegment, drain, patch]);
+  }, [enabled, refreshAvailability, sendSegment, finalizeTake, patch]);
 
   const retryFailed = useCallback(() => {
     for (const take of takesRef.current) {
@@ -241,18 +248,18 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
     for (const take of [...takesRef.current]) {
       for (const index of take.failed.keys()) take.results.set(index, '');
       take.failed = new Map();
-      drain(take);
+      void finalizeTake(take);
     }
-  }, [drain]);
+  }, [finalizeTake]);
 
   // Fermeture d'onglet pendant une prise ou avec des segments en vol : confirmation native
   useEffect(() => {
-    const busy = state.status === 'recording' || state.inFlight > 0;
+    const busy = state.phase !== 'idle';
     if (!busy) return;
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [state.status, state.inFlight]);
+  }, [state.phase]);
 
   // Désactivation (bilan verrouillé, IA en cours) pendant une prise : arrêt propre
   useEffect(() => { if (!enabled && recorderRef.current) stop(); }, [enabled, stop]);

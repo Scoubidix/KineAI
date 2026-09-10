@@ -57,7 +57,7 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
   const lastCaretRef = useRef<number | null>(null);
   const rememberCaret = (e: React.SyntheticEvent<HTMLTextAreaElement>) => { lastCaretRef.current = e.currentTarget.selectionStart; };
   const caretPos = () => { const el = textareaRef.current; return el && document.activeElement === el ? el.selectionStart : (lastCaretRef.current ?? (record.rawNotes ?? '').length); };
-  const dictating = dictation.state.status === 'recording' || dictation.state.inFlight > 0;
+  const dictating = dictation.state.phase !== 'idle';
   const hint = dictating
     ? 'Transcription en cours…'
     : hasNotes

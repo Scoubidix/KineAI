@@ -20,7 +20,7 @@ const mmss = (ms: number) => { const s = Math.floor(ms / 1000); return `${String
 
 // Barre de dictée sous les notes : un bouton Dicter/Arrêter, chrono, vumètre, état des segments.
 export default function DictationBar({ state, disabled, onStart, onStop, onImport, onRetry, onIgnore }: DictationBarProps) {
-  const recording = state.status === 'recording';
+  const recording = state.phase === 'recording';
   const unavailable = !state.available || !state.supported;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,7 +50,7 @@ export default function DictationBar({ state, disabled, onStart, onStop, onImpor
       <Tooltip>
         <TooltipTrigger asChild>
           <span>
-            <Button type="button" size="sm" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={disabled || !state.available || recording || state.starting || state.importing} className="h-8 rounded-full text-xs">
+            <Button type="button" size="sm" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={disabled || !state.available || state.phase !== 'idle' || state.starting || state.importing} className="h-8 rounded-full text-xs">
               {state.importing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1" />}Importer un audio
             </Button>
           </span>
@@ -62,7 +62,9 @@ export default function DictationBar({ state, disabled, onStart, onStop, onImpor
           {bars.map((b) => <span key={b} className={`w-1 rounded-sm transition-colors ${state.level >= b ? 'bg-[#3899aa]' : 'bg-border'}`} style={{ height: `${4 + b * 12}px` }} />)}
         </div>
       )}
-      {state.inFlight > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Transcription… ({state.inFlight})</span>}
+      {recording && state.inFlight > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Transcription… ({state.inFlight})</span>}
+      {state.phase === 'transcribing' && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Transcription… {state.segmentsTotal === null ? `(${state.segmentsDone})` : `${state.segmentsDone} sur ${state.segmentsTotal}`}</span>}
+      {state.phase === 'correcting' && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Correction des termes…</span>}
       {state.permissionDenied && <span className="text-[11px] text-destructive">Autorise le micro dans ton navigateur pour dicter</span>}
       {state.failed > 0 && (
         <span className="inline-flex items-center gap-2 text-[11px] text-amber-700">
