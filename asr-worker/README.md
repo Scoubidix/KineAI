@@ -293,14 +293,6 @@ la stabilité du rappel clean (86 % → 86 %) sur le même cas, ne semblent pas 
 plus — variance plausible de l'extraction, non élucidée précisément faute d'avoir rejoué ce cas
 isolément.
 
-Rappel : `dictee-03` bouge dans les deux sens sans qu'aucune opération n'ait été appliquée dans
-l'un ou l'autre variant (passe abandonnée les deux fois) — clean baisse de 86 % à 79 %
-(`douleur_nocturne` devient manquant, en plus de `eva_repos`/`extension_genou:D` déjà manquants),
-cabinet monte de 79 % à 93 % (`testing_ischio_jambiers:D` n'est plus manquant). Le texte soumis à
-l'extraction est le même dans les deux runs (brut, correction sans effet) : l'écart vient de la
-non-déterminisme de l'appel d'extraction lui-même (température non nulle), pas de la correction.
-Noté tel quel, sans correction du harnais ni retouche.
-
 ### Amorce de vocabulaire : essai A/B du 10 sept. 2026
 
 Whisper ne garde que les 224 derniers tokens du prompt. L'amorce actuelle (75 mots, 180 tokens)

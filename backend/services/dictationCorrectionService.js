@@ -124,7 +124,7 @@ Chaque opération :
 Exemple — texte : « Test de lâchement négatif. Chobet à 13 centimètres, euh, Lasègue négatif. » → { "ops": [ { "op": "replace", "before": "Test de", "from": "lâchement", "after": "négatif.", "to": "Lachman" }, { "op": "replace", "before": "", "from": "Chobet", "after": "à 13", "to": "Schober" }, { "op": "delete", "before": "centimètres,", "from": "euh,", "after": "Lasègue", "to": "" } ] }
 Autorisé : corriger un terme médical, un test, un muscle, une technique, un sigle ou un nom propre mal transcrit ; supprimer une hésitation isolée (« euh », « hum », « bah », « ben », « hein », « voilà »).
 En mode dictée seulement : supprimer un fragment que le locuteur corrige lui-même juste après (« à droite, non pardon, » quand il dit ensuite « à gauche »).
-Interdit : reformuler, ajouter un mot, corriger la grammaire, la casse ou la ponctuation, modifier ou supprimer un nombre (en chiffres ou en lettres), une unité, une date. En cas de doute, ne rien faire.`;
+Interdit : reformuler, ajouter un mot, corriger la grammaire ou la ponctuation, modifier ou supprimer un nombre (en chiffres ou en lettres), une unité, une date. En cas de doute, ne rien faire.`;
 
 const CORRECTION_JSON_SCHEMA = {
   name: 'dictation_correction',
