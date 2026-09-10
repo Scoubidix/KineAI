@@ -1,0 +1,106 @@
+"""Worker ASR : transcription de segments audio par faster-whisper, places limitées, aucun stockage."""
+import asyncio
+import logging
+import os
+import secrets
+import time
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
+
+from scheduler import Busy, Scheduler
+from transcriber import SAMPLE_RATE, AudioInvalid, AudioTooLong, Transcriber, decode_audio
+
+MAX_BYTES = 8 * 1024 * 1024
+MAX_SECONDS = 60.0
+MAX_PROMPT_WORDS = 200
+PRIORITIES = ("interactive", "batch")
+
+logging.basicConfig(level=os.environ.get("ASR_LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("asr")
+
+
+def default_transcriber_factory():
+    return Transcriber(
+        model=os.environ.get("ASR_MODEL", "large-v3-turbo"),
+        device=os.environ.get("ASR_DEVICE", "cpu"),
+        compute_type=os.environ.get("ASR_COMPUTE_TYPE", "int8"),
+        threads=os.environ.get("ASR_THREADS", "2"),
+        model_path=os.environ.get("ASR_MODEL_PATH") or None,
+    )
+
+
+def create_app(transcriber_factory=None, load_on_startup=True) -> FastAPI:
+    slots = int(os.environ.get("ASR_SLOTS", "2"))
+    model_name = os.environ.get("ASR_MODEL", "large-v3-turbo")
+    token = os.environ.get("ASR_WORKER_TOKEN", "")
+    sched = Scheduler(slots, float(os.environ.get("ASR_INTERACTIVE_WAIT_MAX", "30")), int(os.environ.get("ASR_BATCH_QUEUE_MAX", "20")))
+    pool = ThreadPoolExecutor(max_workers=slots)
+    state = {"transcriber": None}
+    factory = transcriber_factory or default_transcriber_factory
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        if load_on_startup:
+            t0 = time.monotonic()
+            # Chargement hors boucle d'événements : /healthz répond « loading » pendant ce temps
+            state["transcriber"] = await asyncio.get_running_loop().run_in_executor(None, factory)
+            log.info("modèle %s chargé en %.1fs, %d place(s)", model_name, time.monotonic() - t0, slots)
+        yield
+        pool.shutdown(wait=False)
+
+    app = FastAPI(title="asr-worker", lifespan=lifespan)
+
+    @app.get("/healthz")
+    async def healthz():
+        ready = state["transcriber"] is not None
+        body = {"status": "ok" if ready else "loading", "model": model_name, "slots": slots, "busy": sched.busy, "queued": sched.queued}
+        return JSONResponse(body, status_code=200 if ready else 503)
+
+    @app.post("/v1/transcribe")
+    async def transcribe(
+        audio: UploadFile = File(...),
+        language: str = Form("fr"),
+        prompt: str = Form(""),
+        priority: str = Form("interactive"),
+        authorization: str = Header(""),
+    ):
+        if not token or not secrets.compare_digest(authorization, f"Bearer {token}"):
+            raise HTTPException(status_code=401, detail="jeton invalide")
+        if state["transcriber"] is None:
+            return JSONResponse({"error": "loading"}, status_code=503, headers={"Retry-After": "10"})
+        if priority not in PRIORITIES:
+            raise HTTPException(status_code=422, detail="priority invalide")
+        data = await audio.read()
+        if len(data) > MAX_BYTES:
+            raise HTTPException(status_code=413, detail="audio trop volumineux")
+        words = prompt.split()
+        prompt = " ".join(words[-MAX_PROMPT_WORDS:])
+        loop = asyncio.get_running_loop()
+        try:
+            pcm = await loop.run_in_executor(None, decode_audio, data, MAX_SECONDS)
+        except AudioTooLong:
+            raise HTTPException(status_code=422, detail="audio trop long")
+        except AudioInvalid:
+            raise HTTPException(status_code=422, detail="audio indécodable")
+        try:
+            waited = await sched.acquire(priority)
+        except Busy as b:
+            return JSONResponse({"error": "busy"}, status_code=503, headers={"Retry-After": str(b.retry_after)})
+        t0 = time.monotonic()
+        try:
+            text = await loop.run_in_executor(pool, state["transcriber"].transcribe, pcm, language, prompt)
+        finally:
+            sched.release()
+        processing = time.monotonic() - t0
+        audio_seconds = len(pcm) / SAMPLE_RATE
+        # Jamais le texte ni le prompt dans les logs (données de santé)
+        log.info("transcribe priority=%s audio=%.1fs processing=%.1fs wait=%.1fs", priority, audio_seconds, processing, waited)
+        return {"text": text, "audio_seconds": round(audio_seconds, 2), "processing_seconds": round(processing, 2), "model": model_name}
+
+    return app
+
+
+app = create_app()

@@ -89,3 +89,11 @@ scripts/
 # Artefacts Playwright e2e (runs locaux)
 test-results/
 playwright-report/
+
+# Worker ASR (Python) : venv, modèle téléchargé, audios et sorties d'évaluation
+asr-worker/.venv/
+asr-worker/models/
+asr-worker/eval/audio/
+asr-worker/eval/out/
+asr-worker/**/__pycache__/
+asr-worker/.pytest_cache/
