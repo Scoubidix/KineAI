@@ -171,18 +171,22 @@ saisi (`backend/eval/extraction/`). Détail du harnais : `backend/eval/README.md
 
 | Variante | Rappel moyen | Interdits |
 |---|---|---|
-| clean | 95,5 % | 2 |
-| cabinet | 94,1 % | 2 |
+| clean | 95,5 % | 0 |
+| cabinet | 94,0 % | 0 |
 
 Manquants par cas (mesure demandée, non corrigée dans cette tâche) :
 - clean : `dictee-01` — `eva_effort` ; `dictee-03` — `eva_repos`, `extension_genou:D` (obtenu -5 au
   lieu de 5, signe inversé)
-- cabinet : `dictee-01` — `eva_effort`, `test_laseuge:G` ; `dictee-03` — `extension_genou:D`
-  (même signe inversé) ; `dictee-05` — `douleur_nocturne`
+- cabinet : `dictee-01` — `eva_effort` ; `dictee-03` — `eva_repos`, `testing_ischio_jambiers:D`,
+  `extension_genou:D` (même signe inversé)
 
-Les deux interdits comptés sur chaque variante sont les mêmes : `dictee-04` (`custom absent :
-spurling` — le modèle extrait `test_spurling:D` en canonique plutôt qu'en mesure libre contenant
-« spurling ») et `dictee-05` (`custom absent : monopodal` — idem avec `appui_monopodal_secondes:G`
-extrait en canonique). Beaucoup d'« extra(s) » par ailleurs (mesures canoniques légitimes non
-listées dans `expect`, ex. `etat_cicatrice`, `reflexes_osteotendineux`) : à relire au cas par cas,
-pas des erreurs en soi.
+Un premier run du 2026-09-10 comptait 2 « interdits » par variante sur `dictee-04`
+(`customContains: ["spurling"]`) et `dictee-05` (`customContains: ["monopodal"]`) : erreur de plan
+dans `cases.json`, pas un défaut d'extraction — le catalogue contient bien `test_spurling` (alias
+`spurling`) et `appui_monopodal_secondes` (alias `appui monopodal`, `unipodal`), donc le modèle les
+extrayait correctement en mesures canoniques, ce que `customContains` (qui cherche une mesure
+*libre*) comptait à tort comme une violation. Corrigé : `customContains` vidé sur `dictee-03/04/05`,
+`test_spurling:D=true` et `appui_monopodal_secondes:G=5` ajoutés à `expect` (dictee-04 et dictee-05).
+Les chiffres ci-dessus sont le run de référence après correction (même date, mêmes fichiers audio).
+Beaucoup d'« extra(s) » par ailleurs (mesures canoniques légitimes non listées dans `expect`, ex.
+`etat_cicatrice`, `reflexes_osteotendineux`) : à relire au cas par cas, pas des erreurs en soi.
