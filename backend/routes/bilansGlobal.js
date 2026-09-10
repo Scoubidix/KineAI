@@ -1,16 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const { z } = require('zod');
+const multer = require('multer');
 
 const bilansGlobalController = require('../controllers/bilansGlobalController');
 const { authenticate } = require('../middleware/authenticate');
-const { pdfGenerationLimiter, crudWriteLimiter, gptLimiter } = require('../middleware/rateLimiter');
+const { pdfGenerationLimiter, crudWriteLimiter, gptLimiter, dictationLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validate');
 const { requireBilanEditor } = require('../middleware/authorization');
 const { SECTION_KEYS } = require('../services/bilanDocument');
 
 // Routes globales (non scopées à un patient)
 router.get('/patients-with-bilans', authenticate, bilansGlobalController.getPatientsWithBilans);
+
+// Dictée (spec dictée §5.1). La route de statut est déclarée avant les routes /:id.
+router.get('/dictation/status', authenticate, bilansGlobalController.dictationStatus);
+const dictationUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
+const dictationAudio = (req, res, next) => dictationUpload.single('audio')(req, res, (err) => {
+  if (!err) return next();
+  const tooLarge = err.code === 'LIMIT_FILE_SIZE';
+  return res.status(tooLarge ? 413 : 400).json({ success: false, error: tooLarge ? 'Segment audio trop volumineux (8 Mo max)' : 'Segment audio invalide', code: tooLarge ? 'AUDIO_INVALID' : 'INVALID_SEGMENT' });
+});
 
 const bilanTypeSchema = z.enum(['INITIAL', 'INTERMEDIAIRE', 'FINAL']);
 // Le document est validé finement par le service (catalogue) ; ici forme grossière seulement.
@@ -52,6 +62,8 @@ router.post('/:id/extract', authenticate, gptLimiter, requireBilanEditor, bilans
 router.post('/:id/compose', authenticate, gptLimiter, requireBilanEditor, validate(composeSchema), bilansGlobalController.composeBilan);
 // « Rédiger avec l'IA » en un appel : extraction, acceptation automatique, rédaction (spec flux deux étapes §5)
 router.post('/:id/compose-from-notes', authenticate, gptLimiter, requireBilanEditor, bilansGlobalController.composeBilanFromNotes);
+// Un segment de dictée → texte, rien n'est écrit ; l'autosave du front porte le texte dans rawNotes.
+router.post('/:id/dictation', authenticate, dictationLimiter, requireBilanEditor, dictationAudio, bilansGlobalController.transcribeDictation);
 
 // Rendu HTML (tout plan : un kiné rétrogradé lit toujours ses bilans)
 router.get('/:id/render', authenticate, bilansGlobalController.renderBilan);

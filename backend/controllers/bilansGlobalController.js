@@ -7,6 +7,7 @@ const { sanitizeId } = require('../utils/logSanitizer');
 const draftService = require('../services/bilanDraftService');
 const extractionService = require('../services/bilanExtractionService');
 const composeService = require('../services/bilanComposeService');
+const asrService = require('../services/asrService');
 
 /**
  * GET /api/bilans/patients-with-bilans
@@ -289,5 +290,38 @@ exports.composeBilanFromNotes = async (req, res) => {
     res.json({ success: true, bilan, warnings, accepted, pending, rejected });
   } catch (err) {
     sendDraftError(res, err, 'rédaction depuis les notes');
+  }
+};
+
+const TAKE_ID_RE = /^[0-9a-f-]{8,64}$/i;
+
+/** GET /api/bilans/dictation/status — le worker ASR est-il configuré et prêt ? */
+exports.dictationStatus = async (req, res) => {
+  res.json({ success: true, available: await asrService.checkHealth() });
+};
+
+/** POST /api/bilans/:id/dictation — transcrit un segment audio (multipart), rien n'est écrit */
+exports.transcribeDictation = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const { takeId, index, prevText, mimeType } = req.body || {};
+    const idx = Number(index);
+    if (!req.file || !req.file.buffer || req.file.buffer.length === 0 || !TAKE_ID_RE.test(String(takeId || '')) || !Number.isInteger(idx) || idx < 0) {
+      return res.status(400).json({ success: false, error: 'Segment invalide', code: 'INVALID_SEGMENT' });
+    }
+    const prisma = prismaService.getInstance();
+    const bilan = await prisma.bilanKine.findFirst({ where: { id: bilanId, kineId, isActive: true }, select: { document: true } });
+    if (!bilan) throw new draftService.DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
+    if (!bilan.document) throw new draftService.DraftError('LEGACY_BILAN', 400, 'Les anciens bilans ne peuvent pas être dictés');
+    const prompt = asrService.buildPrompt(String(prevText || '').slice(0, 600));
+    const r = await asrService.transcribeSegment({ buffer: req.file.buffer, mimeType: String(mimeType || req.file.mimetype || ''), prompt, priority: 'interactive' });
+    logger.info(`Dictée bilan ${bilanId} prise ${sanitizeId(String(takeId))} segment ${idx} : ${r.audioSeconds}s audio, ${r.processingSeconds}s calcul`);
+    res.json({ success: true, text: r.text, audioSeconds: r.audioSeconds, processingSeconds: r.processingSeconds });
+  } catch (err) {
+    if (err instanceof draftService.DraftError && err.code === 'ASR_BUSY') res.set('Retry-After', String((err.extra && err.extra.retryAfter) || 5));
+    sendDraftError(res, err, 'transcription de la dictée');
   }
 };

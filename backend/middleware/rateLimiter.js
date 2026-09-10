@@ -170,6 +170,24 @@ const gptHeavyLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter de la dictée : un segment audio toutes les 15 à 45 s par kiné en usage normal,
+ * 30 par minute laisse de la marge aux réessais sans permettre un flot continu.
+ */
+const dictationLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Trop de segments de dictée', details: 'Patiente une minute avant de reprendre', retryAfter: 60 },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'dictation'),
+  handler: (req, res) => {
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`🚫 Rate limit dépassé - Dictée - User: ${safeUser}`);
+    res.status(429).json({ error: 'Trop de segments de dictée', details: 'Patiente une minute avant de reprendre', retryAfter: 60 });
+  }
+});
+
+/**
  * Rate limiter pour les ecritures CRUD (POST/PUT/DELETE)
  * 30 ecritures par minute par utilisateur — protege contre le spam
  * sans bloquer la navigation (GET non limite)
@@ -718,6 +736,7 @@ module.exports = {
   stripeWebhookLimiter,
   gptLimiter,
   gptHeavyLimiter,
+  dictationLimiter,
   crudWriteLimiter,
   pdfGenerationLimiter,
   authLimiter,
