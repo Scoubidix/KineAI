@@ -35,13 +35,13 @@ async function checkHealth() {
   return ok;
 }
 
-const unavailable = () => new DraftError('ASR_UNAVAILABLE', 502, 'Transcription indisponible, reessaie dans un instant');
+const unavailable = () => new DraftError('ASR_UNAVAILABLE', 502, 'Transcription indisponible, réessaie dans un instant');
 
 /**
  * Transcrit un segment. @throws {DraftError} DICTATION_DISABLED | ASR_BUSY | AUDIO_INVALID | ASR_MISCONFIGURED | ASR_UNAVAILABLE
  */
 async function transcribeSegment({ buffer, mimeType, prompt, priority = 'interactive' }) {
-  if (!isConfigured()) throw new DraftError('DICTATION_DISABLED', 503, 'La dictee n\'est pas disponible pour le moment');
+  if (!isConfigured()) throw new DraftError('DICTATION_DISABLED', 503, 'La dictée n\'est pas disponible pour le moment');
   const { url, token } = config();
   const form = new FormData();
   form.append('audio', new Blob([buffer], { type: mimeType || 'application/octet-stream' }), 'segment');
@@ -57,12 +57,18 @@ async function transcribeSegment({ buffer, mimeType, prompt, priority = 'interac
   }
   if (res.status === 503) {
     const retryAfter = Number(res.headers.get('retry-after')) || 5;
-    throw new DraftError('ASR_BUSY', 503, 'Transcription saturee, reessaie dans un instant', { retryAfter });
+    throw new DraftError('ASR_BUSY', 503, 'Transcription saturée, réessaie dans un instant', { retryAfter });
   }
   if (res.status === 413 || res.status === 422) throw new DraftError('AUDIO_INVALID', 422, 'Segment audio invalide');
-  if (res.status === 401) { logger.error('ASR : jeton refuse par le worker (ASR_WORKER_TOKEN)'); throw new DraftError('ASR_MISCONFIGURED', 500, 'Transcription indisponible'); }
-  if (!res.ok) { logger.error(`ASR : reponse ${res.status}`); throw unavailable(); }
-  const body = await res.json();
+  if (res.status === 401) { logger.error('ASR : jeton refusé par le worker (ASR_WORKER_TOKEN)'); throw new DraftError('ASR_MISCONFIGURED', 500, 'Transcription indisponible'); }
+  if (!res.ok) { logger.error(`ASR : réponse ${res.status}`); throw unavailable(); }
+  let body;
+  try {
+    body = await res.json();
+  } catch (err) {
+    logger.error('ASR : réponse illisible');
+    throw unavailable();
+  }
   return { text: String(body.text ?? ''), audioSeconds: Number(body.audio_seconds) || 0, processingSeconds: Number(body.processing_seconds) || 0 };
 }
 
