@@ -79,7 +79,7 @@ function applyOps(text, ops, mode) {
   if (ops.length > Math.max(MIN_OPS_ALLOWED, Math.floor(wordCount / WORDS_PER_OP))) return giveUp('plafond d’opérations');
 
   let current = raw;
-  let applied = 0; let ignored = 0; let deletedWords = 0; let deletedOps = 0;
+  let applied = 0; let ignored = 0; let deletedWords = 0;
   for (const op of ops) {
     const from = normSpaces(op.from); const to = normSpaces(op.to);
     const before = normSpaces(op.before); const after = normSpaces(op.after);
@@ -93,12 +93,11 @@ function applyOps(text, ops, mode) {
     // replace ne touche que les mots (group 1) ; delete emporte aussi la ponctuation collée qui suivait
     const end = op.op === 'delete' ? tailEnd : wordsEnd;
     current = cleanup(current.slice(0, start) + (op.op === 'replace' ? to : '') + current.slice(end));
-    if (op.op === 'delete') { deletedWords += fromTokens.length; deletedOps += 1; }
+    if (op.op === 'delete') deletedWords += fromTokens.length;
     applied += 1;
   }
-  // Le plafond ne s'applique qu'à partir de 2 suppressions cumulées : une suppression unique, localisée
-  // sans ambiguïté par son contexte, est déjà validée individuellement (ex. fragment auto-corrigé entier).
-  if (wordCount > 0 && deletedOps > 1 && deletedWords / wordCount > MAX_DELETED_RATIO) return giveUp('trop de suppressions');
+  // Un seul « from » sans plafond de longueur peut à lui seul dépasser le ratio : la garde s'applique dès une suppression.
+  if (wordCount > 0 && deletedWords / wordCount > MAX_DELETED_RATIO) return giveUp('trop de suppressions');
   if (!numbersGuard(raw, current)) return giveUp('nombre nouveau');
   return { text: current, applied, ignored };
 }
