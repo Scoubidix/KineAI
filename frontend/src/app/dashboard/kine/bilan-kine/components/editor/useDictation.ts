@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { ApiError, getDictationStatus, transcribeDictationSegment } from '@/utils/bilanApi';
 import { DictationRecorder, pickMimeType } from './dictationRecorder';
 import { drainReady, insertSegment, shiftAnchor } from './dictationText';
+import { decodeToMono16k, encodeWav, sliceAtSilences, TARGET_RATE } from './audioSlicer';
 
 export const MAX_TAKE_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
@@ -18,7 +19,11 @@ export interface DictationState {
   inFlight: number;            // segments envoyés, pas encore revenus (toutes prises)
   failed: number;              // segments en échec définitif, en attente de Réessayer / Ignorer
   permissionDenied: boolean;
+  importing: boolean;          // décodage et découpe d'un fichier importé en cours
 }
+
+/** Résultat d'un import de fichier : `ok`, ou la raison du refus (à afficher par l'appelant) */
+export type ImportResult = 'ok' | 'busy' | 'unavailable' | 'invalid' | 'too_long';
 
 // Une prise : ses segments, son ancre d'insertion, son contexte
 interface Take {
@@ -43,7 +48,7 @@ export interface UseDictationArgs {
 }
 
 export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: UseDictationArgs) {
-  const [state, setState] = useState<DictationState>({ available: false, supported: true, status: 'idle', starting: false, elapsedMs: 0, level: 0, inFlight: 0, failed: 0, permissionDenied: false });
+  const [state, setState] = useState<DictationState>({ available: false, supported: true, status: 'idle', starting: false, elapsedMs: 0, level: 0, inFlight: 0, failed: 0, permissionDenied: false, importing: false });
   const patch = useCallback((p: Partial<DictationState>) => setState((s) => ({ ...s, ...p })), []);
 
   const recorderRef = useRef<DictationRecorder | null>(null);
@@ -199,6 +204,31 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
     patch({ status: 'recording', starting: false, elapsedMs: 0, permissionDenied: false });
   }, [enabled, sendSegment, stop, drain, patch, refreshAvailability]);
 
+  // Import d'un fichier audio (mémo vocal, enregistrement de test) : même chaîne que le micro,
+  // les tranches partent en parallèle comme des segments d'une prise, insérées à l'ancre du curseur.
+  const importingRef = useRef(false);
+  const importFile = useCallback(async (file: Blob, caretPos: number): Promise<ImportResult> => {
+    if (!enabled || startingRef.current || recorderRef.current || importingRef.current) return 'busy';
+    if (!availableRef.current && !(await refreshAvailability())) return 'unavailable';
+    importingRef.current = true;
+    patch({ importing: true });
+    try {
+      let pcm: Float32Array;
+      try { pcm = await decodeToMono16k(file); } catch { return 'invalid'; }
+      if (pcm.length < TARGET_RATE) return 'invalid';                       // moins d'une seconde
+      if (pcm.length > (MAX_TAKE_MS / 1000) * TARGET_RATE) return 'too_long';
+      const take: Take = { id: crypto.randomUUID(), mimeType: 'audio/wav', anchor: Math.min(Math.max(caretPos, 0), notesRef.current.length), started: true, nextIndex: 0, results: new Map(), failed: new Map(), lastText: '', inFlight: 0, recording: true };
+      takesRef.current.add(take);
+      sliceAtSilences(pcm).forEach((slice, index) => { void sendSegment(take, encodeWav(slice), index); });
+      take.recording = false;
+      drain(take);
+      return 'ok';
+    } finally {
+      importingRef.current = false;
+      patch({ importing: false });
+    }
+  }, [enabled, refreshAvailability, sendSegment, drain, patch]);
+
   const retryFailed = useCallback(() => {
     for (const take of takesRef.current) {
       const items = [...take.failed.entries()];
@@ -230,5 +260,5 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
   // Démontage : on libère le micro ; les segments en vol terminent d'eux-mêmes
   useEffect(() => () => { recorderRef.current?.stop(); }, []);
 
-  return { state, start, stop, retryFailed, ignoreFailed };
+  return { state, start, stop, importFile, retryFailed, ignoreFailed };
 }

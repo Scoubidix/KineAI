@@ -229,3 +229,21 @@ extrayait correctement en mesures canoniques, ce que `customContains` (qui cherc
 Les chiffres ci-dessus sont le run de référence après correction (même date, mêmes fichiers audio).
 Beaucoup d'« extra(s) » par ailleurs (mesures canoniques légitimes non listées dans `expect`, ex.
 `etat_cicatrice`, `reflexes_osteotendineux`) : à relire au cas par cas, pas des erreurs en soi.
+
+### Amorce de vocabulaire : essai A/B du 10 sept. 2026
+
+Whisper ne garde que les 224 derniers tokens du prompt. L'amorce actuelle (75 mots, 180 tokens)
+plus 80 mots de contexte (165 tokens) dépasse la fenêtre : dès le deuxième segment d'une prise,
+seule la fin du vocabulaire survit. Quatre variantes mesurées sur trois dictées propres
+(45 s par segment, worker local, WER nombres normalisés) :
+
+| Dictée | Amorce actuelle | Sans amorce | Vocabulaire réduit en tête + 40 mots | Contexte 40 mots puis vocabulaire réduit |
+|---|---|---|---|---|
+| dictee-01 | 11,2 % | 12,7 % | 11,7 % | 11,7 % |
+| dictee-03 | 14,1 % | 12,8 % | 18,1 % | 18,1 % |
+| dictee-04 | 7,2 % | 7,9 % | 11,2 % | 10,5 % |
+
+Conclusion : l'amorce actuelle reste la meilleure ou à égalité ; le vocabulaire réduit aux termes
+rares dégrade ; les noms de tests écorchés (Lachman, Lasègue, Schober sur voix de synthèse) ne sont
+récupérés par aucune variante. Le gain sur les termes passera par la passe de correction par modèle
+de langue, pas par l'amorce. Ne pas rouvrir sans nouvelles données (enregistrements réels).

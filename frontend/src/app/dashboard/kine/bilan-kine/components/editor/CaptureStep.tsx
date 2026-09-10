@@ -8,6 +8,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Search, PenLine, Disc, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
 import type { BilanPatch, BilanRecord } from '@/types/bilan';
 import DictationBar from './DictationBar';
+import { useToast } from '@/hooks/use-toast';
+import type { ImportResult } from './useDictation';
 import { useDictation } from './useDictation';
 
 export interface StepProps {
@@ -40,6 +42,15 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
   const anyText = (record.document?.sections ?? []).some((s) => s.text.trim() !== '');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const handleComposeClick = () => { if (anyText) setConfirmOpen(true); else onCompose(); };
+  const { toast } = useToast();
+  const IMPORT_MESSAGES: Partial<Record<ImportResult, { title: string; description?: string }>> = {
+    invalid: { title: 'Fichier audio illisible', description: 'Formats acceptés : wav, mp3, m4a, webm, ogg, d’au moins une seconde' },
+    too_long: { title: 'Audio trop long', description: '10 minutes maximum par import' },
+    unavailable: { title: 'Dictée indisponible pour le moment' },
+  };
+  const handleImport = (file: File) => {
+    void dictation.importFile(file, caretPos()).then((r) => { const m = IMPORT_MESSAGES[r]; if (m) toast({ ...m, variant: 'destructive' }); });
+  };
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Dernière position de caret connue : le clic sur « Dicter » (mousedown neutralisé) garde en général
   // le focus sur le textarea, mais on retombe ici si le focus a bougé entre-temps (ex. clavier virtuel).
@@ -72,7 +83,7 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
           <Input value={record.motif ?? ''} onChange={(e) => update({ motif: e.target.value })} placeholder="Ex : Lombalgie chronique, rééducation post-opératoire..." disabled={disabled} maxLength={500} className="border-0 border-b border-border/60 rounded-none bg-transparent text-sm h-8 px-2 focus-visible:ring-0" />
         </div>
         <Textarea ref={textareaRef} value={record.rawNotes ?? ''} onChange={(e) => update({ rawNotes: e.target.value })} onSelect={rememberCaret} onBlur={rememberCaret} placeholder={PLACEHOLDER} disabled={disabled} maxLength={50000} className="min-h-[320px] lg:min-h-[480px] text-sm leading-relaxed resize-y rounded-xl border-2 border-border/60 bg-white dark:bg-card p-4 focus-visible:ring-[#3899aa]/50" />
-        <DictationBar state={dictation.state} disabled={!!disabled} onStart={() => { void dictation.start(caretPos()); }} onStop={dictation.stop} onRetry={dictation.retryFailed} onIgnore={dictation.ignoreFailed} />
+        <DictationBar state={dictation.state} disabled={!!disabled} onStart={() => { void dictation.start(caretPos()); }} onStop={dictation.stop} onImport={handleImport} onRetry={dictation.retryFailed} onIgnore={dictation.ignoreFailed} />
         {notesLength > 45000 && (
           <span className="text-[10px] text-muted-foreground -mt-2 self-end px-1">{notesLength} / 50000</span>
         )}
