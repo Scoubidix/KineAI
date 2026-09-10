@@ -108,4 +108,78 @@ function applyOps(text, ops, mode) {
   return { text: current, applied, ignored };
 }
 
-module.exports = { MODES, FILLERS, NUMBER_WORDS, MAX_OPS, applyOps, numbersGuard, fold };
+const SYSTEM_PROMPT = `Tu corriges la transcription automatique d'une dictée de kinésithérapeute (bilan de patient), en français.
+Tu renvoies uniquement un objet JSON { "ops": [...] }. Chaque opération est :
+- { "op": "replace", "before": "...", "from": "...", "after": "...", "to": "..." } : remplacer le fragment « from » (un terme mal transcrit) par « to », le terme correct (un terme du vocabulaire fourni, ou un terme médical évident) ;
+- { "op": "delete", "before": "...", "from": "...", "after": "...", "to": "" } : supprimer le fragment « from ».
+« before » et « after » : jusqu'à deux mots exacts qui précèdent et suivent le fragment dans le texte (vides en début ou fin de texte). « from » : le fragment exact, tel qu'écrit.
+Autorisé : corriger un terme médical, un test, un muscle, une technique, un sigle ou un nom propre mal transcrit ; supprimer une hésitation isolée (« euh », « hum », « bah », « ben », « hein », « voilà »).
+En mode dictée seulement : supprimer un fragment que le locuteur corrige lui-même juste après (« à droite, non pardon, » quand il dit ensuite « à gauche »).
+Interdit : reformuler, ajouter un mot, corriger la grammaire ou la ponctuation, modifier ou supprimer un nombre (en chiffres ou en lettres), une unité, une date. En cas de doute, ne rien faire : renvoyer { "ops": [] }.`;
+
+const CORRECTION_JSON_SCHEMA = {
+  name: 'dictation_correction',
+  schema: {
+    type: 'object', additionalProperties: false, required: ['ops'],
+    properties: { ops: { type: 'array', maxItems: MAX_OPS, items: {
+      type: 'object', additionalProperties: false, required: ['op', 'before', 'from', 'after', 'to'],
+      properties: { op: { type: 'string', enum: ['replace', 'delete'] }, before: { type: 'string' }, from: { type: 'string' }, after: { type: 'string' }, to: { type: 'string' } },
+    } } },
+  },
+};
+
+const opsSchema = z.object({ ops: z.array(z.object({
+  op: z.enum(['replace', 'delete']), before: z.string().default(''), from: z.string(), after: z.string().default(''), to: z.string().default(''),
+})).max(MAX_OPS) });
+
+function parseOps(content) {
+  const result = opsSchema.safeParse(parseJsonOutput(content));
+  if (!result.success) throw new Error(`sortie de correction invalide : ${result.error.issues[0]?.message}`);
+  return result.data.ops;
+}
+
+/** Libellés et alias des champs actifs, plus les termes hors catalogue, dédoublonnés. */
+function buildVocabulary(catalog) {
+  const seen = new Set(); const out = [];
+  const add = (t) => { const s = normSpaces(t); if (s && !seen.has(s)) { seen.add(s); out.push(s); } };
+  for (const f of catalog) if (f.isActive !== false) { add(f.label); for (const a of Array.isArray(f.aliases) ? f.aliases : []) add(a); }
+  for (const t of EXTRA_TERMS) add(t);
+  return out;
+}
+
+function buildCorrectionMessages({ text, mode, vocabulary }) {
+  return [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: `Mode : ${mode === 'session' ? 'séance (dialogue kiné-patient : ne supprimer que les hésitations)' : 'dictée'}\n\nVocabulaire : ${vocabulary.join(' ; ')}\n\nTexte :\n"""\n${text}\n"""` },
+  ];
+}
+
+const safeErrorLabel = (err) => (err instanceof SyntaxError ? 'JSON invalide' : err.message);
+
+/**
+ * Corrige un texte transcrit. Ne lève jamais pour un échec du modèle : renvoie le texte brut.
+ * @returns {Promise<{ text: string, applied: number, ignored: number }>}
+ */
+async function correct({ text, mode, catalog }) {
+  const raw = String(text ?? '').trim();
+  if (!raw) return { text: '', applied: 0, ignored: 0 };
+  const messages = buildCorrectionMessages({ text: raw, mode, vocabulary: buildVocabulary(catalog) });
+  let ops;
+  for (let attempt = 1; attempt <= 2 && !ops; attempt += 1) {
+    try {
+      const { content } = await llmService.chatCompletion({ iaType: 'bilan_dictation_correct', messages, jsonSchema: CORRECTION_JSON_SCHEMA });
+      ops = parseOps(content);
+    } catch (err) {
+      logger.warn(`Correction dictée : essai ${attempt} en échec (${safeErrorLabel(err)})`);
+    }
+  }
+  if (!ops) return { text: raw, applied: 0, ignored: 0 };
+  const r = applyOps(raw, ops, mode);
+  logger.info(`Correction dictée (${mode}) : ${r.applied} appliquée(s), ${r.ignored} ignorée(s)`);
+  return r;
+}
+
+module.exports = {
+  MODES, FILLERS, NUMBER_WORDS, MAX_OPS, applyOps, numbersGuard, fold,
+  buildVocabulary, buildCorrectionMessages, parseOps, correct, CORRECTION_JSON_SCHEMA,
+};
