@@ -14,13 +14,20 @@ export function separatorFor(notes: string, pos: number, isTakeStart: boolean): 
   return /\s/.test(prev) ? '' : ' ';
 }
 
-/** Insère `text` à `pos` ; renvoie les notes et la nouvelle ancre (fin du texte inséré). */
+/**
+ * Insère `text` à `pos`, précédé du séparateur de `separatorFor` et suivi d'un espace si le
+ * caractère qui suivait déjà `pos` existe et n'est pas un blanc (insertion au milieu d'un mot/segment).
+ * Renvoie les notes et la nouvelle ancre : la fin du texte inséré, avant cet éventuel espace de fin.
+ */
 export function insertSegment(notes: string, pos: number, text: string, isTakeStart: boolean): { notes: string; pos: number } {
   const clean = cleanSegment(text);
   if (!clean) return { notes, pos };
   const p = Math.min(Math.max(pos, 0), notes.length);
-  const inserted = separatorFor(notes, p, isTakeStart) + clean;
-  return { notes: notes.slice(0, p) + inserted + notes.slice(p), pos: p + inserted.length };
+  const lead = separatorFor(notes, p, isTakeStart);
+  const nextChar = notes[p];
+  const trail = nextChar !== undefined && !/\s/.test(nextChar) ? ' ' : '';
+  const inserted = lead + clean;
+  return { notes: notes.slice(0, p) + inserted + trail + notes.slice(p), pos: p + inserted.length };
 }
 
 /**

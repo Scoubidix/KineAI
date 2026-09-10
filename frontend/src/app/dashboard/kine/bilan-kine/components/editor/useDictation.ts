@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ApiError, getDictationStatus, transcribeDictationSegment } from '@/utils/bilanApi';
 import { DictationRecorder, pickMimeType } from './dictationRecorder';
 import { drainReady, insertSegment, shiftAnchor } from './dictationText';
@@ -51,14 +51,22 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
   const notesRef = useRef(notes);
   const knownRef = useRef(notes);                     // dernière valeur vue : détecte les éditions du kiné
 
+  // Dernières valeurs de setNotes / onAutoStop, tenues a jour a chaque rendu : évite de recréer les
+  // callbacks stables ci-dessous a chaque changement d'identité de ces props côté parent.
+  const setNotesRef = useRef(setNotes);
+  setNotesRef.current = setNotes;
+  const onAutoStopRef = useRef(onAutoStop);
+  onAutoStopRef.current = onAutoStop;
+
   const refreshCounts = useCallback(() => {
     let inFlight = 0; let failed = 0;
     for (const t of takesRef.current) { inFlight += t.inFlight; failed += t.failed.size; }
     patch({ inFlight, failed });
   }, [patch]);
 
-  // Éditions du kiné pendant la dictée : chaque ancre vivante suit
-  useEffect(() => {
+  // Éditions du kiné pendant la dictée : chaque ancre vivante suit. En layout effect pour s'exécuter
+  // avant qu'un segment revenu (setState React) ne lise notesRef/knownRef sur une frappe pas encore prise en compte.
+  useLayoutEffect(() => {
     notesRef.current = notes;
     if (notes === knownRef.current) return;
     for (const t of takesRef.current) t.anchor = shiftAnchor(knownRef.current, notes, t.anchor);
@@ -88,13 +96,15 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
       // Les autres prises vivantes placées après cette insertion se décalent
       for (const other of takesRef.current) if (other !== take && other.anchor >= take.anchor) other.anchor += delta;
       take.anchor = pos;
-      knownRef.current = current;   // notre propre écriture : pas une édition du kiné
-      notesRef.current = current;
-      setNotes(current);
+      if (current !== notesRef.current) {
+        knownRef.current = current;   // notre propre écriture : pas une édition du kiné
+        notesRef.current = current;
+        setNotesRef.current(current);
+      }
     }
     if (!take.recording && take.inFlight === 0 && take.failed.size === 0) takesRef.current.delete(take);
     refreshCounts();
-  }, [setNotes, refreshCounts]);
+  }, [refreshCounts]);
 
   const sendSegment = useCallback(async (take: Take, blob: Blob, index: number) => {
     take.inFlight += 1;
@@ -110,7 +120,8 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
       } catch (e) {
         const api = e instanceof ApiError ? e : null;
         if (api && api.status === 422) { take.results.set(index, ''); break; }     // audio invalide : ignoré
-        const retryable = !api || api.status === 502 || api.status === 503 || api.status === 429;
+        // Service désactivé : inutile de réessayer, ce sera toujours refusé
+        const retryable = !api || ((api.status === 502 || api.status === 503 || api.status === 429) && api.code !== 'DICTATION_DISABLED');
         if (retryable && attempt < MAX_ATTEMPTS) { await new Promise((resolve) => setTimeout(resolve, api?.retryAfterMs ?? RETRY_DELAY_MS)); continue; }
         take.failed.set(index, blob);
         break;
@@ -122,13 +133,13 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
 
   const stop = useCallback(() => {
     const rec = recorderRef.current;
-    const take = currentRef.current;
     recorderRef.current = null;
     currentRef.current = null;
-    if (rec) rec.stop();                 // le dernier segment part via onSegment
-    if (take) { take.recording = false; drain(take); }
+    // Le dernier segment part via onSegment, puis le recorder déclenche onStopped (enregistré dans start())
+    // une fois cet envoi effectivement lancé : c'est ce callback qui ferme la prise (recording=false, drain).
+    if (rec) rec.stop();
     patch({ status: 'idle', level: 0 });
-  }, [drain, patch]);
+  }, [patch]);
 
   const start = useCallback(async (caretPos: number) => {
     if (!enabled || recorderRef.current) return;
@@ -140,20 +151,27 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
       onLevel: (level) => patch({ level }),
       onTick: (elapsedMs) => {
         patch({ elapsedMs });
-        if (elapsedMs >= MAX_TAKE_MS) { stop(); onAutoStop?.(); }
+        if (elapsedMs >= MAX_TAKE_MS) { stop(); onAutoStopRef.current?.(); }
       },
+      onStopped: () => { take.recording = false; drain(take); },
     });
     try {
       await rec.start();
-    } catch {
-      patch({ permissionDenied: true });
+    } catch (e) {
+      // NotAllowedError/SecurityError : permission refusée. NotFoundError/NotReadableError : pas de micro
+      // utilisable, meme message que « permission refusée » côté UI. Autre chose : format non supporté.
+      if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'SecurityError' || e.name === 'NotFoundError' || e.name === 'NotReadableError')) {
+        patch({ permissionDenied: true });
+      } else {
+        patch({ supported: false });
+      }
       return;
     }
     takesRef.current.add(take);
     currentRef.current = take;
     recorderRef.current = rec;
     patch({ status: 'recording', elapsedMs: 0, permissionDenied: false });
-  }, [enabled, sendSegment, stop, onAutoStop, patch]);
+  }, [enabled, sendSegment, stop, drain, patch]);
 
   const retryFailed = useCallback(() => {
     for (const take of takesRef.current) {
@@ -181,7 +199,7 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
   }, [state.status, state.inFlight]);
 
   // Désactivation (bilan verrouillé, IA en cours) pendant une prise : arrêt propre
-  useEffect(() => { if (!enabled) stop(); }, [enabled, stop]);
+  useEffect(() => { if (!enabled && recorderRef.current) stop(); }, [enabled, stop]);
 
   // Démontage : on libère le micro ; les segments en vol terminent d'eux-mêmes
   useEffect(() => () => { recorderRef.current?.stop(); }, []);

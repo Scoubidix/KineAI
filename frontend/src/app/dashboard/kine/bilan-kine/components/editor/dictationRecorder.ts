@@ -12,6 +12,7 @@ export interface RecorderCallbacks {
   onSegment: (blob: Blob, index: number) => void;
   onLevel: (level: number) => void;      // 0..1 pour le vumètre
   onTick: (elapsedMs: number) => void;   // chrono de la prise
+  onStopped: () => void;                 // dernier segment envoyé, micro libéré : la prise peut être close
 }
 
 export function pickMimeType(): string | null {
@@ -30,7 +31,8 @@ export class DictationRecorder {
   private takeStart = 0;
   private segmentStart = 0;
   private silenceSince: number | null = null;
-  private floorSamples: number[] = [];
+  private sampleCount = 0;
+  private floorMin = Infinity;
   private threshold = 0.008;
   private stopping = false;
 
@@ -38,24 +40,34 @@ export class DictationRecorder {
 
   async start(): Promise<void> {
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    this.ctx = new AudioContext();
-    const source = this.ctx.createMediaStreamSource(this.stream);
-    this.analyser = this.ctx.createAnalyser();
-    this.analyser.fftSize = 1024;
-    source.connect(this.analyser);
-    this.takeStart = Date.now();
-    this.startSegment();
-    this.timer = setInterval(() => this.sample(), LEVEL_INTERVAL_MS);
+    try {
+      this.ctx = new AudioContext();
+      const source = this.ctx.createMediaStreamSource(this.stream);
+      this.analyser = this.ctx.createAnalyser();
+      this.analyser.fftSize = 1024;
+      source.connect(this.analyser);
+      this.takeStart = Date.now();
+      this.startSegment();
+      this.timer = setInterval(() => this.sample(), LEVEL_INTERVAL_MS);
+    } catch (e) {
+      // Échec après l'obtention du micro (AudioContext, MediaRecorder...) : tout libérer avant de relayer l'erreur
+      if (this.timer) clearInterval(this.timer);
+      this.stream?.getTracks().forEach((t) => t.stop());
+      void this.ctx?.close();
+      throw e;
+    }
   }
 
-  /** Ferme le segment courant (envoyé s'il dure ≥ 1 s) et libère le micro. */
+  /** Ferme le segment courant (envoyé s'il dure ≥ 1 s) et libère le micro. `onStopped` suit l'envoi du dernier segment. */
   stop(): void {
     if (this.stopping) return;
     this.stopping = true;
     if (this.timer) clearInterval(this.timer);
+    const willFireOnStop = !!this.recorder && this.recorder.state !== 'inactive';
     this.closeSegment(false);
     this.stream?.getTracks().forEach((t) => t.stop());
     void this.ctx?.close();
+    if (!willFireOnStop) this.cb.onStopped();
   }
 
   private startSegment(): void {
@@ -66,6 +78,8 @@ export class DictationRecorder {
     rec.ondataavailable = (e) => {
       if (e.data.size > 0 && Date.now() - startedAt >= DROP_BELOW_MS) this.cb.onSegment(e.data, idx);
     };
+    // `onstop` arrive après le dernier `dataavailable` : signal fiable de fin d'envoi quand stop() a été demandé.
+    rec.onstop = () => { if (this.stopping) this.cb.onStopped(); };
     rec.start();
     this.recorder = rec;
     this.segmentStart = startedAt;
@@ -90,15 +104,12 @@ export class DictationRecorder {
     const now = Date.now();
     this.cb.onLevel(Math.min(1, rms * 8));
     this.cb.onTick(now - this.takeStart);
-    // Plancher de bruit : médiane de la première seconde de la prise
-    if (this.floorSamples.length < 10) {
-      this.floorSamples.push(rms);
-      if (this.floorSamples.length === 10) {
-        const sorted = [...this.floorSamples].sort((a, b) => a - b);
-        this.threshold = Math.max(sorted[5] * 2, 0.008);
-      }
-      return;
-    }
+    // Plancher de bruit : minimum glissant du RMS sur toute la prise ; les 10 premiers échantillons
+    // servent uniquement à l'initialiser avant d'activer la détection de silence.
+    this.sampleCount += 1;
+    this.floorMin = Math.min(this.floorMin, rms);
+    this.threshold = Math.max(this.floorMin * 3, 0.008);
+    if (this.sampleCount < 10) return;
     const segmentMs = now - this.segmentStart;
     if (rms < this.threshold) this.silenceSince = this.silenceSince ?? now;
     else this.silenceSince = null;
