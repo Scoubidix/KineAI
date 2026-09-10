@@ -134,13 +134,14 @@ dictee-05_clean                  84     28  0.34   9.6%     16.3% 4/18
 
 Wall-clock : 5 min 1 s pour les dix fichiers.
 
-RTF < 0,5 atteint sur les dix fichiers (0,34-0,37). WER (nombres normalisés) **atteint** sur 6/10
-fichiers (cabinet : 11,7 % / 6,6 % / 12,8 % / 11,2 % / 9,6 % — cible < 20 %, tous atteints ; clean :
+RTF < 0,5 atteint sur les dix fichiers (0,34-0,37). WER (nombres normalisés) **atteint** sur 8/10
+fichiers (cabinet : 11,7 % / 6,6 % / 12,8 % / 11,2 % / 9,6 % — cible < 20 %, 5/5 atteints ; clean :
 11,7 % / 8,3 % / 12,1 % / 9,2 % / 9,6 % — cible < 10 %, 3/5 atteints, `dictee-01_clean` 11,7 % et
 `dictee-03_clean` 12,1 % la ratent de peu). La colonne `WER brut` (15-23 %, toutes cibles ratées)
-montre l'ampleur du delta expliqué par les nombres seuls : 5 à 12 points de WER selon le fichier.
-Le résidu restant après normalisation vient d'erreurs de reconnaissance authentiques mais mineures
-(ex. « Schober » → « Chobet », « sept » → « c'est », désaccords singulier/pluriel, conjugaisons).
+montre l'ampleur du delta expliqué par les nombres seuls : 5,7 à 10,4 points de WER selon le
+fichier. Le résidu restant après normalisation vient d'erreurs de reconnaissance authentiques mais
+mineures (ex. « Schober » → « Chobet », « sept » → « c'est », désaccords singulier/pluriel,
+conjugaisons).
 
 ### Run HTTP, `--concurrency 4` (worker `ASR_SLOTS=2`, `ASR_THREADS=2`, `dictee-01` uniquement)
 

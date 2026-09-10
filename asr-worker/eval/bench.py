@@ -1,4 +1,4 @@
-"""Bench de la dictée : WER, RTF, termes kiné, par fichier de eval/audio (et eval/audio/real s'il existe).
+r"""Bench de la dictée : WER, RTF, termes kiné, par fichier de eval/audio (et eval/audio/real s'il existe).
 
 Usage : .venv\Scripts\python.exe eval/bench.py [--url http://localhost:8100 --token dev-token] [--concurrency 4] [--only dictee-03]
 Sans --url : appel direct du Transcriber (in-process). Écrit eval/out/<nom>_<variante>.txt.
@@ -86,11 +86,18 @@ def _parse_up_to_999(words, i):
 
 
 def _parse_number_phrase(words, i):
-    """Nombre complet à partir de i, avec milliers pour les années : deux mille dix-huit → 2018."""
+    """Nombre complet à partir de i, avec milliers pour les années : deux mille dix-huit → 2018 ;
+    "mille" seul (sans multiplicateur) → 1000."""
     n = len(words)
     mult, j2 = _parse_up_to_999(words, i)
     if mult is not None and j2 < n and words[j2] == "mille":
         total, j = (mult or 1) * 1000, j2 + 1
+        rest, j3 = _parse_up_to_999(words, j)
+        if rest:
+            total, j = total + rest, j3
+        return total, j
+    if i < n and words[i] == "mille":
+        total, j = 1000, i + 1
         rest, j3 = _parse_up_to_999(words, j)
         if rest:
             total, j = total + rest, j3
@@ -169,8 +176,8 @@ def main():
     a = ap.parse_args()
     if a.selftest:
         assert normalize_numbers(
-            "cinquante-deux ans, deux mille dix-huit, cent vingt degrés, quatre-vingt-dix, un degré, une fois, un carton"
-        ) == "52 ans, 2018, 120 degrés, 90, 1 degré, 1 fois, un carton"
+            "cinquante-deux ans, deux mille dix-huit, cent vingt degrés, quatre-vingt-dix, un degré, une fois, un carton, mille"
+        ) == "52 ans, 2018, 120 degrés, 90, 1 degré, 1 fois, un carton, 1000"
         print("selftest ok")
         return
     files = sorted(glob.glob(os.path.join(HERE, "audio", "*.wav")) + glob.glob(os.path.join(HERE, "audio", "real", "*.wav")))
@@ -178,7 +185,7 @@ def main():
         files = [f for f in files if a.only in os.path.basename(f)]
     os.makedirs(os.path.join(HERE, "out"), exist_ok=True)
     if a.url:
-        import httpx, tempfile
+        import httpx
         run_bytes = lambda data: httpx.post(f"{a.url}/v1/transcribe", headers={"Authorization": f"Bearer {a.token}"},
                                             files={"audio": ("seg.wav", data, "audio/wav")},
                                             data={"language": "fr", "prompt": PROMPT, "priority": "interactive"}, timeout=120).json()["text"]

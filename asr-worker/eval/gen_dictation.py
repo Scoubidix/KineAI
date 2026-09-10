@@ -1,8 +1,8 @@
-"""Génère les audios de dictée : eval/audio/<nom>_clean.wav (voix seule, 16 kHz mono) et <nom>_cabinet.wav (bruit rose, réverb, micro éloigné).
+r"""Génère les audios de dictée : eval/audio/<nom>_clean.wav (voix seule, 16 kHz mono) et <nom>_cabinet.wav (bruit rose, réverb, micro éloigné).
 
 Usage : .venv\Scripts\python.exe eval/gen_dictation.py [dictee-03]   (sans argument : les cinq)
 """
-import asyncio, glob, os, random, subprocess, sys, tempfile
+import asyncio, glob, os, subprocess, sys, tempfile
 
 import edge_tts
 
@@ -10,7 +10,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FFMPEG = os.path.join(HERE, "..", "..", "backend", "node_modules", "@ffmpeg-installer", "win32-x64", "ffmpeg.exe")
 VOICE, RATE = "fr-FR-HenriNeural", "+2%"
 PAUSE_LINE, PAUSE_PARA = 0.6, 1.4
-SEED = 42
 
 
 def ff(*args):
@@ -49,7 +48,6 @@ def generate(script):
     lines = parse(script)
     audio_dir = os.path.join(HERE, "audio")
     os.makedirs(audio_dir, exist_ok=True)
-    random.seed(SEED)
     with tempfile.TemporaryDirectory() as tmp:
         wavs = asyncio.run(synth(lines, tmp))
         silences = {}
