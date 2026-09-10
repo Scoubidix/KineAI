@@ -387,6 +387,7 @@ module.exports = {
   buildCompactCatalog,
   buildExtractionMessages,
   parseExtractionOutput,
+  parseJsonOutput,
   normalize,
   applyCandidates,
   extractFromText,
