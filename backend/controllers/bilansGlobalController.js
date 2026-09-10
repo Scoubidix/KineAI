@@ -8,6 +8,7 @@ const draftService = require('../services/bilanDraftService');
 const extractionService = require('../services/bilanExtractionService');
 const composeService = require('../services/bilanComposeService');
 const asrService = require('../services/asrService');
+const dictationCorrectionService = require('../services/dictationCorrectionService');
 
 /**
  * GET /api/bilans/patients-with-bilans
@@ -323,5 +324,24 @@ exports.transcribeDictation = async (req, res) => {
   } catch (err) {
     if (err instanceof draftService.DraftError && err.code === 'ASR_BUSY') res.set('Retry-After', String((err.extra && err.extra.retryAfter) || 5));
     sendDraftError(res, err, 'transcription de la dictée');
+  }
+};
+
+/** POST /api/bilans/:id/dictation/correct — corrige le texte d'une prise (termes, hésitations) ; rien n'est écrit */
+exports.correctDictation = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    if (!asrService.isConfigured()) throw new draftService.DraftError('DICTATION_DISABLED', 503, 'La dictée n’est pas disponible pour le moment');
+    const bilan = await prismaService.getInstance().bilanKine.findFirst({ where: { id: bilanId, kineId, isActive: true }, select: { document: true } });
+    if (!bilan) throw new draftService.DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
+    if (!bilan.document) throw new draftService.DraftError('LEGACY_BILAN', 400, 'Les anciens bilans ne peuvent pas être dictés');
+    const catalog = await bilanRenderService.getCatalog();
+    const r = await dictationCorrectionService.correct({ text: req.body.text, mode: req.body.mode, catalog });
+    res.json({ success: true, text: r.text, applied: r.applied, ignored: r.ignored });
+  } catch (err) {
+    sendDraftError(res, err, 'correction de la dictée');
   }
 };

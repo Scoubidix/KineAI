@@ -64,6 +64,9 @@ router.post('/:id/compose', authenticate, gptLimiter, requireBilanEditor, valida
 router.post('/:id/compose-from-notes', authenticate, gptLimiter, requireBilanEditor, bilansGlobalController.composeBilanFromNotes);
 // Un segment de dictée → texte, rien n'est écrit ; l'autosave du front porte le texte dans rawNotes.
 router.post('/:id/dictation', authenticate, dictationLimiter, requireBilanEditor, dictationAudio, bilansGlobalController.transcribeDictation);
+const correctDictationSchema = z.object({ text: z.string().max(20000), mode: z.enum(['dictation', 'session']) });
+// Passe de correction à la fin de la prise (spec correction §3) : rien n'est écrit, texte brut renvoyé sur échec
+router.post('/:id/dictation/correct', authenticate, dictationLimiter, requireBilanEditor, validate(correctDictationSchema), bilansGlobalController.correctDictation);
 
 // Rendu HTML (tout plan : un kiné rétrogradé lit toujours ses bilans)
 router.get('/:id/render', authenticate, bilansGlobalController.renderBilan);
