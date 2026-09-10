@@ -3,10 +3,25 @@
 import React, { useState } from 'react';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { FileText, Sparkles, Search, Layers, ArrowRight, CheckCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { FileText, Sparkles, Search, Layers, ArrowRight, CheckCircle, Megaphone } from 'lucide-react';
 import NouveauBilanModal from './components/NouveauBilanModal';
 import PatientBilansModal from './components/PatientBilansModal';
 import TemplatesModal from './components/TemplatesModal';
+
+// Bandeau temporaire (non fermable, volontairement) : annonce de la nouvelle version
+// du module Bilans en préparation. À retirer dans le commit qui livre la nouvelle version.
+function BilanEvolutionBanner() {
+  return (
+    <Alert role="status" className="mb-6 border-[#3899aa]/50 border-l-4 border-l-[#3899aa] bg-[#3899aa]/15 [&>svg]:text-[#3899aa]">
+      <Megaphone className="h-4 w-4" />
+      <AlertTitle className="text-[#3899aa]">Le module Bilans évolue.</AlertTitle>
+      <AlertDescription className="text-foreground">
+        Suite à vos retours, une nouvelle version est en préparation. Une idée ? Partage dans le groupe pionniers !
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 export default function BilanHubPage() {
   const [nouveauOpen, setNouveauOpen] = useState(false);
@@ -32,6 +47,8 @@ export default function BilanHubPage() {
             </div>
           </div>
         </div>
+
+        <BilanEvolutionBanner />
 
         {/* CTA principal — Nouveau bilan */}
         <Card
