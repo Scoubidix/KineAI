@@ -23,6 +23,8 @@ const PUNCT = /[.,;:!?()«»"]/g;
 // Ponctuation tolérée collée à la fin d'un mot (fermante uniquement)
 const PUNCT_TAIL = '[.,;:!?)»"]*';
 const LETTERS = 'A-Za-zÀ-ÖØ-öø-ÿŒœ';
+// Frontière de mot élargie à l'apostrophe et au tiret : « l'épaule », « Kenneth-Jones » comptent pour un seul mot
+const WORD_CHARS = `${LETTERS}'’-`;
 
 const normSpaces = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
 const tokens = (s) => normSpaces(s).replace(PUNCT, ' ').split(' ').filter(Boolean);
@@ -34,7 +36,11 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 function fold(s) {
   return Array.from(s, (c) => { const f = c.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); return f.length === 1 ? f : c; }).join('');
 }
-const hasNumberWord = (s) => tokens(fold(s)).some((w) => w.split('-').some((p) => NUMBER_WORDS.has(p) || NUMBER_WORDS.has(p.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))));
+// Comparaisons pliées une fois au chargement : FILLERS/NUMBER_WORDS restent exportés accentués (lisibles),
+// mais `from` est toujours comparé sous sa forme pliée, donc l'autre côté de la comparaison doit l'être aussi.
+const FILLERS_FOLDED = new Set(FILLERS.map(fold));
+const NUMBER_WORDS_FOLDED = new Set([...NUMBER_WORDS].map(fold));
+const hasNumberWord = (s) => tokens(fold(s)).some((w) => w.split('-').some((p) => NUMBER_WORDS_FOLDED.has(p)));
 
 // Motif d'un groupe de mots de contexte (before/after) : chaque mot entier, ponctuation collée tolérée, espaces souples
 const group = (s) => tokens(fold(s)).map((w) => `${escapeRe(w)}${PUNCT_TAIL}`).join('\\s+');
@@ -52,7 +58,7 @@ function locate(text, before, from, after) {
   const fromWords = tokens(fold(from));
   const fCore = fromWords.map((w, i) => (i < fromWords.length - 1 ? `${escapeRe(w)}${PUNCT_TAIL}` : escapeRe(w))).join('\\s+');
   const b = group(before); const a = group(after);
-  const pattern = `(?<![${LETTERS}])${b ? `${b}\\s+` : ''}(${fCore})(${PUNCT_TAIL})${a ? `\\s+${a}` : ''}(?![${LETTERS}])`;
+  const pattern = `(?<![${WORD_CHARS}])${b ? `${b}\\s+` : ''}(${fCore})(${PUNCT_TAIL})${a ? `\\s+${a}` : ''}(?![${WORD_CHARS}])`;
   const matches = [...folded.matchAll(new RegExp(pattern, 'gd'))];
   if (matches.length !== 1) return null;
   const [wordsStart, wordsEnd] = matches[0].indices[1];
@@ -84,9 +90,9 @@ function applyOps(text, ops, mode) {
     const from = normSpaces(op.from); const to = normSpaces(op.to);
     const before = normSpaces(op.before); const after = normSpaces(op.after);
     const fromTokens = tokens(from);
-    let ok = fromTokens.length > 0 && !hasDigit(from) && !hasNumberWord(from);
+    let ok = (op.op === 'replace' || op.op === 'delete') && fromTokens.length > 0 && !hasDigit(from) && !hasNumberWord(from);
     if (ok && op.op === 'replace') ok = to.length > 0 && !hasDigit(to) && tokens(to).length <= MAX_TO_WORDS;
-    if (ok && op.op === 'delete') ok = FILLERS.includes(fold(from).replace(PUNCT, '').trim()) || (mode === 'dictation' && fromTokens.length >= 2);
+    if (ok && op.op === 'delete') ok = FILLERS_FOLDED.has(fold(from).replace(PUNCT, '').trim()) || (mode === 'dictation' && fromTokens.length >= 2);
     const pos = ok ? locate(current, before, from, after) : null;
     if (!pos) { ignored += 1; continue; }
     const [start, wordsEnd, tailEnd] = pos;
