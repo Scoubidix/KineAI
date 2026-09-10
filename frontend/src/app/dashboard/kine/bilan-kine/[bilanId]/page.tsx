@@ -14,6 +14,7 @@ import BilanStepper, { type EditorStep } from '../components/editor/BilanStepper
 import CaptureStep from '../components/editor/CaptureStep';
 import DocumentStep from '../components/editor/DocumentStep';
 import MeasuresDrawer, { DRAWER_SUGGESTIONS_ID } from '../components/editor/MeasuresDrawer';
+import { useDictation } from '../components/editor/useDictation';
 import { useMinWidth } from '../components/editor/useMinWidth';
 
 const isStep = (s: string | null): s is EditorStep => s === 'capture' || s === 'document';
@@ -49,6 +50,16 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
     setDrawerOpen(open);
     try { localStorage.setItem('bilan.drawer.open', open ? '1' : '0'); } catch { /* ignoré */ }
   };
+
+  // Dictée : le hook vit dans le shell pour que les segments en vol survivent au changement d'étape
+  const dictation = useDictation({
+    bilanId: record.id,
+    notes: record.rawNotes ?? '',
+    setNotes: (n) => update({ rawNotes: n }),
+    enabled: !locked && aiBusy === null && record.status !== 'ENREGISTRE',
+    onAutoStop: () => toast({ title: 'Dictée arrêtée', description: '10 minutes par prise maximum. Relance une prise pour continuer.' }),
+  });
+
   const openSuggestions = () => {
     setDrawer(true);
     // Double rAF : le nœud du tiroir n'existe qu'après le commit React de l'ouverture (commit après l'état, puis défilement)
@@ -156,6 +167,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
   const clearWarning = (key: BilanSectionKey) => setWarnings((prev) => { if (!(key in prev)) return prev; const next = { ...prev }; delete next[key]; return next; });
 
   const goTo = useCallback(async (s: EditorStep) => {
+    if (dictation.state.status === 'recording') { dictation.stop(); toast({ title: 'Dictée arrêtée' }); }
     await flush();
     setStep(s);
     if (typeof window !== 'undefined') {
@@ -163,7 +175,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
       url.searchParams.set('step', s);
       window.history.replaceState(null, '', url.toString());
     }
-  }, [flush]);
+  }, [flush, dictation.state.status, dictation.stop, toast]);
 
   const handlePatientChange = async (p: PatientSummary | null) => {
     if (!p) { toast({ title: 'Patient conservé', description: 'Pour changer de patient, choisis-en un autre dans la liste' }); return; }
@@ -203,7 +215,7 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
         <BilanStepper step={step} onStep={(s) => { void goTo(s); }} />
         <div className="flex-1 min-h-0 flex">
           <div className="flex-1 min-w-0 pb-12 lg:pb-0">
-            {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('document')} onCompose={() => { void handleComposeFromNotes(); }} composing={aiBusy === 'compose_from_notes'} />}
+            {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('document')} onCompose={() => { void handleComposeFromNotes(); }} composing={aiBusy === 'compose_from_notes'} dictation={dictation} />}
             {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} onComposeFromNotes={() => { void handleComposeFromNotes(); }} lastRun={lastRun} onVerify={openSuggestions} onDismissRun={() => setLastRun(null)} wide={wide} />}
           </div>
           <MeasuresDrawer record={record} update={update} disabled={locked || aiBusy !== null} candidates={candidates} rejectedCount={rejectedCount} onCandidatesChange={setCandidates} onAnalyze={() => { void handleAnalyze(); }} aiBusy={aiBusy} open={drawerOpen} onOpenChange={setDrawer} wide={wide} quotes={quotes} />

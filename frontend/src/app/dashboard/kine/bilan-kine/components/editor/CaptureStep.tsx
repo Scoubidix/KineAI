@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Search, PenLine, Mic, Disc, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
+import { Search, PenLine, Disc, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
 import type { BilanPatch, BilanRecord } from '@/types/bilan';
+import DictationBar from './DictationBar';
+import { useDictation } from './useDictation';
 
 export interface StepProps {
   record: BilanRecord;
@@ -27,17 +29,23 @@ export interface CaptureStepProps extends StepProps {
   /** « Rédiger avec l'IA » : extraction + acceptation + rédaction, puis étape Document */
   onCompose: () => void;
   composing: boolean;
+  dictation: ReturnType<typeof useDictation>;
 }
 
 // Étape 1 : la source seule (notes écrites aujourd'hui, dictée et transcription demain).
 // Les mesures se saisissent ou se corrigent dans le tiroir, disponible ici comme à l'étape Document.
-export default function CaptureStep({ record, update, disabled, onNext, onCompose, composing }: CaptureStepProps) {
+export default function CaptureStep({ record, update, disabled, onNext, onCompose, composing, dictation }: CaptureStepProps) {
   const notesLength = (record.rawNotes ?? '').length;
   const hasNotes = (record.rawNotes ?? '').trim().length > 0;
   const anyText = (record.document?.sections ?? []).some((s) => s.text.trim() !== '');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const handleComposeClick = () => { if (anyText) setConfirmOpen(true); else onCompose(); };
-  const hint = hasNotes
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const caretPos = () => { const el = textareaRef.current; return el && document.activeElement === el ? el.selectionStart : (record.rawNotes ?? '').length; };
+  const dictating = dictation.state.status === 'recording' || dictation.state.inFlight > 0;
+  const hint = dictating
+    ? 'Transcription en cours…'
+    : hasNotes
     ? 'L’IA extrait les mesures de tes notes et rédige le bilan ; tu vérifies ensuite'
     : 'Écris tes notes, ou saisis directement les mesures dans le tiroir';
 
@@ -52,7 +60,6 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
           <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Source</span>
           <span className="flex-1" />
           {modeChip(<PenLine className="h-3 w-3" />, 'Notes', true)}
-          {modeChip(<Mic className="h-3 w-3" />, 'Dicter', false)}
           {modeChip(<Disc className="h-3 w-3" />, 'Séance', false)}
         </div>
         <div className="flex items-center gap-2 px-1">
@@ -60,7 +67,8 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
           <span className="text-xs font-medium text-[#3899aa] shrink-0">Motif</span>
           <Input value={record.motif ?? ''} onChange={(e) => update({ motif: e.target.value })} placeholder="Ex : Lombalgie chronique, rééducation post-opératoire..." disabled={disabled} maxLength={500} className="border-0 border-b border-border/60 rounded-none bg-transparent text-sm h-8 px-2 focus-visible:ring-0" />
         </div>
-        <Textarea value={record.rawNotes ?? ''} onChange={(e) => update({ rawNotes: e.target.value })} placeholder={PLACEHOLDER} disabled={disabled} maxLength={50000} className="min-h-[320px] lg:min-h-[480px] text-sm leading-relaxed resize-y rounded-xl border-2 border-border/60 bg-white dark:bg-card p-4 focus-visible:ring-[#3899aa]/50" />
+        <Textarea ref={textareaRef} value={record.rawNotes ?? ''} onChange={(e) => update({ rawNotes: e.target.value })} placeholder={PLACEHOLDER} disabled={disabled} maxLength={50000} className="min-h-[320px] lg:min-h-[480px] text-sm leading-relaxed resize-y rounded-xl border-2 border-border/60 bg-white dark:bg-card p-4 focus-visible:ring-[#3899aa]/50" />
+        <DictationBar state={dictation.state} disabled={!!disabled} onStart={() => { void dictation.start(caretPos()); }} onStop={dictation.stop} onRetry={dictation.retryFailed} onIgnore={dictation.ignoreFailed} />
         {notesLength > 45000 && (
           <span className="text-[10px] text-muted-foreground -mt-2 self-end px-1">{notesLength} / 50000</span>
         )}
@@ -70,13 +78,13 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
         <div className="flex items-center gap-2 ml-auto">
           {hasNotes ? (
             <>
-              <Button variant="ghost" size="sm" onClick={onNext} disabled={disabled} className="h-9">Rédiger moi-même</Button>
-              <Button onClick={handleComposeClick} disabled={disabled || composing} className="btn-teal rounded-full px-5 h-9">
+              <Button variant="ghost" size="sm" onClick={onNext} disabled={disabled || dictating} className="h-9">Rédiger moi-même</Button>
+              <Button onClick={handleComposeClick} disabled={disabled || composing || dictating} className="btn-teal rounded-full px-5 h-9">
                 {composing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}Rédiger avec l’IA<ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             </>
           ) : (
-            <Button onClick={onNext} disabled={disabled} className="btn-teal rounded-full px-5 h-9">Continuer<ArrowRight className="h-4 w-4 ml-1" /></Button>
+            <Button onClick={onNext} disabled={disabled || dictating} className="btn-teal rounded-full px-5 h-9">Continuer<ArrowRight className="h-4 w-4 ml-1" /></Button>
           )}
         </div>
       </div>
