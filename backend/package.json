@@ -4,7 +4,8 @@
     "postinstall": "prisma generate",
     "test": "jest --verbose",
     "test:watch": "jest --watch --verbose",
-    "eval:extraction": "node eval/extraction/run.js"
+    "eval:extraction": "node eval/extraction/run.js",
+    "eval:dictation": "node eval/dictation/run.js"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

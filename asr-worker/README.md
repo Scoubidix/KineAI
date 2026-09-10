@@ -160,3 +160,29 @@ Wall-clock : 50 s. RTF meilleur qu'en in-process (0,26 contre 0,37) grâce à la
 tranches de 45 s sur les 2 places du worker. WER identique au run in-process (même modèle, même
 texte) : 11,7 % sur les deux variantes, cible clean (< 10 %) ratée de peu, cible cabinet (< 20 %)
 atteinte.
+
+### Extraction
+
+Au bout de la chaîne : les transcriptions ci-dessus (`asr-worker/eval/out/`) sont ensuite passées à
+l'extraction IA du bilan (`backend/eval/dictation/run.js`, `npm run eval:dictation`), qui appelle le
+vrai provider (`mistral-medium-3-5`) et compare aux mêmes attentes que le jeu d'évaluation sur texte
+saisi (`backend/eval/extraction/`). Détail du harnais : `backend/eval/README.md`. Run réel du
+2026-09-10 (5 dictées, un appel provider par cas) :
+
+| Variante | Rappel moyen | Interdits |
+|---|---|---|
+| clean | 95,5 % | 2 |
+| cabinet | 94,1 % | 2 |
+
+Manquants par cas (mesure demandée, non corrigée dans cette tâche) :
+- clean : `dictee-01` — `eva_effort` ; `dictee-03` — `eva_repos`, `extension_genou:D` (obtenu -5 au
+  lieu de 5, signe inversé)
+- cabinet : `dictee-01` — `eva_effort`, `test_laseuge:G` ; `dictee-03` — `extension_genou:D`
+  (même signe inversé) ; `dictee-05` — `douleur_nocturne`
+
+Les deux interdits comptés sur chaque variante sont les mêmes : `dictee-04` (`custom absent :
+spurling` — le modèle extrait `test_spurling:D` en canonique plutôt qu'en mesure libre contenant
+« spurling ») et `dictee-05` (`custom absent : monopodal` — idem avec `appui_monopodal_secondes:G`
+extrait en canonique). Beaucoup d'« extra(s) » par ailleurs (mesures canoniques légitimes non
+listées dans `expect`, ex. `etat_cicatrice`, `reflexes_osteotendineux`) : à relire au cas par cas,
+pas des erreurs en soi.

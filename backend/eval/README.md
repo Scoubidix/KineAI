@@ -86,3 +86,38 @@ Pour chaque cas :
   `customContains`), `extra` (candidat canonique non attendu), `libre` (candidats `custom`
   produits, pour relecture manuelle).
 - en fin de run : rappel moyen et total d'interdits sur tous les cas lancés.
+
+## Eval — dictée
+
+Même principe que ci-dessus, mais sur les **transcriptions** produites par le pipeline ASR plutôt
+que sur du texte saisi. Chaîne complète :
+
+```
+asr-worker/eval/gen_dictation.py   # génère l'audio des 5 dictées (edge-tts), variantes clean/cabinet
+        ↓
+asr-worker/eval/bench.py           # transcrit chaque fichier → asr-worker/eval/out/<nom>_<variante>.txt
+        ↓
+npm run eval:dictation             # (ce harnais) extrait depuis la transcription, compare à expect/forbid
+```
+
+Le harnais ne lit que `asr-worker/eval/out/` (déjà produit par `bench.py`) — il ne relance jamais le
+worker ASR ni la synthèse audio. `backend/eval/dictation/cases.json` reprend les 5 dictées avec les
+mêmes attentes (`expect`/`forbid`/`forbidValues`/`customContains`) que les cas `run.js` équivalents,
+mais un `transcript` (chemin vers le fichier `_clean.txt`, relatif à la racine du dépôt) à la place
+de `notes`. La logique d'évaluation (`runCase`, `printResult`, `summarize`) est partagée avec
+`eval:extraction` via `backend/eval/extraction/lib.js`.
+
+```bash
+cd backend
+npm run eval:dictation                        # 5 cas, variante clean (défaut)
+npm run eval:dictation -- --variant cabinet    # variante cabinet (bruit de salle)
+npm run eval:dictation -- --only dictee-03     # un seul cas
+npm run eval:dictation -- --json out.json      # + dump JSON des résultats
+```
+
+⚠️ Coût : comme `eval:extraction`, chaque cas déclenche un appel réel au provider — 5 appels par
+variante (~0,05 €). Lancer une seule fois par variante, pas en boucle.
+
+Si un fichier `asr-worker/eval/out/dictee-0N_<variante>.txt` est absent, le cas correspondant est
+signalé `ABSENT` et compte en erreur (rappel non calculé) — relancer `asr-worker/eval/bench.py`
+pour régénérer les transcriptions.

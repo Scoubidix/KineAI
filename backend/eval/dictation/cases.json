@@ -1,0 +1,32 @@
+[
+  {
+    "id": "dictee-01", "title": "lombalgie, bilan initial", "motif": "Lombalgie chronique",
+    "transcript": "asr-worker/eval/out/dictee-01_clean.txt",
+    "expect": ["eva_repos=4", "eva_effort=7", "distance_doigt_sol=25", "indice_schober=13", "extension_lombaire=15", "test_laseuge:D=false", "test_laseuge:G=false", "signe_de_la_sonnette=true", "testing_quadriceps:D=5/5", "testing_quadriceps:G=5/5", "sorensen_secondes=45", "douleur_nocturne=true"],
+    "forbid": [], "forbidValues": [52, 2018, 3], "customContains": []
+  },
+  {
+    "id": "dictee-02", "title": "épaule opérée, bilan intermédiaire", "motif": "Réparation de coiffe droite",
+    "transcript": "asr-worker/eval/out/dictee-02_clean.txt",
+    "expect": ["eva_repos=2", "flexion_epaule:D=120", "abduction_epaule:D=90", "rotation_externe_1:D=30", "rotation_interne_main_dos:D=~S1", "flexion_epaule:G=170", "abduction_epaule:G=170", "rotation_externe_1:G=60", "testing_deltoide:D=3/5", "testing_biceps_brachial:D=4/5", "adherences_cicatrice=false", "chaleur_locale=false", "douleur_nocturne=true"],
+    "forbid": ["test_neer", "test_jobe", "test_hawkins_kennedy"], "forbidValues": [63, 12, 4, 6, 8], "customContains": []
+  },
+  {
+    "id": "dictee-03", "title": "genou, ligamentoplastie J+45", "motif": "Ligamentoplastie LCA droite",
+    "transcript": "asr-worker/eval/out/dictee-03_clean.txt",
+    "expect": ["eva_repos=1", "eva_effort=3", "flexion_genou:D=110", "extension_genou:D=5", "flexion_genou:G=140", "extension_genou:G=0", "circonference_cuisse:D=46", "circonference_cuisse:G=49", "choc_rotulien:D=false", "mobilite_rotule:D=Hypomobile", "testing_quadriceps:D=3/5", "testing_ischio_jambiers:D=3/5", "adherences_cicatrice=true", "douleur_nocturne=false"],
+    "forbid": ["test_lachman"], "forbidValues": [28, 45], "customContains": ["monopodal"]
+  },
+  {
+    "id": "dictee-04", "title": "cervicalgie avec paresthésies C6", "motif": "Cervicobrachialgie droite",
+    "transcript": "asr-worker/eval/out/dictee-04_clean.txt",
+    "expect": ["eva_repos=5", "eva_effort=8", "dn4_score=4", "type_douleur=Mixte", "flexion_cervicale=40", "extension_cervicale=30", "rotation_cervicale_droite=50", "rotation_cervicale_gauche=70", "inclinaison_cervicale_droite=25", "inclinaison_cervicale_gauche=35", "distance_menton_sternum=3", "test_phalen:D=false", "signe_tinel:D=false", "force_prehension:D=22", "force_prehension:G=26", "testing_biceps_brachial:D=4/5"],
+    "forbid": [], "forbidValues": [41, 6], "customContains": ["spurling"]
+  },
+  {
+    "id": "dictee-05", "title": "entorse de cheville J+10", "motif": "Entorse LLE cheville gauche",
+    "transcript": "asr-worker/eval/out/dictee-05_clean.txt",
+    "expect": ["eva_repos=3", "eva_effort=6", "circonference_cheville_huit:G=58", "circonference_cheville_huit:D=54", "flexion_dorsale_cheville:G=5", "flexion_dorsale_cheville:D=15", "knee_to_wall:G=4", "knee_to_wall:D=11", "tiroir_anterieur_cheville:G=true", "test_inversion_forcee:G=true", "squeeze_test:G=false", "test_kleiger:G=false", "test_thompson:G=false", "douleur_palpation_lle:G=true", "testing_fibulaires:G=4/5", "releves_mollet_unipodal:G=8", "releves_mollet_unipodal:D=25", "douleur_nocturne=false"],
+    "forbid": [], "forbidValues": [34, 10], "customContains": ["monopodal"]
+  }
+]
