@@ -88,4 +88,65 @@ de fond au démarrage, le serveur écoute dès le lancement), `"ok"` (code `200`
 
 ## Bench
 
-_À compléter (Task 2)._
+Corpus synthétique : cinq dictées (`eval/scripts/dictee-0N.txt`, une par pathologie — lombalgie,
+épaule opérée, genou/ligamentoplastie, cervicalgie, entorse de cheville), générées en audio par
+`eval/gen_dictation.py` (edge-tts, voix `fr-FR-HenriNeural`) en deux variantes chacune :
+`_clean` (voix seule) et `_cabinet` (bruit rose + réverb + filtrage passe-bande, simulant un micro
+éloigné en salle de kiné). `eval/bench.py` transcrit chaque fichier (découpé en tranches de 45 s,
+le worker refusant plus de 60 s), calcule le WER (référence = script tel quel, normalisé
+casse/ponctuation/espaces via `jiwer`), le RTF (temps de traitement / durée audio) et le nombre de
+termes kiné reconnus (`TERMES`, 18 termes), et écrit `eval/out/<nom>.txt`.
+
+Cibles de la spec : WER < 10 % (clean), WER < 20 % (cabinet), RTF < 0,5.
+
+Machine de référence : Intel Core i7-14700K (28 threads logiques), Windows 11. Modèle
+`large-v3-turbo`, CPU, int8. Date : 2026-09-10.
+
+### Run in-process (10 fichiers, `ASR_THREADS=2` par défaut)
+
+```
+.venv/Scripts/python.exe eval/bench.py
+```
+
+```
+fichier                       audio  temps   RTF    WER termes
+dictee-01_cabinet                97     36  0.37  17.4% 3/18
+dictee-01_clean                  97     37  0.38  17.4% 3/18
+dictee-02_cabinet                84     29  0.34  15.2% 0/18
+dictee-02_clean                  84     30  0.35  15.8% 0/18
+dictee-03_cabinet                81     52  0.64  23.2% 0/18
+dictee-03_clean                  81     28  0.35  21.9% 0/18
+dictee-04_cabinet                81     28  0.35  21.4% 3/18
+dictee-04_clean                  81     30  0.37  19.5% 4/18
+dictee-05_cabinet                84     30  0.36  16.3% 4/18
+dictee-05_clean                  84     29  0.34  16.3% 4/18
+```
+
+Wall-clock : 5 min 31 s pour les dix fichiers.
+
+RTF < 0,5 atteint sur 9/10 fichiers (`dictee-03_cabinet` à 0,64, probablement une passe VAD plus
+coûteuse liée au bruit). WER **non atteint** sur les dix fichiers (15 à 23 %, cible < 10 %/< 20 %) :
+mesure de référence à date, pas un critère d'acceptation de cette tâche. Le principal facteur est
+que faster-whisper transcrit les nombres en chiffres (« 52 ans », « 2018 », « L4-L5 ») alors que la
+référence les a en toutes lettres (dictées telles quelles par la synthèse) — ce delta de
+normalisation gonfle le WER indépendamment de la qualité de transcription réelle ; la normalisation
+`jiwer` appliquée ne convertit pas les nombres. Quelques erreurs de reconnaissance authentiques
+s'y ajoutent (ex. « Schober » → « Chobet », « sept » → « c'est », désaccords singulier/pluriel).
+
+### Run HTTP, `--concurrency 4` (worker `ASR_SLOTS=2`, `ASR_THREADS=2`, `dictee-01` uniquement)
+
+```
+ASR_WORKER_TOKEN=dev-token ASR_SLOTS=2 .venv/Scripts/python.exe -m uvicorn app:app --port 8100
+.venv/Scripts/python.exe eval/bench.py --url http://localhost:8100 --concurrency 4 --only dictee-01
+```
+
+```
+fichier                       audio  temps   RTF    WER termes
+dictee-01_cabinet                97     28  0.29  17.4% 3/18
+dictee-01_clean                  97     26  0.27  17.4% 3/18
+```
+
+Wall-clock : 54 s. RTF meilleur qu'en in-process (0,27-0,29 contre 0,37-0,38) grâce à la
+parallélisation des tranches de 45 s sur les 2 places du worker. WER identique au run in-process
+(même modèle, même texte) : cible non atteinte, mêmes causes (nombres en chiffres + quelques
+erreurs de reconnaissance).
