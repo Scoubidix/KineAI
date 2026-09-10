@@ -97,6 +97,16 @@ le worker refusant plus de 60 s), calcule le WER (référence = script tel quel,
 casse/ponctuation/espaces via `jiwer`), le RTF (temps de traitement / durée audio) et le nombre de
 termes kiné reconnus (`TERMES`, 18 termes), et écrit `eval/out/<nom>.txt`.
 
+Le WER référence-hypothèse compare deux textes dont les nombres ne s'écrivent pas pareil : la
+référence les a en toutes lettres (dictées telles quelles), faster-whisper les transcrit en
+chiffres (« cinquante-deux ans » → « 52 ans »). `normalize_numbers` (dans `bench.py`) réécrit les
+nombres en toutes lettres en chiffres des deux côtés avant le calcul du WER (0-99 avec composés,
+centaines, milliers pour les années ; `un`/`une` seulement juste avant un mot d'unité — degré,
+centimètre, kilo, seconde, semaine, mois, fois, sur — pour ne pas confondre avec l'article). La
+table garde les deux colonnes : `WER` (nombres normalisés, métrique de référence) et `WER brut`
+(sans cette normalisation, comportement d'avant, gardé pour la continuité de la mesure). Vérifiable
+avec `.venv/Scripts/python.exe eval/bench.py --selftest`.
+
 Cibles de la spec : WER < 10 % (clean), WER < 20 % (cabinet), RTF < 0,5.
 
 Machine de référence : Intel Core i7-14700K (28 threads logiques), Windows 11. Modèle
@@ -109,29 +119,28 @@ Machine de référence : Intel Core i7-14700K (28 threads logiques), Windows 11.
 ```
 
 ```
-fichier                       audio  temps   RTF    WER termes
-dictee-01_cabinet                97     36  0.37  17.4% 3/18
-dictee-01_clean                  97     37  0.38  17.4% 3/18
-dictee-02_cabinet                84     29  0.34  15.2% 0/18
-dictee-02_clean                  84     30  0.35  15.8% 0/18
-dictee-03_cabinet                81     52  0.64  23.2% 0/18
-dictee-03_clean                  81     28  0.35  21.9% 0/18
-dictee-04_cabinet                81     28  0.35  21.4% 3/18
-dictee-04_clean                  81     30  0.37  19.5% 4/18
-dictee-05_cabinet                84     30  0.36  16.3% 4/18
-dictee-05_clean                  84     29  0.34  16.3% 4/18
+fichier                       audio  temps   RTF    WER  WER brut termes
+dictee-01_cabinet                97     36  0.37  11.7%     17.4% 3/18
+dictee-01_clean                  97     36  0.37  11.7%     17.4% 3/18
+dictee-02_cabinet                84     29  0.34   6.6%     15.2% 0/18
+dictee-02_clean                  84     29  0.34   8.3%     15.8% 0/18
+dictee-03_cabinet                81     28  0.35  12.8%     23.2% 0/18
+dictee-03_clean                  81     28  0.35  12.1%     21.9% 0/18
+dictee-04_cabinet                81     28  0.35  11.2%     21.4% 3/18
+dictee-04_clean                  81     28  0.35   9.2%     19.5% 4/18
+dictee-05_cabinet                84     28  0.34   9.6%     16.3% 4/18
+dictee-05_clean                  84     28  0.34   9.6%     16.3% 4/18
 ```
 
-Wall-clock : 5 min 31 s pour les dix fichiers.
+Wall-clock : 5 min 1 s pour les dix fichiers.
 
-RTF < 0,5 atteint sur 9/10 fichiers (`dictee-03_cabinet` à 0,64, probablement une passe VAD plus
-coûteuse liée au bruit). WER **non atteint** sur les dix fichiers (15 à 23 %, cible < 10 %/< 20 %) :
-mesure de référence à date, pas un critère d'acceptation de cette tâche. Le principal facteur est
-que faster-whisper transcrit les nombres en chiffres (« 52 ans », « 2018 », « L4-L5 ») alors que la
-référence les a en toutes lettres (dictées telles quelles par la synthèse) — ce delta de
-normalisation gonfle le WER indépendamment de la qualité de transcription réelle ; la normalisation
-`jiwer` appliquée ne convertit pas les nombres. Quelques erreurs de reconnaissance authentiques
-s'y ajoutent (ex. « Schober » → « Chobet », « sept » → « c'est », désaccords singulier/pluriel).
+RTF < 0,5 atteint sur les dix fichiers (0,34-0,37). WER (nombres normalisés) **atteint** sur 6/10
+fichiers (cabinet : 11,7 % / 6,6 % / 12,8 % / 11,2 % / 9,6 % — cible < 20 %, tous atteints ; clean :
+11,7 % / 8,3 % / 12,1 % / 9,2 % / 9,6 % — cible < 10 %, 3/5 atteints, `dictee-01_clean` 11,7 % et
+`dictee-03_clean` 12,1 % la ratent de peu). La colonne `WER brut` (15-23 %, toutes cibles ratées)
+montre l'ampleur du delta expliqué par les nombres seuls : 5 à 12 points de WER selon le fichier.
+Le résidu restant après normalisation vient d'erreurs de reconnaissance authentiques mais mineures
+(ex. « Schober » → « Chobet », « sept » → « c'est », désaccords singulier/pluriel, conjugaisons).
 
 ### Run HTTP, `--concurrency 4` (worker `ASR_SLOTS=2`, `ASR_THREADS=2`, `dictee-01` uniquement)
 
@@ -141,12 +150,12 @@ ASR_WORKER_TOKEN=dev-token ASR_SLOTS=2 .venv/Scripts/python.exe -m uvicorn app:a
 ```
 
 ```
-fichier                       audio  temps   RTF    WER termes
-dictee-01_cabinet                97     28  0.29  17.4% 3/18
-dictee-01_clean                  97     26  0.27  17.4% 3/18
+fichier                       audio  temps   RTF    WER  WER brut termes
+dictee-01_cabinet                97     25  0.26  11.7%     17.4% 3/18
+dictee-01_clean                  97     25  0.26  11.7%     17.4% 3/18
 ```
 
-Wall-clock : 54 s. RTF meilleur qu'en in-process (0,27-0,29 contre 0,37-0,38) grâce à la
-parallélisation des tranches de 45 s sur les 2 places du worker. WER identique au run in-process
-(même modèle, même texte) : cible non atteinte, mêmes causes (nombres en chiffres + quelques
-erreurs de reconnaissance).
+Wall-clock : 50 s. RTF meilleur qu'en in-process (0,26 contre 0,37) grâce à la parallélisation des
+tranches de 45 s sur les 2 places du worker. WER identique au run in-process (même modèle, même
+texte) : 11,7 % sur les deux variantes, cible clean (< 10 %) ratée de peu, cible cabinet (< 20 %)
+atteinte.

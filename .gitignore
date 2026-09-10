@@ -97,3 +97,5 @@ asr-worker/eval/audio/
 asr-worker/eval/out/
 asr-worker/**/__pycache__/
 asr-worker/.pytest_cache/
+# la règle globale `scripts/` ci-dessus ne concerne pas le corpus de dictées, versionné
+!asr-worker/eval/scripts/
