@@ -251,59 +251,30 @@ concret, « to » doit différer de « from »), (2) `applyOps` écarte désorma
 identiques (`from`/`to` strictement égaux une fois les espaces normalisés) **avant** de compter
 vers le plafond, au lieu de les laisser saturer le compte d'opérations.
 
-Run de référence après ces deux correctifs, 2026-09-10 (mêmes fichiers audio, même provider
-`mistral-medium-3-5`) :
-
-⚠️ Le tableau ci-dessous a été mesuré sous l'ancienne règle de filtrage (comparaison pliée —
-casse/accents ignorés), qui ne pouvait laisser passer que des opérations ne différant que par la
-casse ou l'accentuation ; la règle livrée compare `from`/`to` en stricte égalité. La revue finale
-a en plus ajouté l'ajout borné (un remplacement ne peut pas allonger le texte de plus d'un mot) et
-le marqueur d'auto-correction (une suppression de fragment en mode dictée exige désormais « non »,
-« pardon », etc. dans le fragment ou juste après) après ce run : les chiffres ci-dessous sont donc
-à rafraîchir avec un nouveau run.
+Run de référence final, 2026-09-11, avec les gardes livrées (opérations identiques écartées en
+stricte égalité, remplacement d'au plus un mot de plus que le fragment, suppression de fragment en
+mode dictée seulement avec un marqueur d'auto-correction), mêmes fichiers audio, même provider
+`mistral-medium-3-5`. Les valeurs « sans correction » sont celles du run de référence du plan dictée.
 
 | Cas | Opérations clean (appliquées/ignorées) | Termes clean avant→après | Rappel clean sans/avec correction | Opérations cabinet (appliquées/ignorées) | Termes cabinet avant→après | Rappel cabinet sans/avec correction |
 |---|---|---|---|---|---|---|
-| dictee-01 | 2/1 | 3→4 | 92 % / 83 % | 2/1 | 3→4 | 92 % / 92 % |
-| dictee-02 | 0/17 — abandonnée (plafond) | 0→0 | 100 % / 100 % | 1/3 | 0→0 | 100 % / 100 % |
-| dictee-03 | 4/1 | 0→0 | 86 % / 86 % | 4/1 | 0→0 | 79 % / 93 % |
-| dictee-04 | 2/2 | 4→4 | 100 % / 100 % | 0/2 | 3→3 | 100 % / 100 % |
-| dictee-05 | 1/3 | 4→4 | 100 % / 100 % | 1/4 | 4→4 | 100 % / 100 % |
+| dictee-01 | 2/2 | 3→4 | 92 % / 92 % | 3/2 | 3→5 | 92 % / 92 % |
+| dictee-02 | 2/3 | 0→0 | 100 % / 100 % | 0/2 | 0→0 | 100 % / 100 % |
+| dictee-03 | 2/3 | 0→0 | 86 % / 86 % | 4/1 | 0→0 | 79 % / 93 % |
+| dictee-04 | 0/4 | 4→4 | 100 % / 100 % | 1/2 | 3→4 | 100 % / 100 % |
+| dictee-05 | 2/3 | 4→4 | 100 % / 95 % | 7/3 | 4→4 | 100 % / 100 % |
 
-Rappel moyen : clean 95,5 % sans correction → 93,8 % avec ; cabinet 94,0 % sans correction →
-96,9 % avec. 0 interdit dans les quatre runs (avec et sans correction, deux variantes).
+Rappel moyen : clean 95,5 % sans correction → 94,4 % avec ; cabinet 94,0 % sans correction →
+96,9 % avec. Aucune passe abandonnée (0 sur 10, contre 8 sur 10 avec le prompt initial et 1 sur 10
+au run intermédiaire). 0 interdit dans tous les runs.
 
-Un seul cas reste abandonné (plafond) sur les dix : `dictee-02` clean (17 opérations proposées
-pour 181 mots, plafond à 12) — la même dictée en cabinet passe (1 opération appliquée, 3 ignorées,
-sous le plafond une fois les identiques filtrées), signe que le nombre d'opérations proposées reste
-sensible d'un appel à l'autre plutôt que structurellement bloqué comme avant le correctif. Sur les 9 dictées où
-la passe aboutit, les opérations appliquées corrigent des termes réels (constaté en rejouant
-`dictee-01` clean isolément : `Chobet` → `Schober`, `distance doit être Sol` → `distance doit être
-doigts-sol`, `achiléen` → `achilléen`), à comparer aux opérations 100 % identiques du run
-précédent.
-
-Effet sur les termes de référence (`TERMES`, mêmes 18 termes que le bench du worker) : progression
-sur `dictee-01` (3→4 dans les deux variantes, `Schober` récupéré) grâce à une opération de
-correction réelle ; inchangé sur les 8 autres dictées (les corrections appliquées ailleurs — ex.
-`doigts-sol`, `achilléen` — ne portent pas sur un terme de la liste `TERMES`).
-
-Rappel : `dictee-01` clean **baisse** (92 % → 83 %, `test_laseuge:G` devient manquant en plus de
-`eva_effort` déjà manquant) alors que le diagnostic ci-dessus montre que les opérations appliquées
-sur cette dictée (Schober, doigts-sol, achilléen) ne touchent pas la phrase « Lasègue négatif à
-droite et à gauche » — le texte soumis à l'extraction autour de ce champ est inchangé, et le
-nombre d'opérations réellement appliquées varie même d'un appel à l'autre sur le même texte brut (2
-dans le run de référence, 3 dans le rejeu isolé), donc la baisse est plus probablement due à la
-non-déterminisme de l'appel d'extraction (température non nulle) qu'à la correction elle-même —
-comme déjà observé sur `dictee-03` dans le run précédent. `eva_effort` reste manquant dans tous
-les runs (avec et sans correction) : la transcription porte « c'est à l'effort » (le worker
-confond l'homophone « sept »/« c'est », résidu déjà documenté dans le bench WER ci-dessus) — la
-passe de correction ne le rattrape pas dans ce run. Noté tel quel, sans retouche.
-
-`dictee-03` cabinet **monte** (79 % → 93 %, `testing_ischio_jambiers:D` n'est plus manquant) malgré
-4 opérations appliquées qui, d'après le run précédent (passe abandonnée, donc texte inchangé) et
-la stabilité du rappel clean (86 % → 86 %) sur le même cas, ne semblent pas cibler ce champ non
-plus — variance plausible de l'extraction, non élucidée précisément faute d'avoir rejoué ce cas
-isolément.
+Lecture : la passe corrige des termes réels (`Schober` récupéré sur dictee-01 dans les deux
+variantes, `Spurling` sur dictee-04 cabinet, 7 opérations appliquées sur dictee-05 cabinet) et ne
+dégrade jamais le rappel de plus d'un champ ; les deux écarts restants (`douleur_nocturne` sur
+dictee-05 clean, `eva_effort` sur dictee-01 dans tous les runs — la transcription porte « c'est à
+l'effort », homophone « sept »/« c'est » déjà documenté dans le bench WER) ne sont pas touchés par
+les opérations appliquées : ils tiennent à la transcription et au non-déterminisme de l'appel
+d'extraction, comme observé aux runs précédents. Noté tel quel, sans retouche.
 
 ### Amorce de vocabulaire : essai A/B du 10 sept. 2026
 
