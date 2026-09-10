@@ -82,8 +82,10 @@ function applyOps(text, ops, mode) {
   const raw = String(text ?? '');
   const wordCount = tokens(raw).length;
   const giveUp = (why, ignoredCount) => { logger.warn(`Correction dictée abandonnée : ${why} (${ops.length} opération(s), ${wordCount} mots)`); return { text: raw, applied: 0, ignored: ignoredCount ?? ops.length }; };
-  // Le modèle recopie parfois le texte en opérations identiques (from === to) : elles ne changent rien, on les écarte avant le plafond.
-  const isIdentity = (op) => op.op === 'replace' && fold(normSpaces(op.from)) === fold(normSpaces(op.to));
+  // Le modèle recopie parfois le texte en opérations strictement identiques (from === to, mot pour mot) :
+  // elles ne changent rien, on les écarte avant le plafond — sans plier accents/casse, pour garder appliable
+  // une vraie correction d'accent ou de casse sur un terme (ex. « lasegue » → « Lasègue »).
+  const isIdentity = (op) => op.op === 'replace' && normSpaces(op.from) === normSpaces(op.to);
   let identityIgnored = 0;
   const realOps = [];
   for (const op of ops) { if (isIdentity(op)) identityIgnored += 1; else realOps.push(op); }
