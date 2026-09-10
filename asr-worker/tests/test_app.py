@@ -40,16 +40,16 @@ def client():
     app = create_app(lambda: fake)
     with TestClient(app) as c:
         c.fake = fake
+        # Le chargement se fait en tâche de fond : laisser jusqu'à 1s pour qu'elle s'exécute,
+        # une bonne fois pour toutes ici plutôt que dans chaque test qui en dépend.
+        deadline = time.monotonic() + 1.0
+        while c.get("/healthz").status_code != 200 and time.monotonic() < deadline:
+            time.sleep(0.02)
         yield c
 
 
 def test_healthz_ok_once_loaded(client):
-    # Le chargement se fait en tâche de fond : laisser jusqu'à 1s pour qu'elle s'exécute.
-    deadline = time.monotonic() + 1.0
     r = client.get("/healthz")
-    while r.status_code != 200 and time.monotonic() < deadline:
-        time.sleep(0.02)
-        r = client.get("/healthz")
     assert r.status_code == 200
     assert r.json() == {"status": "ok", "model": "large-v3-turbo", "slots": 1, "busy": 0, "queued": 0}
 
@@ -123,3 +123,19 @@ def test_healthz_503_while_loading():
         assert r.json()["status"] == "loading"
         r = c.post("/v1/transcribe", files={"audio": ("a.wav", wav_bytes(), "audio/wav")}, headers=AUTH)
         assert r.status_code == 503 and r.headers["retry-after"] == "10"
+
+
+def test_healthz_error_after_load_failure():
+    def failing_factory():
+        raise RuntimeError("boom")
+
+    app = create_app(failing_factory)
+    with TestClient(app) as c:
+        deadline = time.monotonic() + 1.0
+        r = c.get("/healthz")
+        while r.json().get("status") != "error" and time.monotonic() < deadline:
+            time.sleep(0.02)
+            r = c.get("/healthz")
+        assert r.status_code == 503
+        assert r.json()["status"] == "error"
+    # Le context manager (arrêt du lifespan) s'est terminé sans lever : shutdown pas cassé.
