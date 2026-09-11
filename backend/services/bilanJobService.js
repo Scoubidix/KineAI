@@ -305,4 +305,24 @@ async function retryJob({ kineId, bilanId }) {
   return getJobView({ kineId, bilanId });
 }
 
-module.exports = { LocalQueue, __setQueueForTests, createOrResetJob, receiveSegment, getJobView, markLostSegments, evaluate, finishRecording, skipFailed, retryJob, runTail, __drainForTests };
+/** « Écrire plutôt » : le kiné quitte le flux de dictée, le traitement est abandonné (spec §4.2). */
+async function abandonJob({ kineId, bilanId }) {
+  const prisma = prismaService.getInstance();
+  const job = await loadOwnedJob(prisma, kineId, bilanId);
+  if (rules.ACTIVE_STATUSES.includes(job.status)) throw new DraftError('JOB_BUSY', 409, 'Un traitement est en cours pour ce bilan');
+  const segments = await prisma.bilanJobSegment.findMany({ where: { jobId: job.id }, select: { index: true, status: true, text: true } });
+  const raw = rules.assembleSegments(segments);
+  // Le kiné a choisi d'écrire ; ce qui a été transcrit lui est rendu brut, sans passe de correction —
+  // jamais de texte perdu. (Textes encore présents : RECORDING, ou FAILED avant l'écriture des notes.)
+  if (raw) {
+    const bilan = await prisma.bilanKine.findFirst({ where: { id: bilanId, kineId, isActive: true }, select: { rawNotes: true, status: true } });
+    if (bilan && bilan.status !== 'ENREGISTRE') {
+      await prisma.bilanKine.update({ where: { id: bilanId }, data: { rawNotes: rules.appendNotes(bilan.rawNotes, raw) } });
+    }
+  }
+  await prisma.bilanJob.delete({ where: { id: job.id } });   // les segments suivent (cascade)
+  logger.info(`Traitement dictée ${job.id} : abandonné (bilan ${bilanId})`);
+  return { deleted: true, appended: raw.length > 0 };
+}
+
+module.exports = { LocalQueue, __setQueueForTests, createOrResetJob, receiveSegment, getJobView, markLostSegments, evaluate, finishRecording, skipFailed, retryJob, abandonJob, runTail, __drainForTests };

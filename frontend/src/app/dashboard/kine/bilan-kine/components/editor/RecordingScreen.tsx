@@ -2,7 +2,7 @@
 import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, Mic, PenLine, Sparkles, Square, Upload } from 'lucide-react';
-import type { DictationJobState } from './useDictationJob';
+import type { DictationJobState, StartError } from './useDictationJob';
 
 interface RecordingScreenProps {
   state: DictationJobState;
@@ -16,6 +16,14 @@ interface RecordingScreenProps {
 
 const mmss = (ms: number) => { const s = Math.floor(ms / 1000); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
 
+const START_ERRORS: Record<StartError, string> = {
+  done: 'Ce bilan est déjà rédigé : ouvre-le pour le vérifier',
+  busy: 'Un traitement est déjà en cours pour ce bilan',
+  finalized: 'Ce bilan est enregistré, il ne peut plus être dicté',
+  limit: 'Limite de la dictée atteinte : génère le bilan',
+  network: 'Impossible de démarrer, vérifie ta connexion',
+};
+
 // Écran d'enregistrement plein cadre : bouton central, chrono, vumètre, puis Stop → « Générer le bilan ».
 export default function RecordingScreen({ state, onStart, onStop, onGenerate, onImport, onRetryUploads, onWrite }: RecordingScreenProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -27,11 +35,16 @@ export default function RecordingScreen({ state, onStart, onStop, onGenerate, on
   const bars = [0.1, 0.25, 0.4, 0.55, 0.7, 0.85];
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 py-10 text-center" aria-live="polite">
+    <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 py-10 text-center">
       {state.interrupted && stopped && (
         <p className="text-sm text-amber-700">Enregistrement interrompu : tu peux dicter la suite ou générer le bilan avec ce qui a été dicté.</p>
       )}
-      <div className="text-4xl font-mono tabular-nums text-foreground">{mmss(recording ? state.elapsedMs : state.totalMs)}</div>
+      {/* Après une interruption, le chrono ne reflète plus la dictée : on annonce les passages gardés */}
+      {state.interrupted && stopped ? (
+        <div className="text-lg text-muted-foreground">{state.segmentsSent} passage{state.segmentsSent > 1 ? 's' : ''} enregistré{state.segmentsSent > 1 ? 's' : ''}</div>
+      ) : (
+        <div className="text-4xl font-mono tabular-nums text-foreground" aria-hidden>{mmss(recording ? state.elapsedMs : state.totalMs)}</div>
+      )}
       {recording ? (
         <div className="flex items-end gap-1 h-8" aria-hidden>
           {bars.map((b) => <span key={b} className={`w-1.5 rounded-sm transition-colors ${state.level >= b ? 'bg-[#3899aa]' : 'bg-border'}`} style={{ height: `${8 + b * 24}px` }} />)}
@@ -47,7 +60,7 @@ export default function RecordingScreen({ state, onStart, onStop, onGenerate, on
       >
         {state.starting ? <Loader2 className="h-9 w-9 animate-spin" /> : recording ? <Square className="h-9 w-9" /> : <Mic className="h-9 w-9" />}
       </button>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground" role="status">
         {!state.supported ? 'Ton navigateur ne permet pas l’enregistrement audio'
           : !state.available ? 'Dictée indisponible pour le moment'
           : state.permissionDenied ? 'Autorise le micro dans ton navigateur pour dicter'
@@ -55,6 +68,7 @@ export default function RecordingScreen({ state, onStart, onStop, onGenerate, on
           : stopped ? 'Dicter la suite, ou générer le bilan'
           : 'Appuie pour dicter ton bilan'}
       </p>
+      {state.startError && <p className="text-xs text-destructive">{START_ERRORS[state.startError]}</p>}
       {stopped && (
         <div className="flex flex-col items-center gap-2">
           <Button onClick={onGenerate} disabled={!canGenerate} className="btn-teal rounded-full px-6 h-11 text-base">
@@ -75,7 +89,8 @@ export default function RecordingScreen({ state, onStart, onStop, onGenerate, on
         <Button type="button" variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={unavailable || recording || state.starting || state.importing} className="h-8 rounded-full text-xs">
           {state.importing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1" />}Importer un audio
         </Button>
-        {!recording && <Button type="button" variant="ghost" size="sm" onClick={onWrite} className="h-8 rounded-full text-xs"><PenLine className="h-3.5 w-3.5 mr-1" />Écrire plutôt</Button>}
+        {/* Quitter pendant un envoi perdrait les passages en vol : le choix n'apparaît qu'une fois tout acquitté */}
+        {!recording && state.uploading === 0 && <Button type="button" variant="ghost" size="sm" onClick={onWrite} className="h-8 rounded-full text-xs"><PenLine className="h-3.5 w-3.5 mr-1" />Écrire plutôt</Button>}
       </div>
     </div>
   );

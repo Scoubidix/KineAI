@@ -13,9 +13,15 @@ const MAX_UPLOAD_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 2_000;
 const POLL_MS = 2_000;
 const TICK_MS = 250;
+// Même borne que le serveur (bilanJobRules) : au-delà, l'envoi serait refusé sans explication
+const MAX_SEGMENTS = 500;
+// Envois d'un import : plusieurs dizaines de segments d'un coup saturent la connexion
+const IMPORT_CONCURRENCY = 3;
 
 export type JobPhase = 'idle' | 'recording' | 'stopped' | 'processing' | 'done' | 'failed';
 export type ImportResult = 'ok' | 'busy' | 'unavailable' | 'invalid' | 'too_long';
+/** Raison pour laquelle une prise n'a pas pu démarrer (affichée sous l'invite de l'écran) */
+export type StartError = 'done' | 'busy' | 'finalized' | 'limit' | 'network';
 
 export interface DictationJobState {
   available: boolean;        // worker configuré et prêt
@@ -33,6 +39,7 @@ export interface DictationJobState {
   interrupted: boolean;      // traitement RECORDING retrouvé après rechargement : la prise avait été coupée
   generating: boolean;       // « Générer » en cours d'appel
   generateError: boolean;    // dernière tentative de « Générer » en échec (hors 409, le kiné recliquera)
+  startError: StartError | null;   // dernière prise refusée (traitement terminé, occupé, bilan enregistré…)
   job: BilanJobView | null;
   progress: number;          // 0..1 affiché, jamais décroissant
 }
@@ -46,6 +53,13 @@ export interface UseDictationJobArgs {
 
 interface PendingUpload { blob: Blob; mimeType: string }
 
+/** Pourquoi la création du traitement a échoué, dans les termes de l'écran. */
+const startErrorOf = (e: unknown): StartError => {
+  if (e instanceof ApiError) return e.code === 'ALREADY_FINALIZED' ? 'finalized' : e.status === 409 ? 'busy' : 'network';
+  if (e instanceof Error && e.message === 'JOB_DONE') return 'done';
+  return 'network';
+};
+
 const phaseOf = (job: BilanJobView | null, recording: boolean, hasSegments: boolean): JobPhase => {
   if (recording) return 'recording';
   if (!job) return hasSegments ? 'stopped' : 'idle';
@@ -58,7 +72,7 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
   const [state, setState] = useState<DictationJobState>({
     available: false, supported: true, phase: phaseOf(initialJob, false, (initialJob?.nextIndex ?? 0) > 0), starting: false, elapsedMs: 0, totalMs: 0, level: 0,
     permissionDenied: false, importing: false, segmentsSent: initialJob?.nextIndex ?? 0, uploading: 0, uploadFailed: 0,
-    interrupted: initialJob?.status === 'RECORDING' && (initialJob.nextIndex ?? 0) > 0, generating: false, generateError: false, job: initialJob, progress: initialJob?.progress ?? 0,
+    interrupted: initialJob?.status === 'RECORDING' && (initialJob.nextIndex ?? 0) > 0, generating: false, generateError: false, startError: null, job: initialJob, progress: initialJob?.progress ?? 0,
   });
   const patch = useCallback((p: Partial<DictationJobState>) => setState((s) => ({ ...s, ...p })), []);
 
@@ -109,6 +123,8 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
   // Le traitement est créé au premier segment (Dicter ou import), pas à l'ouverture de l'écran
   const ensureJob = useCallback(async () => {
     if (jobRef.current && jobRef.current.status === 'RECORDING') return jobRef.current;
+    // Un traitement terminé ne se remet pas à zéro depuis cet écran : le bilan est déjà rédigé
+    if (jobRef.current?.status === 'DONE') throw new Error('JOB_DONE');
     const job = await createJob(bilanId);
     nextIndexRef.current = job.nextIndex;
     sentRef.current = 0;
@@ -155,21 +171,27 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
     // La demande de micro peut durer plusieurs secondes ; un Stop ou une désactivation pendant ce
     // temps ne doit pas laisser un enregistreur publié : `token` sert de point d'annulation.
     startingRef.current = true;
-    patch({ starting: true });
+    patch({ starting: true, startError: null });
     const token = ++startTokenRef.current;
     if (!availableRef.current && !(await refreshAvailability())) { startingRef.current = false; patch({ starting: false }); return; }
     const mimeType = pickMimeType();
     if (!mimeType) { startingRef.current = false; patch({ starting: false, supported: false }); return; }
     try {
       await ensureJob();
-    } catch {
+    } catch (e) {
       startingRef.current = false;
-      patch({ starting: false });
+      patch({ starting: false, startError: startErrorOf(e) });
       return;
     }
     const base = nextIndexRef.current;
     const rec = new DictationRecorder(mimeType, {
-      onSegment: (blob, index) => { nextIndexRef.current = Math.max(nextIndexRef.current, base + index + 1); void uploadSegment(base + index, { blob, mimeType }); },
+      onSegment: (blob, index) => {
+        const i = base + index;
+        // Borne serveur atteinte : le segment serait refusé, on coupe la prise et on invite à générer
+        if (i >= MAX_SEGMENTS) { stop(); patch({ startError: 'limit' }); return; }
+        nextIndexRef.current = Math.max(nextIndexRef.current, i + 1);
+        void uploadSegment(i, { blob, mimeType });
+      },
       onLevel: (level) => patch({ level }),
       onTick: (elapsedMs) => {
         patch({ elapsedMs, totalMs: takeStartMsRef.current + elapsedMs });
@@ -198,22 +220,34 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
     if (!enabled || startingRef.current || recorderRef.current || importingRef.current) return 'busy';
     if (!availableRef.current && !(await refreshAvailability())) return 'unavailable';
     importingRef.current = true;
-    patch({ importing: true });
+    patch({ importing: true, startError: null });
     try {
       let pcm: Float32Array;
       try { pcm = await decodeToMono16k(file); } catch { return 'invalid'; }
       if (pcm.length < TARGET_RATE) return 'invalid';
       if (pcm.length > (MAX_TAKE_MS / 1000) * TARGET_RATE) return 'too_long';
-      await ensureJob();
+      try { await ensureJob(); } catch (e) { patch({ startError: startErrorOf(e) }); return 'busy'; }
       const base = nextIndexRef.current;
       const slices = sliceAtSilences(pcm);
+      if (base + slices.length > MAX_SEGMENTS) return 'too_long';
       nextIndexRef.current = base + slices.length;
       patch({ totalMs: state.totalMs + Math.round((pcm.length / TARGET_RATE) * 1000), interrupted: false });
-      slices.forEach((slice, i) => { void uploadSegment(base + i, { blob: encodeWav(slice), mimeType: 'audio/wav' }); });
+      // Envois bornés à 3 en parallèle : quelques dizaines de tranches d'un coup saturent la connexion
+      let cursor = 0;
+      const worker = async () => {
+        for (;;) {
+          const i = cursor;
+          cursor += 1;
+          if (i >= slices.length) return;
+          await uploadSegment(base + i, { blob: encodeWav(slices[i]), mimeType: 'audio/wav' });
+        }
+      };
+      void Promise.all(Array.from({ length: Math.min(IMPORT_CONCURRENCY, slices.length) }, () => worker()));
       refreshUploads();
       return 'ok';
-    } catch {
-      return 'unavailable';
+    } catch (e) {
+      patch({ startError: startErrorOf(e) });
+      return 'busy';
     } finally {
       importingRef.current = false;
       patch({ importing: false });
@@ -246,7 +280,7 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
   /** « Dicter à nouveau » après « Rien n'a été entendu » : traitement remis à zéro au prochain segment. */
   const restart = useCallback(() => {
     jobRef.current = null; nextIndexRef.current = 0; sentRef.current = 0; failedRef.current = new Map(); takeStartMsRef.current = 0;
-    patch({ job: null, phase: 'idle', segmentsSent: 0, uploadFailed: 0, uploading: 0, totalMs: 0, progress: 0, interrupted: false, elapsedMs: 0, permissionDenied: false, generateError: false });
+    patch({ job: null, phase: 'idle', segmentsSent: 0, uploadFailed: 0, uploading: 0, totalMs: 0, progress: 0, interrupted: false, elapsedMs: 0, permissionDenied: false, generateError: false, startError: null });
   }, [patch]);
 
   // Sondage pendant le traitement
@@ -285,7 +319,9 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
   }, [busy]);
 
   useEffect(() => { if (!enabled) { startTokenRef.current += 1; if (recorderRef.current) stop(); } }, [enabled, stop]);
-  useEffect(() => () => { recorderRef.current?.stop(); }, []);
+  // Démontage : le jeton coupe une demande de micro encore en vol, sinon le témoin d'enregistrement
+  // de l'onglet resterait allumé après avoir quitté la page.
+  useEffect(() => () => { startTokenRef.current += 1; recorderRef.current?.stop(); }, []);
 
   return { state, start, stop, generate, importFile, retryUploads, skipFailed, retryJob, restart };
 }

@@ -37,7 +37,7 @@ export function stageLabel(job: BilanJobView | null): string {
     case 'CORRECTING': return 'Correction des termes…';
     case 'COMPOSING': return 'Rédaction du bilan…';
     case 'DONE': return 'Bilan rédigé';
-    case 'FAILED': return 'La rédaction n\'a pas abouti';
+    case 'FAILED': return 'La rédaction n’a pas abouti';
     default: return '';
   }
 }

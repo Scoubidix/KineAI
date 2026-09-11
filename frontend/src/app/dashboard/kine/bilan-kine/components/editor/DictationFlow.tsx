@@ -1,8 +1,9 @@
 'use client';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { ArrowLeft, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { BilanJobView, BilanRecord } from '@/types/bilan';
 import { useDictationJob, type ImportResult } from './useDictationJob';
@@ -35,7 +36,14 @@ export default function DictationFlow({ bilan, initialJob, onDone, onWrite }: Di
   });
   const { state } = dictation;
 
-  useEffect(() => { if (state.phase === 'done' && state.job) onDone(state.job); }, [state.phase, state.job, onDone]);
+  // Une seule ouverture du document : le sondage peut repasser par DONE, et `onDone` échoue parfois
+  // (réseau) — l'écran « Bilan rédigé » propose alors de réessayer, sans jamais revenir au micro.
+  const doneRef = useRef(false);
+  useEffect(() => {
+    if (state.phase !== 'done' || !state.job || doneRef.current) return;
+    doneRef.current = true;
+    onDone(state.job);
+  }, [state.phase, state.job, onDone]);
 
   const handleImport = (file: File) => {
     void dictation.importFile(file).then((r) => { if (r !== 'ok') toast({ ...IMPORT_MESSAGES[r], variant: 'destructive' }); });
@@ -53,8 +61,17 @@ export default function DictationFlow({ bilan, initialJob, onDone, onWrite }: Di
         <Button variant="ghost" size="sm" onClick={handleBack} className="h-8"><ArrowLeft className="h-4 w-4 mr-1" />Bilans</Button>
         <span className="text-sm font-medium truncate">{who}</span>
       </div>
-      {state.phase === 'processing' || state.phase === 'failed' ? (
-        <ProcessingScreen state={state} onSkipFailed={() => { void dictation.skipFailed(); }} onRetryUploads={dictation.retryUploads} onRetryJob={() => { void dictation.retryJob(); }} onWrite={onWrite} onRestart={dictation.restart} />
+      {state.phase === 'done' ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 py-10 text-center">
+          <div className="text-5xl font-semibold tabular-nums text-[#3899aa]" aria-hidden>100 %</div>
+          <Progress value={100} className="w-full max-w-md h-2" />
+          <p className="text-sm text-muted-foreground" role="status">Bilan rédigé</p>
+          <Button variant="outline" onClick={() => { if (state.job) { doneRef.current = true; onDone(state.job); } }}>
+            <RotateCcw className="h-4 w-4 mr-2" />Réessayer l’ouverture
+          </Button>
+        </div>
+      ) : state.phase === 'processing' || state.phase === 'failed' ? (
+        <ProcessingScreen state={state} onSkipFailed={() => { void dictation.skipFailed(); }} onRetryJob={() => { void dictation.retryJob(); }} onWrite={onWrite} onRestart={dictation.restart} />
       ) : (
         <RecordingScreen state={state} onStart={() => { void dictation.start(); }} onStop={dictation.stop} onGenerate={() => { void dictation.generate(); }} onImport={handleImport} onRetryUploads={dictation.retryUploads} onWrite={onWrite} />
       )}

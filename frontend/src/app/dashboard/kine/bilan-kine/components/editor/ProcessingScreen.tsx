@@ -9,14 +9,13 @@ import { stageLabel } from './dictationJobProgress';
 interface ProcessingScreenProps {
   state: DictationJobState;
   onSkipFailed: () => void;
-  onRetryUploads: () => void;
   onRetryJob: () => void;
   onWrite: () => void;     // « Rédiger moi-même » : ouvre l'étape Notes (transcription déjà dans les notes)
   onRestart: () => void;   // « Dicter à nouveau » après « Rien n'a été entendu »
 }
 
 // Écran d'attente : une barre continue et le nom de l'étape ; les échecs suivent l'option A de la spec.
-export default function ProcessingScreen({ state, onSkipFailed, onRetryUploads, onRetryJob, onWrite, onRestart }: ProcessingScreenProps) {
+export default function ProcessingScreen({ state, onSkipFailed, onRetryJob, onWrite, onRestart }: ProcessingScreenProps) {
   const job = state.job;
   const failed = state.phase === 'failed';
   const lostSegments = job?.status === 'TRANSCRIBING' && job.segmentsFailed > 0 && job.segmentsQueued === 0;
@@ -25,12 +24,12 @@ export default function ProcessingScreen({ state, onSkipFailed, onRetryUploads, 
   const percent = Math.round(state.progress * 100);
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 py-10 text-center" aria-live="polite">
+    <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 py-10 text-center">
       {!failed && (
         <>
-          <div className="text-5xl font-semibold tabular-nums text-[#3899aa]">{percent} %</div>
+          <div className="text-5xl font-semibold tabular-nums text-[#3899aa]" aria-hidden>{percent} %</div>
           <Progress value={percent} className="w-full max-w-md h-2" />
-          <p className="text-sm text-muted-foreground inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />{stageLabel(job)}</p>
+          <p className="text-sm text-muted-foreground inline-flex items-center gap-2" role="status"><Loader2 className="h-4 w-4 animate-spin" />{stageLabel(job)}</p>
           <p className="text-xs text-muted-foreground max-w-md">Tu peux quitter cette page : le bilan continue de se rédiger et t’attendra dans tes brouillons.</p>
         </>
       )}
@@ -40,7 +39,6 @@ export default function ProcessingScreen({ state, onSkipFailed, onRetryUploads, 
             {job!.segmentsFailed > 1 ? `${job!.segmentsFailed} passages n’ont pas pu être transcrits` : 'Un passage n’a pas pu être transcrit'}
           </p>
           <div className="flex justify-center gap-2">
-            {state.uploadFailed > 0 && <Button size="sm" variant="outline" onClick={onRetryUploads}><RotateCcw className="h-3.5 w-3.5 mr-1" />Réessayer</Button>}
             <Button size="sm" variant="ghost" onClick={onSkipFailed}>Continuer sans {job!.segmentsFailed > 1 ? 'ces passages' : 'ce passage'}</Button>
           </div>
         </div>

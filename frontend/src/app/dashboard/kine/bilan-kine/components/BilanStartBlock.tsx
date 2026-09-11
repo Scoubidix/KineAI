@@ -46,7 +46,8 @@ export default function BilanStartBlock({ onStarted }: BilanStartBlockProps) {
   };
 
   const modeChip = (value: StartMode | 'session', icon: React.ReactNode, label: string, enabled: boolean) => (
-    <button type="button" role="radio" aria-checked={mode === value} disabled={!enabled} title={enabled ? undefined : 'Bientôt disponible'} onClick={() => { if (enabled && value !== 'session') setMode(value); }}
+    // `aria-disabled` plutôt que `disabled` : un bouton désactivé n'affiche pas son info-bulle native
+    <button type="button" role="radio" aria-checked={mode === value} aria-disabled={!enabled} tabIndex={enabled ? 0 : -1} title={enabled ? undefined : 'Bientôt disponible'} onClick={() => { if (enabled && value !== 'session') setMode(value); }}
       className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${mode === value ? 'bg-[#3899aa] text-white border-[#3899aa]' : enabled ? 'bg-background text-foreground border-border hover:border-[#3899aa]/60' : 'bg-muted text-muted-foreground border-transparent opacity-60 cursor-not-allowed'}`}>
       {icon}{label}
     </button>

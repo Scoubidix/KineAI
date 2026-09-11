@@ -177,3 +177,8 @@ export async function retryJob(id: number): Promise<BilanJobView> {
   const r = await call<{ job: BilanJobView }>(`/${id}/job/retry`, jsonInit('POST'));
   return r.job;
 }
+
+/** « Écrire plutôt » : abandon du traitement ; ce qui a été transcrit rejoint les notes brutes. */
+export async function abandonJob(id: number): Promise<void> {
+  await call<{ deleted: boolean }>(`/${id}/job`, { method: 'DELETE' });
+}

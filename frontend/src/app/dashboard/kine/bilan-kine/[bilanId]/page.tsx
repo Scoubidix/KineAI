@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useBilanAutosave } from '@/hooks/useBilanAutosave';
-import { getBilan, getJob, attachPatient, extractBilan, composeBilan, composeBilanFromNotes, ApiError, StaleDraftError } from '@/utils/bilanApi';
+import { getBilan, getJob, abandonJob, attachPatient, extractBilan, composeBilan, composeBilanFromNotes, ApiError, StaleDraftError } from '@/utils/bilanApi';
 import type { AiBusy, BilanJobResult, BilanJobView, BilanRecord, BilanSectionKey, ExtractionCandidate, PatientSummary, BilanType, SectionWarnings } from '@/types/bilan';
 import BilanEditorHeader from '../components/editor/BilanEditorHeader';
 import BilanStepper, { type EditorStep } from '../components/editor/BilanStepper';
@@ -270,7 +270,8 @@ export default function BilanEditorPage() {
     let cancelled = false;
     Promise.all([
       getBilan(bilanId),
-      getJob(bilanId).catch((e) => (e instanceof ApiError && e.status === 404 ? null : Promise.reject(e))),
+      // 404 = aucun traitement ; toute autre panne dégrade sans bloquer la page (l'éditeur s'ouvre)
+      getJob(bilanId).catch(() => null),
     ])
       .then(([bilan, j]) => {
         if (cancelled) return;
@@ -302,11 +303,20 @@ export default function BilanEditorPage() {
     }
   }, [bilanId, toast]);
 
-  // « Écrire plutôt » / « Rédiger moi-même » : le serveur a pu écrire les notes, on relit avant d'ouvrir l'éditeur
+  // « Écrire plutôt » / « Rédiger moi-même » : le traitement est abandonné (la dictée brute rejoint
+  // les notes côté serveur), puis on relit le bilan avant d'ouvrir l'éditeur. Sans cet abandon, le
+  // flux se rouvrirait à chaque retour sur le bilan.
   const handleWrite = useCallback(async () => {
+    try {
+      await abandonJob(bilanId).catch((e) => { if (!(e instanceof ApiError && e.status === 404)) throw e; });
+    } catch {
+      toast({ title: 'Impossible de quitter le flux pour l’instant', description: 'Réessaie dans un instant', variant: 'destructive' });
+      return;
+    }
     try {
       const fresh = await getBilan(bilanId);
       setState({ status: 'ready', bilan: fresh });
+      setJob(null);
       setFlow('editor');
       const url = new URL(window.location.href);
       url.searchParams.delete('mode');

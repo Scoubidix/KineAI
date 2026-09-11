@@ -31,6 +31,7 @@ export const jobLabel = (b: BilanListItem): string | null => {
     case 'CORRECTING': return `${pct}Correction`;
     case 'COMPOSING': return `${pct}Rédaction`;
     case 'FAILED': return 'À reprendre';
+    case 'DONE': return 'Bilan rédigé';
     default: return null;
   }
 };
@@ -49,11 +50,14 @@ export default function DraftsRow({ refreshKey, onOpenAll }: DraftsRowProps) {
   }, [refreshKey]);
 
   // Un bilan se rédige côté serveur : on rafraîchit l'avancement tant qu'un traitement est en cours
+  // (effet piloté par un booléen : sinon chaque rafraîchissement réarmerait l'intervalle)
+  const active = hasActiveJob(items);
   useEffect(() => {
-    if (!hasActiveJob(items)) return;
-    const timer = setInterval(() => { listMyBilans({ statuses: ['BROUILLON', 'GENERE'], limit: 3 }).then(setItems).catch(() => {}); }, 10_000);
-    return () => clearInterval(timer);
-  }, [items]);
+    if (!active) return;
+    let cancelled = false;
+    const timer = setInterval(() => { listMyBilans({ statuses: ['BROUILLON', 'GENERE'], limit: 3 }).then((l) => { if (!cancelled) setItems(l); }).catch(() => {}); }, 10_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [active]);
 
   if (items.length === 0) return null;
 
@@ -67,7 +71,9 @@ export default function DraftsRow({ refreshKey, onOpenAll }: DraftsRowProps) {
         {items.map((b) => {
           const c = BILAN_TYPE_COLORS[b.type];
           const label = jobLabel(b);
-          const labelClass = label === null ? 'text-muted-foreground' : label === 'À reprendre' ? 'text-amber-700' : 'text-[#3899aa]';
+          // Ambre = le kiné doit agir (reprise ou enregistrement coupé) ; teal = traitement en cours
+          const labelClass = label === null || b.job?.status === 'DONE' ? 'text-muted-foreground'
+            : b.job?.status === 'FAILED' || b.job?.status === 'RECORDING' ? 'text-amber-700' : 'text-[#3899aa]';
           return (
             <button key={b.id} type="button" onClick={() => router.push(`/dashboard/kine/bilan-kine/${b.id}`)} className="card-hover rounded-xl border border-border/60 p-3 text-left">
               <div className="flex items-center justify-between gap-2">

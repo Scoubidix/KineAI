@@ -428,6 +428,20 @@ exports.skipFailedSegments = async (req, res) => {
   }
 };
 
+/** DELETE /api/bilans/:id/job — « Écrire plutôt » : abandon du traitement, la dictée brute rejoint les notes */
+exports.abandonJob = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const r = await jobService.abandonJob({ kineId, bilanId });
+    res.json({ success: true, ...r });
+  } catch (err) {
+    sendDraftError(res, err, 'abandon du traitement de dictée');
+  }
+};
+
 /** POST /api/bilans/:id/job/retry — « Réessayer » après un échec de la queue */
 exports.retryJob = async (req, res) => {
   try {

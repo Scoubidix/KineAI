@@ -80,6 +80,7 @@ router.post('/:id/job/finish', authenticate, crudWriteLimiter, requireBilanEdito
 router.get('/:id/job', authenticate, bilansGlobalController.getJob);
 router.post('/:id/job/skip-failed', authenticate, crudWriteLimiter, requireBilanEditor, bilansGlobalController.skipFailedSegments);
 router.post('/:id/job/retry', authenticate, crudWriteLimiter, requireBilanEditor, bilansGlobalController.retryJob);
+router.delete('/:id/job', authenticate, crudWriteLimiter, requireBilanEditor, bilansGlobalController.abandonJob);
 
 // Rendu HTML (tout plan : un kiné rétrogradé lit toujours ses bilans)
 router.get('/:id/render', authenticate, bilansGlobalController.renderBilan);
