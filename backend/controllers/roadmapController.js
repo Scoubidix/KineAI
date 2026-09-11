@@ -26,6 +26,7 @@ const publicIdee = (idee) => ({
   titre: idee.titre,
   description: idee.description,
   statut: idee.statut,
+  itemId: idee.itemId ?? null,
   createdAt: idee.createdAt,
 });
 
@@ -42,8 +43,8 @@ async function getRoadmap(req, res) {
 
 async function createIdee(req, res) {
   try {
-    const { titre, description } = req.body; // déjà validé et trimé par validate(roadmapIdeeSchema)
-    const idee = await roadmapService.createIdee(req.uid, { titre, description });
+    const { titre, description, itemId } = req.body; // déjà validé et trimé par validate(roadmapIdeeSchema)
+    const idee = await roadmapService.createIdee(req.uid, { titre, description, itemId });
     res.status(201).json({ success: true, idee: publicIdee(idee) });
   } catch (error) {
     sendError(res, error, 'ROADMAP_IDEE_CREATE_ERROR', "Erreur lors de l'envoi de l'idée");
@@ -99,8 +100,15 @@ async function adminListIdees(req, res) {
   if (statut !== undefined && !ROADMAP_IDEE_STATUTS.includes(statut)) {
     return res.status(400).json({ success: false, error: 'Statut inconnu', code: 'VALIDATION_ERROR' });
   }
+  let itemId;
+  if (req.query.itemId !== undefined) {
+    itemId = parseInt(req.query.itemId, 10);
+    if (Number.isNaN(itemId) || itemId <= 0 || String(itemId) !== String(req.query.itemId)) {
+      return res.status(400).json({ success: false, error: 'itemId invalide', code: 'VALIDATION_ERROR' });
+    }
+  }
   try {
-    const idees = await roadmapService.listIdees({ statut });
+    const idees = await roadmapService.listIdees({ statut, itemId });
     res.json({ success: true, idees });
   } catch (error) {
     sendError(res, error, 'ROADMAP_ADMIN_ERROR', 'Erreur lors de la récupération des idées');

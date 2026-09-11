@@ -1175,6 +1175,8 @@ model RoadmapItem {
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
+  idees RoadmapIdee[]
+
   @@index([isActive, horizon])
   @@map("roadmap_items")
 }
@@ -1191,7 +1193,12 @@ model RoadmapIdee {
   kineId Int
   kine   Kine @relation(fields: [kineId], references: [id], onDelete: Cascade)
 
+  // Card concernée (optionnelle). SetNull : une card supprimée laisse l'idée intacte.
+  itemId Int?
+  item   RoadmapItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
   @@index([statut, createdAt])
   @@index([kineId])
+  @@index([itemId])
   @@map("roadmap_idees")
 }

@@ -239,6 +239,7 @@ const ROADMAP_IDEE_STATUTS = ['NOUVELLE', 'VUE', 'RETENUE', 'ECARTEE'];
 const roadmapIdeeSchema = z.object({
   titre: z.string().trim().min(3).max(120),
   description: z.string().trim().min(10).max(2000),
+  itemId: z.number().int().positive().optional(), // card concernée (optionnelle)
 });
 
 // Card roadmap créée / modifiée depuis l'admin (POST/PUT /api/admin/roadmap/items)

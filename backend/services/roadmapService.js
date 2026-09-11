@@ -22,6 +22,8 @@ const PUBLIC_SELECT = {
 };
 
 const IDEE_KINE_SELECT = { id: true, firstName: true, lastName: true, email: true };
+const IDEE_ITEM_SELECT = { id: true, titre: true };
+const IDEE_INCLUDE = { kine: { select: IDEE_KINE_SELECT }, item: { select: IDEE_ITEM_SELECT } };
 
 // Dans un groupe : ce qui est en cours d'abord, puis le prévu, puis par ancienneté
 const STATUT_RANK = { EN_COURS: 0, PREVU: 1 };
@@ -61,19 +63,33 @@ async function getRoadmapForKine() {
   return groupItems(items);
 }
 
-/** Le kiné est résolu par son uid Firebase : le corps ne peut pas imposer un kineId. */
-async function createIdee(uid, { titre, description }) {
+/**
+ * Le kiné est résolu par son uid Firebase : le corps ne peut pas imposer un kineId.
+ * itemId (optionnel) doit pointer sur une card existante et active.
+ */
+async function createIdee(uid, { titre, description, itemId }) {
   const prisma = prismaService.getInstance();
   const kine = await prisma.kine.findUnique({ where: { uid }, select: { id: true } });
   if (!kine) throw new RoadmapError('KINE_NOT_FOUND', 404, 'Kiné non trouvé');
-  return prisma.roadmapIdee.create({ data: { kineId: kine.id, titre, description } });
+  if (itemId !== undefined) {
+    const item = await prisma.roadmapItem.findUnique({ where: { id: itemId }, select: { id: true, isActive: true } });
+    if (!item || !item.isActive) throw new RoadmapError('ROADMAP_ITEM_NOT_FOUND', 404, 'Card non trouvée');
+  }
+  return prisma.roadmapIdee.create({
+    data: { kineId: kine.id, titre, description, itemId: itemId ?? null },
+  });
 }
 
 // ===================== ADMIN — CARDS =====================
 
+/** Liste admin : chaque card porte ideesCount (idées liées, tous statuts). */
 async function listAllItems() {
   const prisma = prismaService.getInstance();
-  return prisma.roadmapItem.findMany({ orderBy: { createdAt: 'desc' } });
+  const items = await prisma.roadmapItem.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: { _count: { select: { idees: true } } },
+  });
+  return items.map(({ _count, ...item }) => ({ ...item, ideesCount: _count.idees }));
 }
 
 async function getItemOrThrow(prisma, id) {
@@ -117,11 +133,14 @@ async function deleteItem(id) {
 
 // ===================== ADMIN — IDÉES =====================
 
-async function listIdees({ statut } = {}) {
+async function listIdees({ statut, itemId } = {}) {
   const prisma = prismaService.getInstance();
+  const where = {};
+  if (statut) where.statut = statut;
+  if (itemId !== undefined) where.itemId = itemId;
   return prisma.roadmapIdee.findMany({
-    where: statut ? { statut } : {},
-    include: { kine: { select: IDEE_KINE_SELECT } },
+    where,
+    include: IDEE_INCLUDE,
     orderBy: { createdAt: 'desc' },
   });
 }
@@ -130,11 +149,7 @@ async function setIdeeStatut(id, statut) {
   const prisma = prismaService.getInstance();
   const existing = await prisma.roadmapIdee.findUnique({ where: { id } });
   if (!existing) throw new RoadmapError('ROADMAP_IDEE_NOT_FOUND', 404, 'Idée non trouvée');
-  return prisma.roadmapIdee.update({
-    where: { id },
-    data: { statut },
-    include: { kine: { select: IDEE_KINE_SELECT } },
-  });
+  return prisma.roadmapIdee.update({ where: { id }, data: { statut }, include: IDEE_INCLUDE });
 }
 
 module.exports = {
