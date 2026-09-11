@@ -174,6 +174,7 @@ export default function RoadmapTab() {
       if (data.success) {
         toast({ title: 'Card supprimée' });
         loadItems();
+        if (ideeItemFilter === deleteTarget.id) setIdeeItemFilter('ALL'); else loadIdees();
       } else {
         toast({ title: 'Erreur', description: data.error, variant: 'destructive' });
       }
@@ -392,6 +393,12 @@ export default function RoadmapTab() {
             <AlertDialogTitle>Supprimer cette card ?</AlertDialogTitle>
             <AlertDialogDescription>
               « {deleteTarget?.titre} » sera supprimée définitivement. Pour la masquer sans la perdre, désactive-la plutôt.
+              {!!deleteTarget?.ideesCount && (
+                <>
+                  {' '}
+                  {deleteTarget.ideesCount} idée{deleteTarget.ideesCount > 1 ? 's' : ''} reçue{deleteTarget.ideesCount > 1 ? 's' : ''} sur cette card perdront leur rattachement (elles restent visibles ci-dessous).
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
