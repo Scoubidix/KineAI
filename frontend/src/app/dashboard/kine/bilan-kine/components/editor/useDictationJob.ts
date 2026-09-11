@@ -32,6 +32,7 @@ export interface DictationJobState {
   uploadFailed: number;      // envois en échec définitif (blobs gardés en mémoire pour « Réessayer l'envoi »)
   interrupted: boolean;      // traitement RECORDING retrouvé après rechargement : la prise avait été coupée
   generating: boolean;       // « Générer » en cours d'appel
+  generateError: boolean;    // dernière tentative de « Générer » en échec (hors 409, le kiné recliquera)
   job: BilanJobView | null;
   progress: number;          // 0..1 affiché, jamais décroissant
 }
@@ -57,7 +58,7 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
   const [state, setState] = useState<DictationJobState>({
     available: false, supported: true, phase: phaseOf(initialJob, false, (initialJob?.nextIndex ?? 0) > 0), starting: false, elapsedMs: 0, totalMs: 0, level: 0,
     permissionDenied: false, importing: false, segmentsSent: initialJob?.nextIndex ?? 0, uploading: 0, uploadFailed: 0,
-    interrupted: initialJob?.status === 'RECORDING' && (initialJob.nextIndex ?? 0) > 0, generating: false, job: initialJob, progress: initialJob?.progress ?? 0,
+    interrupted: initialJob?.status === 'RECORDING' && (initialJob.nextIndex ?? 0) > 0, generating: false, generateError: false, job: initialJob, progress: initialJob?.progress ?? 0,
   });
   const patch = useCallback((p: Partial<DictationJobState>) => setState((s) => ({ ...s, ...p })), []);
 
@@ -65,6 +66,9 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
   const nextIndexRef = useRef(initialJob?.nextIndex ?? 0);
   const recorderRef = useRef<DictationRecorder | null>(null);
   const startingRef = useRef(false);
+  // Incrémenté à chaque start()/stop()/désactivation : la demande de micro peut durer plusieurs
+  // secondes, un Stop ou une désactivation pendant ce temps ne doit pas laisser un enregistreur publié.
+  const startTokenRef = useRef(0);
   const availableRef = useRef(false);
   const uploadingRef = useRef(0);
   const sentRef = useRef(initialJob?.nextIndex ?? 0);
@@ -110,8 +114,9 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
     sentRef.current = 0;
     failedRef.current = new Map();
     setJob(job);
+    refreshUploads();
     return job;
-  }, [bilanId, setJob]);
+  }, [bilanId, setJob, refreshUploads]);
 
   const uploadSegment = useCallback(async (index: number, upload: PendingUpload) => {
     uploadingRef.current += 1;
@@ -136,6 +141,7 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
   }, [bilanId, refreshUploads]);
 
   const stop = useCallback(() => {
+    startTokenRef.current += 1;
     const rec = recorderRef.current;
     recorderRef.current = null;
     if (rec) rec.stop();
@@ -146,11 +152,14 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
   /** Nouvelle prise (« Dicter », « Dicter la suite ») : les indices continuent après ceux déjà envoyés. */
   const start = useCallback(async () => {
     if (!enabled || startingRef.current || recorderRef.current) return;
-    if (!availableRef.current && !(await refreshAvailability())) return;
-    const mimeType = pickMimeType();
-    if (!mimeType) { patch({ supported: false }); return; }
+    // La demande de micro peut durer plusieurs secondes ; un Stop ou une désactivation pendant ce
+    // temps ne doit pas laisser un enregistreur publié : `token` sert de point d'annulation.
     startingRef.current = true;
     patch({ starting: true });
+    const token = ++startTokenRef.current;
+    if (!availableRef.current && !(await refreshAvailability())) { startingRef.current = false; patch({ starting: false }); return; }
+    const mimeType = pickMimeType();
+    if (!mimeType) { startingRef.current = false; patch({ starting: false, supported: false }); return; }
     try {
       await ensureJob();
     } catch {
@@ -176,6 +185,7 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
       startingRef.current = false;
       return;
     }
+    if (token !== startTokenRef.current) { rec.stop(); startingRef.current = false; patch({ starting: false }); return; }
     recorderRef.current = rec;
     startingRef.current = false;
     takeStartMsRef.current = state.totalMs;
@@ -219,12 +229,13 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
   /** « Générer le bilan » : tous les envois acquittés, au moins un segment. */
   const generate = useCallback(async () => {
     if (recorderRef.current || uploadingRef.current > 0 || failedRef.current.size > 0 || nextIndexRef.current === 0) return;
-    patch({ generating: true });
+    patch({ generating: true, generateError: false });
     try {
       setJob(await finishJob(bilanId, nextIndexRef.current));
     } catch (e) {
       // 409 : déjà généré ailleurs → on relit l'état ; autre erreur : on reste sur l'écran, le kiné recliquera
       if (e instanceof ApiError && e.status === 409) { try { setJob(await getJob(bilanId)); } catch { /* l'écran reste tel quel */ } }
+      else { patch({ generateError: true }); }
     } finally {
       patch({ generating: false });
     }
@@ -234,8 +245,8 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
   const retryJob = useCallback(async () => { try { setJob(await apiRetryJob(bilanId)); } catch { /* idem */ } }, [bilanId, setJob]);
   /** « Dicter à nouveau » après « Rien n'a été entendu » : traitement remis à zéro au prochain segment. */
   const restart = useCallback(() => {
-    jobRef.current = null; nextIndexRef.current = 0; sentRef.current = 0; failedRef.current = new Map();
-    patch({ job: null, phase: 'idle', segmentsSent: 0, uploadFailed: 0, uploading: 0, totalMs: 0, progress: 0, interrupted: false });
+    jobRef.current = null; nextIndexRef.current = 0; sentRef.current = 0; failedRef.current = new Map(); takeStartMsRef.current = 0;
+    patch({ job: null, phase: 'idle', segmentsSent: 0, uploadFailed: 0, uploading: 0, totalMs: 0, progress: 0, interrupted: false, elapsedMs: 0, permissionDenied: false, generateError: false });
   }, [patch]);
 
   // Sondage pendant le traitement
@@ -250,9 +261,14 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
     return () => { cancelled = true; clearInterval(timer); };
   }, [processing, bilanId, setJob]);
 
-  // Barre : recalculée 4 fois par seconde (les étapes estimées avancent dans le temps)
+  // Barre : recalculée 4 fois par seconde (les étapes estimées avancent dans le temps) ; à DONE,
+  // valeur figée à 1 une seule fois, sans réarmer l'intervalle.
   useEffect(() => {
-    if (!processing && state.job?.status !== 'DONE') return;
+    if (state.job?.status === 'DONE') {
+      setState((s) => (s.progress === 1 ? s : { ...s, progress: 1 }));
+      return;
+    }
+    if (!processing) return;
     const timer = setInterval(() => {
       setState((s) => { const p = displayProgress(s.job, stageRef.current.startedAt, Date.now(), s.progress); return p === s.progress ? s : { ...s, progress: p }; });
     }, TICK_MS);
@@ -268,7 +284,7 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
     return () => window.removeEventListener('beforeunload', handler);
   }, [busy]);
 
-  useEffect(() => { if (!enabled && recorderRef.current) stop(); }, [enabled, stop]);
+  useEffect(() => { if (!enabled) { startTokenRef.current += 1; if (recorderRef.current) stop(); } }, [enabled, stop]);
   useEffect(() => () => { recorderRef.current?.stop(); }, []);
 
   return { state, start, stop, generate, importFile, retryUploads, skipFailed, retryJob, restart };
