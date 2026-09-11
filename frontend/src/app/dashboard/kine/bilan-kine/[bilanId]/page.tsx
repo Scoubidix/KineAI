@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useBilanAutosave } from '@/hooks/useBilanAutosave';
-import { getBilan, attachPatient, extractBilan, composeBilan, composeBilanFromNotes, ApiError, StaleDraftError } from '@/utils/bilanApi';
-import type { AiBusy, BilanRecord, BilanSectionKey, ExtractionCandidate, PatientSummary, BilanType, SectionWarnings } from '@/types/bilan';
+import { getBilan, getJob, attachPatient, extractBilan, composeBilan, composeBilanFromNotes, ApiError, StaleDraftError } from '@/utils/bilanApi';
+import type { AiBusy, BilanJobResult, BilanJobView, BilanRecord, BilanSectionKey, ExtractionCandidate, PatientSummary, BilanType, SectionWarnings } from '@/types/bilan';
 import BilanEditorHeader from '../components/editor/BilanEditorHeader';
 import BilanStepper, { type EditorStep } from '../components/editor/BilanStepper';
 import CaptureStep from '../components/editor/CaptureStep';
+import DictationFlow from '../components/editor/DictationFlow';
 import DocumentStep from '../components/editor/DocumentStep';
 import MeasuresDrawer, { DRAWER_SUGGESTIONS_ID } from '../components/editor/MeasuresDrawer';
 import { useDictation } from '../components/editor/useDictation';
@@ -19,8 +20,25 @@ import { useMinWidth } from '../components/editor/useMinWidth';
 
 const isStep = (s: string | null): s is EditorStep => s === 'capture' || s === 'document';
 
+/** État IA repris du traitement serveur (dictée) pour rouvrir l'éditeur comme après « Rédiger avec l'IA » */
+export interface InitialAi {
+  candidates: ExtractionCandidate[];
+  rejected: number;
+  quotes: Map<string, string>;
+  lastRun: { extracted: number; pending: number } | null;
+  warnings: SectionWarnings;
+}
+
+const toInitialAi = (r: BilanJobResult): InitialAi => ({
+  candidates: r.pending,
+  rejected: r.rejected,
+  quotes: new Map(r.accepted.map((a) => [a.id, a.quote])),
+  lastRun: { extracted: r.accepted.length + r.pending.length, pending: r.pending.length },
+  warnings: r.warnings,
+});
+
 // Éditeur de bilan V1 : un état (useBilanAutosave), deux étapes, tiroir Mesures
-function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialStep: EditorStep }) {
+function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen }: { initial: BilanRecord; initialStep: EditorStep; initialAi?: InitialAi; forceDrawerOpen?: boolean }) {
   const router = useRouter();
   const { toast } = useToast();
   const { record, update, flush, saveState, savedAt, pending, errorMessage, reload, replaceRecord } = useBilanAutosave(initial);
@@ -28,10 +46,10 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
   const locked = saveState === 'stale';
 
   // État IA, non persisté (spec §9.2) : candidats d'extraction, appel en cours, avertissements de rédaction
-  const [candidates, setCandidates] = useState<ExtractionCandidate[] | null>(null);
-  const [rejectedCount, setRejectedCount] = useState(0);
+  const [candidates, setCandidates] = useState<ExtractionCandidate[] | null>(initialAi?.candidates ?? null);
+  const [rejectedCount, setRejectedCount] = useState(initialAi?.rejected ?? 0);
   const [aiBusy, setAiBusy] = useState<AiBusy>(null);
-  const [warnings, setWarnings] = useState<SectionWarnings>({});
+  const [warnings, setWarnings] = useState<SectionWarnings>(initialAi?.warnings ?? {});
   // Garde de réentrance : `aiBusy` n'est posé qu'après le flush, une fenêtre où un double clic
   // lancerait deux appels IA (closure périmée). Le ref, lui, est synchrone.
   const aiLockRef = useRef(false);
@@ -41,11 +59,13 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
   // Tiroir Mesures : état mémorisé par navigateur ; sans valeur, ouvert sur grand écran (≥ 1280)
   const [drawerOpen, setDrawerOpen] = useState(false);
   useEffect(() => {
+    // Sortie de dictée avec des suggestions à vérifier : le tiroir s'ouvre quoi qu'en dise le stockage
+    if (forceDrawerOpen) { setDrawerOpen(true); return; }
     try {
       const v = localStorage.getItem('bilan.drawer.open');
       setDrawerOpen(v === null ? window.matchMedia('(min-width: 1280px)').matches : v === '1');
     } catch { /* stockage indisponible : replié */ }
-  }, []);
+  }, [forceDrawerOpen]);
   const setDrawer = (open: boolean) => {
     setDrawerOpen(open);
     try { localStorage.setItem('bilan.drawer.open', open ? '1' : '0'); } catch { /* ignoré */ }
@@ -67,11 +87,12 @@ function BilanEditor({ initial, initialStep }: { initial: BilanRecord; initialSt
   };
 
   // Citations des mesures acceptées automatiquement à la dernière rédaction (session)
-  const [quotes, setQuotes] = useState<Map<string, string>>(new Map());
+  const [quotes, setQuotes] = useState<Map<string, string>>(initialAi?.quotes ?? new Map());
   // Bandeau de la page Document : résultat de la dernière rédaction (session)
-  const [lastRun, setLastRun] = useState<{ extracted: number; pending: number } | null>(null);
+  const [lastRun, setLastRun] = useState<{ extracted: number; pending: number } | null>(initialAi?.lastRun ?? null);
   // Empreinte des mesures à la dernière rédaction : si elles changent, Examen et Diagnostic sont signalées
-  const composedMeasurementsRef = useRef<string | null>(null);
+  // (rédaction faite côté serveur : l'empreinte de départ est celle du bilan relu)
+  const composedMeasurementsRef = useRef<string | null>(initialAi ? JSON.stringify(initial.document?.measurements ?? []) : null);
   const fingerprint = (r: BilanRecord) => JSON.stringify(r.document?.measurements ?? []);
   useEffect(() => {
     const ref = composedMeasurementsRef.current;
@@ -239,23 +260,62 @@ export default function BilanEditorPage() {
   const bilanId = Number(params.bilanId);
   const stepParam = searchParams.get('step');
   const initialStep: EditorStep = stepParam === 'verification' ? 'document' : isStep(stepParam) ? stepParam : 'capture';
+  const modeParam = searchParams.get('mode');
+  // Traitement serveur (dictée) : sert d'aiguillage à l'ouverture, puis d'état IA initial une fois terminé
+  const [job, setJob] = useState<BilanJobView | null>(null);
+  const [flow, setFlow] = useState<'auto' | 'dictation' | 'editor'>(modeParam === 'dictation' ? 'dictation' : 'auto');
 
   useEffect(() => {
     if (!Number.isInteger(bilanId) || bilanId <= 0) { setState({ status: 'error', message: 'Identifiant de bilan invalide' }); return; }
     let cancelled = false;
-    getBilan(bilanId)
-      .then((bilan) => {
+    Promise.all([
+      getBilan(bilanId),
+      getJob(bilanId).catch((e) => (e instanceof ApiError && e.status === 404 ? null : Promise.reject(e))),
+    ])
+      .then(([bilan, j]) => {
         if (cancelled) return;
         if (!bilan.document) {
           toast({ title: 'Bilan en lecture seule', description: 'Les anciens bilans se consultent depuis la fiche patient.' });
           router.replace('/dashboard/kine/bilan-kine');
           return;
         }
+        setJob(j);
         setState({ status: 'ready', bilan });
       })
       .catch((e) => { if (!cancelled) setState({ status: 'error', message: e instanceof ApiError && e.status === 404 ? 'Ce bilan n’existe pas ou ne t’appartient pas' : (e as Error).message }); });
     return () => { cancelled = true; };
   }, [bilanId, router, toast]);
+
+  // Fin du flux : le serveur a écrit les notes et le document, on relit le bilan et on ouvre le document
+  const handleDone = useCallback(async (j: BilanJobView) => {
+    try {
+      const fresh = await getBilan(bilanId);
+      setState({ status: 'ready', bilan: fresh });
+      setJob(j);
+      setFlow('editor');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('mode');
+      url.searchParams.set('step', 'verification');
+      window.history.replaceState(null, '', url.toString());
+    } catch (e) {
+      toast({ title: 'Rechargement impossible', description: (e as Error).message, variant: 'destructive' });
+    }
+  }, [bilanId, toast]);
+
+  // « Écrire plutôt » / « Rédiger moi-même » : le serveur a pu écrire les notes, on relit avant d'ouvrir l'éditeur
+  const handleWrite = useCallback(async () => {
+    try {
+      const fresh = await getBilan(bilanId);
+      setState({ status: 'ready', bilan: fresh });
+      setFlow('editor');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('mode');
+      url.searchParams.set('step', 'capture');
+      window.history.replaceState(null, '', url.toString());
+    } catch (e) {
+      toast({ title: 'Rechargement impossible', description: (e as Error).message, variant: 'destructive' });
+    }
+  }, [bilanId, toast]);
 
   if (state.status === 'loading') return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#3899aa]" /></div>;
   if (state.status === 'error') {
@@ -266,5 +326,15 @@ export default function BilanEditorPage() {
       </div>
     );
   }
-  return <BilanEditor key={state.bilan.id} initial={state.bilan} initialStep={initialStep} />;
+  // Un traitement non terminé (ou le mode « Dicter » demandé depuis l'accueil) prend toute la page
+  const jobActive = job !== null && job.status !== 'DONE';
+  const showFlow = flow === 'dictation' || (flow === 'auto' && jobActive);
+  if (showFlow) {
+    // Rappels stables (useCallback) : l'effet de fin de flux de DictationFlow ne doit se déclencher qu'une fois
+    return <DictationFlow key={`flow-${state.bilan.id}`} bilan={state.bilan} initialJob={job} onDone={handleDone} onWrite={handleWrite} />;
+  }
+  const initialAi = job?.status === 'DONE' && job.result ? toInitialAi(job.result) : undefined;
+  // Bilan rédigé par dictée : on ouvre sur le document, sauf si l'URL demande explicitement une étape
+  const step: EditorStep = initialAi && (flow === 'editor' || stepParam === null) ? 'document' : initialStep;
+  return <BilanEditor key={`${state.bilan.id}-${flow}`} initial={state.bilan} initialStep={step} initialAi={initialAi} forceDrawerOpen={Boolean(initialAi && initialAi.candidates.length > 0)} />;
 }

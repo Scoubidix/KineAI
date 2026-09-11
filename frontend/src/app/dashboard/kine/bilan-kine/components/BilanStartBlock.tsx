@@ -10,8 +10,10 @@ import PatientCombobox from './PatientCombobox';
 import { createBilan, ApiError } from '@/utils/bilanApi';
 import { BILAN_TYPE_LABELS, type BilanRecord, type BilanType, type PatientSummary } from '@/types/bilan';
 
+type StartMode = 'write' | 'dictation';
+
 interface BilanStartBlockProps {
-  onStarted: (bilan: BilanRecord) => void;
+  onStarted: (bilan: BilanRecord, mode: StartMode) => void;
 }
 
 const TYPES: BilanType[] = ['INITIAL', 'INTERMEDIAIRE', 'FINAL'];
@@ -25,6 +27,7 @@ export default function BilanStartBlock({ onStarted }: BilanStartBlockProps) {
   const { toast } = useToast();
   const [patient, setPatient] = useState<PatientSummary | null>(null);
   const [type, setType] = useState<BilanType>('INITIAL');
+  const [mode, setMode] = useState<StartMode>('write');
   const [creating, setCreating] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
 
@@ -33,7 +36,7 @@ export default function BilanStartBlock({ onStarted }: BilanStartBlockProps) {
     setCreating(true);
     try {
       const bilan = await createBilan({ type, patientId: patient?.id ?? null });
-      onStarted(bilan);
+      onStarted(bilan, mode);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'PLAN_REQUIRED') setPaywallOpen(true);
       else toast({ title: 'Erreur', description: (e as Error).message || 'Impossible de créer le bilan', variant: 'destructive' });
@@ -42,10 +45,11 @@ export default function BilanStartBlock({ onStarted }: BilanStartBlockProps) {
     }
   };
 
-  const modeChip = (icon: React.ReactNode, label: string, active: boolean) => (
-    <span title={active ? undefined : 'Bientôt disponible'} className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium ${active ? 'bg-[#3899aa] text-white border-[#3899aa]' : 'bg-muted text-muted-foreground border-transparent opacity-60 cursor-not-allowed'}`}>
+  const modeChip = (value: StartMode | 'session', icon: React.ReactNode, label: string, enabled: boolean) => (
+    <button type="button" role="radio" aria-checked={mode === value} disabled={!enabled} title={enabled ? undefined : 'Bientôt disponible'} onClick={() => { if (enabled && value !== 'session') setMode(value); }}
+      className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${mode === value ? 'bg-[#3899aa] text-white border-[#3899aa]' : enabled ? 'bg-background text-foreground border-border hover:border-[#3899aa]/60' : 'bg-muted text-muted-foreground border-transparent opacity-60 cursor-not-allowed'}`}>
       {icon}{label}
-    </span>
+    </button>
   );
 
   return (
@@ -65,16 +69,16 @@ export default function BilanStartBlock({ onStarted }: BilanStartBlockProps) {
           ))}
         </div>
         <span className="text-xs font-semibold text-muted-foreground">Mode</span>
-        <div className="flex flex-wrap gap-2">
-          {modeChip(<PenLine className="h-3.5 w-3.5" />, 'Écrire', true)}
-          {modeChip(<Mic className="h-3.5 w-3.5" />, 'Dicter', false)}
-          {modeChip(<Disc className="h-3.5 w-3.5" />, 'Enregistrer la séance', false)}
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Mode de saisie">
+          {modeChip('write', <PenLine className="h-3.5 w-3.5" />, 'Écrire', true)}
+          {modeChip('dictation', <Mic className="h-3.5 w-3.5" />, 'Dicter', true)}
+          {modeChip('session', <Disc className="h-3.5 w-3.5" />, 'Enregistrer la séance', false)}
         </div>
       </div>
       <div className="flex justify-end">
         <Button onClick={handleStart} disabled={creating} className="btn-teal rounded-full px-6 h-10">
           {creating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-          Commencer →
+          {mode === 'dictation' ? 'Dicter →' : 'Commencer →'}
         </Button>
       </div>
       <PaywallModal isOpen={paywallOpen} onClose={() => setPaywallOpen(false)} subscription={subscription} />

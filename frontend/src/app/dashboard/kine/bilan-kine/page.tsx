@@ -40,7 +40,7 @@ export default function BilanHubPage() {
           </div>
         </div>
 
-        <BilanStartBlock onStarted={(bilan) => router.push(`/dashboard/kine/bilan-kine/${bilan.id}`)} />
+        <BilanStartBlock onStarted={(bilan, mode) => router.push(mode === 'dictation' ? `/dashboard/kine/bilan-kine/${bilan.id}?mode=dictation` : `/dashboard/kine/bilan-kine/${bilan.id}`)} />
 
         <DraftsRow refreshKey={refreshKey} onOpenAll={() => setDraftsOpen(true)} />
 

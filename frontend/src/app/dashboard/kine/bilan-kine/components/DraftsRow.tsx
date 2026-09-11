@@ -20,6 +20,23 @@ export const formatRelative = (iso: string): string => {
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 };
 
+/** Avancement du traitement de dictée, affiché sur la carte du brouillon */
+export const jobLabel = (b: BilanListItem): string | null => {
+  const j = b.job;
+  if (!j) return null;
+  const pct = j.progress === null ? '' : `${Math.round(j.progress * 100)} % · `;
+  switch (j.status) {
+    case 'RECORDING': return 'Enregistrement interrompu';
+    case 'TRANSCRIBING': return `${pct}Transcription`;
+    case 'CORRECTING': return `${pct}Correction`;
+    case 'COMPOSING': return `${pct}Rédaction`;
+    case 'FAILED': return 'À reprendre';
+    default: return null;
+  }
+};
+
+const hasActiveJob = (items: BilanListItem[]) => items.some((b) => b.job && b.job.status !== 'DONE' && b.job.status !== 'FAILED' && b.job.status !== 'RECORDING');
+
 // « Reprendre » : les 3 derniers bilans non enregistrés
 export default function DraftsRow({ refreshKey, onOpenAll }: DraftsRowProps) {
   const router = useRouter();
@@ -30,6 +47,13 @@ export default function DraftsRow({ refreshKey, onOpenAll }: DraftsRowProps) {
     listMyBilans({ statuses: ['BROUILLON', 'GENERE'], limit: 3 }).then((l) => { if (!cancelled) setItems(l); }).catch(() => {});
     return () => { cancelled = true; };
   }, [refreshKey]);
+
+  // Un bilan se rédige côté serveur : on rafraîchit l'avancement tant qu'un traitement est en cours
+  useEffect(() => {
+    if (!hasActiveJob(items)) return;
+    const timer = setInterval(() => { listMyBilans({ statuses: ['BROUILLON', 'GENERE'], limit: 3 }).then(setItems).catch(() => {}); }, 10_000);
+    return () => clearInterval(timer);
+  }, [items]);
 
   if (items.length === 0) return null;
 
@@ -42,13 +66,15 @@ export default function DraftsRow({ refreshKey, onOpenAll }: DraftsRowProps) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {items.map((b) => {
           const c = BILAN_TYPE_COLORS[b.type];
+          const label = jobLabel(b);
+          const labelClass = label === null ? 'text-muted-foreground' : label === 'À reprendre' ? 'text-amber-700' : 'text-[#3899aa]';
           return (
             <button key={b.id} type="button" onClick={() => router.push(`/dashboard/kine/bilan-kine/${b.id}`)} className="card-hover rounded-xl border border-border/60 p-3 text-left">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium text-sm truncate">{b.patient ? `${b.patient.firstName} ${b.patient.lastName.toUpperCase()}` : 'Sans patient'}</span>
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${c.bg} ${c.text} border ${c.border}`}>{BILAN_TYPE_LABELS[b.type]}</span>
               </div>
-              <div className="text-xs text-muted-foreground mt-1">{b.status === 'GENERE' ? 'Généré' : 'Brouillon'} · {formatRelative(b.updatedAt)}</div>
+              <div className={`text-xs mt-1 ${labelClass}`}>{label ?? (b.status === 'GENERE' ? 'Généré' : 'Brouillon')} · {formatRelative(b.updatedAt)}</div>
             </button>
           );
         })}

@@ -9,7 +9,7 @@ import { FolderOpen, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { listMyBilans, deleteBilan } from '@/utils/bilanApi';
 import { BILAN_TYPE_LABELS, type BilanListItem } from '@/types/bilan';
-import { formatRelative } from './DraftsRow';
+import { formatRelative, jobLabel } from './DraftsRow';
 
 interface DraftsModalProps {
   open: boolean;
@@ -55,7 +55,7 @@ export default function DraftsModal({ open, onOpenChange, onChanged }: DraftsMod
             <div key={b.id} className="flex items-center gap-2 rounded-lg border border-border/60 p-3">
               <button type="button" onClick={() => { onOpenChange(false); router.push(`/dashboard/kine/bilan-kine/${b.id}`); }} className="flex-1 text-left min-w-0">
                 <div className="text-sm font-medium truncate">{b.patient ? `${b.patient.firstName} ${b.patient.lastName.toUpperCase()}` : 'Sans patient'} · {BILAN_TYPE_LABELS[b.type]}</div>
-                <div className="text-xs text-muted-foreground">{b.motif || 'Sans motif'} · {formatRelative(b.updatedAt)}</div>
+                <div className="text-xs text-muted-foreground">{jobLabel(b) ? `${jobLabel(b)} · ` : ''}{b.motif || 'Sans motif'} · {formatRelative(b.updatedAt)}</div>
               </button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
