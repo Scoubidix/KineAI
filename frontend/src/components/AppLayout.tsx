@@ -91,7 +91,8 @@ import {
   Camera,
   HelpCircle,
   Video,
-  MessagesSquare
+  MessagesSquare,
+  Map as MapIcon
 } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { normalizeFirstName, normalizeLastName } from '@/utils/nameNormalization';
@@ -1365,6 +1366,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       label: 'Communauté',
       items: [
         { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, emoji: '🎁', highlight: false },
+        { href: '/dashboard/kine/roadmap', label: 'Roadmap', icon: MapIcon, emoji: '🗺️', highlight: false },
         // Reserve aux membres du plan Pionnier (et aux admins) : masque pour les autres
         ...(pionniersAccess
           ? [{ href: '/dashboard/kine/groupe-pionniers', label: 'Groupe Pionniers', icon: MessagesSquare, emoji: '💬', highlight: false }]
