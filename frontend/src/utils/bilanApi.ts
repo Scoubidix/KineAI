@@ -1,5 +1,5 @@
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import type { BilanListItem, BilanPatch, BilanRecord, BilanSectionKey, BilanStatus, BilanType, ComposeFromNotesResult, ComposeResult, ExtractionResult } from '@/types/bilan';
+import type { BilanJobView, BilanListItem, BilanPatch, BilanRecord, BilanSectionKey, BilanStatus, BilanType, ComposeFromNotesResult, ComposeResult, ExtractionResult } from '@/types/bilan';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -135,4 +135,45 @@ export async function transcribeDictationSegment(id: number, input: { blob: Blob
 export async function correctDictation(id: number, input: { text: string; mode: 'dictation' | 'session' }, signal?: AbortSignal): Promise<{ text: string; applied: number; ignored: number }> {
   const r = await call<{ text: string; applied: number; ignored: number }>(`/${id}/dictation/correct`, { ...jsonInit('POST', input), signal });
   return { text: r.text ?? input.text, applied: r.applied ?? 0, ignored: r.ignored ?? 0 };
+}
+
+// ---- Traitement de dictée côté serveur (plan 7) ----
+
+/** Crée (ou remet à zéro) le traitement de dictée du bilan : statut RECORDING. */
+export async function createJob(id: number, kind: 'DICTATION' | 'SESSION' = 'DICTATION'): Promise<BilanJobView> {
+  const r = await call<{ job: BilanJobView }>(`/${id}/job`, jsonInit('POST', { kind }));
+  return r.job;
+}
+
+/** Envoie un segment audio ; le serveur répond « reçu » (202) et transcrit en arrière-plan. */
+export async function uploadJobSegment(id: number, input: { blob: Blob; index: number; mimeType: string }): Promise<void> {
+  const form = new FormData();
+  form.append('audio', input.blob, 'segment');
+  form.append('index', String(input.index));
+  form.append('mimeType', input.mimeType);
+  await call<{ index: number }>(`/${id}/job/segments`, { method: 'POST', body: form });
+}
+
+/** « Générer le bilan » : fin d'enregistrement, le serveur enchaîne transcription → correction → rédaction. */
+export async function finishJob(id: number, segmentsTotal: number): Promise<BilanJobView> {
+  const r = await call<{ job: BilanJobView }>(`/${id}/job/finish`, jsonInit('POST', { segmentsTotal }));
+  return r.job;
+}
+
+/** Avancement du traitement ; lève ApiError 404 JOB_NOT_FOUND s'il n'y en a pas. */
+export async function getJob(id: number): Promise<BilanJobView> {
+  const r = await call<{ job: BilanJobView }>(`/${id}/job`);
+  return r.job;
+}
+
+/** « Continuer sans ces passages » */
+export async function skipFailedSegments(id: number): Promise<BilanJobView> {
+  const r = await call<{ job: BilanJobView }>(`/${id}/job/skip-failed`, jsonInit('POST'));
+  return r.job;
+}
+
+/** « Réessayer » après un échec de correction ou de rédaction */
+export async function retryJob(id: number): Promise<BilanJobView> {
+  const r = await call<{ job: BilanJobView }>(`/${id}/job/retry`, jsonInit('POST'));
+  return r.job;
 }

@@ -85,6 +85,36 @@ export interface BilanListItem {
   updatedAt: string;
   createdAt: string;
   patient: Pick<PatientSummary, 'id' | 'firstName' | 'lastName'> | null;
+  job: { status: BilanJobStatus; progress: number | null } | null;
+}
+
+// ==================== DICTÉE : TRAITEMENT CÔTÉ SERVEUR (plan 7) ====================
+export type BilanJobStatus = 'RECORDING' | 'TRANSCRIBING' | 'CORRECTING' | 'COMPOSING' | 'DONE' | 'FAILED';
+
+/** Ce que renvoyait « Rédiger avec l'IA » en direct, conservé par le serveur pour rouvrir le tiroir « à vérifier » */
+export interface BilanJobResult {
+  accepted: { id: string; quote: string }[];
+  pending: ExtractionCandidate[];
+  rejected: number;
+  warnings: SectionWarnings;
+}
+
+export interface BilanJobView {
+  id: number;
+  bilanId: number;
+  kind: 'DICTATION' | 'SESSION';
+  status: BilanJobStatus;
+  segmentsTotal: number | null;
+  segmentsDone: number;
+  segmentsFailed: number;
+  segmentsQueued: number;
+  nextIndex: number;
+  progress: number | null;
+  error: string | null;
+  errorDetail: Record<string, unknown> | null;
+  result: BilanJobResult | null;
+  updatedAt: string;
+  finishedAt: string | null;
 }
 
 export type BilanPatch = Partial<Pick<BilanRecord, 'rawNotes' | 'motif' | 'type' | 'document'>>;
