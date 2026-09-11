@@ -10,6 +10,7 @@ const composeService = require('../services/bilanComposeService');
 const asrService = require('../services/asrService');
 const dictationCorrectionService = require('../services/dictationCorrectionService');
 const jobService = require('../services/bilanJobService');
+const { MAX_SEGMENTS } = require('../services/bilanJobRules');
 
 /**
  * GET /api/bilans/patients-with-bilans
@@ -377,7 +378,7 @@ exports.uploadJobSegment = async (req, res) => {
     if (!kineId) return;
     const { index, mimeType } = req.body || {};
     const idx = Number(index);
-    if (!req.file || !req.file.buffer || req.file.buffer.length === 0 || !Number.isInteger(idx) || idx < 0) {
+    if (!req.file || !req.file.buffer || req.file.buffer.length === 0 || !Number.isInteger(idx) || idx < 0 || idx >= MAX_SEGMENTS) {
       return res.status(400).json({ success: false, error: 'Segment invalide', code: 'INVALID_SEGMENT' });
     }
     const r = await jobService.receiveSegment({ kineId, bilanId, index: idx, buffer: req.file.buffer, mimeType: String(mimeType || req.file.mimetype || '') });

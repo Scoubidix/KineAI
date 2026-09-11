@@ -10,7 +10,7 @@ const { validate } = require('../middleware/validate');
 const { requireBilanEditor } = require('../middleware/authorization');
 const { SECTION_KEYS } = require('../services/bilanDocument');
 const { MODES } = require('../services/dictationCorrectionService');
-const { KINDS } = require('../services/bilanJobRules');
+const { KINDS, MAX_SEGMENTS } = require('../services/bilanJobRules');
 
 // Routes globales (non scopées à un patient)
 router.get('/patients-with-bilans', authenticate, bilansGlobalController.getPatientsWithBilans);
@@ -72,10 +72,11 @@ router.post('/:id/dictation/correct', authenticate, dictationCorrectLimiter, req
 
 // Traitement de dictée côté serveur (spec traitement serveur §4.2) : le navigateur envoie, le serveur enchaîne.
 const createJobSchema = z.object({ kind: z.enum(KINDS).optional() });
-const finishJobSchema = z.object({ segmentsTotal: z.number().int().min(0).max(500) });
+const finishJobSchema = z.object({ segmentsTotal: z.number().int().min(0).max(MAX_SEGMENTS) });
 router.post('/:id/job', authenticate, crudWriteLimiter, requireBilanEditor, validate(createJobSchema), bilansGlobalController.createJob);
 router.post('/:id/job/segments', authenticate, dictationLimiter, requireBilanEditor, dictationAudio, bilansGlobalController.uploadJobSegment);
 router.post('/:id/job/finish', authenticate, crudWriteLimiter, requireBilanEditor, validate(finishJobSchema), bilansGlobalController.finishJob);
+// Pas de limiteur : sondage toutes les 2 s par un kiné authentifié, lecture seule.
 router.get('/:id/job', authenticate, bilansGlobalController.getJob);
 router.post('/:id/job/skip-failed', authenticate, crudWriteLimiter, requireBilanEditor, bilansGlobalController.skipFailedSegments);
 router.post('/:id/job/retry', authenticate, crudWriteLimiter, requireBilanEditor, bilansGlobalController.retryJob);

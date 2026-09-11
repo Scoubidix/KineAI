@@ -6,6 +6,8 @@ const KINDS = ['DICTATION', 'SESSION'];
 const ACTIVE_STATUSES = ['TRANSCRIBING', 'CORRECTING', 'COMPOSING'];
 // Poids de la barre : la transcription est la seule étape mesurée (spec §5.2)
 const PROGRESS = { TRANSCRIBING: 0.7, CORRECTING: 0.72, COMPOSING: 0.85 };
+// Borne des index et du total : ~8 h de dictée par segments d'une minute, au-delà c'est une anomalie
+const MAX_SEGMENTS = 500;
 
 const cleanSegment = (t) => String(t || '').replace(/\s+/g, ' ').trim();
 
@@ -69,4 +71,4 @@ function toView(job, segments) {
   };
 }
 
-module.exports = { KINDS, ACTIVE_STATUSES, PROGRESS, cleanSegment, assembleSegments, appendNotes, missingIndexes, isTranscriptionComplete, computeProgress, toView };
+module.exports = { KINDS, ACTIVE_STATUSES, PROGRESS, MAX_SEGMENTS, cleanSegment, assembleSegments, appendNotes, missingIndexes, isTranscriptionComplete, computeProgress, toView };
