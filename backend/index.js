@@ -560,6 +560,9 @@ app.use('/api/notifications', notificationRoutes);
 // Routes nouveautés (annonces produit) — kiné (lecture) + admin (gestion)
 app.use('/api/nouveautes', require('./routes/nouveautes'));
 
+// Routes roadmap publique (cards + boîte à idées) — kiné
+app.use('/api/roadmap', require('./routes/roadmap'));
+
 // Routes système paywall (LIBRES - navigation)
 app.use('/api/kine', subscriptionRoutes);
 app.use('/api/stripe', checkoutRoutes);     // Rate limiting dans le routeur APRÈS authenticate
