@@ -101,6 +101,7 @@ model Kine {
   // ========== RELATION BILANS ==========
   bilans         BilanKine[]
   bilanTemplates BilanTemplate[]
+  bilanJobs      BilanJob[]
   // =====================================
 
   // ========== RELATION TRAÇABILITÉ LÉGALE ==========
@@ -755,11 +756,74 @@ model BilanKine {
   // Conversation copilote liée (plan 4) ; SetNull si la conversation est supprimée
   copilotConversationId Int?          @unique
   copilotConversation   Conversation? @relation(fields: [copilotConversationId], references: [id], onDelete: SetNull)
+  job                   BilanJob? // traitement de dictée côté serveur (plan 7a)
 
   @@index([kineId, createdAt])
   @@index([patientId, createdAt])
   @@index([kineId, status, updatedAt])
   @@map("bilans_kine")
+}
+
+// ========== DICTÉE : TRAITEMENT CÔTÉ SERVEUR (plan 7a) ==========
+enum BilanJobKind {
+  DICTATION
+  SESSION
+}
+
+enum BilanJobStatus {
+  RECORDING // segments en cours de réception
+  TRANSCRIBING // « Générer » cliqué, segments en cours de transcription
+  CORRECTING // passe de correction puis écriture des notes
+  COMPOSING // extraction + rédaction
+  DONE
+  FAILED // queue en échec (correction, notes, rédaction) ; les segments perdus ne passent pas par ici
+}
+
+enum BilanJobSegmentStatus {
+  QUEUED
+  DONE
+  FAILED
+  SKIPPED
+}
+
+model BilanJob {
+  id            Int            @id @default(autoincrement())
+  bilanId       Int            @unique // un traitement vivant par bilan
+  kineId        Int
+  kind          BilanJobKind   @default(DICTATION)
+  status        BilanJobStatus @default(RECORDING)
+  segmentsTotal Int? // connu à « Générer »
+  error         String?        @db.VarChar(40) // code DraftError de la queue
+  errorDetail   Json? // ex. { measurementsSaved: true }
+  result        Json? // à DONE : { accepted: [{ id, quote }], pending: [candidats], rejected, warnings } pour rouvrir le tiroir « à vérifier »
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  finishedAt    DateTime?
+
+  bilan    BilanKine         @relation(fields: [bilanId], references: [id], onDelete: Cascade)
+  kine     Kine              @relation(fields: [kineId], references: [id], onDelete: Cascade)
+  segments BilanJobSegment[]
+
+  @@index([kineId, status])
+  @@map("bilan_jobs")
+}
+
+model BilanJobSegment {
+  id           Int                   @id @default(autoincrement())
+  jobId        Int
+  index        Int
+  status       BilanJobSegmentStatus @default(QUEUED)
+  text         String?               @db.Text // transcription brute ; effacée quand les notes sont écrites
+  audioSeconds Float?
+  attempts     Int                   @default(0)
+  error        String?               @db.VarChar(40)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  job BilanJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, index])
+  @@map("bilan_job_segments")
 }
 
 // ==== Champs canoniques (gérés via /dashboard/admin) ====
