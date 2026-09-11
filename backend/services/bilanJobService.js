@@ -138,11 +138,98 @@ async function getJobView({ kineId, bilanId }) {
 }
 
 // ---- Task 4 : fin de transcription et queue ----
-// eslint-disable-next-line no-unused-vars
-async function evaluate(jobId) {} // TODO Task 4 : décide la transition TRANSCRIBING → CORRECTING → ... quand tous les segments sont traités
-async function finishRecording() { throw new Error('Task 4'); }
-async function skipFailed() { throw new Error('Task 4'); }
-async function retryJob() { throw new Error('Task 4'); }
-async function runTail() { throw new Error('Task 4'); }
+
+/** « Générer » : pose le total, passe en TRANSCRIBING, évalue. Total 0 → FAILED NOTES_REQUIRED. */
+async function finishRecording({ kineId, bilanId, segmentsTotal }) {
+  const prisma = prismaService.getInstance();
+  const job = await loadOwnedJob(prisma, kineId, bilanId);
+  if (job.status !== 'RECORDING') throw new DraftError('JOB_NOT_RECORDING', 409, 'Ce traitement n’est plus en enregistrement');
+  if (segmentsTotal === 0) {
+    const failed = await prisma.bilanJob.update({ where: { id: job.id }, data: { status: 'FAILED', error: 'NOTES_REQUIRED', errorDetail: null, segmentsTotal: 0 } });
+    return rules.toView(failed, []);
+  }
+  const updated = await prisma.bilanJob.update({ where: { id: job.id }, data: { status: 'TRANSCRIBING', segmentsTotal } });
+  logger.info(`Traitement dictée ${job.id} : enregistrement terminé, ${segmentsTotal} segment(s)`);
+  await evaluate(job.id);
+  const segments = await prisma.bilanJobSegment.findMany({ where: { jobId: job.id }, select: { index: true, status: true } });
+  return rules.toView(updated, segments);
+}
+
+const JOB_INCLUDE = { segments: true, kine: { select: { uid: true } }, bilan: { select: { rawNotes: true, status: true, document: true } } };
+
+/** Si la transcription est complète, tente la transition atomique TRANSCRIBING → CORRECTING et lance la queue. */
+async function evaluate(jobId) {
+  const prisma = prismaService.getInstance();
+  const job = await prisma.bilanJob.findUnique({ where: { id: jobId }, include: JOB_INCLUDE });
+  if (!job || job.status !== 'TRANSCRIBING') return;
+  await markLostSegments(jobId);
+  if (!rules.isTranscriptionComplete({ segmentsTotal: job.segmentsTotal, segments: job.segments })) return;
+  // Plusieurs instances peuvent évaluer en même temps : une seule gagne la transition
+  const r = await prisma.bilanJob.updateMany({ where: { id: jobId, status: 'TRANSCRIBING' }, data: { status: 'CORRECTING' } });
+  if (r.count !== 1) return;
+  await runTail(jobId, 'CORRECTING');
+}
+
+/**
+ * Queue du traitement à partir de `stage` (CORRECTING ou COMPOSING). Toute erreur → FAILED avec le
+ * code DraftError (INTERNAL_ERROR sinon) ; jamais de texte dans les logs.
+ */
+async function runTail(jobId, stage) {
+  const prisma = prismaService.getInstance();
+  const job = await prisma.bilanJob.findUnique({ where: { id: jobId }, include: JOB_INCLUDE });
+  if (!job) return;
+  try {
+    if (stage === 'CORRECTING') {
+      const raw = rules.assembleSegments(job.segments);
+      if (!raw) throw new DraftError('NOTES_REQUIRED', 400, 'Rien n’a été entendu');
+      const catalog = await getCatalog();
+      const { text, applied, ignored } = await dictationCorrectionService.correct({ text: raw, mode: job.kind === 'SESSION' ? 'session' : 'dictation', catalog });
+      await prisma.bilanKine.update({ where: { id: job.bilanId }, data: { rawNotes: rules.appendNotes(job.bilan.rawNotes, text) } });
+      // Le texte vit désormais dans les notes : les copies par segment n'ont plus de raison d'être
+      await prisma.bilanJobSegment.updateMany({ where: { jobId }, data: { text: null } });
+      await prisma.bilanJob.update({ where: { id: jobId }, data: { status: 'COMPOSING' } });
+      logger.info(`Traitement dictée ${jobId} : notes écrites (${applied} correction(s), ${ignored} ignorée(s))`);
+    }
+    const r = await composeService.composeFromNotesForBilan({ kineId: job.kineId, bilanId: job.bilanId, uid: job.kine.uid });
+    // Ce que le front recevait d'un « Rédiger avec l'IA » direct, gardé pour rouvrir le tiroir « à vérifier »
+    const result = { accepted: (r.accepted || []).map((a) => ({ id: a.id, quote: a.quote })), pending: r.pending || [], rejected: r.rejected || 0, warnings: r.warnings || {} };
+    await prisma.bilanJob.update({ where: { id: jobId }, data: { status: 'DONE', error: null, errorDetail: null, result, finishedAt: new Date() } });
+    logger.info(`Traitement dictée ${jobId} : bilan ${job.bilanId} rédigé`);
+  } catch (err) {
+    const isDraft = err instanceof DraftError;
+    const code = isDraft ? err.code : 'INTERNAL_ERROR';
+    const detail = isDraft && err.extra && Object.keys(err.extra).length > 0 ? err.extra : null;
+    if (isDraft) logger.warn(`Traitement dictée ${jobId} : queue en échec (${code})`);
+    else logger.error(`Traitement dictée ${jobId} : erreur inattendue dans la queue`, err);
+    await prisma.bilanJob.update({ where: { id: jobId }, data: { status: 'FAILED', error: code, errorDetail: detail } });
+  }
+}
+
+/** « Continuer sans ces passages » : FAILED → SKIPPED, index jamais reçus créés SKIPPED, puis évaluation. */
+async function skipFailed({ kineId, bilanId }) {
+  const prisma = prismaService.getInstance();
+  const job = await loadOwnedJob(prisma, kineId, bilanId);
+  if (job.status !== 'TRANSCRIBING') throw new DraftError('JOB_NOT_TRANSCRIBING', 409, 'Ce traitement n’est pas en transcription');
+  await prisma.bilanJobSegment.updateMany({ where: { jobId: job.id, status: 'FAILED' }, data: { status: 'SKIPPED' } });
+  const present = await prisma.bilanJobSegment.findMany({ where: { jobId: job.id }, select: { index: true, status: true } });
+  const missing = rules.missingIndexes(job.segmentsTotal, present);
+  if (missing.length > 0) await prisma.bilanJobSegment.createMany({ data: missing.map((index) => ({ jobId: job.id, index, status: 'SKIPPED' })), skipDuplicates: true });
+  logger.info(`Traitement dictée ${job.id} : passages ignorés (${missing.length} jamais reçu(s))`);
+  await evaluate(job.id);
+  return getJobView({ kineId, bilanId });
+}
+
+/** « Réessayer » après un échec de la queue : reprend à l'étape échouée (textes encore là → CORRECTING, sinon COMPOSING). */
+async function retryJob({ kineId, bilanId }) {
+  const prisma = prismaService.getInstance();
+  const job = await prisma.bilanJob.findUnique({ where: { bilanId }, include: JOB_INCLUDE });
+  if (!job || job.kineId !== kineId) throw new DraftError('JOB_NOT_FOUND', 404, 'Aucun traitement pour ce bilan');
+  if (job.status !== 'FAILED') throw new DraftError('JOB_NOT_FAILED', 409, 'Ce traitement n’est pas en échec');
+  const stage = job.segments.some((s) => s.status === 'DONE' && s.text !== null) ? 'CORRECTING' : 'COMPOSING';
+  await prisma.bilanJob.update({ where: { id: job.id }, data: { status: stage, error: null, errorDetail: null } });
+  logger.info(`Traitement dictée ${job.id} : reprise en ${stage}`);
+  await runTail(job.id, stage);
+  return getJobView({ kineId, bilanId });
+}
 
 module.exports = { LocalQueue, __setQueueForTests, createOrResetJob, receiveSegment, getJobView, markLostSegments, evaluate, finishRecording, skipFailed, retryJob, runTail };
