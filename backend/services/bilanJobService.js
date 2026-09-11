@@ -17,6 +17,8 @@ const SEGMENT_TIMEOUT_MS = Number(process.env.JOB_SEGMENT_TIMEOUT_MS) || 5 * 60 
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 2_000;
 const RETRYABLE = new Set(['ASR_BUSY', 'ASR_UNAVAILABLE']);
+// Un CORRECTING/COMPOSING sans mise à jour depuis ce délai n'a plus de processus qui le porte : perdu
+const TAIL_TIMEOUT_MS = Number(process.env.JOB_TAIL_TIMEOUT_MS) || 10 * 60 * 1000;
 
 /** File locale à concurrence bornée ; une tâche en erreur n'arrête jamais la file. */
 class LocalQueue {
@@ -117,7 +119,8 @@ async function transcribeQueued({ jobId, kind, index, buffer, mimeType }) {
       break;
     }
   }
-  await evaluate(jobId);
+  // Ne bloque pas le créneau ASR : la suite (correction, notes, rédaction) continue en tâche de fond
+  detach(evaluate(jobId));
 }
 
 /** QUEUED sans mise à jour depuis SEGMENT_TIMEOUT_MS → FAILED TRANSCRIPTION_LOST. Renvoie le nombre marqué. */
@@ -128,16 +131,37 @@ async function markLostSegments(jobId) {
   return r.count;
 }
 
-/** Vue pour le front (compteurs, progression) ; détecte les segments perdus au passage. */
+/** Vue pour le front (compteurs, progression) ; détecte les segments perdus et la queue périmée au passage. */
 async function getJobView({ kineId, bilanId }) {
   const prisma = prismaService.getInstance();
-  const job = await loadOwnedJob(prisma, kineId, bilanId);
+  let job = await loadOwnedJob(prisma, kineId, bilanId);
   if (job.status === 'RECORDING' || job.status === 'TRANSCRIBING') await markLostSegments(job.id);
+  if (await markStaleTail(job)) job = await prisma.bilanJob.findUnique({ where: { id: job.id } });
   const segments = await prisma.bilanJobSegment.findMany({ where: { jobId: job.id }, select: { index: true, status: true } });
   return rules.toView(job, segments);
 }
 
 // ---- Task 4 : fin de transcription et queue ----
+
+// Tâches de fond (évaluation, queue) : la requête HTTP n'attend pas dessus, mais on garde une
+// référence pour que les tests puissent les vider avant d'observer leurs effets.
+const inFlight = new Set();
+function detach(promise) {
+  const p = promise.catch((err) => logger.error('Traitement dictée : tâche détachée en erreur', err)).finally(() => inFlight.delete(p));
+  inFlight.add(p);
+  return p;
+}
+const __drainForTests = () => Promise.all([...inFlight]);
+
+/** Un processus arrêté en pleine queue laisserait le traitement coincé ; passé ce délai il est déclaré
+ * perdu et « Réessayer » reprend à la bonne étape. */
+async function markStaleTail(job) {
+  if ((job.status !== 'CORRECTING' && job.status !== 'COMPOSING') || job.updatedAt >= new Date(Date.now() - TAIL_TIMEOUT_MS)) return false;
+  const prisma = prismaService.getInstance();
+  await prisma.bilanJob.updateMany({ where: { id: job.id, status: job.status }, data: { status: 'FAILED', error: 'TAIL_LOST', errorDetail: null } });
+  logger.warn(`Traitement dictée ${job.id} : queue périmée, déclarée perdue`);
+  return true;
+}
 
 /** « Générer » : pose le total, passe en TRANSCRIBING, évalue. Total 0 → FAILED NOTES_REQUIRED. */
 async function finishRecording({ kineId, bilanId, segmentsTotal }) {
@@ -148,11 +172,10 @@ async function finishRecording({ kineId, bilanId, segmentsTotal }) {
     const failed = await prisma.bilanJob.update({ where: { id: job.id }, data: { status: 'FAILED', error: 'NOTES_REQUIRED', errorDetail: null, segmentsTotal: 0 } });
     return rules.toView(failed, []);
   }
-  const updated = await prisma.bilanJob.update({ where: { id: job.id }, data: { status: 'TRANSCRIBING', segmentsTotal } });
+  await prisma.bilanJob.update({ where: { id: job.id }, data: { status: 'TRANSCRIBING', segmentsTotal } });
   logger.info(`Traitement dictée ${job.id} : enregistrement terminé, ${segmentsTotal} segment(s)`);
-  await evaluate(job.id);
-  const segments = await prisma.bilanJobSegment.findMany({ where: { jobId: job.id }, select: { index: true, status: true } });
-  return rules.toView(updated, segments);
+  detach(evaluate(job.id));
+  return getJobView({ kineId, bilanId });
 }
 
 const JOB_INCLUDE = { segments: true, kine: { select: { uid: true } }, bilan: { select: { rawNotes: true, status: true, document: true } } };
@@ -160,7 +183,8 @@ const JOB_INCLUDE = { segments: true, kine: { select: { uid: true } }, bilan: { 
 /** Si la transcription est complète, tente la transition atomique TRANSCRIBING → CORRECTING et lance la queue. */
 async function evaluate(jobId) {
   const prisma = prismaService.getInstance();
-  const job = await prisma.bilanJob.findUnique({ where: { id: jobId }, include: JOB_INCLUDE });
+  // Appelé après chaque segment : pas besoin des textes ni du document, juste de quoi juger la complétude
+  const job = await prisma.bilanJob.findUnique({ where: { id: jobId }, select: { id: true, status: true, segmentsTotal: true, segments: { select: { index: true, status: true } } } });
   if (!job || job.status !== 'TRANSCRIBING') return;
   await markLostSegments(jobId);
   if (!rules.isTranscriptionComplete({ segmentsTotal: job.segmentsTotal, segments: job.segments })) return;
@@ -180,14 +204,19 @@ async function runTail(jobId, stage) {
   if (!job) return;
   try {
     if (stage === 'CORRECTING') {
+      // Un bilan enregistré pendant le traitement ne doit pas être modifié
+      if (job.bilan.status === 'ENREGISTRE') throw new DraftError('ALREADY_FINALIZED', 409, 'Ce bilan est déjà enregistré');
       const raw = rules.assembleSegments(job.segments);
       if (!raw) throw new DraftError('NOTES_REQUIRED', 400, 'Rien n’a été entendu');
       const catalog = await getCatalog();
       const { text, applied, ignored } = await dictationCorrectionService.correct({ text: raw, mode: job.kind === 'SESSION' ? 'session' : 'dictation', catalog });
-      await prisma.bilanKine.update({ where: { id: job.bilanId }, data: { rawNotes: rules.appendNotes(job.bilan.rawNotes, text) } });
-      // Le texte vit désormais dans les notes : les copies par segment n'ont plus de raison d'être
-      await prisma.bilanJobSegment.updateMany({ where: { jobId }, data: { text: null } });
-      await prisma.bilanJob.update({ where: { id: jobId }, data: { status: 'COMPOSING' } });
+      // Les trois écritures (notes, segments, statut) doivent réussir ou échouer ensemble
+      await prisma.$transaction([
+        prisma.bilanKine.update({ where: { id: job.bilanId }, data: { rawNotes: rules.appendNotes(job.bilan.rawNotes, text) } }),
+        // Le texte vit désormais dans les notes : les copies par segment n'ont plus de raison d'être
+        prisma.bilanJobSegment.updateMany({ where: { jobId }, data: { text: null } }),
+        prisma.bilanJob.update({ where: { id: jobId }, data: { status: 'COMPOSING' } }),
+      ]);
       logger.info(`Traitement dictée ${jobId} : notes écrites (${applied} correction(s), ${ignored} ignorée(s))`);
     }
     const r = await composeService.composeFromNotesForBilan({ kineId: job.kineId, bilanId: job.bilanId, uid: job.kine.uid });
@@ -215,7 +244,7 @@ async function skipFailed({ kineId, bilanId }) {
   const missing = rules.missingIndexes(job.segmentsTotal, present);
   if (missing.length > 0) await prisma.bilanJobSegment.createMany({ data: missing.map((index) => ({ jobId: job.id, index, status: 'SKIPPED' })), skipDuplicates: true });
   logger.info(`Traitement dictée ${job.id} : passages ignorés (${missing.length} jamais reçu(s))`);
-  await evaluate(job.id);
+  detach(evaluate(job.id));
   return getJobView({ kineId, bilanId });
 }
 
@@ -226,10 +255,12 @@ async function retryJob({ kineId, bilanId }) {
   if (!job || job.kineId !== kineId) throw new DraftError('JOB_NOT_FOUND', 404, 'Aucun traitement pour ce bilan');
   if (job.status !== 'FAILED') throw new DraftError('JOB_NOT_FAILED', 409, 'Ce traitement n’est pas en échec');
   const stage = job.segments.some((s) => s.status === 'DONE' && s.text !== null) ? 'CORRECTING' : 'COMPOSING';
-  await prisma.bilanJob.update({ where: { id: job.id }, data: { status: stage, error: null, errorDetail: null } });
+  // Concurrence : si une autre requête a déjà repris ce job, on ne relance pas une deuxième queue
+  const r = await prisma.bilanJob.updateMany({ where: { id: job.id, status: job.status }, data: { status: stage, error: null, errorDetail: null } });
+  if (r.count !== 1) return getJobView({ kineId, bilanId });
   logger.info(`Traitement dictée ${job.id} : reprise en ${stage}`);
-  await runTail(job.id, stage);
+  detach(runTail(job.id, stage));
   return getJobView({ kineId, bilanId });
 }
 
-module.exports = { LocalQueue, __setQueueForTests, createOrResetJob, receiveSegment, getJobView, markLostSegments, evaluate, finishRecording, skipFailed, retryJob, runTail };
+module.exports = { LocalQueue, __setQueueForTests, createOrResetJob, receiveSegment, getJobView, markLostSegments, evaluate, finishRecording, skipFailed, retryJob, runTail, __drainForTests };
