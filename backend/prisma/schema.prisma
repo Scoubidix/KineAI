@@ -1147,6 +1147,7 @@ enum RoadmapHorizon {
 }
 
 enum RoadmapStatut {
+  A_L_ETUDE
   PREVU
   EN_COURS
 

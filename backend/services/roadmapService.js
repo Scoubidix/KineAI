@@ -25,8 +25,8 @@ const IDEE_KINE_SELECT = { id: true, firstName: true, lastName: true, email: tru
 const IDEE_ITEM_SELECT = { id: true, titre: true };
 const IDEE_INCLUDE = { kine: { select: IDEE_KINE_SELECT }, item: { select: IDEE_ITEM_SELECT } };
 
-// Dans un groupe : ce qui est en cours d'abord, puis le prévu, puis par ancienneté
-const STATUT_RANK = { EN_COURS: 0, PREVU: 1 };
+// Dans un groupe : en cours d'abord, puis prévu, puis à l'étude, puis par ancienneté
+const STATUT_RANK = { EN_COURS: 0, PREVU: 1, A_L_ETUDE: 2 };
 
 function sortGroup(items) {
   return [...items].sort(
