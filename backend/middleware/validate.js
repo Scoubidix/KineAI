@@ -232,7 +232,7 @@ const updatePionnierMessageSchema = z.object({
 // ========== ROADMAP ==========
 
 const ROADMAP_HORIZONS = ['COURT_TERME', 'MOYEN_LONG_TERME'];
-const ROADMAP_STATUTS = ['PREVU', 'EN_COURS', 'LIVRE'];
+const ROADMAP_STATUTS = ['PREVU', 'EN_COURS'];
 const ROADMAP_IDEE_STATUTS = ['NOUVELLE', 'VUE', 'RETENUE', 'ECARTEE'];
 
 // Idée proposée par un kiné (POST /api/roadmap/idees)

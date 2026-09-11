@@ -1149,7 +1149,6 @@ enum RoadmapHorizon {
 enum RoadmapStatut {
   PREVU
   EN_COURS
-  LIVRE
 
   @@map("roadmap_statut")
 }

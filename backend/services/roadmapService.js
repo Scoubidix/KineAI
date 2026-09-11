@@ -36,18 +36,15 @@ function sortGroup(items) {
 
 /**
  * Découpe une liste de cards en sections pour la page kiné.
- * Une card livrée va toujours dans `livrees`, même si elle porte encore le flag objectif n°1.
+ * L'objectif principal est sorti des lanes ; le reste est réparti par horizon.
  */
 function groupItems(items) {
-  const livrees = items.filter((i) => i.statut === 'LIVRE');
-  const ouvertes = items.filter((i) => i.statut !== 'LIVRE');
-  const objectifPrincipal = ouvertes.find((i) => i.isObjectifPrincipal) || null;
-  const reste = ouvertes.filter((i) => i !== objectifPrincipal);
+  const objectifPrincipal = items.find((i) => i.isObjectifPrincipal) || null;
+  const reste = items.filter((i) => i !== objectifPrincipal);
   return {
     objectifPrincipal,
     courtTerme: sortGroup(reste.filter((i) => i.horizon === 'COURT_TERME')),
     moyenLongTerme: sortGroup(reste.filter((i) => i.horizon === 'MOYEN_LONG_TERME')),
-    livrees: [...livrees].sort((a, b) => b.createdAt - a.createdAt),
   };
 }
 
