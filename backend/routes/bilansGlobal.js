@@ -10,6 +10,7 @@ const { validate } = require('../middleware/validate');
 const { requireBilanEditor } = require('../middleware/authorization');
 const { SECTION_KEYS } = require('../services/bilanDocument');
 const { MODES } = require('../services/dictationCorrectionService');
+const { KINDS } = require('../services/bilanJobRules');
 
 // Routes globales (non scopées à un patient)
 router.get('/patients-with-bilans', authenticate, bilansGlobalController.getPatientsWithBilans);
@@ -68,6 +69,16 @@ router.post('/:id/dictation', authenticate, dictationLimiter, requireBilanEditor
 const correctDictationSchema = z.object({ text: z.string().max(20000), mode: z.enum(MODES) });
 // Passe de correction à la fin de la prise (spec correction §3) : rien n'est écrit, texte brut renvoyé sur échec
 router.post('/:id/dictation/correct', authenticate, dictationCorrectLimiter, requireBilanEditor, validate(correctDictationSchema), bilansGlobalController.correctDictation);
+
+// Traitement de dictée côté serveur (spec traitement serveur §4.2) : le navigateur envoie, le serveur enchaîne.
+const createJobSchema = z.object({ kind: z.enum(KINDS).optional() });
+const finishJobSchema = z.object({ segmentsTotal: z.number().int().min(0).max(500) });
+router.post('/:id/job', authenticate, crudWriteLimiter, requireBilanEditor, validate(createJobSchema), bilansGlobalController.createJob);
+router.post('/:id/job/segments', authenticate, dictationLimiter, requireBilanEditor, dictationAudio, bilansGlobalController.uploadJobSegment);
+router.post('/:id/job/finish', authenticate, crudWriteLimiter, requireBilanEditor, validate(finishJobSchema), bilansGlobalController.finishJob);
+router.get('/:id/job', authenticate, bilansGlobalController.getJob);
+router.post('/:id/job/skip-failed', authenticate, crudWriteLimiter, requireBilanEditor, bilansGlobalController.skipFailedSegments);
+router.post('/:id/job/retry', authenticate, crudWriteLimiter, requireBilanEditor, bilansGlobalController.retryJob);
 
 // Rendu HTML (tout plan : un kiné rétrogradé lit toujours ses bilans)
 router.get('/:id/render', authenticate, bilansGlobalController.renderBilan);

@@ -9,6 +9,7 @@ const extractionService = require('../services/bilanExtractionService');
 const composeService = require('../services/bilanComposeService');
 const asrService = require('../services/asrService');
 const dictationCorrectionService = require('../services/dictationCorrectionService');
+const jobService = require('../services/bilanJobService');
 
 /**
  * GET /api/bilans/patients-with-bilans
@@ -350,5 +351,91 @@ exports.correctDictation = async (req, res) => {
     }
   } catch (err) {
     sendDraftError(res, err, 'correction de la dictée');
+  }
+};
+
+/** POST /api/bilans/:id/job — crée (ou remet à zéro) le traitement de dictée du bilan */
+exports.createJob = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const job = await jobService.createOrResetJob({ kineId, bilanId, kind: req.body.kind || 'DICTATION' });
+    res.status(201).json({ success: true, job });
+  } catch (err) {
+    sendDraftError(res, err, 'création du traitement de dictée');
+  }
+};
+
+/** POST /api/bilans/:id/job/segments — un segment audio, transcrit en arrière-plan ; 202 tout de suite */
+exports.uploadJobSegment = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const { index, mimeType } = req.body || {};
+    const idx = Number(index);
+    if (!req.file || !req.file.buffer || req.file.buffer.length === 0 || !Number.isInteger(idx) || idx < 0) {
+      return res.status(400).json({ success: false, error: 'Segment invalide', code: 'INVALID_SEGMENT' });
+    }
+    const r = await jobService.receiveSegment({ kineId, bilanId, index: idx, buffer: req.file.buffer, mimeType: String(mimeType || req.file.mimetype || '') });
+    res.status(202).json({ success: true, index: r.index });
+  } catch (err) {
+    sendDraftError(res, err, 'réception d’un segment de dictée');
+  }
+};
+
+/** POST /api/bilans/:id/job/finish — « Générer le bilan » */
+exports.finishJob = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    const job = await jobService.finishRecording({ kineId, bilanId, segmentsTotal: req.body.segmentsTotal });
+    res.json({ success: true, job });
+  } catch (err) {
+    sendDraftError(res, err, 'fin d’enregistrement de la dictée');
+  }
+};
+
+/** GET /api/bilans/:id/job — avancement */
+exports.getJob = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    res.json({ success: true, job: await jobService.getJobView({ kineId, bilanId }) });
+  } catch (err) {
+    sendDraftError(res, err, 'lecture du traitement de dictée');
+  }
+};
+
+/** POST /api/bilans/:id/job/skip-failed — « Continuer sans ces passages » */
+exports.skipFailedSegments = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    res.json({ success: true, job: await jobService.skipFailed({ kineId, bilanId }) });
+  } catch (err) {
+    sendDraftError(res, err, 'passages ignorés de la dictée');
+  }
+};
+
+/** POST /api/bilans/:id/job/retry — « Réessayer » après un échec de la queue */
+exports.retryJob = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    res.json({ success: true, job: await jobService.retryJob({ kineId, bilanId }) });
+  } catch (err) {
+    sendDraftError(res, err, 'reprise du traitement de dictée');
   }
 };

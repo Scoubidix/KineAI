@@ -4,6 +4,7 @@ const prismaService = require('./prismaService');
 const logger = require('../utils/logger');
 const { emptyDocument, validateDocument, isDocumentEmpty } = require('./bilanDocument');
 const { getCatalog } = require('./bilanRenderService');
+const { computeProgress } = require('./bilanJobRules');
 
 const BILAN_TYPES = ['INITIAL', 'INTERMEDIAIRE', 'FINAL'];
 const DRAFT_STATUSES = ['BROUILLON', 'GENERE'];
@@ -47,6 +48,9 @@ async function createDraft({ kineId, type = 'INITIAL', patientId = null, motif =
 }
 
 function toListItem(b) {
+  const job = b.job
+    ? { status: b.job.status, progress: computeProgress(b.job.status, b.job.segments.filter((s) => s.status === 'DONE' || s.status === 'SKIPPED').length, b.job.segmentsTotal) }
+    : null;
   return {
     id: b.id,
     status: b.status,
@@ -55,6 +59,7 @@ function toListItem(b) {
     updatedAt: b.updatedAt,
     createdAt: b.createdAt,
     patient: b.patient ? { id: b.patient.id, firstName: b.patient.firstName, lastName: b.patient.lastName } : null,
+    job,
   };
 }
 
@@ -64,7 +69,7 @@ async function listMyBilans({ kineId, statuses = DRAFT_STATUSES, limit = 20 }) {
     where: { kineId, isActive: true, status: { in: statuses } },
     orderBy: { updatedAt: 'desc' },
     take: limit,
-    include: { patient: { select: PATIENT_SELECT } },
+    include: { patient: { select: PATIENT_SELECT }, job: { select: { status: true, segmentsTotal: true, segments: { select: { status: true } } } } },
   });
   return rows.map(toListItem);
 }
