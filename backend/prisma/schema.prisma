@@ -45,11 +45,11 @@ model Kine {
   subscriptionStatus    SubscriptionStatus? // Statut de l'abonnement
   subscriptionStartDate DateTime? // Date début abonnement
   subscriptionEndDate   DateTime? // Date fin abonnement
-  billingCycle          String?   @default("monthly") // Cycle de facturation : "monthly" | "yearly"
+  billingCycle          String?             @default("monthly") // Cycle de facturation : "monthly" | "yearly"
   trialEndDate          DateTime? // Date fin période d'essai (si applicable)
   trialBilanMailSentAt  DateTime? // Essai : date d'envoi du mail "1er bilan" (idempotence)
   trialRecapMailSentAt  DateTime? // Essai : date d'envoi du mail récap de fin (idempotence)
-  hasHadTrial           Boolean   @default(false)
+  hasHadTrial           Boolean             @default(false)
   // ===============================================
 
   // ========== PARRAINAGE ==========
@@ -63,6 +63,7 @@ model Kine {
   exerciceTemplates ExerciceTemplate[]
   notifications     Notification[]
   nouveauteVues     NouveauteVue[]
+  roadmapIdees      RoadmapIdee[]
 
   // ========== GROUPE PIONNIERS ==========
   pionnierMessages PionnierMessage[]
@@ -129,8 +130,8 @@ model Patient {
   firstName String
   lastName  String
   birthDate DateTime
-  phone     String?  // Optionnel : sert uniquement au canal WhatsApp (email par défaut)
-  email     String?  // Optionnel : le kiné peut créer un patient sans email
+  phone     String? // Optionnel : sert uniquement au canal WhatsApp (email par défaut)
+  email     String? // Optionnel : le kiné peut créer un patient sans email
   goals     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -417,7 +418,7 @@ model Nouveaute {
   id          Int                @id @default(autoincrement())
   titre       String
   description String
-  imagePaths  String[] @default([]) // Chemins GCS (dossier nouveautes/) — carrousel, pas les URLs signées
+  imagePaths  String[]           @default([]) // Chemins GCS (dossier nouveautes/) — carrousel, pas les URLs signées
   categorie   NouveauteCategorie @default(NOUVEAUTE)
   ctaLabel    String? // Libellé du bouton (optionnel)
   ctaHref     String? // Lien du bouton (optionnel)
@@ -679,7 +680,7 @@ model SupportTicket {
 model TicketMessage {
   id        Int      @id @default(autoincrement())
   body      String   @db.Text
-  imagePath String?  // Chemin GCS de la piece jointe (dossier support/), supprime a la resolution du ticket
+  imagePath String? // Chemin GCS de la piece jointe (dossier support/), supprime a la resolution du ticket
   isAdmin   Boolean  @default(false)
   createdAt DateTime @default(now())
 
@@ -1134,4 +1135,63 @@ model PionnierRead {
   updatedAt         DateTime @updatedAt
 
   @@map("pionnier_reads")
+}
+
+// ========== ROADMAP (cards publiques + boîte à idées) ==========
+
+enum RoadmapHorizon {
+  COURT_TERME
+  MOYEN_LONG_TERME
+
+  @@map("roadmap_horizon")
+}
+
+enum RoadmapStatut {
+  PREVU
+  EN_COURS
+  LIVRE
+
+  @@map("roadmap_statut")
+}
+
+enum RoadmapIdeeStatut {
+  NOUVELLE
+  VUE
+  RETENUE
+  ECARTEE
+
+  @@map("roadmap_idee_statut")
+}
+
+/// Card de la roadmap publique, rédigée depuis l'admin. Contenu éditorial : hard delete accepté.
+model RoadmapItem {
+  id                  Int            @id @default(autoincrement())
+  titre               String
+  description         String         @db.Text
+  horizon             RoadmapHorizon
+  statut              RoadmapStatut  @default(PREVU)
+  isObjectifPrincipal Boolean        @default(false) // une seule card à true, garanti par roadmapService
+  isActive            Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@index([isActive, horizon])
+  @@map("roadmap_items")
+}
+
+/// Idée proposée par un kiné. Privée : visible uniquement dans l'admin.
+model RoadmapIdee {
+  id          Int               @id @default(autoincrement())
+  titre       String
+  description String            @db.Text
+  statut      RoadmapIdeeStatut @default(NOUVELLE)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  kineId Int
+  kine   Kine @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
+  @@index([statut, createdAt])
+  @@index([kineId])
+  @@map("roadmap_idees")
 }
