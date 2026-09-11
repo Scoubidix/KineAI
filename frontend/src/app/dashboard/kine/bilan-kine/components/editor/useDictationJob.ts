@@ -1,0 +1,275 @@
+'use client';
+// Flux « Dicter → Bilan » (plan 7b) : le recorder coupe des segments, chacun est envoyé au serveur
+// sans attendre la transcription ; « Générer » clôt l'enregistrement, puis on sonde l'avancement.
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ApiError, createJob, finishJob, getDictationStatus, getJob, retryJob as apiRetryJob, skipFailedSegments, uploadJobSegment } from '@/utils/bilanApi';
+import type { BilanJobView } from '@/types/bilan';
+import { DictationRecorder, pickMimeType } from './dictationRecorder';
+import { decodeToMono16k, encodeWav, sliceAtSilences, TARGET_RATE } from './audioSlicer';
+import { displayProgress, isProcessing } from './dictationJobProgress';
+
+export const MAX_TAKE_MS = 10 * 60 * 1000;
+const MAX_UPLOAD_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 2_000;
+const POLL_MS = 2_000;
+const TICK_MS = 250;
+
+export type JobPhase = 'idle' | 'recording' | 'stopped' | 'processing' | 'done' | 'failed';
+export type ImportResult = 'ok' | 'busy' | 'unavailable' | 'invalid' | 'too_long';
+
+export interface DictationJobState {
+  available: boolean;        // worker configuré et prêt
+  supported: boolean;        // MediaRecorder + format audio disponibles
+  phase: JobPhase;
+  starting: boolean;         // start() en cours (avant que le micro soit acquis)
+  elapsedMs: number;         // chrono de la prise en cours
+  totalMs: number;           // durée cumulée des prises (affichée après Stop)
+  level: number;             // 0..1 vumètre
+  permissionDenied: boolean;
+  importing: boolean;
+  segmentsSent: number;      // segments acquittés par le serveur (202)
+  uploading: number;         // envois en cours
+  uploadFailed: number;      // envois en échec définitif (blobs gardés en mémoire pour « Réessayer l'envoi »)
+  interrupted: boolean;      // traitement RECORDING retrouvé après rechargement : la prise avait été coupée
+  generating: boolean;       // « Générer » en cours d'appel
+  job: BilanJobView | null;
+  progress: number;          // 0..1 affiché, jamais décroissant
+}
+
+export interface UseDictationJobArgs {
+  bilanId: number;
+  initialJob: BilanJobView | null;
+  enabled: boolean;
+  onAutoStop?: () => void;
+}
+
+interface PendingUpload { blob: Blob; mimeType: string }
+
+const phaseOf = (job: BilanJobView | null, recording: boolean, hasSegments: boolean): JobPhase => {
+  if (recording) return 'recording';
+  if (!job) return hasSegments ? 'stopped' : 'idle';
+  if (job.status === 'RECORDING') return hasSegments ? 'stopped' : 'idle';
+  if (isProcessing(job.status)) return 'processing';
+  return job.status === 'DONE' ? 'done' : 'failed';
+};
+
+export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: UseDictationJobArgs) {
+  const [state, setState] = useState<DictationJobState>({
+    available: false, supported: true, phase: phaseOf(initialJob, false, (initialJob?.nextIndex ?? 0) > 0), starting: false, elapsedMs: 0, totalMs: 0, level: 0,
+    permissionDenied: false, importing: false, segmentsSent: initialJob?.nextIndex ?? 0, uploading: 0, uploadFailed: 0,
+    interrupted: initialJob?.status === 'RECORDING' && (initialJob.nextIndex ?? 0) > 0, generating: false, job: initialJob, progress: initialJob?.progress ?? 0,
+  });
+  const patch = useCallback((p: Partial<DictationJobState>) => setState((s) => ({ ...s, ...p })), []);
+
+  const jobRef = useRef<BilanJobView | null>(initialJob);
+  const nextIndexRef = useRef(initialJob?.nextIndex ?? 0);
+  const recorderRef = useRef<DictationRecorder | null>(null);
+  const startingRef = useRef(false);
+  const availableRef = useRef(false);
+  const uploadingRef = useRef(0);
+  const sentRef = useRef(initialJob?.nextIndex ?? 0);
+  const failedRef = useRef(new Map<number, PendingUpload>());
+  const takeStartMsRef = useRef(0);
+  const stageRef = useRef<{ status: string | null; startedAt: number }>({ status: initialJob?.status ?? null, startedAt: Date.now() });
+  const onAutoStopRef = useRef(onAutoStop);
+  onAutoStopRef.current = onAutoStop;
+
+  const setJob = useCallback((job: BilanJobView | null) => {
+    jobRef.current = job;
+    if (job) {
+      nextIndexRef.current = Math.max(nextIndexRef.current, job.nextIndex);
+      if (stageRef.current.status !== job.status) stageRef.current = { status: job.status, startedAt: Date.now() };
+    }
+    patch({ job, phase: phaseOf(job, recorderRef.current !== null, nextIndexRef.current > 0) });
+  }, [patch]);
+
+  const refreshUploads = useCallback(() => {
+    patch({ uploading: uploadingRef.current, uploadFailed: failedRef.current.size, segmentsSent: sentRef.current, phase: phaseOf(jobRef.current, recorderRef.current !== null, nextIndexRef.current > 0) });
+  }, [patch]);
+
+  // Disponibilité du worker (cache serveur 30 s) : au montage puis toutes les 30 s tant qu'indisponible
+  const refreshAvailability = useCallback(async () => {
+    const ok = await getDictationStatus().catch(() => false);
+    availableRef.current = ok;
+    patch({ available: ok });
+    return ok;
+  }, [patch]);
+  useEffect(() => { patch({ supported: pickMimeType() !== null }); }, [patch]);
+  useEffect(() => { void refreshAvailability(); }, [refreshAvailability]);
+  useEffect(() => {
+    if (state.available) return;
+    const timer = setInterval(() => { void refreshAvailability(); }, 30_000);
+    return () => clearInterval(timer);
+  }, [state.available, refreshAvailability]);
+
+  // Le traitement est créé au premier segment (Dicter ou import), pas à l'ouverture de l'écran
+  const ensureJob = useCallback(async () => {
+    if (jobRef.current && jobRef.current.status === 'RECORDING') return jobRef.current;
+    const job = await createJob(bilanId);
+    nextIndexRef.current = job.nextIndex;
+    sentRef.current = 0;
+    failedRef.current = new Map();
+    setJob(job);
+    return job;
+  }, [bilanId, setJob]);
+
+  const uploadSegment = useCallback(async (index: number, upload: PendingUpload) => {
+    uploadingRef.current += 1;
+    refreshUploads();
+    let attempt = 0;
+    for (;;) {
+      attempt += 1;
+      try {
+        await uploadJobSegment(bilanId, { blob: upload.blob, index, mimeType: upload.mimeType });
+        sentRef.current += 1;
+        break;
+      } catch (e) {
+        const api = e instanceof ApiError ? e : null;
+        const retryable = !api || api.status === 502 || api.status === 503 || api.status === 429;
+        if (retryable && attempt < MAX_UPLOAD_ATTEMPTS) { await new Promise((r) => setTimeout(r, api?.retryAfterMs ?? RETRY_DELAY_MS)); continue; }
+        failedRef.current.set(index, upload);
+        break;
+      }
+    }
+    uploadingRef.current -= 1;
+    refreshUploads();
+  }, [bilanId, refreshUploads]);
+
+  const stop = useCallback(() => {
+    const rec = recorderRef.current;
+    recorderRef.current = null;
+    if (rec) rec.stop();
+    patch({ level: 0 });
+    refreshUploads();
+  }, [patch, refreshUploads]);
+
+  /** Nouvelle prise (« Dicter », « Dicter la suite ») : les indices continuent après ceux déjà envoyés. */
+  const start = useCallback(async () => {
+    if (!enabled || startingRef.current || recorderRef.current) return;
+    if (!availableRef.current && !(await refreshAvailability())) return;
+    const mimeType = pickMimeType();
+    if (!mimeType) { patch({ supported: false }); return; }
+    startingRef.current = true;
+    patch({ starting: true });
+    try {
+      await ensureJob();
+    } catch {
+      startingRef.current = false;
+      patch({ starting: false });
+      return;
+    }
+    const base = nextIndexRef.current;
+    const rec = new DictationRecorder(mimeType, {
+      onSegment: (blob, index) => { nextIndexRef.current = Math.max(nextIndexRef.current, base + index + 1); void uploadSegment(base + index, { blob, mimeType }); },
+      onLevel: (level) => patch({ level }),
+      onTick: (elapsedMs) => {
+        patch({ elapsedMs, totalMs: takeStartMsRef.current + elapsedMs });
+        if (elapsedMs >= MAX_TAKE_MS) { stop(); onAutoStopRef.current?.(); }
+      },
+      onStopped: () => { refreshUploads(); },
+    });
+    try {
+      await rec.start();
+    } catch (e) {
+      const denied = e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'SecurityError' || e.name === 'NotFoundError' || e.name === 'NotReadableError');
+      patch(denied ? { permissionDenied: true, starting: false } : { supported: false, starting: false });
+      startingRef.current = false;
+      return;
+    }
+    recorderRef.current = rec;
+    startingRef.current = false;
+    takeStartMsRef.current = state.totalMs;
+    patch({ starting: false, elapsedMs: 0, permissionDenied: false, interrupted: false, phase: 'recording' });
+  }, [enabled, refreshAvailability, ensureJob, uploadSegment, stop, patch, state.totalMs]);
+
+  /** Fichier audio (mémo vocal, test sans micro) : découpé aux silences, envoyé comme une prise. */
+  const importingRef = useRef(false);
+  const importFile = useCallback(async (file: Blob): Promise<ImportResult> => {
+    if (!enabled || startingRef.current || recorderRef.current || importingRef.current) return 'busy';
+    if (!availableRef.current && !(await refreshAvailability())) return 'unavailable';
+    importingRef.current = true;
+    patch({ importing: true });
+    try {
+      let pcm: Float32Array;
+      try { pcm = await decodeToMono16k(file); } catch { return 'invalid'; }
+      if (pcm.length < TARGET_RATE) return 'invalid';
+      if (pcm.length > (MAX_TAKE_MS / 1000) * TARGET_RATE) return 'too_long';
+      await ensureJob();
+      const base = nextIndexRef.current;
+      const slices = sliceAtSilences(pcm);
+      nextIndexRef.current = base + slices.length;
+      patch({ totalMs: state.totalMs + Math.round((pcm.length / TARGET_RATE) * 1000), interrupted: false });
+      slices.forEach((slice, i) => { void uploadSegment(base + i, { blob: encodeWav(slice), mimeType: 'audio/wav' }); });
+      refreshUploads();
+      return 'ok';
+    } catch {
+      return 'unavailable';
+    } finally {
+      importingRef.current = false;
+      patch({ importing: false });
+    }
+  }, [enabled, refreshAvailability, ensureJob, uploadSegment, refreshUploads, patch, state.totalMs]);
+
+  const retryUploads = useCallback(() => {
+    const items = [...failedRef.current.entries()];
+    failedRef.current = new Map();
+    for (const [index, upload] of items) void uploadSegment(index, upload);
+  }, [uploadSegment]);
+
+  /** « Générer le bilan » : tous les envois acquittés, au moins un segment. */
+  const generate = useCallback(async () => {
+    if (recorderRef.current || uploadingRef.current > 0 || failedRef.current.size > 0 || nextIndexRef.current === 0) return;
+    patch({ generating: true });
+    try {
+      setJob(await finishJob(bilanId, nextIndexRef.current));
+    } catch (e) {
+      // 409 : déjà généré ailleurs → on relit l'état ; autre erreur : on reste sur l'écran, le kiné recliquera
+      if (e instanceof ApiError && e.status === 409) { try { setJob(await getJob(bilanId)); } catch { /* l'écran reste tel quel */ } }
+    } finally {
+      patch({ generating: false });
+    }
+  }, [bilanId, patch, setJob]);
+
+  const skipFailed = useCallback(async () => { try { setJob(await skipFailedSegments(bilanId)); } catch { /* le sondage rattrapera */ } }, [bilanId, setJob]);
+  const retryJob = useCallback(async () => { try { setJob(await apiRetryJob(bilanId)); } catch { /* idem */ } }, [bilanId, setJob]);
+  /** « Dicter à nouveau » après « Rien n'a été entendu » : traitement remis à zéro au prochain segment. */
+  const restart = useCallback(() => {
+    jobRef.current = null; nextIndexRef.current = 0; sentRef.current = 0; failedRef.current = new Map();
+    patch({ job: null, phase: 'idle', segmentsSent: 0, uploadFailed: 0, uploading: 0, totalMs: 0, progress: 0, interrupted: false });
+  }, [patch]);
+
+  // Sondage pendant le traitement
+  const processing = state.job !== null && isProcessing(state.job.status);
+  useEffect(() => {
+    if (!processing) return;
+    let cancelled = false;
+    const tick = async () => {
+      try { const j = await getJob(bilanId); if (!cancelled) setJob(j); } catch { /* réseau : on réessaie au tick suivant */ }
+    };
+    const timer = setInterval(() => { void tick(); }, POLL_MS);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [processing, bilanId, setJob]);
+
+  // Barre : recalculée 4 fois par seconde (les étapes estimées avancent dans le temps)
+  useEffect(() => {
+    if (!processing && state.job?.status !== 'DONE') return;
+    const timer = setInterval(() => {
+      setState((s) => { const p = displayProgress(s.job, stageRef.current.startedAt, Date.now(), s.progress); return p === s.progress ? s : { ...s, progress: p }; });
+    }, TICK_MS);
+    return () => clearInterval(timer);
+  }, [processing, state.job?.status]);
+
+  // Fermer l'onglet pendant un enregistrement ou un envoi perdrait de l'audio : confirmation native
+  const busy = state.phase === 'recording' || state.uploading > 0;
+  useEffect(() => {
+    if (!busy) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [busy]);
+
+  useEffect(() => { if (!enabled && recorderRef.current) stop(); }, [enabled, stop]);
+  useEffect(() => () => { recorderRef.current?.stop(); }, []);
+
+  return { state, start, stop, generate, importFile, retryUploads, skipFailed, retryJob, restart };
+}
