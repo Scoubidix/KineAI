@@ -205,7 +205,8 @@ async function correct({ text, mode, catalog, pseudo }) {
   const r = applyOps(masked, ops, mode);
   const tokenCount = pseudo ? Object.values(pseudo.stats()).reduce((a, b) => a + b, 0) : 0;
   logger.info(`Correction dictée (${mode}) : ${r.applied} appliquée(s), ${r.ignored} ignorée(s), ${tokenCount} jeton(s)`);
-  return { ...r, text: pseudo ? pseudo.unmask(r.text) : r.text };
+  // Le texte corrigé rejoint les notes du kiné (pas un document rendu) : réhydratation verbatim, telle que saisie
+  return { ...r, text: pseudo ? pseudo.unmaskDeep(r.text) : r.text };
 }
 
 module.exports = {
