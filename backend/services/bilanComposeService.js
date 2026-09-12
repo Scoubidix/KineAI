@@ -25,9 +25,9 @@ const DIALOGUE_GUIDE = `L'entrée est la transcription d'un dialogue entre le ki
 const { STYLE_PRINCIPLES, STYLE_EXAMPLES } = require('../data/bilanStyleExamples');
 
 const SECTION_GUIDE = {
-  anamnese: 'commence exactement par « [Prénom] [NOM], [âge] ans, » puis le métier s\'il est connu, puis « consulte pour » le motif de consultation avec les détails disponibles (ancienneté, circonstances d\'apparition, mécanisme). Ensuite ce que les notes disent du patient : activités, sport, loisirs, contexte de travail. Puis l\'histoire de la plainte et les attentes du patient. Recopie les jetons entre crochets tels quels, n\'écris jamais un nom.',
+  anamnese: 'commence exactement par « [Prénom] [NOM], [âge] ans, » puis le métier s’il est connu, puis « consulte pour » le motif. Ensuite, et seulement : l’ancienneté et les circonstances d’apparition, le mécanisme, l’évolution depuis le début (traitements essayés, ce qui soulage ou aggrave), le retentissement tel que le patient l’exprime, en une phrase, et ses attentes. Le contexte du patient (activités, sport, travail) quand les notes le donnent. Rien de ce que le kiné a constaté ou mesuré lui-même : aucun signe d’examen, aucun test, aucune valeur — cela appartient à l’examen clinique. Recopie les jetons entre crochets tels quels, n’écris jamais un nom.',
   antecedents: 'antécédents et traitements réellement rapportés, en une phrase',
-  examen: 'synthèse interprétative : ce que les signes et les tests, nommés sans leurs valeurs, suggèrent ensemble (observation, palpation, qualité du mouvement, tests positifs ou négatifs qui orientent)',
+  examen: 'ce que le kiné a constaté et mesuré lui-même le jour du bilan, et cela seulement : observation, palpation, qualité du mouvement, tests positifs ou négatifs qui orientent. C’est ici, et nulle part ailleurs, que les signes actuels sont décrits. Synthèse interprétative : ce que les signes et les tests, nommés sans leurs valeurs, suggèrent ensemble.',
   limitations: 'uniquement les limitations d\'activité et restrictions de participation rapportées dans les notes ; sinon chaîne vide',
   diagnostic: 'hypothèse kinésithérapique : déficiences, limitations, restrictions, deux ou trois dominantes, pronostic prudent',
   objectifs: 'uniquement les objectifs formulés dans les notes ou par le patient, à court, moyen et long terme ; sinon chaîne vide',
@@ -41,6 +41,7 @@ Règles absolues :
 - Si les notes ne contiennent rien pour une section, renvoie une chaîne vide "" pour cette section. Si elles ne contiennent que des mesures, une phrase de synthèse suffit.
 - Pas de titre, pas de puces, pas de retour à la ligne superflu.
 - Les mesures listées comme « déjà présentées en tableau » ne doivent pas être chiffrées dans le texte ; un test peut être nommé quand il sert le raisonnement.
+- Chaque information n’est écrite qu’une seule fois, dans la section à laquelle elle appartient. Ne reprends pas dans une section ce qu’une autre porte déjà. Seul le diagnostic kinésithérapique peut relier des éléments déjà écrits ailleurs, sans les redécrire.
 - Les jetons entre crochets ([NOM], [Tiers 1], [Date de naissance]…) désignent des personnes ou des données masquées : recopie-les tels quels, ne les remplace jamais, n'essaie pas de deviner ce qu'ils cachent.
 - Exception : les jetons d'identité [Prénom], [NOM] et [âge] de la première phrase de l'anamnèse ne sont pas des informations à retrouver dans les notes : ce sont un gabarit obligatoire. Écris-les toujours, dans cet ordre, même si les notes ne nomment personne, même si elles portent un autre nom.
 Style attendu :
