@@ -48,6 +48,11 @@ const GENERATION_CONFIG = {
     openai: { model: 'gpt-4.1-mini', max_tokens: 1500, temperature: 0, presence_penalty: 0, frequency_penalty: 0 },
     mistral: { model: MISTRAL_MODEL, max_tokens: 1500, temperature: 0, presence_penalty: 0, frequency_penalty: 0 },
   },
+  // Compte rendu de séance (plan 8b) : sept sections JSON à partir d'un dialogue, température 0
+  bilan_session_report: {
+    openai: { model: 'gpt-4.1-mini', max_tokens: 3000, temperature: 0, presence_penalty: 0, frequency_penalty: 0 },
+    mistral: { model: MISTRAL_MODEL, max_tokens: 3000, temperature: 0, presence_penalty: 0, frequency_penalty: 0 },
+  },
   default: {
     openai: { model: 'gpt-4o-mini', max_tokens: 1000, temperature: 0.7 },
     mistral: { model: MISTRAL_MODEL, max_tokens: 1000, temperature: 0.7 },
@@ -83,7 +88,7 @@ function resolveConfig(iaType, provider) {
 /**
  * Génère une complétion de chat via le provider de génération actif.
  * @param {Object} p
- * @param {string} p.iaType - clé de GENERATION_CONFIG (basique, biblio, clinique, admin, followup, admin_message, bilan_extract, bilan_compose, bilan_dictation_correct)
+ * @param {string} p.iaType - clé de GENERATION_CONFIG (basique, biblio, clinique, admin, followup, admin_message, bilan_extract, bilan_compose, bilan_dictation_correct, bilan_session_report)
  * @param {Array} p.messages - messages OpenAI-style ({role, content})
  * @param {boolean} [p.stream=false] - active le streaming
  * @param {Function} [p.onToken] - callback(delta) appelé par token en mode streaming

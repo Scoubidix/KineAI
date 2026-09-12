@@ -309,6 +309,7 @@ async function composeFromNotesForBilan({ kineId, bilanId, uid }) {
 }
 
 module.exports = {
+  SECTION_GUIDE,
   formatNarrativeMeasurements,
   tableMeasurementSummary,
   buildComposeMessages,
