@@ -362,7 +362,7 @@ exports.createJob = async (req, res) => {
     if (bilanId === null) return;
     const kineId = await getKineId(req, res);
     if (!kineId) return;
-    const job = await jobService.createOrResetJob({ kineId, bilanId, kind: req.body.kind || 'DICTATION' });
+    const job = await jobService.createOrResetJob({ kineId, bilanId, kind: req.body.kind || 'DICTATION', consent: req.body.consent === true });
     res.status(201).json({ success: true, job });
   } catch (err) {
     sendDraftError(res, err, 'création du traitement de dictée');

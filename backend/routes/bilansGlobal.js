@@ -71,7 +71,7 @@ const correctDictationSchema = z.object({ text: z.string().max(20000), mode: z.e
 router.post('/:id/dictation/correct', authenticate, dictationCorrectLimiter, requireBilanEditor, validate(correctDictationSchema), bilansGlobalController.correctDictation);
 
 // Traitement de dictée côté serveur (spec traitement serveur §4.2) : le navigateur envoie, le serveur enchaîne.
-const createJobSchema = z.object({ kind: z.enum(KINDS).optional() });
+const createJobSchema = z.object({ kind: z.enum(KINDS).optional(), consent: z.boolean().optional() });
 const finishJobSchema = z.object({ segmentsTotal: z.number().int().min(0).max(MAX_SEGMENTS) });
 router.post('/:id/job', authenticate, crudWriteLimiter, requireBilanEditor, validate(createJobSchema), bilansGlobalController.createJob);
 router.post('/:id/job/segments', authenticate, dictationLimiter, requireBilanEditor, dictationAudio, bilansGlobalController.uploadJobSegment);

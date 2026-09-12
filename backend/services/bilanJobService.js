@@ -10,6 +10,7 @@ const composeService = require('./bilanComposeService');
 const { getCatalog } = require('./bilanRenderService');
 const { DraftError } = require('./bilanDraftService');
 const rules = require('./bilanJobRules');
+const sessionReportService = require('./sessionReportService');
 
 const CONCURRENCY = Number(process.env.DICTATION_JOB_CONCURRENCY) || 2;
 // Un QUEUED sans mise à jour depuis ce délai n'a plus d'audio nulle part (instance arrêtée) : perdu.
@@ -60,8 +61,11 @@ async function loadOwnedJob(prisma, kineId, bilanId) {
 }
 
 /** Crée le traitement du bilan, le renvoie s'il enregistre encore, le remet à zéro s'il est terminé. */
-async function createOrResetJob({ kineId, bilanId, kind = 'DICTATION' }) {
+async function createOrResetJob({ kineId, bilanId, kind = 'DICTATION', consent = false }) {
   if (!rules.KINDS.includes(kind)) throw new DraftError('INVALID_KIND', 400, 'Type de traitement invalide');
+  // Une séance enregistre le patient : le consentement est une condition d'entrée, pas une option
+  if (kind === 'SESSION' && consent !== true) throw new DraftError('CONSENT_REQUIRED', 400, 'Confirme avoir informé le patient avant d’enregistrer la séance');
+  const consentAt = kind === 'SESSION' ? new Date() : null;
   const prisma = prismaService.getInstance();
   await loadOwnedBilan(prisma, kineId, bilanId);
   let existing = await prisma.bilanJob.findUnique({ where: { bilanId } });
@@ -71,7 +75,7 @@ async function createOrResetJob({ kineId, bilanId, kind = 'DICTATION' }) {
   let job;
   let segments = [];
   if (!existing) {
-    job = await prisma.bilanJob.create({ data: { bilanId, kineId, kind, status: 'RECORDING' } });
+    job = await prisma.bilanJob.create({ data: { bilanId, kineId, kind, status: 'RECORDING', consentAt } });
     logger.info(`Traitement dictée ${job.id} créé (bilan ${bilanId}, ${kind})`);
   } else if (existing.status === 'RECORDING') {
     job = existing;
@@ -79,7 +83,7 @@ async function createOrResetJob({ kineId, bilanId, kind = 'DICTATION' }) {
     segments = await prisma.bilanJobSegment.findMany({ where: { jobId: job.id }, select: { index: true, status: true } });
   } else {
     await prisma.bilanJobSegment.deleteMany({ where: { jobId: existing.id } });
-    job = await prisma.bilanJob.update({ where: { id: existing.id }, data: { status: 'RECORDING', kind, segmentsTotal: null, error: null, errorDetail: null, result: null, finishedAt: null } });
+    job = await prisma.bilanJob.update({ where: { id: existing.id }, data: { status: 'RECORDING', kind, segmentsTotal: null, error: null, errorDetail: null, result: null, finishedAt: null, consentAt } });
     logger.info(`Traitement dictée ${job.id} remis à zéro (bilan ${bilanId})`);
   }
   return rules.toView(job, segments);
@@ -184,7 +188,7 @@ const __drainForTests = () => Promise.all([...inFlight]);
 /** Un processus arrêté en pleine queue laisserait le traitement coincé ; passé ce délai il est déclaré
  * perdu et « Réessayer » reprend à la bonne étape. */
 async function markStaleTail(job) {
-  if ((job.status !== 'CORRECTING' && job.status !== 'COMPOSING') || job.updatedAt >= new Date(Date.now() - TAIL_TIMEOUT_MS)) return false;
+  if (!['CORRECTING', 'REPORTING', 'COMPOSING'].includes(job.status) || job.updatedAt >= new Date(Date.now() - TAIL_TIMEOUT_MS)) return false;
   const prisma = prismaService.getInstance();
   await prisma.bilanJob.updateMany({ where: { id: job.id, status: job.status }, data: { status: 'FAILED', error: 'TAIL_LOST', errorDetail: null } });
   logger.warn(`Traitement dictée ${job.id} : queue périmée, déclarée perdue`);
@@ -208,7 +212,7 @@ async function finishRecording({ kineId, bilanId, segmentsTotal }) {
   return getJobView({ kineId, bilanId });
 }
 
-const JOB_INCLUDE = { segments: true, kine: { select: { uid: true } }, bilan: { select: { rawNotes: true, status: true } } };
+const JOB_INCLUDE = { segments: true, kine: { select: { uid: true } }, bilan: { select: { rawNotes: true, status: true, motif: true, type: true } } };
 
 /** Si la transcription est complète, tente la transition atomique TRANSCRIBING → CORRECTING et lance la queue. */
 async function evaluate(jobId) {
@@ -241,12 +245,24 @@ async function runTail(jobId, stage) {
       if (!raw) throw new DraftError('NOTES_REQUIRED', 400, 'Rien n’a été entendu');
       const catalog = await getCatalog();
       const { text, applied, ignored } = await dictationCorrectionService.correct({ text: raw, mode: job.kind === 'SESSION' ? 'session' : 'dictation', catalog });
-      // La transition sert de verrou : une queue qui a perdu la main n'ajoute pas la dictée une 2e fois.
+      let notesText = text;
+      let fromStatus = 'CORRECTING';
+      if (job.kind === 'SESSION') {
+        // Séance : le dialogue corrigé devient un compte rendu ; la transition sert de verrou comme ailleurs
+        const toReporting = await prisma.bilanJob.updateMany({ where: { id: jobId, status: 'CORRECTING' }, data: { status: 'REPORTING' } });
+        if (toReporting.count !== 1) throw new TailLost();
+        const rep = await sessionReportService.report({ transcript: text, motif: job.bilan.motif ?? null, type: job.bilan.type, catalog });
+        const filled = Object.values(rep.sections || {}).filter(Boolean).length;
+        logger.info(`Traitement dictée ${jobId} : séance, compte rendu (${filled} section(s) remplie(s), ${rep.dropped.length} vidée(s))`);
+        notesText = rep.notes;
+        fromStatus = 'REPORTING';
+      }
+      // La transition sert de verrou : une queue qui a perdu la main n'ajoute pas les notes une 2e fois.
       // Les trois écritures (statut, notes, segments) réussissent ou échouent ensemble.
       await prisma.$transaction(async (tx) => {
-        const r = await tx.bilanJob.updateMany({ where: { id: jobId, status: 'CORRECTING' }, data: { status: 'COMPOSING' } });
+        const r = await tx.bilanJob.updateMany({ where: { id: jobId, status: fromStatus }, data: { status: 'COMPOSING' } });
         if (r.count !== 1) throw new TailLost();
-        await tx.bilanKine.update({ where: { id: job.bilanId }, data: { rawNotes: rules.appendNotes(job.bilan.rawNotes, text) } });
+        await tx.bilanKine.update({ where: { id: job.bilanId }, data: { rawNotes: rules.appendNotes(job.bilan.rawNotes, notesText) } });
         // Le texte vit désormais dans les notes : les copies par segment n'ont plus de raison d'être
         await tx.bilanJobSegment.updateMany({ where: { jobId }, data: { text: null } });
       });
@@ -271,7 +287,7 @@ async function runTail(jobId, stage) {
     const detail = isDraft && err.extra && Object.keys(err.extra).length > 0 ? err.extra : null;
     if (isDraft) logger.warn(`Traitement dictée ${jobId} : queue en échec (${code})`);
     else logger.error(`Traitement dictée ${jobId} : erreur inattendue dans la queue (${err?.name || 'Error'})`);
-    await prisma.bilanJob.updateMany({ where: { id: jobId, status: { in: ['CORRECTING', 'COMPOSING'] } }, data: { status: 'FAILED', error: code, errorDetail: detail } });
+    await prisma.bilanJob.updateMany({ where: { id: jobId, status: { in: ['CORRECTING', 'REPORTING', 'COMPOSING'] } }, data: { status: 'FAILED', error: code, errorDetail: detail } });
   }
 }
 
@@ -295,7 +311,8 @@ async function retryJob({ kineId, bilanId }) {
   const job = await prisma.bilanJob.findUnique({ where: { bilanId }, include: JOB_INCLUDE });
   if (!job || job.kineId !== kineId) throw new DraftError('JOB_NOT_FOUND', 404, 'Aucun traitement pour ce bilan');
   if (job.status !== 'FAILED') throw new DraftError('JOB_NOT_FAILED', 409, 'Ce traitement n’est pas en échec');
-  // « Rien n'a été entendu » : on reprend en CORRECTING pour réechouer aussitôt, sans rédiger sur les notes tapées
+  // « Rien n'a été entendu » ou REPORT_FAILED : les textes sont encore là, on reprend en CORRECTING
+  // pour réechouer aussitôt, sans rédiger sur les notes tapées
   const stage = job.error === 'NOTES_REQUIRED' || job.segments.some((s) => s.status === 'DONE' && s.text !== null) ? 'CORRECTING' : 'COMPOSING';
   // Concurrence : si une autre requête a déjà repris ce job, on ne relance pas une deuxième queue
   const r = await prisma.bilanJob.updateMany({ where: { id: job.id, status: job.status }, data: { status: stage, error: null, errorDetail: null } });
