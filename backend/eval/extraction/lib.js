@@ -1,6 +1,6 @@
 // Logique partagée des harnais d'évaluation de l'extraction (notes et dictées).
 const { extractFromText, normalizeText } = require('../../services/bilanExtractionService');
-const { fold } = require('../../services/pseudonymService');
+const { fold, dateForms } = require('../../services/pseudonymService');
 
 function parseExpect(s) {
   const [left, rawValue] = s.split('=');
@@ -87,16 +87,51 @@ function installLeakGuard(llmService, forbidden) {
   return { leaks, restore() { llmService.chatCompletion = original; } };
 }
 
+// Nombre en toutes lettres (0 à 9999) : une date de naissance dictée l'est presque toujours ainsi
+// (« née le trois mars mille neuf cent quatre-vingt »), et le harnais doit la reconnaître comme fuite.
+const UNITS_FR = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf'];
+const TENS_FR = { 20: 'vingt', 30: 'trente', 40: 'quarante', 50: 'cinquante', 60: 'soixante', 80: 'quatre-vingt' };
+function spellFrench(n) {
+  if (n < 20) return UNITS_FR[n];
+  if (n < 100) {
+    const base = n < 70 ? Math.floor(n / 10) * 10 : (n < 80 ? 60 : 80);
+    const rest = n - base;
+    if (!rest) return TENS_FR[base] + (base === 80 ? 's' : '');
+    return `${TENS_FR[base]}${rest === 1 && base < 80 ? ' et ' : '-'}${spellFrench(rest)}`;
+  }
+  if (n < 1000) {
+    const hundreds = Math.floor(n / 100);
+    const rest = n % 100;
+    return `${hundreds > 1 ? `${UNITS_FR[hundreds]} ` : ''}cent${!rest && hundreds > 1 ? 's' : ''}${rest ? ` ${spellFrench(rest)}` : ''}`;
+  }
+  const thousands = Math.floor(n / 1000);
+  const rest = n % 1000;
+  return `${thousands > 1 ? `${UNITS_FR[thousands]} ` : ''}mille${rest ? ` ${spellFrench(rest)}` : ''}`;
+}
+const MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+/** Formes d'une date de naissance : canoniques (jj/mm/aaaa et variantes) + « trois mars mille neuf cent quatre-vingt ». */
+function birthDateForms(birthDate) {
+  if (!birthDate) return [];
+  const date = birthDate instanceof Date ? birthDate : new Date(birthDate);
+  if (Number.isNaN(date.getTime())) return [];
+  const spelled = `${spellFrench(date.getUTCDate())} ${MONTHS_FR[date.getUTCMonth()]} ${spellFrench(date.getUTCFullYear())}`;
+  // Dans une date, l'usage écrit « mille neuf cent quatre-vingt » sans s : les deux formes comptent
+  const singular = spelled.replace(/vingts/g, 'vingt').replace(/cents/g, 'cent');
+  return [...new Set([...dateForms(date), spelled, singular])];
+}
+
 /**
  * Formes interdites d'un cas et leur type, pour attribuer une fuite sans jamais imprimer sa valeur :
- * prénom et nom de l'identité synthétique du cas, puis les tiers repérés dans le corpus
- * (`mustNotReachModel`).
+ * prénom, nom et date de naissance de l'identité synthétique du cas, puis les tiers repérés dans le
+ * corpus (`mustNotReachModel`).
  */
 function identityOf(kase) {
   const identity = kase.identity || {};
   const forms = [];
   if (identity.firstName) forms.push({ form: String(identity.firstName), type: 'Prénom' });
   if (identity.lastName) forms.push({ form: String(identity.lastName), type: 'NOM' });
+  for (const form of birthDateForms(identity.birthDate)) forms.push({ form, type: 'Date de naissance' });
   for (const m of kase.mustNotReachModel || []) if (m) forms.push({ form: String(m), type: 'Tiers' });
   return forms;
 }

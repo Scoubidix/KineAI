@@ -4,6 +4,7 @@
 const { z } = require('zod');
 const prismaService = require('./prismaService');
 const logger = require('../utils/logger');
+const { logMasked } = require('../utils/pseudonymDebug');
 const llmService = require('./llmService');
 const { getCatalog } = require('./bilanRenderService');
 const { normalizeLabel } = require('./bilanDocument');
@@ -349,6 +350,7 @@ async function callExtraction(messages) {
 async function extractFromText({ rawNotes, motif, catalog, document, logContext = 'texte', pseudo }) {
   const notes = pseudo ? pseudo.mask(rawNotes) : rawNotes;
   const m = pseudo ? pseudo.mask(motif || '') : motif;
+  logMasked(`extraction (${logContext})`, `Motif : ${m || '(aucun)'}\n${notes}`, pseudo);
   const messages = buildExtractionMessages({ rawNotes: notes, motif: m, compactCatalog: buildCompactCatalog(catalog) });
   let output;
   try {
@@ -374,7 +376,7 @@ async function extractForBilan({ kineId, bilanId }) {
   const prisma = prismaService.getInstance();
   const bilan = await prisma.bilanKine.findFirst({
     where: { id: bilanId, kineId, isActive: true },
-    select: { id: true, rawNotes: true, motif: true, document: true, patient: { select: { firstName: true, lastName: true, birthDate: true } } },
+    select: { id: true, rawNotes: true, motif: true, document: true, createdAt: true, patient: { select: { firstName: true, lastName: true, birthDate: true } } },
   });
   if (!bilan) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
   if (!bilan.document) throw new DraftError('LEGACY_BILAN', 400, 'Les anciens bilans ne peuvent pas être analysés');
@@ -382,7 +384,7 @@ async function extractForBilan({ kineId, bilanId }) {
   if (!notes) throw new DraftError('NOTES_REQUIRED', 400, 'Saisis des notes avant de lancer l’analyse');
 
   const catalog = await getCatalog();
-  const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId) });
+  const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId), at: bilan.createdAt });
   const result = await extractFromText({ rawNotes: notes, motif: bilan.motif, catalog, document: bilan.document, logContext: `bilan ${bilanId}`, pseudo });
   logger.info(`Extraction bilan ${bilanId} : ${result.candidates.length} candidat(s), ${result.rejected} rejeté(s)`);
   return result;

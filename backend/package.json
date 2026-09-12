@@ -6,7 +6,8 @@
     "test:watch": "jest --watch --verbose",
     "eval:extraction": "node eval/extraction/run.js",
     "eval:dictation": "node eval/dictation/run.js",
-    "eval:session": "node eval/session/run.js"
+    "eval:session": "node eval/session/run.js",
+    "eval:pseudonym": "node eval/pseudonym/run.js"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

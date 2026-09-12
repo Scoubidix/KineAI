@@ -1,0 +1,223 @@
+[
+  {
+    "id": "pseudo-01",
+    "title": "nom + prénom du patient connu, âge et métier conservés",
+    "transcript": "asr-worker/eval/out/pseudo-01.txt",
+    "identity": {
+      "firstName": "Sophie",
+      "lastName": "Martin",
+      "birthDate": "1980-03-03"
+    },
+    "kine": {
+      "firstName": "Valentin",
+      "lastName": "Durand",
+      "email": null
+    },
+    "expectTokens": [
+      "NOM",
+      "Prénom"
+    ],
+    "keep": [
+      "46",
+      "coiffeuse"
+    ]
+  },
+  {
+    "id": "pseudo-02",
+    "title": "date de naissance dite en lettres",
+    "transcript": "asr-worker/eval/out/pseudo-02.txt",
+    "identity": {
+      "firstName": "Sophie",
+      "lastName": "Martin",
+      "birthDate": "1980-03-03"
+    },
+    "kine": {
+      "firstName": "Valentin",
+      "lastName": "Durand",
+      "email": null
+    },
+    "expectTokens": [
+      "Date de naissance"
+    ],
+    "keep": [
+      "trois mois",
+      "EVA"
+    ]
+  },
+  {
+    "id": "pseudo-03",
+    "title": "téléphone et e-mail",
+    "transcript": "asr-worker/eval/out/pseudo-03.txt",
+    "identity": {
+      "firstName": "Sophie",
+      "lastName": "Martin",
+      "birthDate": "1980-03-03"
+    },
+    "kine": {
+      "firstName": "Valentin",
+      "lastName": "Durand",
+      "email": null
+    },
+    "expectTokens": [
+      "Téléphone",
+      "Prénom"
+    ],
+    "keep": [
+      "mail"
+    ],
+    "note": "edge-tts dit « arobase » : Whisper écrit « sophie.martin.gmail.com » sans @ — le motif e-mail ne peut pas matcher, le nom est masqué par la garde « identifiant de contact » (artefact de corpus, pas de fuite)"
+  },
+  {
+    "id": "pseudo-04",
+    "title": "adresse postale, ville conservée",
+    "transcript": "asr-worker/eval/out/pseudo-04.txt",
+    "identity": {
+      "firstName": "Sophie",
+      "lastName": "Martin",
+      "birthDate": "1980-03-03"
+    },
+    "kine": {
+      "firstName": "Valentin",
+      "lastName": "Durand",
+      "email": null
+    },
+    "expectTokens": [
+      "Adresse"
+    ],
+    "keep": [
+      "Lyon",
+      "dix minutes"
+    ]
+  },
+  {
+    "id": "pseudo-05",
+    "title": "tiers : docteur adresseur et fils prénommé",
+    "transcript": "asr-worker/eval/out/pseudo-05.txt",
+    "identity": {
+      "firstName": "Sophie",
+      "lastName": "Martin",
+      "birthDate": "1980-03-03"
+    },
+    "kine": {
+      "firstName": "Valentin",
+      "lastName": "Durand",
+      "email": null
+    },
+    "expectTokens": [
+      "Tiers"
+    ],
+    "keep": [
+      "épaule droite",
+      "dix ans"
+    ]
+  },
+  {
+    "id": "pseudo-06",
+    "title": "le kiné se présente ; patient Delcourt",
+    "transcript": "asr-worker/eval/out/pseudo-06.txt",
+    "identity": {
+      "firstName": "Jean",
+      "lastName": "Delcourt",
+      "birthDate": "1963-05-20"
+    },
+    "kine": {
+      "firstName": "Valentin",
+      "lastName": "Durand",
+      "email": null
+    },
+    "expectTokens": [
+      "Kiné",
+      "NOM"
+    ],
+    "keep": [
+      "huit semaines"
+    ]
+  },
+  {
+    "id": "pseudo-07",
+    "title": "mode libre : aucun patient connu",
+    "transcript": "asr-worker/eval/out/pseudo-07.txt",
+    "identity": null,
+    "kine": {
+      "firstName": "Valentin",
+      "lastName": "Durand",
+      "email": null
+    },
+    "expectTokens": [
+      "Patient"
+    ],
+    "keep": [
+      "Ottawa",
+      "varus"
+    ]
+  },
+  {
+    "id": "pseudo-08",
+    "title": "nom qui est un mot courant (Petit)",
+    "transcript": "asr-worker/eval/out/pseudo-08.txt",
+    "identity": {
+      "firstName": "Pierre",
+      "lastName": "Petit",
+      "birthDate": "1975-01-15"
+    },
+    "kine": {
+      "firstName": "Valentin",
+      "lastName": "Durand",
+      "email": null
+    },
+    "expectTokens": [
+      "NOM"
+    ],
+    "keep": [
+      "petit gonflement",
+      "110"
+    ],
+    "commonWords": [
+      "Petit",
+      "Pierre"
+    ]
+  },
+  {
+    "id": "pseudo-09",
+    "title": "numéro de sécurité sociale et numéro de dossier",
+    "transcript": "asr-worker/eval/out/pseudo-09.txt",
+    "identity": {
+      "firstName": "Sophie",
+      "lastName": "Martin",
+      "birthDate": "1980-03-03"
+    },
+    "kine": {
+      "firstName": "Valentin",
+      "lastName": "Durand",
+      "email": null
+    },
+    "expectTokens": [
+      "NIR",
+      "Numéro"
+    ],
+    "keep": []
+  },
+  {
+    "id": "pseudo-10",
+    "title": "éponymes cliniques conservés, nom du patient masqué",
+    "transcript": "asr-worker/eval/out/pseudo-10.txt",
+    "identity": {
+      "firstName": "Claire",
+      "lastName": "Rosier",
+      "birthDate": "1997-08-02"
+    },
+    "kine": {
+      "firstName": "Valentin",
+      "lastName": "Durand",
+      "email": null
+    },
+    "expectTokens": [
+      "NOM"
+    ],
+    "keep": [
+      "Lasègue",
+      "McKenzie"
+    ],
+    "note": "Whisper transcrit Lachman en « lâchement » : c’est la passe de correction qui le répare, pas le masquage"
+  }
+]

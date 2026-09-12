@@ -117,7 +117,8 @@ candidats, sections rédigées) — les notes réelles ne quittent jamais le ser
   « mon mari », « ma femme », « ma fille », n'ont pas de nom propre attaché).
 - **Garde anti-fuite** (`installLeakGuard`, `backend/eval/extraction/lib.js`) : enveloppe
   `llmService.chatCompletion`, cherche chaque forme interdite du cas (`identityOf(kase)` : prénom,
-  nom, `mustNotReachModel`) dans le texte des messages envoyés — repli accents/casse identique au
+  nom, date de naissance sous ses formes canoniques **et en toutes lettres**, `mustNotReachModel`)
+  dans le texte des messages envoyés — repli accents/casse identique au
   service, recherche en mot entier, jamais bloquant. `eval:session` posant ses cas en parallèle
   (`Promise.all`), une seule garde globale est installée avant le lancement, avec l'union des formes
   interdites de tous les cas ; chaque cas relit `guard.leaks` filtré sur ses propres formes une fois
@@ -145,6 +146,28 @@ candidats, sections rédigées) — les notes réelles ne quittent jamais le ser
   `[Prénom]` plutôt que de le recopier. Aucun nom, réel ou synthétique, n'apparaît en clair (ni fuite
   RGPD ni fuite de test) : c'est une non-conformité au gabarit du guide de rédaction, à corriger côté
   prompt (`SECTION_GUIDE.anamnese`) si le format « Prénom NOM » est requis à l'affichage.
+
+## Eval — pseudonymisation (gratuit, déterministe)
+
+```bash
+cd backend
+npm run eval:pseudonym                     # les 10 clips
+npm run eval:pseudonym -- --only pseudo-03 # un seul
+```
+
+**Aucun appel au provider** : le harnais ne fait tourner que `pseudonymService` sur dix
+transcriptions courtes réelles (`asr-worker/eval/gen_pseudo.py` génère les clips avec edge-tts puis
+les transcrit ; les `.wav` et les `.txt` restent hors dépôt, comme tout `asr-worker/eval/audio/` et
+`out/`). Il mesure les **faux positifs et les faux négatifs du masquage**, pas la qualité du modèle :
+pour chaque cas il imprime la transcription, le texte masqué, les jetons posés et la réhydratation,
+puis vérifie trois choses — les `expectTokens` sont bien posés, le contenu clinique listé dans `keep`
+a survécu, et l’identité du cas n’est plus lisible dans le texte masqué (un nom qui est aussi un mot
+courant n’est une fuite que capitalisé, cf. `commonWords`). Le texte s’affiche ici, contrairement aux
+logs applicatifs, parce que le corpus est entièrement synthétique.
+
+État au 2026-09-12, après les correctifs de revue : **10/10**. Les deux cas qui portent une `note`
+documentent un artefact de transcription (Whisper perd l’arobase d’un e-mail, transcrit « Lachman »
+en « lâchement »), pas une limite du service.
 
 ## Eval — dictée
 

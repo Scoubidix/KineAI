@@ -4,6 +4,7 @@
 const { z } = require('zod');
 const prismaService = require('./prismaService');
 const logger = require('../utils/logger');
+const { logMasked } = require('../utils/pseudonymDebug');
 const llmService = require('./llmService');
 const activityService = require('./activityService');
 const { getCatalog } = require('./bilanRenderService');
@@ -204,7 +205,12 @@ async function composeSections({ bilanId, type, motif, notes, document, catalog,
   const maskedMotif = pseudo ? pseudo.mask(motif || '') : motif;
   const lines = formatNarrativeMeasurements(document.measurements, catalog).map((l) => (pseudo ? pseudo.mask(l) : l));
   const table = tableMeasurementSummary(document.measurements, catalog);
-  const messages = buildComposeMessages({ type, motif: maskedMotif, rawNotes: maskedNotes, lines, tableLabels: table.labels, keys, source });
+  // Un libellé de mesure personnalisée est du texte libre (tapé par le kiné ou rédigé par le modèle
+  // puis réhydraté) : il part masqué comme le reste. `table.entries`, qui ne sert qu'à la détection
+  // de doublon, reste sur le texte réel — un nom n'y change rien.
+  const tableLabels = pseudo ? table.labels.map((l) => pseudo.mask(l)) : table.labels;
+  const messages = buildComposeMessages({ type, motif: maskedMotif, rawNotes: maskedNotes, lines, tableLabels, keys, source });
+  logMasked(`rédaction (bilan ${bilanId}, ${source})`, `Motif : ${maskedMotif || '(aucun)'}\n${maskedNotes}${lines.length ? `\nMesures : ${lines.join(' ; ')}` : ''}`, pseudo);
   const jsonSchema = buildComposeJsonSchema(keys);
 
   let output;
@@ -239,7 +245,7 @@ async function composeSections({ bilanId, type, motif, notes, document, catalog,
 
 // Lecture et gardes communes aux deux rédactions
 async function loadBilanForCompose(prisma, where) {
-  const bilan = await prisma.bilanKine.findFirst({ where, select: { id: true, type: true, status: true, rawNotes: true, motif: true, document: true, updatedAt: true, patient: { select: { firstName: true, lastName: true, birthDate: true } } } });
+  const bilan = await prisma.bilanKine.findFirst({ where, select: { id: true, type: true, status: true, rawNotes: true, motif: true, document: true, updatedAt: true, createdAt: true, patient: { select: { firstName: true, lastName: true, birthDate: true } } } });
   if (!bilan) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
   if (!bilan.document) throw new DraftError('LEGACY_BILAN', 400, 'Les anciens bilans ne peuvent pas être rédigés par l’IA');
   if (bilan.status === 'ENREGISTRE') throw new DraftError('ALREADY_FINALIZED', 409, 'Ce bilan est déjà enregistré');
@@ -281,7 +287,7 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
   // Ordre canonique, doublons ignorés, clés inconnues ignorées (déjà filtrées par Zod en route)
   const keys = Array.isArray(sections) && sections.length ? SECTION_KEYS.filter((k) => sections.includes(k)) : SECTION_KEYS;
   const catalog = await getCatalog();
-  const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId) });
+  const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId), at: bilan.createdAt });
   const { texts, warnings } = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: bilan.document, catalog, keys, pseudo });
 
   // L'appel IA a duré plusieurs secondes : on relit la version la plus fraîche et on ne
@@ -307,7 +313,7 @@ async function composeFromNotesForBilan({ kineId, bilanId, uid, source = 'notes'
   const catalog = await getCatalog();
   if (!SOURCES.includes(source)) throw new Error(`source de rédaction inconnue : ${source}`);
 
-  const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId) });
+  const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId), at: bilan.createdAt });
   const { candidates, rejected } = await extractionService.extractFromText({ rawNotes: notes, motif: bilan.motif, catalog, document: bilan.document, logContext: `bilan ${bilanId}`, pseudo });
   const { document: withMeasures, accepted, pending } = extractionService.applyCandidates(bilan.document, candidates);
   const base = { prisma, where, updatedAt: bilan.updatedAt, status: bilan.status, uid };

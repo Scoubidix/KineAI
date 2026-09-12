@@ -4,6 +4,7 @@
 // « from », les suppressions sont plafonnées à 20 % du texte ; tout doute → texte brut.
 const { z } = require('zod');
 const logger = require('../utils/logger');
+const { logMasked } = require('../utils/pseudonymDebug');
 const llmService = require('./llmService');
 const { numbersIn } = require('./bilanComposeService');
 const { parseJsonOutput } = require('./bilanExtractionService');
@@ -190,6 +191,7 @@ async function correct({ text, mode, catalog, pseudo }) {
   if (!raw) return { text: '', applied: 0, ignored: 0 };
   // Le modèle ne reçoit jamais l'identité en clair : masquée avant l'envoi, réhydratée sur le texte rendu
   const masked = pseudo ? pseudo.mask(raw) : raw;
+  logMasked(`correction (${mode})`, masked, pseudo);
   const messages = buildCorrectionMessages({ text: masked, mode, vocabulary: buildVocabulary(catalog) });
   let ops;
   for (let attempt = 1; attempt <= 2 && !ops; attempt += 1) {
