@@ -10,7 +10,6 @@ const composeService = require('./bilanComposeService');
 const { getCatalog } = require('./bilanRenderService');
 const { DraftError } = require('./bilanDraftService');
 const rules = require('./bilanJobRules');
-const sessionReportService = require('./sessionReportService');
 
 const CONCURRENCY = Number(process.env.DICTATION_JOB_CONCURRENCY) || 2;
 // Un QUEUED sans mise à jour depuis ce délai n'a plus d'audio nulle part (instance arrêtée) : perdu.
@@ -191,7 +190,7 @@ const __drainForTests = () => Promise.all([...inFlight]);
 /** Un processus arrêté en pleine queue laisserait le traitement coincé ; passé ce délai il est déclaré
  * perdu et « Réessayer » reprend à la bonne étape. */
 async function markStaleTail(job) {
-  if (!['CORRECTING', 'REPORTING', 'COMPOSING'].includes(job.status) || job.updatedAt >= new Date(Date.now() - TAIL_TIMEOUT_MS)) return false;
+  if (!['CORRECTING', 'COMPOSING'].includes(job.status) || job.updatedAt >= new Date(Date.now() - TAIL_TIMEOUT_MS)) return false;
   const prisma = prismaService.getInstance();
   await prisma.bilanJob.updateMany({ where: { id: job.id, status: job.status }, data: { status: 'FAILED', error: 'TAIL_LOST', errorDetail: null } });
   logger.warn(`Traitement dictée ${job.id} : queue périmée, déclarée perdue`);
@@ -215,7 +214,7 @@ async function finishRecording({ kineId, bilanId, segmentsTotal }) {
   return getJobView({ kineId, bilanId });
 }
 
-const JOB_INCLUDE = { segments: true, kine: { select: { uid: true } }, bilan: { select: { rawNotes: true, status: true, motif: true, type: true } } };
+const JOB_INCLUDE = { segments: true, kine: { select: { uid: true } }, bilan: { select: { rawNotes: true, status: true } } };
 
 /** Si la transcription est complète, tente la transition atomique TRANSCRIBING → CORRECTING et lance la queue. */
 async function evaluate(jobId) {
@@ -240,6 +239,8 @@ async function runTail(jobId, stage) {
   const prisma = prismaService.getInstance();
   const job = await prisma.bilanJob.findUnique({ where: { id: jobId }, include: JOB_INCLUDE });
   if (!job) return;
+  // Vaut aussi pour une reprise en COMPOSING : les notes d'une séance sont le dialogue corrigé
+  const source = job.kind === 'SESSION' ? 'dialogue' : 'notes';
   try {
     if (stage === 'CORRECTING') {
       // Un bilan enregistré pendant le traitement ne doit pas être modifié
@@ -248,34 +249,22 @@ async function runTail(jobId, stage) {
       if (!raw) throw new DraftError('NOTES_REQUIRED', 400, 'Rien n’a été entendu');
       const catalog = await getCatalog();
       const { text, applied, ignored } = await dictationCorrectionService.correct({ text: raw, mode: job.kind === 'SESSION' ? 'session' : 'dictation', catalog });
-      let notesText = text;
-      let fromStatus = 'CORRECTING';
-      if (job.kind === 'SESSION') {
-        // Séance : le dialogue corrigé devient un compte rendu ; la transition sert de verrou comme ailleurs
-        const toReporting = await prisma.bilanJob.updateMany({ where: { id: jobId, status: 'CORRECTING' }, data: { status: 'REPORTING' } });
-        if (toReporting.count !== 1) throw new TailLost();
-        const rep = await sessionReportService.report({ transcript: text, motif: job.bilan.motif, type: job.bilan.type, catalog });
-        const filled = Object.values(rep.sections).filter(Boolean).length;
-        // Jamais le texte des phrases retirées dans les logs : ce sont des données de santé
-        logger.info(`Traitement dictée ${jobId} : séance, compte rendu (${filled} section(s) remplie(s), ${rep.dropped.length} vidée(s), ${rep.sentencesDropped} phrase(s) retirée(s))`);
-        notesText = rep.notes;
-        fromStatus = 'REPORTING';
-      }
+      if (source === 'dialogue') logger.info(`Traitement dictée ${jobId} : séance, rédaction depuis le dialogue`);
       // La transition sert de verrou : une queue qui a perdu la main n'ajoute pas les notes une 2e fois.
       // Les trois écritures (statut, notes, segments) réussissent ou échouent ensemble.
       await prisma.$transaction(async (tx) => {
-        const r = await tx.bilanJob.updateMany({ where: { id: jobId, status: fromStatus }, data: { status: 'COMPOSING' } });
+        const r = await tx.bilanJob.updateMany({ where: { id: jobId, status: 'CORRECTING' }, data: { status: 'COMPOSING' } });
         if (r.count !== 1) throw new TailLost();
-        // Le compte rendu peut durer une minute : le kiné a pu taper entre-temps, on relit les notes
+        // La correction prend du temps : le kiné a pu taper entre-temps, on relit les notes
         // dans la transaction plutôt que de repartir de celles lues au début de la queue
         const fresh = await tx.bilanKine.findUnique({ where: { id: job.bilanId }, select: { rawNotes: true } });
-        await tx.bilanKine.update({ where: { id: job.bilanId }, data: { rawNotes: rules.appendNotes(fresh?.rawNotes, notesText) } });
+        await tx.bilanKine.update({ where: { id: job.bilanId }, data: { rawNotes: rules.appendNotes(fresh?.rawNotes, text) } });
         // Le texte vit désormais dans les notes : les copies par segment n'ont plus de raison d'être
         await tx.bilanJobSegment.updateMany({ where: { jobId }, data: { text: null } });
       });
       logger.info(`Traitement dictée ${jobId} : notes écrites (${applied} correction(s), ${ignored} ignorée(s))`);
     }
-    const r = await composeService.composeFromNotesForBilan({ kineId: job.kineId, bilanId: job.bilanId, uid: job.kine.uid });
+    const r = await composeService.composeFromNotesForBilan({ kineId: job.kineId, bilanId: job.bilanId, uid: job.kine.uid, source });
     // Ce que le front recevait d'un « Rédiger avec l'IA » direct, gardé pour rouvrir le tiroir « à vérifier »
     const result = { accepted: (r.accepted || []).map((a) => ({ id: a.id, quote: a.quote })), pending: r.pending || [], rejected: r.rejected || 0, warnings: r.warnings || {} };
     const finished = await prisma.bilanJob.updateMany({ where: { id: jobId, status: 'COMPOSING' }, data: { status: 'DONE', error: null, errorDetail: null, result, finishedAt: new Date() } });
@@ -294,7 +283,7 @@ async function runTail(jobId, stage) {
     const detail = isDraft && err.extra && Object.keys(err.extra).length > 0 ? err.extra : null;
     if (isDraft) logger.warn(`Traitement dictée ${jobId} : queue en échec (${code})`);
     else logger.error(`Traitement dictée ${jobId} : erreur inattendue dans la queue (${err?.name || 'Error'})`);
-    await prisma.bilanJob.updateMany({ where: { id: jobId, status: { in: ['CORRECTING', 'REPORTING', 'COMPOSING'] } }, data: { status: 'FAILED', error: code, errorDetail: detail } });
+    await prisma.bilanJob.updateMany({ where: { id: jobId, status: { in: ['CORRECTING', 'COMPOSING'] } }, data: { status: 'FAILED', error: code, errorDetail: detail } });
   }
 }
 
@@ -318,7 +307,7 @@ async function retryJob({ kineId, bilanId }) {
   const job = await prisma.bilanJob.findUnique({ where: { bilanId }, include: JOB_INCLUDE });
   if (!job || job.kineId !== kineId) throw new DraftError('JOB_NOT_FOUND', 404, 'Aucun traitement pour ce bilan');
   if (job.status !== 'FAILED') throw new DraftError('JOB_NOT_FAILED', 409, 'Ce traitement n’est pas en échec');
-  // « Rien n'a été entendu » ou REPORT_FAILED : les textes sont encore là, on reprend en CORRECTING
+  // « Rien n'a été entendu » : les textes sont encore là, on reprend en CORRECTING
   // pour réechouer aussitôt, sans rédiger sur les notes tapées
   const stage = job.error === 'NOTES_REQUIRED' || job.segments.some((s) => s.status === 'DONE' && s.text !== null) ? 'CORRECTING' : 'COMPOSING';
   // Concurrence : si une autre requête a déjà repris ce job, on ne relance pas une deuxième queue

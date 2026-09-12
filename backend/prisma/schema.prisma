@@ -774,7 +774,7 @@ enum BilanJobStatus {
   RECORDING // segments en cours de réception
   TRANSCRIBING // « Générer » cliqué, segments en cours de transcription
   CORRECTING // passe de correction puis écriture des notes
-  REPORTING // séance : compte rendu clinique en cours (plan 8b)
+  REPORTING // plus jamais écrit depuis le 2026-09-12 (compte rendu de séance supprimé), à retirer à la prochaine migration
   COMPOSING // extraction + rédaction
   DONE
   FAILED // queue en échec (correction, notes, rédaction) ; les segments perdus ne passent pas par ici

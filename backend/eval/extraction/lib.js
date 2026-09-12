@@ -34,19 +34,20 @@ async function runCase(c, catalog) {
   const extras = canon.filter((x) => !expectedKeys.has(`${x.key}${x.side ? ':' + x.side : ''}`)).map((x) => `${x.key}${x.side ? ':' + x.side : ''}=${JSON.stringify(x.value)}`);
   const total = (c.expect || []).length;
   const recall = total ? (total - missing.length - wrong.length) / total : 1;
-  return { id: c.id, title: c.title, recall, missing, wrong, forbidden, forbiddenValues, customMissing, extras, rejected, custom: custom.map((x) => `${x.label} = ${x.value}`) };
+  return { id: c.id, title: c.title, recall, missing, wrong, forbidden, forbiddenValues, customMissing, extras, rejected, custom: custom.map((x) => `${x.label} = ${x.value}`), candidates };
 }
 
-function printResult(r) {
+// `log` : sortie ligne à ligne (console.log par défaut ; un tampon quand les cas tournent en parallèle)
+function printResult(r, log = console.log) {
   const errors = r.forbidden.length + r.forbiddenValues.length + r.customMissing.length;
-  console.log(`rappel ${(r.recall * 100).toFixed(0)} %${errors ? ` · ${errors} interdit(s)` : ''} · ${r.extras.length} extra(s) · ${r.rejected} écarté(s)`);
-  for (const m of r.missing) console.log(`   manquant   ${m}`);
-  for (const w of r.wrong) console.log(`   valeur     ${w}`);
-  for (const f of r.forbidden) console.log(`   INTERDIT   ${f}`);
-  for (const v of r.forbiddenValues) console.log(`   INTERDIT   valeur ${v}`);
-  for (const s of r.customMissing) console.log(`   custom absent : ${s}`);
-  for (const e of r.extras) console.log(`   extra      ${e}`);
-  for (const x of r.custom) console.log(`   libre      ${x}`);
+  log(`rappel ${(r.recall * 100).toFixed(0)} %${errors ? ` · ${errors} interdit(s)` : ''} · ${r.extras.length} extra(s) · ${r.rejected} écarté(s)`);
+  for (const m of r.missing) log(`   manquant   ${m}`);
+  for (const w of r.wrong) log(`   valeur     ${w}`);
+  for (const f of r.forbidden) log(`   INTERDIT   ${f}`);
+  for (const v of r.forbiddenValues) log(`   INTERDIT   valeur ${v}`);
+  for (const s of r.customMissing) log(`   custom absent : ${s}`);
+  for (const e of r.extras) log(`   extra      ${e}`);
+  for (const x of r.custom) log(`   libre      ${x}`);
 }
 
 /** Rappel moyen et total d'interdits ; code de sortie 1 si un interdit, une erreur ou aucun cas. */

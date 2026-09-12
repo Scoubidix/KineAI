@@ -405,6 +405,12 @@ d'extraction, comme observé aux runs précédents. Noté tel quel, sans retouch
 
 ### Séance
 
+> **2026-09-12 — l'étape « compte rendu » a été supprimée.** La séance est désormais rédigée
+> directement depuis le dialogue corrigé (`bilanComposeService`, `source: 'dialogue'`) : plus de
+> `sessionReportService`, plus de statut `REPORTING`. Les chiffres ci-dessous sont ceux de
+> **l'ancienne chaîne**, conservés pour mémoire. Référence de la chaîne actuelle :
+> `backend/eval/README.md`, section « Eval — séance ».
+
 Chaîne complète du corpus de séances (`backend/eval/session/run.js`, `npm run eval:session`) :
 transcription (`asr-worker/eval/out/seance-0N_*.txt`, voir plus haut) → passe de correction
 obligatoire (mode `session`, toujours appliquée ici, pas de flag) → compte rendu en sept sections

@@ -140,8 +140,8 @@ function wordValues(text) {
 }
 
 // ---- Ordinaux (garde uniquement) ----
-// Un dialogue dit « le quatrième mois », le compte rendu écrit « à 4 mois » : sans les ordinaux la
-// garde voyait un nombre inventé et vidait la section. Lecture seule (valeurs pour l'ensemble
+// Un dialogue dit « le quatrième mois », la rédaction écrit « à 4 mois » : sans les ordinaux la
+// garde voyait un nombre inventé et signalait la section. Lecture seule (valeurs pour l'ensemble
 // autorisé) : `wordsToDigits` garde sa sémantique de réécriture et ignore toujours les ordinaux.
 const ORDINAL_RE = /\b(\p{L}+)i[èe]mes?\b/giu;
 const ORDINAL_IRREGULAR_RE = /\b(premi(?:er|ère|ere)|seconde?)\b/gi;

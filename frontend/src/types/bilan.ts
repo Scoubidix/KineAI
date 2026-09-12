@@ -89,7 +89,7 @@ export interface BilanListItem {
 }
 
 // ==================== DICTÉE : TRAITEMENT CÔTÉ SERVEUR (plan 7) ====================
-export type BilanJobStatus = 'RECORDING' | 'TRANSCRIBING' | 'CORRECTING' | 'REPORTING' | 'COMPOSING' | 'DONE' | 'FAILED';
+export type BilanJobStatus = 'RECORDING' | 'TRANSCRIBING' | 'CORRECTING' | 'COMPOSING' | 'DONE' | 'FAILED';
 
 export type BilanJobKind = 'DICTATION' | 'SESSION';
 

@@ -11,8 +11,14 @@ const { SECTION_KEYS, SECTION_TITLES } = require('./bilanDocument');
 const { DraftError, PATIENT_SELECT } = require('./bilanDraftService');
 const { BILAN_TYPE_LABELS } = require('./bilanRenderer/format');
 const extractionService = require('./bilanExtractionService');
+const { wordsToDigits, wordValues, ordinalValues } = require('../utils/frenchNumbers');
 
 const SECTION_TEXT_MAX = 5000;
+
+// Origine des notes : « notes » (saisies ou dictées par le kiné) ou « dialogue » (transcription
+// d'une séance, lue directement par le rédacteur).
+const SOURCES = ['notes', 'dialogue'];
+const DIALOGUE_GUIDE = `L'entrée est la transcription d'un dialogue entre le kinésithérapeute et son patient, sans indication de locuteur : tu déduis qui parle du contenu (le kiné examine, mesure, explique et prescrit ; le patient décrit, répond, raconte). « Les notes » désignent ce dialogue. Tu ne rapportes que ce qui a été dit, avec les mots du kiné quand il formule lui-même. Ignore le hors-sujet (vie privée, organisation, stationnement) sauf s'il éclaire la plainte ou les objectifs. Une valeur corrigée par le locuteur juste après : garder la valeur finale. Le diagnostic n'est rempli que si le kiné l'a formulé ; les objectifs sont ceux énoncés par le patient et le kiné ; le traitement reprend le plan, les consignes et les exercices donnés pendant la séance.`;
 
 const { STYLE_PRINCIPLES, STYLE_EXAMPLES } = require('../data/bilanStyleExamples');
 
@@ -111,16 +117,18 @@ function checkTableDuplicate(text, entries) {
   return null;
 }
 
-function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys }) {
+function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys, source = 'notes' }) {
+  const dialogue = source === 'dialogue';
   const user = [
     `Type de bilan : ${BILAN_TYPE_LABELS[type] || type}`,
     `Motif : ${motif || '(non renseigné)'}`,
     '',
-    'Notes du kiné :',
+    dialogue ? 'Transcription de la séance :' : 'Notes du kiné :',
     '"""',
     rawNotes,
     '"""',
     '',
+    ...(dialogue ? [DIALOGUE_GUIDE, ''] : []),
     'Mesures à intégrer en prose (déjà validées par le kiné) :',
     lines.length ? lines.map((l) => `- ${l}`).join('\n') : '(aucune)',
     '',
@@ -189,10 +197,10 @@ async function callCompose(messages, jsonSchema) {
  * composeFromNotesForBilan. Renvoie les textes tronqués et les avertissements par section.
  * @throws {DraftError} COMPOSE_FAILED
  */
-async function composeSections({ bilanId, type, motif, notes, document, catalog, keys }) {
+async function composeSections({ bilanId, type, motif, notes, document, catalog, keys, source = 'notes' }) {
   const lines = formatNarrativeMeasurements(document.measurements, catalog);
   const table = tableMeasurementSummary(document.measurements, catalog);
-  const messages = buildComposeMessages({ type, motif, rawNotes: notes, lines, tableLabels: table.labels, keys });
+  const messages = buildComposeMessages({ type, motif, rawNotes: notes, lines, tableLabels: table.labels, keys, source });
   const jsonSchema = buildComposeJsonSchema(keys);
 
   let output;
@@ -208,7 +216,10 @@ async function composeSections({ bilanId, type, motif, notes, document, catalog,
     }
   }
 
-  const allowed = new Set([...numbersIn(notes), ...numbersIn(motif), ...lines.flatMap(numbersIn)]);
+  // Un dialogue porte ses nombres en lettres (« trois sur dix », « le quatrième mois ») : l'ensemble
+  // autorisé les accepte aussi, sinon chaque valeur serait « non vérifiée »
+  const spoken = source === 'dialogue' ? [...numbersIn(wordsToDigits(notes)), ...wordValues(notes).map(String), ...ordinalValues(notes).map(String)] : [];
+  const allowed = new Set([...numbersIn(notes), ...numbersIn(motif), ...lines.flatMap(numbersIn), ...spoken]);
   const texts = {};
   const warnings = {};
   for (const k of keys) {
@@ -282,11 +293,12 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
  * l'édition pendant l'appel ; toute autre modification (autre appareil) → STALE_DRAFT.
  * @throws {DraftError} BILAN_NOT_FOUND | LEGACY_BILAN | ALREADY_FINALIZED | NOTES_REQUIRED | EXTRACTION_FAILED | COMPOSE_FAILED | STALE_DRAFT
  */
-async function composeFromNotesForBilan({ kineId, bilanId, uid }) {
+async function composeFromNotesForBilan({ kineId, bilanId, uid, source = 'notes' }) {
   const prisma = prismaService.getInstance();
   const where = { id: bilanId, kineId, isActive: true };
   const { bilan, notes } = await loadBilanForCompose(prisma, where);
   const catalog = await getCatalog();
+  if (!SOURCES.includes(source)) throw new Error(`source de rédaction inconnue : ${source}`);
 
   const { candidates, rejected } = await extractionService.extractFromText({ rawNotes: notes, motif: bilan.motif, catalog, document: bilan.document, logContext: `bilan ${bilanId}` });
   const { document: withMeasures, accepted, pending } = extractionService.applyCandidates(bilan.document, candidates);
@@ -294,7 +306,7 @@ async function composeFromNotesForBilan({ kineId, bilanId, uid }) {
 
   let composed;
   try {
-    composed = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: withMeasures, catalog, keys: SECTION_KEYS });
+    composed = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: withMeasures, catalog, keys: SECTION_KEYS, source });
   } catch (err) {
     // Les mesures acceptées ne sont pas perdues : écrites seules, le kiné relance la rédaction
     if (err instanceof DraftError && err.code === 'COMPOSE_FAILED' && accepted.length > 0) {
@@ -310,6 +322,8 @@ async function composeFromNotesForBilan({ kineId, bilanId, uid }) {
 
 module.exports = {
   SECTION_GUIDE,
+  SOURCES,
+  composeSections,
   formatNarrativeMeasurements,
   tableMeasurementSummary,
   buildComposeMessages,

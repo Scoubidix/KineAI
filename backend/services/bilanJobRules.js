@@ -3,11 +3,11 @@
 
 const KINDS = ['DICTATION', 'SESSION'];
 // Statuts pendant lesquels un nouveau traitement ne peut pas démarrer sur le même bilan
-const ACTIVE_STATUSES = ['TRANSCRIBING', 'CORRECTING', 'REPORTING', 'COMPOSING'];
+const ACTIVE_STATUSES = ['TRANSCRIBING', 'CORRECTING', 'COMPOSING'];
 // Poids de la barre par kind : en séance, à Stop presque tout est transcrit, la queue pèse plus
 const PROGRESS = {
   DICTATION: { TRANSCRIBING: 0.7, CORRECTING: 0.72, COMPOSING: 0.85 },
-  SESSION: { TRANSCRIBING: 0.5, CORRECTING: 0.55, REPORTING: 0.65, COMPOSING: 0.8 },
+  SESSION: { TRANSCRIBING: 0.5, CORRECTING: 0.55, COMPOSING: 0.8 },
 };
 // Borne des index et du total : ~8 h de dictée par segments d'une minute, au-delà c'est une anomalie
 const MAX_SEGMENTS = 500;
@@ -45,7 +45,7 @@ function isTranscriptionComplete({ segmentsTotal, segments }) {
 function computeProgress(status, done, total, kind = 'DICTATION') {
   const weights = PROGRESS[kind] || PROGRESS.DICTATION;
   if (status === 'TRANSCRIBING') return total ? weights.TRANSCRIBING * Math.min(done / total, 1) : 0;
-  if (status === 'CORRECTING' || status === 'REPORTING' || status === 'COMPOSING') return weights[status] ?? null;
+  if (status === 'CORRECTING' || status === 'COMPOSING') return weights[status] ?? null;
   if (status === 'DONE') return 1;
   return null;
 }

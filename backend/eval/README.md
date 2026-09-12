@@ -132,15 +132,16 @@ pour régénérer les transcriptions.
 
 ## Eval — séance (dialogue kiné-patient)
 
-Chaîne complète de la séance (plan 8b) : transcription (`asr-worker/eval/out/seance-0N_*.txt`,
-dialogue à deux voix) → **passe de correction obligatoire**
-(`services/dictationCorrectionService.correct`, mode `session`) → compte rendu en sept sections
-(`services/sessionReportService.report`) → extraction (même logique partagée `runCase`/`printResult`/
-`summarize` que `eval:extraction`/`eval:dictation`, sur les notes produites par le compte rendu).
+Chaîne de la séance : transcription (`asr-worker/eval/out/seance-0N_*.txt`, dialogue à deux voix) →
+**passe de correction obligatoire** (`services/dictationCorrectionService.correct`, mode `session`)
+→ extraction sur le dialogue corrigé (même logique partagée `runCase`/`printResult`/`summarize` que
+`eval:extraction`/`eval:dictation`) → rédaction des sept sections depuis ce même dialogue
+(`services/bilanComposeService.composeSections`, `source: 'dialogue'`, mesures acceptées exclues de
+la prose comme en production). Depuis le 2026-09-12, il n'y a plus d'étape « compte rendu »
+intermédiaire : le rédacteur lit le dialogue directement.
 
 Contrairement à `eval:dictation`, il n'y a pas de flag `--correct` ici : la correction fait partie
-intégrante de la chaîne de séance (le compte rendu est toujours produit à partir du dialogue
-corrigé), donc toujours appliquée.
+intégrante de la chaîne de séance, donc toujours appliquée.
 
 ```bash
 cd backend
@@ -148,37 +149,52 @@ npm run eval:session                        # 5 cas, variante clean (défaut)
 npm run eval:session -- --variant cabinet   # variante cabinet (bruit de salle)
 npm run eval:session -- --only seance-03    # un seul cas
 npm run eval:session -- --json out.json     # + dump JSON des résultats
+npm run eval:session -- --dump out/sessions # sections rédigées écrites en .md, un fichier par cas
 ```
 
-⚠️ Coût : **3 appels réels au provider par cas** (correction, compte rendu, extraction), soit
-15 appels pour les 5 cas d'une variante (quelques dizaines de centimes, run réel du 2026-09-12
-avec `mistral-medium-3-5`). Les trois services journalisent désormais leurs compteurs d'usage
-(`prompt_tokens` / `completion_tokens` en `logger.info`, sans aucun texte) : le coût par séance se
-lit dans les logs applicatifs (~26 k jetons d'entrée et ~2 k de sortie pour une séance de
-1500-2100 mots, les trois appels cumulés).
+**`--dump <dossier>`** écrit les sections rédigées en Markdown (`<cas>_<variante>.md`) pour les
+relire — corpus synthétique seulement, jamais de texte réel.
+
+⚠️ Coût : **3 appels réels au provider par cas** (correction, extraction, rédaction), soit
+15 appels pour les 5 cas d'une variante (quelques dizaines de centimes). Les trois services
+journalisent leurs compteurs d'usage (`prompt_tokens` / `completion_tokens` en `logger.info`, sans
+aucun texte) : le coût par séance se lit dans les logs applicatifs.
 
 Ce qui est mesuré, en plus du rappel d'extraction habituel :
-- **sections attendues retrouvées** : sur les 7 sections du document (`anamnese`, `antecedents`,
+- **sections attendues rédigées** : sur les 7 sections du document (`anamnese`, `antecedents`,
   `examen`, `limitations`, `diagnostic`, `objectifs`, `traitement`), combien de celles que le cas
-  attend (`expectSections`) sont effectivement non vides dans le compte rendu.
-- **phrases retirées** (`sentencesDropped`) : depuis l'amendement de la spec §4.3,
-  `sessionReportService.guardReport` retire la **phrase** (ou l'item de liste) citant un nombre
-  absent du dialogue, et non plus la section entière. C'est la mesure fine du « nombre inventé » :
-  quelques unités sur cinq séances est le régime attendu. Le texte des phrases retirées
-  (`droppedSentences`) n'est jamais imprimé ni journalisé (données de santé).
-- **sections vidées par la garde** (`dropped`) : une section n'est vidée que si **toutes** ses
-  phrases ont été retirées. C'est le critère de seuil « 0 nombre inventé » de ce harnais —
-  l'objectif est **zéro** sur la variante clean.
+  attend (`expectSections`) sont effectivement non vides dans la rédaction.
+- **sections avec nombre non vérifié ou doublon de tableau** : les avertissements du rédacteur
+  (`composeSections`, `warnings`). Informatif, sans seuil : un nombre « non vérifié » signale une
+  valeur absente de l'ensemble autorisé (le dialogue porte ses nombres en lettres, la garde les
+  accepte), un « doublon de tableau » une mesure déjà présente dans le tableau et reprise en prose.
 
-Seuils d'ouverture du bouton (spec §6), vérifiés en fin de run : sections attendues retrouvées
-≥ 80 %, rappel d'extraction moyen ≥ 85 % (variante clean), 0 section vidée par la garde, **et
-aucun cas en erreur** (une transcription absente ou un appel provider en échec ne doit pas passer
-pour une réussite au prétexte que la moyenne des cas aboutis tient). Code de sortie 1 si un seuil
-n'est pas atteint (en plus des cas déjà gérés par `summarize` : interdits, cas en erreur).
+Seuils d'ouverture du bouton (spec §6), vérifiés en fin de run : sections attendues rédigées ≥ 80 %,
+rappel d'extraction moyen ≥ 85 % (variante clean), **et aucun cas en erreur** (une transcription
+absente ou un appel provider en échec ne doit pas passer pour une réussite au prétexte que la
+moyenne des cas aboutis tient). Code de sortie 1 si un seuil n'est pas atteint (en plus des cas
+déjà gérés par `summarize` : interdits, cas en erreur).
 
 Attente retirée du corpus : `kinésiophobie` (seance-01, seance-04). Le catalogue n'a pas de champ
 dédié et l'extracteur la mappe sur `peur_de_chuter`, un concept différent : l'attendre en mesure
 libre testait le harnais, pas le pipeline.
 
-Run de référence, détail par séance et conclusion : `asr-worker/README.md`, section
-« Correction → Séance ».
+### Run de référence du 2026-09-12 (variante clean, `mistral-medium-3-5`)
+
+Chaîne directe, 5 séances : **sections attendues rédigées 100 %**, **rappel d'extraction 98,3 %**,
+**0 nombre non vérifié**, 4 sections avec doublon de tableau. 4 « interdits » relevés par
+`summarize` = 3 mesures libres attendues absentes sur `seance-05` (préexistant) + 1 valeur
+auto-corrigée dans le dialogue (`seance-02` : abduction annoncée à 80 puis rectifiée à 90,
+l'extracteur a gardé 80). Ce dernier point est un sujet **extracteur**, à traiter un jour de ce
+côté-là, pas par une étape de traitement supplémentaire.
+
+Rejeu du même jour après la suppression définitive de l'étape (même chaîne, même provider) : sections
+100 %, rappel d'extraction **93,3 %** (seance-01 à 83 % avec 5 candidats écartés : variance de l'extracteur,
+pas de changement de code entre les deux runs), 0 nombre non vérifié, 4 doublons de tableau, mêmes 80/90 sur
+seance-02. Retenir une fourchette 93–98 % plutôt qu'un chiffre unique.
+
+Comparaison avec l'ancienne chaîne à compte rendu (mêmes cas) : rappel d'extraction 88,7 %, et
+~70 s de traitement après la transcription contre **~15 s** pour la chaîne directe.
+
+Ancienne chaîne (compte rendu), détail par séance et conclusion, conservés pour mémoire :
+`asr-worker/README.md`, section « Correction → Séance ».
