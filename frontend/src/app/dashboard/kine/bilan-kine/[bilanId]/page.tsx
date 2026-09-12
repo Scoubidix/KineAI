@@ -8,7 +8,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useBilanAutosave } from '@/hooks/useBilanAutosave';
 import { getBilan, getJob, abandonJob, attachPatient, extractBilan, composeBilan, composeBilanFromNotes, ApiError, StaleDraftError } from '@/utils/bilanApi';
-import type { AiBusy, BilanJobResult, BilanJobView, BilanRecord, BilanSectionKey, ExtractionCandidate, PatientSummary, BilanType, SectionWarnings } from '@/types/bilan';
+import type { AiBusy, BilanJobKind, BilanJobResult, BilanJobView, BilanRecord, BilanSectionKey, ExtractionCandidate, PatientSummary, BilanType, SectionWarnings } from '@/types/bilan';
 import BilanEditorHeader from '../components/editor/BilanEditorHeader';
 import BilanStepper, { type EditorStep } from '../components/editor/BilanStepper';
 import CaptureStep from '../components/editor/CaptureStep';
@@ -263,7 +263,8 @@ export default function BilanEditorPage() {
   const modeParam = searchParams.get('mode');
   // Traitement serveur (dictée) : sert d'aiguillage à l'ouverture, puis d'état IA initial une fois terminé
   const [job, setJob] = useState<BilanJobView | null>(null);
-  const [flow, setFlow] = useState<'auto' | 'dictation' | 'editor'>(modeParam === 'dictation' ? 'dictation' : 'auto');
+  // Dictée et séance partagent le même flux d'écrans : seul le genre du traitement change
+  const [flow, setFlow] = useState<'auto' | 'dictation' | 'editor'>(modeParam === 'dictation' || modeParam === 'session' ? 'dictation' : 'auto');
 
   useEffect(() => {
     if (!Number.isInteger(bilanId) || bilanId <= 0) { setState({ status: 'error', message: 'Identifiant de bilan invalide' }); return; }
@@ -336,12 +337,14 @@ export default function BilanEditorPage() {
       </div>
     );
   }
-  // Un traitement non terminé (ou le mode « Dicter » demandé depuis l'accueil) prend toute la page
+  // Un traitement non terminé (ou le mode « Dicter »/« Enregistrer la séance » demandé depuis l'accueil) prend toute la page
   const jobActive = job !== null && job.status !== 'DONE';
   const showFlow = flow === 'dictation' || (flow === 'auto' && jobActive);
   if (showFlow) {
+    // Un traitement déjà ouvert impose son genre : un rechargement avec une autre URL ne le change pas
+    const flowKind: BilanJobKind = job?.kind ?? (modeParam === 'session' ? 'SESSION' : 'DICTATION');
     // Rappels stables (useCallback) : l'effet de fin de flux de DictationFlow ne doit se déclencher qu'une fois
-    return <DictationFlow key={`flow-${state.bilan.id}`} bilan={state.bilan} initialJob={job} onDone={handleDone} onWrite={handleWrite} />;
+    return <DictationFlow key={`flow-${state.bilan.id}`} bilan={state.bilan} kind={flowKind} initialJob={job} onDone={handleDone} onWrite={handleWrite} />;
   }
   const initialAi = job?.status === 'DONE' && job.result ? toInitialAi(job.result) : undefined;
   // Bilan rédigé par dictée : on ouvre sur le document, sauf si l'URL demande explicitement une étape
