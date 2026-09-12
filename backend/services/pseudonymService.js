@@ -99,11 +99,24 @@ const TRAILING_PUNCT = '.,;:!?)»';
 const NUMBER_WORD = '(?:zero|une?|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingts?|trente|quarante|cinquante|soixante|cents?|mille|et)';
 const NUMBER_RUN = `(?:\\d{1,4}|${NUMBER_WORD}(?:\\s+${NUMBER_WORD})*)`;
 const BIRTH_DATE_RE = new RegExp(`${B_BEFORE}(?:nee?s?|naissance)${B_AFTER}(?:\\s+\\S+){0,4}?\\s+(${NUMBER_RUN}\\s+(?:${alt(MONTHS)})\\s+${NUMBER_RUN})${B_AFTER}`, 'gdu');
-// Le segment n'est une date que si `wordsToDigits` en tire un jour, un mois et une année à 4 chiffres
-const DIGITS_DATE_RE = new RegExp(`^\\d{1,2}\\s+(?:${alt(MONTHS)})\\s+\\d{4}$`, 'u');
 
 /** Segments « jour mois année » situés à quatre mots au plus derrière « né(e) » ou « naissance ». */
 const birthDateSegments = (folded) => [...folded.matchAll(BIRTH_DATE_RE)].map((m) => m.indices[1]).filter(Boolean);
+
+const NUMERIC_DATE_RE = /^(\d{1,2})[\s./-]+(\d{1,2})[\s./-]+(\d{4})$/;
+const MONTH_DATE_RE = new RegExp(`^(\\d{1,2})\\s+(${alt(MONTHS)})\\s+(\\d{4})$`, 'u');
+/**
+ * Forme canonique `jj/mm/aaaa` d'une date captée (chiffres ou toutes lettres), sinon null. C'est la
+ * clé de cohérence des jetons de date : les cinq orthographes d'une même date donnent un seul jeton,
+ * et c'est cette valeur — jamais celle de la fiche — qui est réhydratée.
+ */
+function canonicalDate(foldedSpan) {
+  const text = wordsToDigits(foldedSpan).trim();
+  const numeric = text.match(NUMERIC_DATE_RE);
+  if (numeric) return `${pad2(numeric[1])}/${pad2(numeric[2])}/${numeric[3]}`;
+  const named = text.match(MONTH_DATE_RE);
+  return named ? `${pad2(named[1])}/${pad2(MONTHS.indexOf(named[2]) + 1)}/${named[3]}` : null;
+}
 
 // Règles de contexte : marqueur lexical puis un ou deux mots capitalisés
 const CIVILITY_RE = new RegExp(`${B_BEFORE}(?:${alt(CIVILITIES)})\\.?\\s+(${WORD})(?:\\s+(${WORD}))?${B_AFTER}`, 'gdu');
@@ -144,6 +157,7 @@ class Pseudonymizer {
     this.freeMode = !this.patient;
     this.table = new Map();      // jeton → valeur d'origine (première occurrence)
     this.byValue = new Map();    // valeur pliée → jeton
+    this.birthTokens = new Map();// date captée en jj/mm/aaaa → jeton ([Date de naissance], puis numérotés)
     this.tiers = 0;
     this.counts = {};
     this.patientAssigned = false;
@@ -244,8 +258,26 @@ class Pseudonymizer {
       }
     }
     for (const form of this.birthForms) {
-      for (const [start, end] of findForm(folded, form)) this._pushPattern(src, spans, start, end, '[Date de naissance]');
+      for (const [start, end] of findForm(folded, form)) this._pushDate(src, folded, spans, start, end);
     }
+  }
+
+  /**
+   * Jeton d'une date captée, cohérent par forme canonique : une même date, quelle que soit son
+   * orthographe, garde son jeton ; une date différente en reçoit un numéroté. La valeur réhydratée
+   * est la date captée elle-même, jamais celle de la fiche (le texte peut parler d'un tiers).
+   */
+  _pushDate(src, folded, spans, start, end) {
+    const canonical = canonicalDate(folded.slice(start, end));
+    if (!canonical) return;
+    let token = this.birthTokens.get(canonical);
+    if (!token) {
+      const index = this.birthTokens.size + 1;
+      token = index === 1 ? '[Date de naissance]' : `[Date de naissance ${index}]`;
+      this.birthTokens.set(canonical, token);
+      this.table.set(token, canonical);
+    }
+    this._pushPattern(src, spans, start, end, token);
   }
 
   _pushPattern(src, spans, start, end, token) {
@@ -275,9 +307,7 @@ class Pseudonymizer {
     }
     // Une date complète derrière « né(e) » ou « naissance » est une date de naissance, qu'elle soit
     // celle de la fiche ou non ; une date sans ce marqueur reste (spec §4.2 et §4.4).
-    for (const [start, end] of birthDateSegments(folded)) {
-      if (DIGITS_DATE_RE.test(wordsToDigits(folded.slice(start, end)))) this._pushPattern(src, spans, start, end, '[Date de naissance]');
-    }
+    for (const [start, end] of birthDateSegments(folded)) this._pushDate(src, folded, spans, start, end);
   }
 
   _matchContext(src, folded, spans) {
@@ -324,7 +354,10 @@ class Pseudonymizer {
     this._matchKnown(src, folded, spans);
     this._matchPatterns(src, folded, spans);
     this._matchContext(src, folded, spans);
-    // Chevauchements : le plus long d'abord, puis le plus à gauche ; un span déjà couvert est ignoré
+    // Chevauchements : le plus long d'abord, puis le plus à gauche ; un span déjà couvert est ignoré.
+    // À span identique, le tri stable (garanti depuis ES2019) conserve l'ordre des couches : identité
+    // connue, puis motifs, puis contexte — c'est ce qui fait gagner [Kiné] sur [E-mail] pour l'e-mail
+    // du kiné, les deux couches proposant exactement les mêmes bornes.
     spans.sort((a, b) => (b.end - b.start) - (a.end - a.start) || a.start - b.start);
     const kept = []; const taken = tokenSpans(src);
     for (const s of spans) { if (taken.some((t) => s.start < t.end && t.start < s.end)) continue; kept.push(s); taken.push(s); }
@@ -354,11 +387,7 @@ class Pseudonymizer {
         const name = `${this.kine.firstName || ''} ${this.kine.lastName || ''}`.trim();
         return name || null;
       }
-      case '[Date de naissance]': {
-        const born = this.patient && this.patient.birthDate ? new Date(this.patient.birthDate) : null;
-        if (!born || Number.isNaN(born.getTime())) return this.table.get(token) || null;
-        return `${pad2(born.getUTCDate())}/${pad2(born.getUTCMonth() + 1)}/${born.getUTCFullYear()}`;
-      }
+      // [Date de naissance n] passe par la table : c'est la date captée, en jj/mm/aaaa
       default: return this.table.get(token) || null;
     }
   }
