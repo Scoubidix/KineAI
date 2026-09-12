@@ -323,3 +323,75 @@ vérifié, 4 sections avec doublon de tableau (même compte que les runs précé
 4 « interdits » relevés par `summarize` — les 3 mesures libres attendues absentes sur `seance-05`
 déjà documentées, plus le sujet extracteur déjà connu sur `seance-02` (abduction 80/90) — aucun des
 deux lié au changement d'identité. Seuils d'ouverture : ATTEINTS.
+
+### Critère d'acceptation : frontière anamnèse subjective / examen objectif (2026-09-13)
+
+Depuis le lot `docs/superpowers/specs/2026-09-13-sections-frontieres-design.md` (trois consignes
+réécrites côté rédacteur, aucun code touché) : l'anamnèse est bornée au subjectif (motif, ancienneté,
+mécanisme, évolution, retentissement vécu en une phrase, attentes, contexte de vie), avec interdiction
+explicite d'y écrire un signe constaté ou une valeur mesurée par le kiné ; l'examen devient exclusif
+(« c'est ici, et nulle part ailleurs, que les signes actuels sont décrits ») ; une règle de
+non-répétition est ajoutée, avec une exception pour le diagnostic (relier sans redécrire). Critères
+d'acceptation (spec §5) : aucune anamnèse ne cite un signe d'examen ni une valeur mesurée ;
+avertissements `table_duplicate` **en baisse** par rapport aux quatre du run de référence du
+2026-09-12 ; non-régression sur sections rédigées / rappel / fuites ; gabarit d'identité conforme.
+
+Run de référence (variante clean, `mistral-medium-3-5`, dump `eval:session --dump`) :
+
+| Mesure | Run 2026-09-12 (avant) | Run 2026-09-13 (après) |
+|---|---|---|
+| Sections attendues rédigées | 100 % | 100 % |
+| Rappel d'extraction moyen | 96,7 % | 96,7 % |
+| Avertissements `table_duplicate` | 4 | **7** |
+| Fuites | 0 | 0 |
+| Nombres non vérifiés | 0 | 0 |
+| Gabarit d'identité conforme (5/5) | oui | oui |
+
+Non-régression atteinte sur toutes les mesures **sauf une** : les avertissements `table_duplicate`
+sont en **hausse** (4 → 7), alors que le critère d'acceptation exigeait une baisse. Détail par
+séance : `seance-01` (nouveau : examen), `seance-02` (objectifs, déjà présent avant), `seance-03`
+(nouveau : anamnèse ; déjà présents : examen, traitement), `seance-04` (nouveau : examen, diagnostic ;
+disparu : anamnèse), `seance-05` (aucun, inchangé). Conformément à la consigne « une hausse des
+doublons … est un échec à rapporter, pas à corriger en relançant », ce résultat est documenté tel
+quel, sans nouveau run.
+
+Lecture littérale des cinq anamnèses et des cinq examens :
+
+- Les deux recouvrements connus du run précédent ont **disparu** :
+  - épaule (`seance-02`) : l'anamnèse ne porte plus « réveils nocturnes » (elle dit désormais
+    « perturbe surtout le sommeil », une formulation de retentissement plus générale) ; l'examen
+    porte seul « Douleur nocturne positive avec réveils fréquents. »
+  - cheville (`seance-05`) : l'anamnèse ne mentionne plus ni gonflement ni boiterie ; l'examen porte
+    seul « Gonflement net et hématome étendu devant et sous la malléole latérale gauche, avec œdème
+    périmalléolaire. […] les fibulaires sont affaiblis, l'appui monopodal gauche est impossible et la
+    boiterie est présente. »
+- Un nouveau cas de **valeur mesurée dans l'anamnèse** apparaît, en violation directe de la consigne
+  « aucune valeur » : `seance-03` écrit « La douleur, évaluée à 1 au repos et 3 à l'effort » — deux
+  valeurs d'EVA, alors que ces mêmes valeurs entrent par ailleurs dans le tableau de mesures (d'où
+  l'avertissement `table_duplicate` sur l'anamnèse de ce cas, une première).
+- Le diagnostic de `seance-04` **redécrit** au lieu de relier, à l'encontre de l'exception prévue :
+  « réflexe bicipital diminué et testing du biceps à 4/5 », alors que l'examen porte déjà « Le
+  réflexe bicipital est diminué à droite, et le testing du biceps droit est à 4/5 » — valeur 4/5
+  répétée à l'identique.
+- Constat hors périmètre de la spec (qui ne touchait que l'anamnèse et l'examen) mais relevé à la
+  lecture : l'anamnèse fait désormais **double emploi avec les Limitations fonctionnelles** sur
+  plusieurs cas, exactement le risque anticipé par la spec §3.5 (« à rouvrir si la lecture montre que
+  la phrase de l'anamnèse fait double emploi ») —
+  - `seance-02` : anamnèse « limite les activités quotidiennes comme s'habiller ou attraper des
+    objets en hauteur » / limitations « Difficulté à s'habiller, impossibilité d'attraper des objets
+    en hauteur ».
+  - `seance-03` : anamnèse « Le retentissement porte sur la conduite (difficulté avec l'accélérateur
+    et le freinage), la marche prolongée et la descente des escaliers » / limitations « Difficulté à
+    conduire (freinage d'urgence non maîtrisé), marche prolongée et descente des escaliers une marche
+    à la fois. »
+
+**Verdict** : la frontière anamnèse/examen proprement dite tient sur les deux cas qui avaient motivé
+le lot (plus aucun signe d'examen constaté n'apparaît dans une anamnèse), mais le critère
+d'acceptation formel (`table_duplicate` en baisse) n'est **pas atteint** — il est en hausse — et deux
+nouvelles non-conformités sont apparues ailleurs (valeur d'EVA en anamnèse sur `seance-03`, diagnostic
+qui redécrit sur `seance-04`), plus un doublon anamnèse/limitations sur deux cas. À rouvrir : borner
+plus strictement le « retentissement en une phrase » (3.1/3.5) pour qu'il ne reprenne pas
+l'inventaire des Limitations fonctionnelles, interdire explicitement les valeurs d'échelle de douleur
+(EVA) dans l'anamnèse, et vérifier que le diagnostic ne recopie pas les valeurs de testing déjà dans
+le tableau. Log complet et dump conservés hors dépôt (gitignorés) pour relecture :
+`.superpowers/sdd/2026-09-13-sections-frontieres/task-2-report.md`.
