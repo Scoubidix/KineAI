@@ -16,8 +16,12 @@ const { correct } = require('../../services/dictationCorrectionService');
 const { composeSections } = require('../../services/bilanComposeService');
 const { applyCandidates } = require('../../services/bilanExtractionService');
 const { SECTION_KEYS, SECTION_TITLES } = require('../../services/bilanDocument');
-const { runCase, printResult, summarize } = require('../extraction/lib');
+const { createPseudonymizer } = require('../../services/pseudonymService');
+const llmService = require('../../services/llmService');
+const { runCase, printResult, summarize, installLeakGuard, identityOf, formatStats } = require('../extraction/lib');
 const cases = require('./cases.json');
+// Kiné synthétique des harnais (jamais un vrai kiné) : masqué comme le patient, jamais envoyé au modèle.
+const KINE_IDENTITY = { firstName: 'Valentin', lastName: 'Durand', email: null };
 
 const args = process.argv.slice(2);
 const arg = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : null);
@@ -43,11 +47,22 @@ function dump(id, sections, warnings) {
   const results = [];
   const sectionStats = { expected: 0, found: 0, unexpected: 0, warnings: 0 };
   console.log('Chaîne de séance : correction → extraction sur le dialogue → rédaction depuis le dialogue');
+  const selected = cases.filter((x) => !only || x.id === only);
+  // Une identité par cas ; les formes interdites de chaque cas ne se recoupent jamais (patients
+  // distincts), donc une seule garde globale posée avant Promise.all — avec l'union des formes de
+  // tous les cas — suffit : chaque cas ne relit que ses propres formes dans `guard.leaks` en fin de
+  // chaîne (`runOne` n'y accède qu'après avoir attendu tous ses propres appels au modèle, la garde y
+  // a donc déjà consigné ses éventuelles fuites). C'est la solution la plus simple qui garde
+  // l'attribution par cas sans poser/retirer une garde par appel concurrent.
+  const identities = new Map(selected.map((k) => [k.id, identityOf(k)]));
+  const allForms = [...new Set(selected.flatMap((k) => identities.get(k.id).map((f) => f.form)))];
+  const guard = installLeakGuard(llmService, allForms);
   // Un cas = une chaîne d'appels ; les cas tournent en parallèle contre le provider et chacun
   // tamponne sa sortie pour l'imprimer d'un bloc, dans l'ordre du corpus
   async function runOne(kase) {
     const buf = [];
     const out = { write: (t) => buf.push(t), log: (t) => buf.push(`${t}\n`) };
+    const pseudo = createPseudonymizer({ patient: kase.identity, kine: KINE_IDENTITY, at: new Date() });
     const result = await (async () => {
       const file = path.join(ROOT, kase.transcript.replace(/_clean\.txt$/, `_${variant}.txt`));
       out.write(`▶ ${kase.id} — ${kase.title} (${variant}) … `);
@@ -55,15 +70,15 @@ function dump(id, sections, warnings) {
       try {
         const transcript = fs.readFileSync(file, 'utf8');
         const words = transcript.split(/\s+/).filter(Boolean).length;
-        const c = await correct({ text: transcript, mode: 'session', catalog });
+        const c = await correct({ text: transcript, mode: 'session', catalog, pseudo });
         const expected = kase.expectSections || [];
         out.write(`\n   dialogue ${words} mots · correction ${c.applied}/${c.ignored}\n   extraction … `);
-        const x = await runCase({ ...kase, notes: c.text }, catalog);
+        const x = await runCase({ ...kase, notes: c.text, pseudo }, catalog);
         printResult(x, out.log);
         // Comme en production : les mesures acceptées entrent au document avant la rédaction (tableau exclu de la prose)
         const { document, accepted } = applyCandidates(EMPTY_DOC, x.candidates);
         const t0 = Date.now();
-        const composed = await composeSections({ bilanId: kase.id, type: kase.type, motif: kase.motif, notes: c.text, document, catalog, keys: SECTION_KEYS, source: 'dialogue' });
+        const composed = await composeSections({ bilanId: kase.id, type: kase.type, motif: kase.motif, notes: c.text, document, catalog, keys: SECTION_KEYS, source: 'dialogue', pseudo });
         const sections = composed.texts;
         const warned = Object.keys(composed.warnings);
         sectionStats.warnings += warned.length;
@@ -81,10 +96,18 @@ function dump(id, sections, warnings) {
         return { id: kase.id, error: err.message };
       }
     })();
+    const myForms = new Set(identities.get(kase.id).map((f) => f.form));
+    const myLeaks = guard.leaks.filter((l) => myForms.has(l));
+    if (myLeaks.length) {
+      result.error = `FUITE (${myLeaks.length})`;
+      const types = myLeaks.map((l) => identities.get(kase.id).find((f) => f.form === l)?.type || '?');
+      out.log(`   FUITE (${myLeaks.length}) : ${types.join(', ')}`);
+    }
+    out.log(`   ${formatStats(pseudo.stats())}`);
     return { result, text: buf.join('') };
   }
-  const selected = cases.filter((x) => !only || x.id === only);
   const runs = await Promise.all(selected.map(runOne));
+  guard.restore();
   for (const r of runs) { process.stdout.write(r.text); if (!r.text.endsWith('\n')) console.log(); results.push(r.result); }
   const code = summarize(results);
   const ok = results.filter((r) => !r.error);

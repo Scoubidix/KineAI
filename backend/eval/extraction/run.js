@@ -5,12 +5,16 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 const { loadSeedFile } = require('../../services/bilanSeedService');
-const { runCase, printResult, summarize } = require('./lib');
+const { createPseudonymizer } = require('../../services/pseudonymService');
+const llmService = require('../../services/llmService');
+const { runCase, printResult, summarize, installLeakGuard, identityOf, formatStats } = require('./lib');
 const cases = require('./cases.json');
 
 const args = process.argv.slice(2);
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : null;
 const jsonOut = args.includes('--json') ? args[args.indexOf('--json') + 1] : null;
+// Kiné synthétique des harnais (jamais un vrai kiné) : masqué comme le patient, jamais envoyé au modèle.
+const KINE_IDENTITY = { firstName: 'Valentin', lastName: 'Durand', email: null };
 
 (async () => {
   const seed = loadSeedFile();
@@ -20,11 +24,23 @@ const jsonOut = args.includes('--json') ? args[args.indexOf('--json') + 1] : nul
   const results = [];
   for (const c of selected) {
     process.stdout.write(`▶ ${c.id} — ${c.title} … `);
+    const pseudo = createPseudonymizer({ patient: c.identity, kine: KINE_IDENTITY, at: new Date() });
+    const identity = identityOf(c);
+    const guard = installLeakGuard(llmService, identity.map((f) => f.form));
     try {
-      const r = await runCase(c, catalog);
+      const r = await runCase({ ...c, pseudo }, catalog);
+      guard.restore();
+      if (guard.leaks.length) {
+        r.error = `FUITE (${guard.leaks.length})`;
+        const types = guard.leaks.map((leak) => identity.find((f) => f.form === leak)?.type || '?');
+        console.log(`FUITE (${guard.leaks.length}) : ${types.join(', ')}`);
+      } else {
+        printResult(r);
+      }
+      console.log(`   ${formatStats(pseudo.stats())}`);
       results.push(r);
-      printResult(r);
     } catch (err) {
+      guard.restore();
       console.log(`ERREUR ${err.code || ''} ${err.message}`);
       results.push({ id: c.id, error: err.message });
     }

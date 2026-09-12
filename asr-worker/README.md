@@ -410,6 +410,10 @@ d'extraction, comme observé aux runs précédents. Noté tel quel, sans retouch
 > `sessionReportService`, plus de statut `REPORTING`. Les chiffres ci-dessous sont ceux de
 > **l'ancienne chaîne**, conservés pour mémoire. Référence de la chaîne actuelle :
 > `backend/eval/README.md`, section « Eval — séance ».
+>
+> **2026-09-12 — pseudonymisation.** Le texte de ce corpus (noms Martin, Delcourt, Rosier, Vasseur,
+> Berthier) est désormais masqué avant tout appel au modèle par les trois harnais bilan ; voir
+> `backend/eval/README.md`, section « Pseudonymisation et fuites ».
 
 Chaîne complète du corpus de séances (`backend/eval/session/run.js`, `npm run eval:session`) :
 transcription (`asr-worker/eval/out/seance-0N_*.txt`, voir plus haut) → passe de correction

@@ -39,10 +39,17 @@ présent et lisible (catalogue des champs). Aucun accès DB, aucun serveur à d�
   "expect": ["eva_repos=4", "test_laseuge:D=false"],
   "forbid": ["test_lachman"],
   "forbidValues": [92],
-  "customContains": ["monopodal"]
+  "customContains": ["monopodal"],
+  "identity": { "firstName": "Prénom synthétique", "lastName": "Nom synthétique", "birthDate": "1985-01-01" },
+  "mustNotReachModel": []
 }
 ```
 
+- `identity`/`mustNotReachModel` : voir « Pseudonymisation et fuites » plus bas — obligatoires sur
+  chaque cas des trois harnais. Choisir un prénom/nom qui n'apparaît pas dans le texte du cas et qui
+  ne collide pas avec un éponyme clinique (`CLINICAL_EPONYMS` de `pseudonymService.js` : Lachman,
+  Thomas, Ober, Speed, Roos… souvent des alias du catalogue) ni avec un mot du vocabulaire envoyé au
+  modèle pour la correction.
 - `expect` : liste de `clé[:D|G]=valeur`. La clé est la clé canonique du champ (voir
   `data/bilanSeed.json`). `:D` / `:G` précise le côté pour les champs latéralisés. La valeur
   est parsée en nombre si elle ressemble à un nombre, en booléen si `true`/`false`, sinon
@@ -86,6 +93,58 @@ Pour chaque cas :
   `customContains`), `extra` (candidat canonique non attendu), `libre` (candidats `custom`
   produits, pour relecture manuelle).
 - en fin de run : rappel moyen et total d'interdits sur tous les cas lancés.
+
+## Pseudonymisation et fuites
+
+Depuis le 2026-09-12, les trois harnais (`eval:extraction`, `eval:dictation`, `eval:session`)
+pseudonymisent le texte envoyé au modèle exactement comme en production
+(`services/pseudonymService.js`, design `docs/superpowers/specs/2026-09-12-pseudonymisation-design.md`) :
+chaque cas construit un `pseudo = createPseudonymizer({ patient: c.identity, kine, at })` (kiné
+synthétique fixe `{ firstName: 'Valentin', lastName: 'Durand', email: null }`) et le transmet à
+`correct`, `runCase`/`extractFromText`, `composeSections`. Le nom, le prénom et la date de naissance
+du patient sont masqués avant tout appel au modèle, et réhydratés dans les sorties (texte corrigé,
+candidats, sections rédigées) — les notes réelles ne quittent jamais le serveur.
+
+- **`identity`** (par cas, dans `cases.json`) : `{ firstName, lastName, birthDate }`, tous
+  synthétiques, jamais l'identité réelle d'un patient. Pour les cas de séance, le `lastName` reprend
+  volontairement le nom prononcé dans la transcription (Martin, Delcourt, Rosier, Vasseur, Berthier)
+  — c'est ce nom réel du corpus que la pseudonymisation doit intercepter ; `firstName` et `birthDate`
+  sont inventés, absents du texte. Pour les notes et dictées (aucun nom dans le texte source),
+  l'identité entière est synthétique.
+- **`mustNotReachModel`** (par cas) : formes de tiers repérées dans le corpus par
+  `grep -iE "(docteur|dr|monsieur|madame|mon fils|ma fille|ma femme|mon mari) [A-Z]…"` sur la
+  transcription — vide si le corpus n'en nomme aucun (cas actuel des 5 séances : les tiers cités,
+  « mon mari », « ma femme », « ma fille », n'ont pas de nom propre attaché).
+- **Garde anti-fuite** (`installLeakGuard`, `backend/eval/extraction/lib.js`) : enveloppe
+  `llmService.chatCompletion`, cherche chaque forme interdite du cas (`identityOf(kase)` : prénom,
+  nom, `mustNotReachModel`) dans le texte des messages envoyés — repli accents/casse identique au
+  service, recherche en mot entier, jamais bloquant. `eval:session` posant ses cas en parallèle
+  (`Promise.all`), une seule garde globale est installée avant le lancement, avec l'union des formes
+  interdites de tous les cas ; chaque cas relit `guard.leaks` filtré sur ses propres formes une fois
+  sa propre chaîne d'appels terminée (les formes ne se recoupent jamais entre patients, l'attribution
+  reste donc exacte sans poser une garde par appel concurrent). `eval:extraction` et `eval:dictation`,
+  séquentiels, posent et retirent une garde par cas.
+- **Lire une fuite** : un cas fuité imprime `FUITE (n)` suivi des **types** concernés (« Prénom »,
+  « NOM », « Tiers »), jamais la valeur — cohérent avec la règle « aucun nom dans les sorties du
+  harnais ». Le cas compte alors en erreur (`summarize` sort en code 1). Chaque cas imprime aussi
+  `pseudo.stats()` (« jetons : NOM ×2, Tiers ×1 ») : nombre de jetons posés par type, jamais leur
+  valeur.
+- **Run de référence du 2026-09-12** (`mistral-medium-3-5`, après pseudonymisation) : **0 fuite**
+  sur les 23 cas des trois harnais. `eval:extraction` (13 cas) : rappel moyen **98,6 %**, 0 interdit.
+  `eval:dictation --correct` (5 cas) : rappel moyen **94,4 %**, 0 interdit. `eval:session --dump`
+  (5 cas) : sections 100 %, rappel d'extraction **95,0 %** (dans la fourchette attendue), 3 interdits
+  — préexistants, cf. « Run de référence » ci-dessous, sans lien avec la pseudonymisation.
+  Un premier essai avait signalé une fuite sur `seance-05` (identité synthétique `Thomas`, qui
+  collidait avec l'alias catalogue « thomas » du champ `test_thomas`, envoyé au modèle dans le
+  vocabulaire de correction pour **tous** les cas, pas seulement celui-ci) : corrigé en changeant le
+  prénom synthétique du cas (`Julien`), sans toucher au code — une identité de harnais doit éviter les
+  éponymes cliniques (`CLINICAL_EPONYMS` de `pseudonymService.js`) et les alias du catalogue.
+- **Anamnèse — défaut de guide relevé, sans fuite** : sur les 5 séances du dump, la section
+  Identification & anamnèse commence systématiquement par `NOM, âge ans,` (ex. « MARTIN, 46 ans, »)
+  au lieu de `Prénom NOM, âge ans,` attendu (« Sophie MARTIN, 46 ans, ») — le modèle omet le jeton
+  `[Prénom]` plutôt que de le recopier. Aucun nom, réel ou synthétique, n'apparaît en clair (ni fuite
+  RGPD ni fuite de test) : c'est une non-conformité au gabarit du guide de rédaction, à corriger côté
+  prompt (`SECTION_GUIDE.anamnese`) si le format « Prénom NOM » est requis à l'affichage.
 
 ## Eval — dictée
 
@@ -198,3 +257,12 @@ Comparaison avec l'ancienne chaîne à compte rendu (mêmes cas) : rappel d'extr
 
 Ancienne chaîne (compte rendu), détail par séance et conclusion, conservés pour mémoire :
 `asr-worker/README.md`, section « Correction → Séance ».
+
+### Rejeu du 2026-09-12 après pseudonymisation (identité par cas, garde anti-fuite)
+
+Même chaîne, même provider, cases.json enrichi d'`identity`/`mustNotReachModel` (voir « Pseudonymisation
+et fuites » plus haut) : sections attendues rédigées **100 %**, rappel d'extraction **95,0 %** (dans la
+fourchette 93–98 % ci-dessus), 0 nombre non vérifié, 4 sections avec doublon de tableau, 0 fuite. Les
+3 « interdits » relevés par `summarize` sont les 3 mesures libres attendues absentes sur `seance-05`
+déjà documentées ci-dessus (préexistant, sans lien avec la pseudonymisation) ; `seance-02` garde le
+même sujet extracteur (80/90). Seuils d'ouverture : ATTEINTS.

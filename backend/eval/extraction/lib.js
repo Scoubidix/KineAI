@@ -17,7 +17,7 @@ const sameValue = (got, exp) => {
 };
 
 async function runCase(c, catalog) {
-  const { candidates, rejected } = await extractFromText({ rawNotes: c.notes, motif: c.motif ?? null, catalog, document: { schemaVersion: 1, sections: [], measurements: [] }, logContext: c.id });
+  const { candidates, rejected } = await extractFromText({ rawNotes: c.notes, motif: c.motif ?? null, catalog, document: { schemaVersion: 1, sections: [], measurements: [] }, logContext: c.id, pseudo: c.pseudo });
   const canon = candidates.filter((x) => x.kind === 'canonical');
   const custom = candidates.filter((x) => x.kind === 'custom');
   const missing = [];
@@ -59,4 +59,53 @@ function summarize(results) {
   return errors > 0 || results.length === 0 || results.some((r) => r.error) ? 1 : 0;
 }
 
-module.exports = { parseExpect, sameValue, runCase, printResult, summarize };
+// ---- Garde anti-fuite (pseudonymisation, spec 2026-09-12 §9) : repère si une forme interdite —
+// identité du cas de test, jamais l'identité réelle d'un patient — atteint le modèle malgré le
+// masquage. Repli identique à `pseudonymService.fold` (accents, casse) ; recherche en mot entier ;
+// l'appel continue toujours (on mesure, on ne bloque pas).
+const foldChar = (c) => { const f = c.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); return f.length === 1 ? f : c; };
+const fold = (s) => Array.from(String(s ?? ''), foldChar).join('');
+const LETTER = '\\p{L}\\p{M}';
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const formRegex = (foldedForm) => new RegExp(`(?<![${LETTER}])${foldedForm.split(/\s+/).map(escapeRe).join('\\s+')}(?![${LETTER}])`, 'u');
+
+/**
+ * Enveloppe `llmService.chatCompletion` : pour chaque appel, cherche chaque forme interdite (pliée,
+ * mot entier) dans le texte des messages envoyés. Une occurrence → `leaks.push(form)` (dédoublonné,
+ * une seule fois par forme). Ne bloque jamais l'appel. `restore()` remet la fonction d'origine.
+ */
+function installLeakGuard(llmService, forbidden) {
+  const original = llmService.chatCompletion;
+  const forms = [...new Set((forbidden || []).map((f) => String(f ?? '').trim()).filter(Boolean))];
+  const compiled = forms.map((form) => ({ form, re: formRegex(fold(form)) }));
+  const leaks = [];
+  llmService.chatCompletion = function guarded() {
+    const params = arguments[0];
+    const text = fold((params?.messages || []).map((m) => String(m?.content ?? '')).join('\n'));
+    for (const { form, re } of compiled) { if (!leaks.includes(form) && re.test(text)) leaks.push(form); }
+    return original.apply(this, arguments);
+  };
+  return { leaks, restore() { llmService.chatCompletion = original; } };
+}
+
+/**
+ * Formes interdites d'un cas et leur type, pour attribuer une fuite sans jamais imprimer sa valeur :
+ * prénom et nom de l'identité synthétique du cas, puis les tiers repérés dans le corpus
+ * (`mustNotReachModel`).
+ */
+function identityOf(kase) {
+  const identity = kase.identity || {};
+  const forms = [];
+  if (identity.firstName) forms.push({ form: String(identity.firstName), type: 'Prénom' });
+  if (identity.lastName) forms.push({ form: String(identity.lastName), type: 'NOM' });
+  for (const m of kase.mustNotReachModel || []) if (m) forms.push({ form: String(m), type: 'Tiers' });
+  return forms;
+}
+
+/** Ligne « jetons : NOM ×2, Tiers ×1 » à partir de `pseudo.stats()` — jamais de valeur. */
+function formatStats(stats) {
+  const entries = Object.entries(stats || {});
+  return `jetons : ${entries.length ? entries.map(([type, n]) => `${type} ×${n}`).join(', ') : 'aucun'}`;
+}
+
+module.exports = { parseExpect, sameValue, runCase, printResult, summarize, installLeakGuard, identityOf, formatStats };

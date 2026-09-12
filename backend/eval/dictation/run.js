@@ -7,8 +7,12 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 const { loadSeedFile } = require('../../services/bilanSeedService');
 const { correct } = require('../../services/dictationCorrectionService');
-const { runCase, printResult, summarize } = require('../extraction/lib');
+const { createPseudonymizer } = require('../../services/pseudonymService');
+const llmService = require('../../services/llmService');
+const { runCase, printResult, summarize, installLeakGuard, identityOf, formatStats } = require('../extraction/lib');
 const cases = require('./cases.json');
+// Kiné synthétique des harnais (jamais un vrai kiné) : masqué comme le patient, jamais envoyé au modèle.
+const KINE_IDENTITY = { firstName: 'Valentin', lastName: 'Durand', email: null };
 
 const args = process.argv.slice(2);
 const arg = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : null);
@@ -30,19 +34,31 @@ const termHits = (t) => TERMES.filter((x) => t.toLowerCase().includes(x)).length
     const file = path.join(ROOT, kase.transcript.replace(/_clean\.txt$/, `_${variant}.txt`));
     process.stdout.write(`▶ ${kase.id} — ${kase.title} (${variant}) … `);
     if (!fs.existsSync(file)) { console.log(`ABSENT ${path.relative(ROOT, file)} (lancer asr-worker/eval/bench.py)`); results.push({ id: kase.id, error: 'transcription absente' }); continue; }
+    const pseudo = createPseudonymizer({ patient: kase.identity, kine: KINE_IDENTITY, at: new Date() });
+    const identity = identityOf(kase);
+    const guard = installLeakGuard(llmService, identity.map((f) => f.form));
     try {
       let notes = fs.readFileSync(file, 'utf8');
       if (withCorrection) {
         const before = termHits(notes);
-        const c = await correct({ text: notes, mode: 'dictation', catalog });
+        const c = await correct({ text: notes, mode: 'dictation', catalog, pseudo });
         notes = c.text;
         console.log(`\n   correction : ${c.applied} appliquée(s), ${c.ignored} ignorée(s) · termes ${before} → ${termHits(notes)} / ${TERMES.length}`);
         process.stdout.write('   extraction … ');
       }
-      const r = await runCase({ ...kase, notes }, catalog);
+      const r = await runCase({ ...kase, notes, pseudo }, catalog);
+      guard.restore();
+      if (guard.leaks.length) {
+        r.error = `FUITE (${guard.leaks.length})`;
+        const types = guard.leaks.map((leak) => identity.find((f) => f.form === leak)?.type || '?');
+        console.log(`FUITE (${guard.leaks.length}) : ${types.join(', ')}`);
+      } else {
+        printResult(r);
+      }
+      console.log(`   ${formatStats(pseudo.stats())}`);
       results.push(r);
-      printResult(r);
     } catch (err) {
+      guard.restore();
       console.log(`ERREUR ${err.code || ''} ${err.message}`);
       results.push({ id: kase.id, error: err.message });
     }
