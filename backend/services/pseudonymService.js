@@ -415,4 +415,5 @@ class Pseudonymizer {
 
 const createPseudonymizer = (options = {}) => new Pseudonymizer(options);
 
-module.exports = { createPseudonymizer, computeAge, TOKEN_TYPES };
+/** Repli caractère par caractère (accents, casse, apostrophes/tirets → espace), longueur conservée. */
+module.exports = { createPseudonymizer, computeAge, TOKEN_TYPES, fold };

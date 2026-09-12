@@ -9,7 +9,7 @@ const { loadSeedFile } = require('../../services/bilanSeedService');
 const { correct } = require('../../services/dictationCorrectionService');
 const { createPseudonymizer } = require('../../services/pseudonymService');
 const llmService = require('../../services/llmService');
-const { runCase, printResult, summarize, installLeakGuard, identityOf, formatStats } = require('../extraction/lib');
+const { runCase, printResult, summarize, installLeakGuard, identityOf, formatStats, leakLine } = require('../extraction/lib');
 const cases = require('./cases.json');
 // Kiné synthétique des harnais (jamais un vrai kiné) : masqué comme le patient, jamais envoyé au modèle.
 const KINE_IDENTITY = { firstName: 'Valentin', lastName: 'Durand', email: null };
@@ -48,10 +48,10 @@ const termHits = (t) => TERMES.filter((x) => t.toLowerCase().includes(x)).length
       }
       const r = await runCase({ ...kase, notes, pseudo }, catalog);
       guard.restore();
-      if (guard.leaks.length) {
-        r.error = `FUITE (${guard.leaks.length})`;
-        const types = guard.leaks.map((leak) => identity.find((f) => f.form === leak)?.type || '?');
-        console.log(`FUITE (${guard.leaks.length}) : ${types.join(', ')}`);
+      const line = leakLine(guard.leaks, identity);
+      if (line) {
+        r.error = line;
+        console.log(line);
       } else {
         printResult(r);
       }
@@ -59,8 +59,11 @@ const termHits = (t) => TERMES.filter((x) => t.toLowerCase().includes(x)).length
       results.push(r);
     } catch (err) {
       guard.restore();
+      const line = leakLine(guard.leaks, identity);
       console.log(`ERREUR ${err.code || ''} ${err.message}`);
-      results.push({ id: kase.id, error: err.message });
+      if (line) console.log(line);
+      console.log(`   ${formatStats(pseudo.stats())}`);
+      results.push({ id: kase.id, error: line ? `${err.message} ; ${line}` : err.message });
     }
   }
   const code = summarize(results);

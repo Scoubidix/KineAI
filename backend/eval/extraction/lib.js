@@ -1,5 +1,6 @@
 // Logique partagée des harnais d'évaluation de l'extraction (notes et dictées).
 const { extractFromText, normalizeText } = require('../../services/bilanExtractionService');
+const { fold } = require('../../services/pseudonymService');
 
 function parseExpect(s) {
   const [left, rawValue] = s.split('=');
@@ -61,10 +62,8 @@ function summarize(results) {
 
 // ---- Garde anti-fuite (pseudonymisation, spec 2026-09-12 §9) : repère si une forme interdite —
 // identité du cas de test, jamais l'identité réelle d'un patient — atteint le modèle malgré le
-// masquage. Repli identique à `pseudonymService.fold` (accents, casse) ; recherche en mot entier ;
-// l'appel continue toujours (on mesure, on ne bloque pas).
-const foldChar = (c) => { const f = c.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); return f.length === 1 ? f : c; };
-const fold = (s) => Array.from(String(s ?? ''), foldChar).join('');
+// masquage. Repli `pseudonymService.fold` (accents, casse, apostrophes/tirets → espace) ;
+// recherche en mot entier ; l'appel continue toujours (on mesure, on ne bloque pas).
 const LETTER = '\\p{L}\\p{M}';
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const formRegex = (foldedForm) => new RegExp(`(?<![${LETTER}])${foldedForm.split(/\s+/).map(escapeRe).join('\\s+')}(?![${LETTER}])`, 'u');
@@ -108,4 +107,11 @@ function formatStats(stats) {
   return `jetons : ${entries.length ? entries.map(([type, n]) => `${type} ×${n}`).join(', ') : 'aucun'}`;
 }
 
-module.exports = { parseExpect, sameValue, runCase, printResult, summarize, installLeakGuard, identityOf, formatStats };
+/** Ligne « FUITE (n) : Type1, Type2 » à partir des `leaks` d'une garde et de `identityOf(kase)` ; null si aucune fuite. */
+function leakLine(leaks, identity) {
+  if (!leaks || !leaks.length) return null;
+  const types = leaks.map((leak) => identity.find((f) => f.form === leak)?.type || '?');
+  return `FUITE (${leaks.length}) : ${types.join(', ')}`;
+}
+
+module.exports = { parseExpect, sameValue, runCase, printResult, summarize, installLeakGuard, identityOf, formatStats, leakLine };

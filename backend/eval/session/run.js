@@ -16,9 +16,9 @@ const { correct } = require('../../services/dictationCorrectionService');
 const { composeSections } = require('../../services/bilanComposeService');
 const { applyCandidates } = require('../../services/bilanExtractionService');
 const { SECTION_KEYS, SECTION_TITLES } = require('../../services/bilanDocument');
-const { createPseudonymizer } = require('../../services/pseudonymService');
+const { createPseudonymizer, fold } = require('../../services/pseudonymService');
 const llmService = require('../../services/llmService');
-const { runCase, printResult, summarize, installLeakGuard, identityOf, formatStats } = require('../extraction/lib');
+const { runCase, printResult, summarize, installLeakGuard, identityOf, formatStats, leakLine } = require('../extraction/lib');
 const cases = require('./cases.json');
 // Kiné synthétique des harnais (jamais un vrai kiné) : masqué comme le patient, jamais envoyé au modèle.
 const KINE_IDENTITY = { firstName: 'Valentin', lastName: 'Durand', email: null };
@@ -55,6 +55,21 @@ function dump(id, sections, warnings) {
   // a donc déjà consigné ses éventuelles fuites). C'est la solution la plus simple qui garde
   // l'attribution par cas sans poser/retirer une garde par appel concurrent.
   const identities = new Map(selected.map((k) => [k.id, identityOf(k)]));
+  // L'attribution par cas ci-dessous (une garde globale, relue avec les formes propres à chaque cas)
+  // suppose qu'aucune forme interdite n'est partagée entre deux cas ; vérifié explicitement plutôt
+  // que supposé silencieusement — jamais la valeur de la forme dans le message d'erreur.
+  const formOwner = new Map();
+  for (const kase of selected) {
+    for (const f of identities.get(kase.id)) {
+      const folded = fold(f.form);
+      const owner = formOwner.get(folded);
+      if (owner && owner !== kase.id) {
+        console.error(`Formes interdites partagées entre deux cas (${owner} et ${kase.id}) : l'attribution des fuites par cas ne serait plus fiable.`);
+        process.exit(2);
+      }
+      formOwner.set(folded, kase.id);
+    }
+  }
   const allForms = [...new Set(selected.flatMap((k) => identities.get(k.id).map((f) => f.form)))];
   const guard = installLeakGuard(llmService, allForms);
   // Un cas = une chaîne d'appels ; les cas tournent en parallèle contre le provider et chacun
@@ -98,10 +113,10 @@ function dump(id, sections, warnings) {
     })();
     const myForms = new Set(identities.get(kase.id).map((f) => f.form));
     const myLeaks = guard.leaks.filter((l) => myForms.has(l));
-    if (myLeaks.length) {
-      result.error = `FUITE (${myLeaks.length})`;
-      const types = myLeaks.map((l) => identities.get(kase.id).find((f) => f.form === l)?.type || '?');
-      out.log(`   FUITE (${myLeaks.length}) : ${types.join(', ')}`);
+    const line = leakLine(myLeaks, identities.get(kase.id));
+    if (line) {
+      result.error = result.error ? `${result.error} ; ${line}` : line;
+      out.log(`   ${line}`);
     }
     out.log(`   ${formatStats(pseudo.stats())}`);
     return { result, text: buf.join('') };

@@ -7,7 +7,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 const { loadSeedFile } = require('../../services/bilanSeedService');
 const { createPseudonymizer } = require('../../services/pseudonymService');
 const llmService = require('../../services/llmService');
-const { runCase, printResult, summarize, installLeakGuard, identityOf, formatStats } = require('./lib');
+const { runCase, printResult, summarize, installLeakGuard, identityOf, formatStats, leakLine } = require('./lib');
 const cases = require('./cases.json');
 
 const args = process.argv.slice(2);
@@ -30,10 +30,10 @@ const KINE_IDENTITY = { firstName: 'Valentin', lastName: 'Durand', email: null }
     try {
       const r = await runCase({ ...c, pseudo }, catalog);
       guard.restore();
-      if (guard.leaks.length) {
-        r.error = `FUITE (${guard.leaks.length})`;
-        const types = guard.leaks.map((leak) => identity.find((f) => f.form === leak)?.type || '?');
-        console.log(`FUITE (${guard.leaks.length}) : ${types.join(', ')}`);
+      const line = leakLine(guard.leaks, identity);
+      if (line) {
+        r.error = line;
+        console.log(line);
       } else {
         printResult(r);
       }
@@ -41,8 +41,11 @@ const KINE_IDENTITY = { firstName: 'Valentin', lastName: 'Durand', email: null }
       results.push(r);
     } catch (err) {
       guard.restore();
+      const line = leakLine(guard.leaks, identity);
       console.log(`ERREUR ${err.code || ''} ${err.message}`);
-      results.push({ id: c.id, error: err.message });
+      if (line) console.log(line);
+      console.log(`   ${formatStats(pseudo.stats())}`);
+      results.push({ id: c.id, error: line ? `${err.message} ; ${line}` : err.message });
     }
   }
   const code = summarize(results);
