@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 const { emptyDocument, validateDocument, isDocumentEmpty } = require('./bilanDocument');
 const { getCatalog } = require('./bilanRenderService');
 const { computeProgress } = require('./bilanJobRules');
+const { resolveIdentity } = require('./pseudonymService');
 
 const BILAN_TYPES = ['INITIAL', 'INTERMEDIAIRE', 'FINAL'];
 const DRAFT_STATUSES = ['BROUILLON', 'GENERE'];
@@ -129,13 +130,28 @@ async function updateDraft({ kineId, bilanId, patch, expectedUpdatedAt }) {
   }
 }
 
+// Résout les jetons d'identité de toutes les sections d'un document (spec 2026-09-12 : gabarit
+// obligatoire, seule la fiche patient fait foi). Sans document (bilan hérité), rien à résoudre.
+function resolveDocumentSections(document, identity) {
+  if (!document) return null;
+  return { ...document, sections: document.sections.map((s) => ({ ...s, text: resolveIdentity(s.text, identity) })) };
+}
+
+// Vrai si la résolution ne change le texte d'aucune section (déjà posée, ou éditée à la main) :
+// évite d'écrire un document identique à celui déjà en base.
+const sectionsUnchanged = (document, resolved) => document.sections.every((s, i) => s.text === resolved.sections[i].text);
+
 async function attachPatient({ kineId, bilanId, patientId }) {
   const prisma = prismaService.getInstance();
-  await findOwnedBilan(prisma, kineId, bilanId);
-  await findOwnedPatient(prisma, kineId, patientId);
+  const bilan = await findOwnedBilan(prisma, kineId, bilanId);
+  const patient = await findOwnedPatient(prisma, kineId, patientId);
+  const kine = await loadIdentity(prisma, kineId);
+  // Au rattachement, le document reste littéral (gabarit) jusqu'ici : la résolution est toujours écrite.
+  const document = resolveDocumentSections(bilan.document, { patient, kine, at: bilan.createdAt });
+  const data = document ? { patientId, document } : { patientId };
   return prisma.bilanKine.update({
     where: { id: bilanId },
-    data: { patientId },
+    data,
     include: { patient: { select: PATIENT_SELECT } },
   });
 }
@@ -146,9 +162,15 @@ async function finalizeBilan({ kineId, bilanId }) {
   if (bilan.status === 'ENREGISTRE') throw new DraftError('ALREADY_FINALIZED', 409, 'Ce bilan est déjà enregistré');
   if (!bilan.patientId) throw new DraftError('PATIENT_REQUIRED', 400, 'Associe un patient avant d’enregistrer');
   if (isDocumentEmpty(bilan.document)) throw new DraftError('DOCUMENT_EMPTY', 400, 'Le bilan est vide');
+  // Filet de sécurité avant de figer : la plupart du temps déjà résolu par attachPatient, donc
+  // sans effet — on n'écrit le document que s'il reste quelque chose à résoudre.
+  const kine = await loadIdentity(prisma, kineId);
+  const resolved = resolveDocumentSections(bilan.document, { patient: bilan.patient, kine, at: bilan.createdAt });
+  const document = resolved && !sectionsUnchanged(bilan.document, resolved) ? resolved : null;
+  const data = document ? { status: 'ENREGISTRE', document } : { status: 'ENREGISTRE' };
   const updated = await prisma.bilanKine.update({
     where: { id: bilanId },
-    data: { status: 'ENREGISTRE' },
+    data,
     include: { patient: { select: PATIENT_SELECT } },
   });
   logger.info(`Bilan ${bilanId} enregistré (kiné ${kineId})`);

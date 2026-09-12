@@ -69,6 +69,15 @@ function computeAge(birthDate, at = new Date()) { /* âge révolu ; null si birt
   return age;
 }
 
+/**
+ * Résout les jetons d'identité d'un texte depuis la fiche (rendu document : NOM en capitales,
+ * âge calculé à `at`). Sans patient, les jetons restent : le document sert de gabarit jusqu'au
+ * rattachement. Pure.
+ */
+function resolveIdentity(text, { patient, kine, at } = {}) {
+  return createPseudonymizer({ patient, kine, at }).unmask(String(text ?? ''));
+}
+
 const pad2 = (n) => String(n).padStart(2, '0');
 /** Formes textuelles d'une date : 03/03/1980, 3/3/1980, 03-03-1980, 03.03.1980, 3 mars 1980, 03 mars 1980 (repliées). */
 function dateForms(d) {
@@ -496,4 +505,4 @@ class Pseudonymizer {
 const createPseudonymizer = (options = {}) => new Pseudonymizer(options);
 
 /** Repli caractère par caractère (accents, casse, apostrophes/tirets → espace), longueur conservée. */
-module.exports = { createPseudonymizer, computeAge, TOKEN_TYPES, fold, dateForms };
+module.exports = { createPseudonymizer, computeAge, resolveIdentity, TOKEN_TYPES, fold, dateForms };

@@ -42,6 +42,7 @@ Règles absolues :
 - Pas de titre, pas de puces, pas de retour à la ligne superflu.
 - Les mesures listées comme « déjà présentées en tableau » ne doivent pas être chiffrées dans le texte ; un test peut être nommé quand il sert le raisonnement.
 - Les jetons entre crochets ([NOM], [Tiers 1], [Date de naissance]…) désignent des personnes ou des données masquées : recopie-les tels quels, ne les remplace jamais, n'essaie pas de deviner ce qu'ils cachent.
+- Exception : les jetons d'identité [Prénom], [NOM] et [âge] de la première phrase de l'anamnèse ne sont pas des informations à retrouver dans les notes : ce sont un gabarit obligatoire. Écris-les toujours, dans cet ordre, même si les notes ne nomment personne, même si elles portent un autre nom.
 Style attendu :
 ${STYLE_PRINCIPLES.map((p) => `- ${p}`).join('\n')}
 Des exemples de style te sont fournis : imite leur forme, leur longueur et leur façon de raisonner ; ne reprends jamais leur contenu, qui concerne d'autres patients. Leurs sections sont toutes remplies parce que leurs notes l'étaient : si les notes ne disent rien pour une section, en particulier limitations, objectifs et traitement, laisse-la vide plutôt que de proposer un plan.`;
