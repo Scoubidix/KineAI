@@ -50,8 +50,8 @@ const GENERATION_CONFIG = {
   },
   // Compte rendu de séance (plan 8b) : sept sections JSON à partir d'un dialogue, température 0
   bilan_session_report: {
-    openai: { model: 'gpt-4.1-mini', max_tokens: 3000, temperature: 0, presence_penalty: 0, frequency_penalty: 0 },
-    mistral: { model: MISTRAL_MODEL, max_tokens: 3000, temperature: 0, presence_penalty: 0, frequency_penalty: 0 },
+    openai: { model: 'gpt-4.1-mini', max_tokens: 6000, temperature: 0, presence_penalty: 0, frequency_penalty: 0 },
+    mistral: { model: MISTRAL_MODEL, max_tokens: 6000, temperature: 0, presence_penalty: 0, frequency_penalty: 0 },
   },
   default: {
     openai: { model: 'gpt-4o-mini', max_tokens: 1000, temperature: 0.7 },

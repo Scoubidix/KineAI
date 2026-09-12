@@ -139,4 +139,53 @@ function wordValues(text) {
   return out;
 }
 
-module.exports = { wordsToDigits, wordValues };
+// ---- Ordinaux (garde uniquement) ----
+// Un dialogue dit « le quatrième mois », le compte rendu écrit « à 4 mois » : sans les ordinaux la
+// garde voyait un nombre inventé et vidait la section. Lecture seule (valeurs pour l'ensemble
+// autorisé) : `wordsToDigits` garde sa sémantique de réécriture et ignore toujours les ordinaux.
+const ORDINAL_RE = /\b(\p{L}+)i[èe]mes?\b/giu;
+const ORDINAL_IRREGULAR_RE = /\b(premi(?:er|ère|ere)|seconde?)\b/gi;
+const ORDINAL_IRREGULAR = { premier: 1, première: 1, premiere: 1, second: 2, seconde: 2 };
+const NUMBER_TOKEN = (t) => t === 'et' || t === 'cent' || t === 'cents' || t === 'mille' || UNITS[t] !== undefined || TENS[t] !== undefined;
+
+/**
+ * Cardinal d'un radical d'ordinal : « quatr » → quatre, « cinqu » → cinq, « neuv » → neuf,
+ * « trent » → trente. Essais dans l'ordre : radical seul, radical + « e », « u » final retiré,
+ * « v » final en « f ».
+ */
+function cardinalFromStem(stem) {
+  for (const word of [stem, `${stem}e`, stem.replace(/u$/, ''), stem.replace(/v$/, 'f')]) {
+    const value = parseFullNumber([word]);
+    if (value !== null) return { word, value };
+  }
+  return null;
+}
+
+/**
+ * Valeurs des ordinaux d'un texte (« quatrième » → 4, « premier » → 1). Un ordinal ne porte que la
+ * fin d'un nombre composé : ce qui le précède immédiatement, s'il s'agit de mots-nombres collés par
+ * un espace ou un tiret, est rattaché (« vingt et unième » → 21, « quatre-vingt-dixième » → 90).
+ */
+function ordinalValues(text) {
+  const src = String(text ?? '');
+  const out = [];
+  for (const m of src.matchAll(ORDINAL_RE)) {
+    const cardinal = cardinalFromStem(m[1].toLowerCase());
+    if (!cardinal) continue;
+    const before = src.slice(0, m.index).toLowerCase();
+    const run = (before.match(/(?:\p{L}+[ -])+$/u) || [''])[0].split(/[ -]/).filter(Boolean);
+    const tail = [];
+    for (let i = run.length - 1; i >= 0 && NUMBER_TOKEN(run[i]); i -= 1) tail.unshift(run[i]);
+    let value = cardinal.value;
+    while (tail.length) {
+      const composed = parseFullNumber([...tail, cardinal.word]);
+      if (composed !== null) { value = composed; break; }
+      tail.shift();
+    }
+    out.push(value);
+  }
+  for (const m of src.matchAll(ORDINAL_IRREGULAR_RE)) out.push(ORDINAL_IRREGULAR[m[1].toLowerCase()]);
+  return out;
+}
+
+module.exports = { wordsToDigits, wordValues, ordinalValues };

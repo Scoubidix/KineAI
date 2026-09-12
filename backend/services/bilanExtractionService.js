@@ -336,7 +336,8 @@ function applyCandidates(document, candidates) {
 const safeErrorLabel = (err) => (err instanceof SyntaxError ? 'JSON invalide' : err.message);
 
 async function callExtraction(messages) {
-  const { content } = await llmService.chatCompletion({ iaType: 'bilan_extract', messages, jsonSchema: EXTRACTION_JSON_SCHEMA });
+  const { content, usage } = await llmService.chatCompletion({ iaType: 'bilan_extract', messages, jsonSchema: EXTRACTION_JSON_SCHEMA });
+  if (usage) logger.info(`Extraction bilan : ${usage.prompt_tokens} jeton(s) d'entrée, ${usage.completion_tokens} de sortie`);
   return parseExtractionOutput(content);
 }
 

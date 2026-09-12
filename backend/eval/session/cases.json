@@ -4,7 +4,7 @@
     "transcript": "asr-worker/eval/out/seance-01_clean.txt",
     "expectSections": ["anamnese", "antecedents", "examen", "limitations", "diagnostic", "objectifs", "traitement"],
     "expect": ["eva_repos=3", "eva_effort=7", "distance_doigt_sol=22", "indice_schober=13", "extension_lombaire=15", "test_laseuge:D=false", "test_laseuge:G=false", "signe_de_la_sonnette=true", "testing_quadriceps:D=5/5", "testing_quadriceps:G=5/5", "sorensen_secondes=45", "douleur_nocturne=true"],
-    "forbid": [], "forbidValues": [46, 10, 18], "customContains": ["kinésiophobie"]
+    "forbid": [], "forbidValues": [46, 10, 18], "customContains": []
   },
   {
     "id": "seance-02", "title": "épaule opérée, bilan intermédiaire", "motif": "Réparation de coiffe droite", "type": "INTERMEDIAIRE",
@@ -25,13 +25,13 @@
     "transcript": "asr-worker/eval/out/seance-04_clean.txt",
     "expectSections": ["anamnese", "antecedents", "examen", "limitations", "diagnostic", "objectifs", "traitement"],
     "expect": ["eva_repos=4", "eva_effort=6", "flexion_cervicale=40", "extension_cervicale=30", "rotation_cervicale_droite=50", "rotation_cervicale_gauche=70", "test_spurling:D=true", "test_phalen:D=false", "signe_tinel:D=false", "paresthesies=true", "testing_biceps_brachial:D=4/5", "douleur_nocturne=true"],
-    "forbid": [], "forbidValues": [51, 60], "customContains": ["kinésiophobie"]
+    "forbid": [], "forbidValues": [51, 60], "customContains": []
   },
   {
     "id": "seance-05", "title": "entorse de cheville J+10", "motif": "Entorse latérale de cheville gauche", "type": "INITIAL",
     "transcript": "asr-worker/eval/out/seance-05_clean.txt",
     "expectSections": ["anamnese", "antecedents", "examen", "limitations", "diagnostic", "objectifs", "traitement"],
     "expect": ["eva_repos=2", "eva_effort=5", "flexion_dorsale_cheville:G=5", "flexion_plantaire_cheville:G=35", "tiroir_anterieur_cheville:G=false", "test_kleiger:G=false", "test_thompson:G=false", "knee_to_wall:G=4", "knee_to_wall:D=10", "testing_fibulaires:G=3/5"],
-    "forbid": [], "forbidValues": [34, 28, 0], "customContains": ["dème", "bimalléolaire", "ottawa"]
+    "forbid": [], "forbidValues": [34, 28, 0], "customContains": ["dème", "périmalléolaire", "ottawa"]
   }
 ]

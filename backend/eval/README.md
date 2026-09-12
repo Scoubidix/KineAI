@@ -152,25 +152,33 @@ npm run eval:session -- --json out.json     # + dump JSON des résultats
 
 ⚠️ Coût : **3 appels réels au provider par cas** (correction, compte rendu, extraction), soit
 15 appels pour les 5 cas d'une variante (quelques dizaines de centimes, run réel du 2026-09-12
-avec `mistral-medium-3-5`). Aucun log de tokens/coût par appel n'est actuellement émis par
-`dictationCorrectionService`, `sessionReportService` ni `bilanExtractionService` (seuls le nombre
-d'opérations et de sections sont journalisés) : le coût par séance n'est donc pas mesurable
-depuis les logs applicatifs, seulement estimable par le nombre d'appels × la taille du dialogue
-(1500 à 2100 mots par séance ici).
+avec `mistral-medium-3-5`). Les trois services journalisent désormais leurs compteurs d'usage
+(`prompt_tokens` / `completion_tokens` en `logger.info`, sans aucun texte) : le coût par séance se
+lit dans les logs applicatifs (~26 k jetons d'entrée et ~2 k de sortie pour une séance de
+1500-2100 mots, les trois appels cumulés).
 
 Ce qui est mesuré, en plus du rappel d'extraction habituel :
 - **sections attendues retrouvées** : sur les 7 sections du document (`anamnese`, `antecedents`,
   `examen`, `limitations`, `diagnostic`, `objectifs`, `traitement`), combien de celles que le cas
   attend (`expectSections`) sont effectivement non vides dans le compte rendu.
-- **sections vidées par la garde** (`dropped`) : `sessionReportService.guardReport` vide toute
-  section citant un nombre absent du dialogue (aucun nombre inventé toléré). C'est la mesure du
-  « nombre inventé » pour ce harnais (la garde vide la section plutôt que de laisser passer un
-  chiffre halluciné) — l'objectif est **zéro** sur la variante clean.
+- **phrases retirées** (`sentencesDropped`) : depuis l'amendement de la spec §4.3,
+  `sessionReportService.guardReport` retire la **phrase** (ou l'item de liste) citant un nombre
+  absent du dialogue, et non plus la section entière. C'est la mesure fine du « nombre inventé » :
+  quelques unités sur cinq séances est le régime attendu. Le texte des phrases retirées
+  (`droppedSentences`) n'est jamais imprimé ni journalisé (données de santé).
+- **sections vidées par la garde** (`dropped`) : une section n'est vidée que si **toutes** ses
+  phrases ont été retirées. C'est le critère de seuil « 0 nombre inventé » de ce harnais —
+  l'objectif est **zéro** sur la variante clean.
 
 Seuils d'ouverture du bouton (spec §6), vérifiés en fin de run : sections attendues retrouvées
-≥ 80 %, rappel d'extraction moyen ≥ 85 % (variante clean), 0 section vidée par la garde. Code de
-sortie 1 si un seuil n'est pas atteint (en plus des cas déjà gérés par `summarize` : interdits,
-cas en erreur).
+≥ 80 %, rappel d'extraction moyen ≥ 85 % (variante clean), 0 section vidée par la garde, **et
+aucun cas en erreur** (une transcription absente ou un appel provider en échec ne doit pas passer
+pour une réussite au prétexte que la moyenne des cas aboutis tient). Code de sortie 1 si un seuil
+n'est pas atteint (en plus des cas déjà gérés par `summarize` : interdits, cas en erreur).
+
+Attente retirée du corpus : `kinésiophobie` (seance-01, seance-04). Le catalogue n'a pas de champ
+dédié et l'extracteur la mappe sur `peur_de_chuter`, un concept différent : l'attendre en mesure
+libre testait le harnais, pas le pipeline.
 
 Run de référence, détail par séance et conclusion : `asr-worker/README.md`, section
 « Correction → Séance ».

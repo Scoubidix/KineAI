@@ -26,7 +26,7 @@ const THRESHOLDS = { sectionsRecall: 0.8, extractionRecall: 0.85, invented: 0 };
   if (!seed) { console.error('Seed illisible'); process.exit(2); }
   const catalog = seed.fields.map((f) => ({ isActive: true, ...f }));
   const results = [];
-  const sectionStats = { expected: 0, found: 0, unexpected: 0, dropped: 0 };
+  const sectionStats = { expected: 0, found: 0, unexpected: 0, dropped: 0, sentencesDropped: 0 };
   for (const kase of cases.filter((x) => !only || x.id === only)) {
     const file = path.join(ROOT, kase.transcript.replace(/_clean\.txt$/, `_${variant}.txt`));
     process.stdout.write(`▶ ${kase.id} — ${kase.title} (${variant}) … `);
@@ -41,11 +41,11 @@ const THRESHOLDS = { sectionsRecall: 0.8, extractionRecall: 0.85, invented: 0 };
       const expected = kase.expectSections || [];
       const found = expected.filter((k) => got.includes(k));
       const unexpected = got.filter((k) => !expected.includes(k));
-      sectionStats.expected += expected.length; sectionStats.found += found.length; sectionStats.unexpected += unexpected.length; sectionStats.dropped += r.dropped.length;
-      console.log(`\n   dialogue ${words} mots · correction ${c.applied}/${c.ignored} · compte rendu ${got.length}/7 sections en ${((Date.now() - t0) / 1000).toFixed(1)} s (${r.notes.split(/\s+/).length} mots) · attendues ${found.length}/${expected.length}${unexpected.length ? ` · inattendues ${unexpected.join(', ')}` : ''}${r.dropped.length ? ` · vidées par la garde ${r.dropped.join(', ')}` : ''}`);
+      sectionStats.expected += expected.length; sectionStats.found += found.length; sectionStats.unexpected += unexpected.length; sectionStats.dropped += r.dropped.length; sectionStats.sentencesDropped += r.sentencesDropped;
+      console.log(`\n   dialogue ${words} mots · correction ${c.applied}/${c.ignored} · compte rendu ${got.length}/7 sections en ${((Date.now() - t0) / 1000).toFixed(1)} s (${r.notes.split(/\s+/).length} mots) · attendues ${found.length}/${expected.length}${unexpected.length ? ` · inattendues ${unexpected.join(', ')}` : ''}${r.dropped.length ? ` · vidées par la garde ${r.dropped.join(', ')}` : ''} · phrases retirées ${r.sentencesDropped}`);
       process.stdout.write('   extraction … ');
       const x = await runCase({ ...kase, notes: r.notes }, catalog);
-      x.sections = { expected, found, unexpected, dropped: r.dropped };
+      x.sections = { expected, found, unexpected, dropped: r.dropped, sentencesDropped: r.sentencesDropped };
       results.push(x);
       printResult(x);
     } catch (err) {
@@ -58,8 +58,10 @@ const THRESHOLDS = { sectionsRecall: 0.8, extractionRecall: 0.85, invented: 0 };
   const sectionsRecall = sectionStats.expected ? sectionStats.found / sectionStats.expected : 0;
   const extractionRecall = ok.length ? ok.reduce((s, r) => s + r.recall, 0) / ok.length : 0;
   const invented = sectionStats.dropped;
-  console.log(`Sections attendues retrouvées ${(sectionsRecall * 100).toFixed(1)} % · sections vidées par la garde ${invented} · rappel d'extraction moyen ${(extractionRecall * 100).toFixed(1)} %`);
-  const pass = sectionsRecall >= THRESHOLDS.sectionsRecall && extractionRecall >= THRESHOLDS.extractionRecall && invented <= THRESHOLDS.invented;
+  console.log(`Sections attendues retrouvées ${(sectionsRecall * 100).toFixed(1)} % · sections vidées par la garde ${invented} · phrases retirées ${sectionStats.sentencesDropped} · rappel d'extraction moyen ${(extractionRecall * 100).toFixed(1)} %`);
+  // Un cas en erreur (transcription absente, provider en échec) n'est pas une réussite : les seuils
+  // ne portent que sur les cas aboutis, la moyenne ne doit pas masquer un cas qui n'a pas tourné
+  const pass = sectionsRecall >= THRESHOLDS.sectionsRecall && extractionRecall >= THRESHOLDS.extractionRecall && invented <= THRESHOLDS.invented && !results.some((r) => r.error);
   console.log(pass ? 'Seuils d’ouverture : ATTEINTS' : 'Seuils d’ouverture : NON ATTEINTS');
   if (jsonOut) fs.writeFileSync(jsonOut, JSON.stringify({ date: new Date().toISOString(), variant, provider: process.env.GENERATION_PROVIDER || 'openai', sectionStats, results }, null, 2));
   process.exit(pass ? code : 1);

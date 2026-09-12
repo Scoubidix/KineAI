@@ -408,57 +408,67 @@ d'extraction, comme observé aux runs précédents. Noté tel quel, sans retouch
 Chaîne complète du corpus de séances (`backend/eval/session/run.js`, `npm run eval:session`) :
 transcription (`asr-worker/eval/out/seance-0N_*.txt`, voir plus haut) → passe de correction
 obligatoire (mode `session`, toujours appliquée ici, pas de flag) → compte rendu en sept sections
-(`sessionReportService.report`) → extraction. Détail du harnais : `backend/eval/README.md`. Run
-réel du 2026-09-12, un cas = 3 appels provider (`mistral-medium-3-5`) :
+(`sessionReportService.report`) → extraction. Détail du harnais : `backend/eval/README.md`. Run de
+référence du 2026-09-12 **après la revue finale du plan 8b** (ordinaux dans la garde, garde à la
+phrase et non à la section, règle de prompt « ne dérive jamais une date ou un délai ») ; un cas =
+3 appels provider (`mistral-medium-3-5`) :
 
-| Séance | Mots dialogue | Sections attendues/obtenues (clean) | Vidées (clean) | Rappel extraction (clean) | Sections attendues/obtenues (cabinet) | Vidées (cabinet) | Rappel extraction (cabinet) |
-|---|---|---|---|---|---|---|---|
-| seance-01 | 1521 / 1542 | 7/7 | 0 | 100 % | 7/7 | 0 | 100 % |
-| seance-02 | 1676 / 1676 | 5/7 | 2 (anamnese, antecedents) | 75 % | 5/7 | 2 (anamnese, antecedents) | 75 % |
-| seance-03 | 1967 / 1964 | 5/7 | 2 (anamnese, objectifs) | 100 % | 5/7 | 2 (anamnese, objectifs) | 80 % |
-| seance-04 | 2063 / 2080 | 7/7 | 0 | 100 % | 7/7 | 0 | 100 % |
-| seance-05 | 2068 / 2069 | 7/7 | 0 | 90 % | 7/7 | 0 | 90 % |
-| **Moyenne/total** | — | **31/35 (88,6 %)** | **4** | **93,0 %** | **31/35 (88,6 %)** | **4** | **89,0 %** |
+| Séance | Mots dialogue (clean / cabinet) | Sections attendues/obtenues | Vidées | Phrases retirées | Rappel extraction (clean) | Rappel extraction (cabinet) |
+|---|---|---|---|---|---|---|
+| seance-01 | 1521 / 1542 | 7/7 (les deux variantes) | 0 | 0 | 100 % | 100 % |
+| seance-02 | 1676 / 1676 | 7/7 | 0 | 2 (les deux variantes) | 83 % | 83 % |
+| seance-03 | 1967 / 1964 | 7/7 | 0 | 0 | 80 % | 80 % |
+| seance-04 | 2063 / 2080 | 7/7 | 0 | 0 | 100 % | 100 % |
+| seance-05 | 2068 / 2069 | 7/7 | 0 | 0 | 80 % | 80 % |
+| **Moyenne/total** | — | **35/35 (100 %)** | **0** | **2** | **88,7 %** | **88,7 %** |
 
 Caveat connu du corpus : `seance-01` porte `eva_effort=7` transcrit « A7 à l'effort » (les deux
 variantes) — recouvré à 100 % dans les deux runs (la garde des nombres accepte « 7 » comme
 sous-chaîne de « A7 », et l'extraction retrouve `eva_effort=7`) : pas de perte sur ce cas connu.
 
-**Seuils d'ouverture (spec §6) : sections attendues ≥ 80 % (atteint, 88,6 % sur les deux
-variantes), rappel d'extraction ≥ 85 % variante clean (atteint, 93,0 %), 0 section vidée par la
-garde des nombres inventés variante clean (NON ATTEINT — 4 sections vidées sur seance-02 et
-seance-03, identiquement en cabinet).** Conclusion : seuils NON ATTEINTS dans l'ensemble, à cause
-du seul critère « 0 inventé ».
+**Seuils d'ouverture (spec §6) : sections attendues ≥ 80 % (ATTEINT, 100 % sur les deux
+variantes), rappel d'extraction ≥ 85 % variante clean (ATTEINT, 88,7 %), 0 section vidée par la
+garde des nombres inventés variante clean (ATTEINT, 0 — idem en cabinet).** Conclusion : **seuils
+ATTEINTS sur les deux variantes.** Le run précédent (même corpus, avant revue) donnait 88,6 % de
+sections et 4 sections vidées : le passage à zéro tient à deux corrections indépendantes.
 
-Mécanismes observés (aucune retouche de prompt : règle projet « pas de nouvelle règle sans
-mécanisme vu ≥ 2 fois ») :
+1. **L'angle mort des ordinaux expliquait 2 des 4 sections vidées.** `seance-03` : le compte rendu
+   écrivait « reprise de la course à 4 mois » alors que le dialogue dit « vers le quatrième mois » —
+   « 4 » n'apparaissait ni en chiffres ni en lettres pour la garde, qui lisait un nombre inventé et
+   vidait `anamnese` et `objectifs`. `utils/frenchNumbers.ordinalValues` verse désormais la valeur
+   des ordinaux (`quatrième` → 4, `vingt et unième` → 21, `premier`/`second`) dans l'ensemble
+   autorisé : la section passe, sans rien relâcher d'autre. Les 2 autres (seance-02, « infiltration
+   il y a 18 mois » jamais énoncée) relevaient d'une vraie dérivation de délai : `seance-02` est
+   précisément le seul cas qui porte encore des retraits (2 phrases, dans les deux sections
+   auparavant vidées, aux deux variantes). La dérivation n'a donc pas disparu ; son coût est passé
+   d'une section entière à une phrase. Le texte des phrases retirées est rendu aux appelants
+   (`droppedSentences`) mais jamais journalisé ni imprimé par le harnais (données de santé).
+2. **La garde est un filet, pas la défense principale.** Elle raisonne sur la présence d'un nombre
+   dans le dialogue : plus le dialogue est long, plus il contient de nombres, donc moins elle
+   discrimine (une durée inventée qui existe ailleurs dans l'heure de séance passe). Sur une séance
+   d'une heure son pouvoir de détection est nettement plus faible que sur ce corpus de 10-15 min.
+   La défense principale est la ligne de prompt ajoutée au `SYSTEM_PROMPT` (« ne calcule jamais une
+   date, une durée ou un délai à partir d'autres nombres du dialogue, et ne déduis jamais un délai
+   d'un protocole habituel ») ; le filet ne fait que rattraper ce qui passe.
+3. **Amendement de la spec §4.3 : la garde retire la phrase, plus la section.** Vider une section
+   entière pour un seul chiffre perdait l'âge, les EVA et les amplitudes correctement rapportés.
+   Chiffre de référence du run : **2 phrases retirées** au total (seance-02, les deux variantes,
+   aucune section vidée) — c'est le régime attendu, une poignée de phrases sur cinq séances.
+4. **`customContains` qui ne remonte pas malgré une présence avérée dans le dialogue.**
+   `seance-05` : « Ottawa » (3 occurrences dans le dialogue) ne survit pas jusqu'au compte rendu ;
+   « Œdème » et « périmalléolaire » sont dans la section `examen` mais ne sont jamais extraits
+   comme mesure libre distincte (fondus dans `circonference_cheville_huit:G=27` / `:D=25`, bien
+   extraites). Ces 3 attentes restent donc en échec (`3 interdit(s)`, code de sortie 1 malgré les
+   seuils atteints). Même catégorie que le biais déjà documenté côté dictée (le harnais teste un
+   concept que le pipeline capture autrement) plutôt qu'un défaut nouveau ; comportement identique
+   aux deux variantes. L'attente `kinésiophobie` (seance-01, seance-04) a été retirée : le
+   catalogue n'a pas de champ dédié, l'extracteur la mappe sur `peur_de_chuter`, concept différent.
 
-1. **Chiffre de délai clinique plausible mais non énoncé, halluciné par la rédaction du compte
-   rendu.** `seance-02` : le compte rendu écrit « infiltration de l'épaule droite il y a 18 mois »
-   dans `anamnese` et `antecedents`, alors que le dialogue dit seulement « ça faisait deux ans que
-   ça me tirait. On m'avait fait une infiltration, ça a calmé six mois » — sans jamais dater
-   l'infiltration elle-même à 18 mois, et « 18 » n'apparaît nulle part dans la transcription.
-   `seance-03` : le compte rendu écrit « reprise de la course à 4 mois » dans `anamnese` et
-   `objectifs` ; « 4 » (chiffre ou lettres) n'apparaît nulle part dans la transcription — le
-   dialogue ne donne que « on vise 130 [degrés] à 3 mois » et « retour au handball [...] après
-   9 mois ». Dans les deux cas, le même chiffre inventé apparaît identiquement dans les deux
-   sections concernées et dans les deux variantes (clean et cabinet), donc reproductible — pas un
-   artefact de bruit ASR ponctuel. La garde fonctionne comme conçu (elle vide la section plutôt que
-   de publier un chiffre halluciné), mais son rayon d'action est la section entière : les autres
-   nombres corrects de la même section (âge, ancienneté, EVA, amplitudes...) sont perdus avec elle.
-   Observé sur 2 séances sur 5, aux deux variantes (4 occurrences au total) : mécanisme confirmé,
-   mais aucun réglage de prompt fait sur la base de cette seule tâche.
-2. **`customContains` qui ne remonte pas malgré une présence avérée dans le dialogue, voire dans le
-   compte rendu.** `kinésiophobie` (seance-01, seance-04) : le mot est bien dans la transcription
-   mais aucune mesure libre ne le porte en sortie d'extraction. `seance-05` : « Ottawa » (3
-   occurrences dans le dialogue) ne survit pas jusqu'au compte rendu ; « Œdème » survit
-   littéralement dans la section `examen` (« Œdème périmalléolaire gauche (27 cm vs 25 cm à
-   droite)... », vérifié) mais n'est jamais extrait comme mesure libre distincte (probablement
-   fondu dans la mesure `circonference_cheville_huit` déjà extraite) ; « bimalléolaire » (dans le
-   script d'origine) est devenu « périmalléolaire » à la transcription — une dérive de synthèse/ASR
-   sur ce terme précis, pas un défaut du compte rendu ou de l'extraction. Même catégorie que le
-   biais déjà documenté côté dictée (cases.json qui teste un concept que le pipeline capture
-   autrement) plutôt qu'un défaut nouveau ; comportement identique aux deux variantes.
+Coût : les compteurs d'usage sont désormais journalisés (`prompt_tokens`/`completion_tokens` en
+`logger.info` pour la correction, le compte rendu et l'extraction, sans aucun texte). Mesuré ici,
+une séance de 10-15 min = ~26 k jetons d'entrée et ~2 k de sortie sur les 3 appels. **Estimation
+pour une séance d'une heure : ≈ 3 à 4 centimes** (le dialogue pèse dans les 3 appels, le reste du
+prompt est fixe) — estimation, pas une mesure.
 
 Note d'environnement pour le déploiement des séances : la file `batch` (priorité des dictées de
 séance) partage l'ordonnanceur avec les dictées `interactive`. `ASR_BATCH_QUEUE_MAX` (défaut `20`

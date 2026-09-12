@@ -78,6 +78,9 @@ async function createOrResetJob({ kineId, bilanId, kind = 'DICTATION', consent =
     job = await prisma.bilanJob.create({ data: { bilanId, kineId, kind, status: 'RECORDING', consentAt } });
     logger.info(`Traitement dictée ${job.id} créé (bilan ${bilanId}, ${kind})`);
   } else if (existing.status === 'RECORDING') {
+    // Une dictée en cours ne se poursuit pas en séance (ni l'inverse) : le consentement, la priorité
+    // ASR et le traitement de fin diffèrent — on refuse plutôt que de changer de type en route
+    if (existing.kind !== kind) throw new DraftError('JOB_KIND_MISMATCH', 409, 'Un enregistrement d’un autre type est en cours pour ce bilan');
     job = existing;
     // Reprise après rechargement : la vue doit repartir du bon index, donc des segments déjà reçus
     segments = await prisma.bilanJobSegment.findMany({ where: { jobId: job.id }, select: { index: true, status: true } });
@@ -251,9 +254,10 @@ async function runTail(jobId, stage) {
         // Séance : le dialogue corrigé devient un compte rendu ; la transition sert de verrou comme ailleurs
         const toReporting = await prisma.bilanJob.updateMany({ where: { id: jobId, status: 'CORRECTING' }, data: { status: 'REPORTING' } });
         if (toReporting.count !== 1) throw new TailLost();
-        const rep = await sessionReportService.report({ transcript: text, motif: job.bilan.motif ?? null, type: job.bilan.type, catalog });
-        const filled = Object.values(rep.sections || {}).filter(Boolean).length;
-        logger.info(`Traitement dictée ${jobId} : séance, compte rendu (${filled} section(s) remplie(s), ${rep.dropped.length} vidée(s))`);
+        const rep = await sessionReportService.report({ transcript: text, motif: job.bilan.motif, type: job.bilan.type, catalog });
+        const filled = Object.values(rep.sections).filter(Boolean).length;
+        // Jamais le texte des phrases retirées dans les logs : ce sont des données de santé
+        logger.info(`Traitement dictée ${jobId} : séance, compte rendu (${filled} section(s) remplie(s), ${rep.dropped.length} vidée(s), ${rep.sentencesDropped} phrase(s) retirée(s))`);
         notesText = rep.notes;
         fromStatus = 'REPORTING';
       }
@@ -262,7 +266,10 @@ async function runTail(jobId, stage) {
       await prisma.$transaction(async (tx) => {
         const r = await tx.bilanJob.updateMany({ where: { id: jobId, status: fromStatus }, data: { status: 'COMPOSING' } });
         if (r.count !== 1) throw new TailLost();
-        await tx.bilanKine.update({ where: { id: job.bilanId }, data: { rawNotes: rules.appendNotes(job.bilan.rawNotes, notesText) } });
+        // Le compte rendu peut durer une minute : le kiné a pu taper entre-temps, on relit les notes
+        // dans la transaction plutôt que de repartir de celles lues au début de la queue
+        const fresh = await tx.bilanKine.findUnique({ where: { id: job.bilanId }, select: { rawNotes: true } });
+        await tx.bilanKine.update({ where: { id: job.bilanId }, data: { rawNotes: rules.appendNotes(fresh?.rawNotes, notesText) } });
         // Le texte vit désormais dans les notes : les copies par segment n'ont plus de raison d'être
         await tx.bilanJobSegment.updateMany({ where: { jobId }, data: { text: null } });
       });

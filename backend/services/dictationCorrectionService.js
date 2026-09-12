@@ -189,7 +189,8 @@ async function correct({ text, mode, catalog }) {
   let ops;
   for (let attempt = 1; attempt <= 2 && !ops; attempt += 1) {
     try {
-      const { content } = await llmService.chatCompletion({ iaType: 'bilan_dictation_correct', messages, jsonSchema: CORRECTION_JSON_SCHEMA });
+      const { content, usage } = await llmService.chatCompletion({ iaType: 'bilan_dictation_correct', messages, jsonSchema: CORRECTION_JSON_SCHEMA });
+      if (usage) logger.info(`Correction dictée : ${usage.prompt_tokens} jeton(s) d'entrée, ${usage.completion_tokens} de sortie`);
       ops = parseOps(content);
     } catch (err) {
       logger.warn(`Correction dictée : essai ${attempt} en échec (${safeErrorLabel(err)})`);
