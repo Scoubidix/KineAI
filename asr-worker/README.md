@@ -215,8 +215,12 @@ repli n'a été nécessaire.
 
 ```bash
 .venv/Scripts/python.exe eval/gen_session.py            # les cinq séances (dix fichiers audio)
-.venv/Scripts/python.exe eval/bench.py --url http://localhost:8100 --concurrency 2 --only seance
+ASR_MODEL_PATH=<snapshot local> HF_HUB_OFFLINE=1 ASR_THREADS=4 .venv/Scripts/python.exe eval/bench.py --only seance
 ```
+
+Sans `--url`, le bench charge le modèle localement (in-process, comme `app.py`) : poser
+`ASR_MODEL_PATH` (chemin du snapshot faster-whisper déjà en cache) et `HF_HUB_OFFLINE=1` comme pour
+le worker, sous peine de tenter un accès réseau à Hugging Face.
 
 `bench.py` calcule la référence des séances différemment de la dictée : `reference_text()` retire
 les préfixes `K:`/`P:` des scripts (le texte réellement prononcé, sans les marqueurs de rôle) au
@@ -229,14 +233,43 @@ Durées mesurées (`_clean`, `_cabinet` à la seconde près) : `seance-01` 11 mi
 10 min 44 s, `seance-03` 14 min 29 s, `seance-04` 12 min 31 s, `seance-05` 15 min 3 s — dans la
 fourchette visée (10-15 min), `seance-05` la dépasse de peu.
 
-**Bench BLOCKED** : le worker local répondait à `/healthz` (`{"status":"ok", "slots":2}`) mais
-rejetait `/v1/transcribe` avec `401 {"detail":"jeton invalide"}` pour `dev-token` **et** pour un
-jeton volontairement faux, réponse identique dans les deux cas — signe que `ASR_WORKER_TOKEN` n'était
-pas positionné (vide) sur le process qui tourne (`app.py` : `if not token or not compare_digest(...)`
-rejette tout dès que `token` est une chaîne vide, indépendamment du jeton envoyé). N'ayant pas le
-droit de démarrer/relancer le worker moi-même, la mesure du tableau WER (dix lignes, `eval/out/`)
-n'a pas pu être produite dans cette tâche — à relancer une fois le worker redémarré avec
-`ASR_WORKER_TOKEN` positionné.
+Le worker local tournait sans `ASR_WORKER_TOKEN` positionné dans son environnement
+(`/v1/transcribe` répondait `401 {"detail":"jeton invalide"}` identiquement pour `dev-token` et pour
+un jeton volontairement faux — `app.py` : `if not token or not compare_digest(...)` rejette tout dès
+que `token` est une chaîne vide côté serveur). Sans droit de le redémarrer, le bench ci-dessous a
+été lancé **en local** (in-process, sans `--url`, modèle chargé dans le process du bench) plutôt
+qu'à travers le worker HTTP. Le RTF mesuré ci-dessous (4 threads CPU, dans le process du bench) n'est
+donc pas directement comparable au RTF du run HTTP de la dictée plus haut (2 places worker + 2
+threads chacune) : il reflète un seul processus faster-whisper à 4 threads, pas le multiplexage
+places/priorités du scheduler HTTP.
+
+### Résultats (dix fichiers, in-process, `ASR_THREADS=4`)
+
+```
+fichier                       audio  temps   RTF    WER  WER brut termes
+seance-01_cabinet               694    142  0.21   4.3%      5.6% 2/18
+seance-01_clean                 694    142  0.21   3.8%      4.9% 4/18
+seance-02_cabinet               645    139  0.22   5.0%      7.0% 0/18
+seance-02_clean                 644    138  0.21   5.3%      7.6% 0/18
+seance-03_cabinet               870    181  0.21   4.6%      7.3% 0/18
+seance-03_clean                 869    180  0.21   4.0%      6.9% 0/18
+seance-04_cabinet               752    163  0.22   5.9%      6.9% 5/18
+seance-04_clean                 751    162  0.22   3.5%      4.3% 3/18
+seance-05_cabinet               903    188  0.21   7.3%      8.7% 3/18
+seance-05_clean                 903    185  0.21   5.4%      6.8% 2/18
+```
+
+RTF ≤ 0,22 sur les dix fichiers (cible < 0,5 largement atteinte). WER (nombres normalisés) 3,5 à
+7,3 %, largement sous la cible de la spec (8-18 % visé, plus proche en réalité des cibles dictée
+< 10 %/< 20 %) : le corpus de séances synthétique reste plus propre qu'attendu — les deux voix
+edge-tts restent nettes même en dialogue, et la dégradation `_cabinet` (bruit rose + réverb) ne
+pénalise pas autant qu'espéré un modèle habitué au bruit de fond. `_cabinet` est systématiquement un
+peu au-dessus de `_clean` (effet attendu), sauf `seance-02` où l'écart est négligeable. Aucun terme
+kiné dans les scripts de séance (dialogue naturel, pas de jargon dicté) : la colonne `termes`
+(0 à 5 sur 18) n'est pas significative ici, contrairement à la dictée où elle mesure la
+reconnaissance du vocabulaire spécialisé.
+
+Fichiers écrits : `eval/out/seance-0{1..5}_{clean,cabinet}.txt` (dix fichiers, vérifiés présents).
 
 ### Extraction
 

@@ -200,7 +200,7 @@ def main():
                                             data={"language": "fr", "prompt": PROMPT, "priority": "interactive"}, timeout=120).json()["text"]
     else:
         from transcriber import Transcriber, decode_audio
-        t = Transcriber(threads=int(os.environ.get("ASR_THREADS", "2")))
+        t = Transcriber(threads=int(os.environ.get("ASR_THREADS", "2")), model_path=os.environ.get("ASR_MODEL_PATH") or None)
         run_bytes = lambda data: t.transcribe(decode_audio(data, 10_000), "fr", PROMPT)
 
     print(f"{'fichier':28} {'audio':>6} {'temps':>6} {'RTF':>5} {'WER':>6} {'WER brut':>9} termes")
