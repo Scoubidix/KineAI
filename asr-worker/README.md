@@ -201,6 +201,43 @@ tranches de 45 s sur les 2 places du worker. WER identique au run in-process (m�
 texte) : 11,7 % sur les deux variantes, cible clean (< 10 %) ratée de peu, cible cabinet (< 20 %)
 atteinte.
 
+### Corpus de séances
+
+Deuxième corpus, à deux voix : cinq séances kiné-patient scriptées (`eval/sessions/seance-0N.txt`,
+dialogues `K:` / `P:`, ligne vide = pause longue au changement de temps de la séance), générées en
+audio par `eval/gen_session.py` (edge-tts, deux voix par fichier + silences insérés entre répliques
+via ffmpeg) en deux variantes chacune : `_clean` et `_cabinet` (même dégradation que la dictée —
+bruit rose, réverb, filtrage passe-bande, simulant un micro posé sur la table plutôt que tenu à la
+main). Séances impaires : kiné `fr-FR-HenriNeural` (H), patient `fr-FR-DeniseNeural` (F) ; séances
+paires : rôles inversés en genre, kiné `fr-FR-VivienneMultilingualNeural` (F), patient
+`fr-FR-RemyMultilingualNeural` (H) — les quatre voix existent telles quelles côté edge-tts, aucun
+repli n'a été nécessaire.
+
+```bash
+.venv/Scripts/python.exe eval/gen_session.py            # les cinq séances (dix fichiers audio)
+.venv/Scripts/python.exe eval/bench.py --url http://localhost:8100 --concurrency 2 --only seance
+```
+
+`bench.py` calcule la référence des séances différemment de la dictée : `reference_text()` retire
+les préfixes `K:`/`P:` des scripts (le texte réellement prononcé, sans les marqueurs de rôle) au
+lieu de lire le script tel quel. Attendu par rapport à la dictée : audio 10 à 15 minutes par fichier
+(contre ~1,5 minute), WER plus élevé (8 à 18 % visé, contre <10-20 % dictée) du fait du dialogue à
+deux voix, du débit conversationnel (relances, hésitations, chevauchements de ton) et, pour
+`_cabinet`, d'un micro posé plus dégradé qu'une dictée tenue près de la bouche.
+
+Durées mesurées (`_clean`, `_cabinet` à la seconde près) : `seance-01` 11 min 34 s, `seance-02`
+10 min 44 s, `seance-03` 14 min 29 s, `seance-04` 12 min 31 s, `seance-05` 15 min 3 s — dans la
+fourchette visée (10-15 min), `seance-05` la dépasse de peu.
+
+**Bench BLOCKED** : le worker local répondait à `/healthz` (`{"status":"ok", "slots":2}`) mais
+rejetait `/v1/transcribe` avec `401 {"detail":"jeton invalide"}` pour `dev-token` **et** pour un
+jeton volontairement faux, réponse identique dans les deux cas — signe que `ASR_WORKER_TOKEN` n'était
+pas positionné (vide) sur le process qui tourne (`app.py` : `if not token or not compare_digest(...)`
+rejette tout dès que `token` est une chaîne vide, indépendamment du jeton envoyé). N'ayant pas le
+droit de démarrer/relancer le worker moi-même, la mesure du tableau WER (dix lignes, `eval/out/`)
+n'a pas pu être produite dans cette tâche — à relancer une fois le worker redémarré avec
+`ASR_WORKER_TOKEN` positionné.
+
 ### Extraction
 
 Au bout de la chaîne : les transcriptions ci-dessus (`asr-worker/eval/out/`) sont ensuite passées à

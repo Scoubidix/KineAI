@@ -168,6 +168,14 @@ def split_segments(path, seconds=45.0):
     return out
 
 
+def reference_text(ref_name):
+    """Texte de référence : dictée (scripts/) telle quelle, séance (sessions/) sans les préfixes K:/P:."""
+    if ref_name.startswith("seance-"):
+        lines = open(os.path.join(HERE, "sessions", f"{ref_name}.txt"), encoding="utf-8").read().split("\n")
+        return " ".join(l.strip()[2:].strip() for l in lines if l.strip()[:2] in ("K:", "P:"))
+    return open(os.path.join(HERE, "scripts", f"{ref_name}.txt"), encoding="utf-8").read()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url"); ap.add_argument("--token", default=os.environ.get("ASR_WORKER_TOKEN", "dev-token"))
@@ -178,6 +186,7 @@ def main():
         assert normalize_numbers(
             "cinquante-deux ans, deux mille dix-huit, cent vingt degrés, quatre-vingt-dix, un degré, une fois, un carton, mille"
         ) == "52 ans, 2018, 120 degrés, 90, 1 degré, 1 fois, un carton, 1000"
+        assert reference_text("seance-01").startswith("Bonjour madame Martin")
         print("selftest ok")
         return
     files = sorted(glob.glob(os.path.join(HERE, "audio", "*.wav")) + glob.glob(os.path.join(HERE, "audio", "real", "*.wav")))
@@ -198,7 +207,7 @@ def main():
     for path in files:
         name = os.path.basename(path)[:-4]
         ref_name = re.sub(r"_(clean|cabinet)$", "", name)
-        ref = open(os.path.join(HERE, "scripts", f"{ref_name}.txt"), encoding="utf-8").read()
+        ref = reference_text(ref_name)
         segs = split_segments(path)
         results = [None] * len(segs)
         t0 = time.time()
