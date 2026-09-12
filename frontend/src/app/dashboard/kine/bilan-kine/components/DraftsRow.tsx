@@ -29,6 +29,7 @@ export const jobLabel = (b: BilanListItem): string | null => {
     case 'RECORDING': return 'Enregistrement interrompu';
     case 'TRANSCRIBING': return `${pct}Transcription`;
     case 'CORRECTING': return `${pct}Correction`;
+    case 'REPORTING': return `${pct}Compte rendu`;
     case 'COMPOSING': return `${pct}Rédaction`;
     case 'FAILED': return 'À reprendre';
     case 'DONE': return 'Bilan rédigé';

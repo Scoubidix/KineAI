@@ -1,5 +1,5 @@
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import type { BilanJobView, BilanListItem, BilanPatch, BilanRecord, BilanSectionKey, BilanStatus, BilanType, ComposeFromNotesResult, ComposeResult, ExtractionResult } from '@/types/bilan';
+import type { BilanJobKind, BilanJobView, BilanListItem, BilanPatch, BilanRecord, BilanSectionKey, BilanStatus, BilanType, ComposeFromNotesResult, ComposeResult, ExtractionResult } from '@/types/bilan';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -139,9 +139,9 @@ export async function correctDictation(id: number, input: { text: string; mode: 
 
 // ---- Traitement de dictée côté serveur (plan 7) ----
 
-/** Crée (ou remet à zéro) le traitement de dictée du bilan : statut RECORDING. */
-export async function createJob(id: number, kind: 'DICTATION' | 'SESSION' = 'DICTATION'): Promise<BilanJobView> {
-  const r = await call<{ job: BilanJobView }>(`/${id}/job`, jsonInit('POST', { kind }));
+/** Crée (ou remet à zéro) le traitement du bilan : statut RECORDING. En séance, `consent` atteste que le patient a été informé. */
+export async function createJob(id: number, kind: BilanJobKind = 'DICTATION', consent = false): Promise<BilanJobView> {
+  const r = await call<{ job: BilanJobView }>(`/${id}/job`, jsonInit('POST', { kind, consent }));
   return r.job;
 }
 

@@ -89,7 +89,9 @@ export interface BilanListItem {
 }
 
 // ==================== DICTÉE : TRAITEMENT CÔTÉ SERVEUR (plan 7) ====================
-export type BilanJobStatus = 'RECORDING' | 'TRANSCRIBING' | 'CORRECTING' | 'COMPOSING' | 'DONE' | 'FAILED';
+export type BilanJobStatus = 'RECORDING' | 'TRANSCRIBING' | 'CORRECTING' | 'REPORTING' | 'COMPOSING' | 'DONE' | 'FAILED';
+
+export type BilanJobKind = 'DICTATION' | 'SESSION';
 
 /** Ce que renvoyait « Rédiger avec l'IA » en direct, conservé par le serveur pour rouvrir le tiroir « à vérifier » */
 export interface BilanJobResult {
@@ -102,7 +104,7 @@ export interface BilanJobResult {
 export interface BilanJobView {
   id: number;
   bilanId: number;
-  kind: 'DICTATION' | 'SESSION';
+  kind: BilanJobKind;
   status: BilanJobStatus;
   segmentsTotal: number | null;
   segmentsDone: number;
@@ -113,6 +115,7 @@ export interface BilanJobView {
   error: string | null;
   errorDetail: Record<string, unknown> | null;
   result: BilanJobResult | null;
+  consentAt: string | null;
   updatedAt: string;
   finishedAt: string | null;
 }
