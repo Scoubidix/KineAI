@@ -774,6 +774,7 @@ enum BilanJobStatus {
   RECORDING // segments en cours de réception
   TRANSCRIBING // « Générer » cliqué, segments en cours de transcription
   CORRECTING // passe de correction puis écriture des notes
+  REPORTING // séance : compte rendu clinique en cours (plan 8b)
   COMPOSING // extraction + rédaction
   DONE
   FAILED // queue en échec (correction, notes, rédaction) ; les segments perdus ne passent pas par ici
@@ -799,6 +800,7 @@ model BilanJob {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   finishedAt    DateTime?
+  consentAt     DateTime? // séance : le kiné a confirmé avoir informé le patient (plan 8b)
 
   bilan    BilanKine         @relation(fields: [bilanId], references: [id], onDelete: Cascade)
   kine     Kine              @relation(fields: [kineId], references: [id], onDelete: Cascade)

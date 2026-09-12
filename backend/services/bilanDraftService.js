@@ -49,7 +49,7 @@ async function createDraft({ kineId, type = 'INITIAL', patientId = null, motif =
 
 function toListItem(b) {
   const job = b.job
-    ? { status: b.job.status, progress: computeProgress(b.job.status, b.job.segments.filter((s) => s.status === 'DONE' || s.status === 'SKIPPED').length, b.job.segmentsTotal) }
+    ? { status: b.job.status, progress: computeProgress(b.job.status, b.job.segments.filter((s) => s.status === 'DONE' || s.status === 'SKIPPED').length, b.job.segmentsTotal, b.job.kind) }
     : null;
   return {
     id: b.id,
@@ -69,7 +69,7 @@ async function listMyBilans({ kineId, statuses = DRAFT_STATUSES, limit = 20 }) {
     where: { kineId, isActive: true, status: { in: statuses } },
     orderBy: { updatedAt: 'desc' },
     take: limit,
-    include: { patient: { select: PATIENT_SELECT }, job: { select: { status: true, segmentsTotal: true, segments: { select: { status: true } } } } },
+    include: { patient: { select: PATIENT_SELECT }, job: { select: { status: true, segmentsTotal: true, kind: true, segments: { select: { status: true } } } } },
   });
   return rows.map(toListItem);
 }

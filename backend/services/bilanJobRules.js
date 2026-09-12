@@ -3,9 +3,12 @@
 
 const KINDS = ['DICTATION', 'SESSION'];
 // Statuts pendant lesquels un nouveau traitement ne peut pas démarrer sur le même bilan
-const ACTIVE_STATUSES = ['TRANSCRIBING', 'CORRECTING', 'COMPOSING'];
-// Poids de la barre : la transcription est la seule étape mesurée (spec §5.2)
-const PROGRESS = { TRANSCRIBING: 0.7, CORRECTING: 0.72, COMPOSING: 0.85 };
+const ACTIVE_STATUSES = ['TRANSCRIBING', 'CORRECTING', 'REPORTING', 'COMPOSING'];
+// Poids de la barre par kind : en séance, à Stop presque tout est transcrit, la queue pèse plus
+const PROGRESS = {
+  DICTATION: { TRANSCRIBING: 0.7, CORRECTING: 0.72, COMPOSING: 0.85 },
+  SESSION: { TRANSCRIBING: 0.5, CORRECTING: 0.55, REPORTING: 0.65, COMPOSING: 0.8 },
+};
 // Borne des index et du total : ~8 h de dictée par segments d'une minute, au-delà c'est une anomalie
 const MAX_SEGMENTS = 500;
 
@@ -39,9 +42,10 @@ function isTranscriptionComplete({ segmentsTotal, segments }) {
 }
 
 /** 0..1, ou null quand la barre n'a pas de sens (enregistrement, échec). */
-function computeProgress(status, done, total) {
-  if (status === 'TRANSCRIBING') return total ? PROGRESS.TRANSCRIBING * Math.min(done / total, 1) : 0;
-  if (status === 'CORRECTING' || status === 'COMPOSING') return PROGRESS[status];
+function computeProgress(status, done, total, kind = 'DICTATION') {
+  const weights = PROGRESS[kind] || PROGRESS.DICTATION;
+  if (status === 'TRANSCRIBING') return total ? weights.TRANSCRIBING * Math.min(done / total, 1) : 0;
+  if (status === 'CORRECTING' || status === 'REPORTING' || status === 'COMPOSING') return weights[status] ?? null;
   if (status === 'DONE') return 1;
   return null;
 }
@@ -62,10 +66,11 @@ function toView(job, segments) {
     segmentsQueued: count('QUEUED'),
     // Prochain index libre : permet de « Dicter la suite » après un rechargement sans écraser un segment
     nextIndex: segments.length ? Math.max(...segments.map((s) => s.index)) + 1 : 0,
-    progress: computeProgress(job.status, done, job.segmentsTotal),
+    progress: computeProgress(job.status, done, job.segmentsTotal, job.kind),
     error: job.error,
     errorDetail: job.errorDetail,
     result: job.status === 'DONE' ? (job.result ?? null) : null,
+    consentAt: job.consentAt instanceof Date ? job.consentAt.toISOString() : (job.consentAt ?? null),
     updatedAt: job.updatedAt instanceof Date ? job.updatedAt.toISOString() : job.updatedAt,
     finishedAt: job.finishedAt instanceof Date ? job.finishedAt.toISOString() : job.finishedAt,
   };
