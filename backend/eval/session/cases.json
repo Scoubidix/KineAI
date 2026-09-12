@@ -1,0 +1,37 @@
+[
+  {
+    "id": "seance-01", "title": "lombalgie, bilan initial", "motif": "Lombalgie chronique", "type": "INITIAL",
+    "transcript": "asr-worker/eval/out/seance-01_clean.txt",
+    "expectSections": ["anamnese", "antecedents", "examen", "limitations", "diagnostic", "objectifs", "traitement"],
+    "expect": ["eva_repos=3", "eva_effort=7", "distance_doigt_sol=22", "indice_schober=13", "extension_lombaire=15", "test_laseuge:D=false", "test_laseuge:G=false", "signe_de_la_sonnette=true", "testing_quadriceps:D=5/5", "testing_quadriceps:G=5/5", "sorensen_secondes=45", "douleur_nocturne=true"],
+    "forbid": [], "forbidValues": [46, 10, 18], "customContains": ["kinésiophobie présente"]
+  },
+  {
+    "id": "seance-02", "title": "épaule opérée, bilan intermédiaire", "motif": "Réparation de coiffe droite", "type": "INTERMEDIAIRE",
+    "transcript": "asr-worker/eval/out/seance-02_clean.txt",
+    "expectSections": ["anamnese", "antecedents", "examen", "limitations", "objectifs", "traitement"],
+    "expect": ["eva_repos=2", "eva_effort=5", "flexion_epaule:D=120", "abduction_epaule:D=90", "rotation_externe_1:D=30", "flexion_epaule:G=170", "abduction_epaule:G=170", "testing_deltoide:D=3/5", "testing_biceps_brachial:D=4/5", "adherences_cicatrice=false", "chaleur_locale=false", "douleur_nocturne=true"],
+    "forbid": ["test_neer", "test_jobe", "test_hawkins_kennedy"], "forbidValues": [63, 8], "customContains": []
+  },
+  {
+    "id": "seance-03", "title": "genou, ligamentoplastie LCA J+45", "motif": "Ligamentoplastie du LCA droit", "type": "INITIAL",
+    "transcript": "asr-worker/eval/out/seance-03_clean.txt",
+    "expectSections": ["anamnese", "antecedents", "examen", "limitations", "objectifs", "traitement"],
+    "expect": ["eva_repos=1", "eva_effort=3", "flexion_genou:D=110", "extension_genou:D=0", "circonference_cuisse:D=45", "circonference_cuisse:G=48", "testing_quadriceps:D=3/5", "testing_ischio_jambiers:D=3/5", "appui_monopodal_secondes:D=5", "boiterie=true"],
+    "forbid": ["test_lachman"], "forbidValues": [29, 45.5], "customContains": []
+  },
+  {
+    "id": "seance-04", "title": "cervicalgie avec névralgie cervico-brachiale", "motif": "Cervicalgie droite irradiante", "type": "INITIAL",
+    "transcript": "asr-worker/eval/out/seance-04_clean.txt",
+    "expectSections": ["anamnese", "antecedents", "examen", "limitations", "diagnostic", "objectifs", "traitement"],
+    "expect": ["eva_repos=4", "eva_effort=6", "flexion_cervicale=40", "extension_cervicale=30", "rotation_cervicale_droite=50", "rotation_cervicale_gauche=70", "test_spurling:D=true", "test_phalen:D=false", "signe_tinel:D=false", "paresthesies=true", "testing_biceps_brachial:D=4/5", "douleur_nocturne=true"],
+    "forbid": [], "forbidValues": [51], "customContains": ["kinésiophobie absente"]
+  },
+  {
+    "id": "seance-05", "title": "entorse de cheville J+10", "motif": "Entorse latérale de cheville gauche", "type": "INITIAL",
+    "transcript": "asr-worker/eval/out/seance-05_clean.txt",
+    "expectSections": ["anamnese", "antecedents", "examen", "limitations", "objectifs", "traitement"],
+    "expect": ["eva_repos=2", "eva_effort=5", "flexion_dorsale_cheville:G=5", "flexion_plantaire_cheville:G=35", "tiroir_anterieur_cheville:G=false", "test_kleiger:G=false", "test_thompson:G=false", "knee_to_wall:G=4", "knee_to_wall:D=10", "testing_fibulaires:G=3/5"],
+    "forbid": [], "forbidValues": [34, 28], "customContains": ["oedème de la cheville gauche", "périmètre bimalléolaire gauche 27 cm", "périmètre bimalléolaire droite 25 cm", "critères d'Ottawa négatifs"]
+  }
+]
