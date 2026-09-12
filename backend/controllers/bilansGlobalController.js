@@ -11,6 +11,7 @@ const asrService = require('../services/asrService');
 const dictationCorrectionService = require('../services/dictationCorrectionService');
 const jobService = require('../services/bilanJobService');
 const { MAX_SEGMENTS } = require('../services/bilanJobRules');
+const { createPseudonymizer } = require('../services/pseudonymService');
 
 /**
  * GET /api/bilans/patients-with-bilans
@@ -337,12 +338,15 @@ exports.correctDictation = async (req, res) => {
     const kineId = await getKineId(req, res);
     if (!kineId) return;
     if (!asrService.isConfigured()) throw new draftService.DraftError('DICTATION_DISABLED', 503, 'La dictée n’est pas disponible pour le moment');
-    const bilan = await prismaService.getInstance().bilanKine.findFirst({ where: { id: bilanId, kineId, isActive: true }, select: { document: true } });
+    const prisma = prismaService.getInstance();
+    const bilan = await prisma.bilanKine.findFirst({ where: { id: bilanId, kineId, isActive: true }, select: { document: true, patient: { select: { firstName: true, lastName: true, birthDate: true } } } });
     if (!bilan) throw new draftService.DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
     if (!bilan.document) throw new draftService.DraftError('LEGACY_BILAN', 400, 'Les anciens bilans ne peuvent pas être dictés');
     try {
       const catalog = await bilanRenderService.getCatalog();
-      const r = await dictationCorrectionService.correct({ text: req.body.text, mode: req.body.mode, catalog });
+      const kine = await prisma.kine.findUnique({ where: { id: kineId }, select: { firstName: true, lastName: true, email: true } });
+      const pseudo = createPseudonymizer({ patient: bilan.patient, kine });
+      const r = await dictationCorrectionService.correct({ text: req.body.text, mode: req.body.mode, catalog, pseudo });
       return res.json({ success: true, text: r.text, applied: r.applied, ignored: r.ignored });
     } catch (err) {
       if (err instanceof draftService.DraftError) throw err;

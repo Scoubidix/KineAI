@@ -101,6 +101,9 @@ function applyOps(text, ops, mode) {
   let current = raw;
   let applied = 0; let ignored = identityIgnored; let deletedWords = 0;
   for (const op of realOps) {
+    // Un jeton de pseudonymisation ([Libellé] ou [Libellé n]) ne figure jamais dans une vraie transcription :
+    // toute opération qui en touche un (dans from/to/before/after) est un artefact du modèle, jamais appliquée.
+    if (/[[\]]/.test(`${op.from}${op.to}${op.before}${op.after}`)) { ignored += 1; continue; }
     const from = normSpaces(op.from); const to = normSpaces(op.to);
     const before = normSpaces(op.before); const after = normSpaces(op.after);
     const fromTokens = tokens(from);
@@ -182,10 +185,12 @@ const safeErrorLabel = (err) => (err instanceof SyntaxError ? 'JSON invalide' : 
  * Corrige un texte transcrit. Ne lève jamais pour un échec du modèle : renvoie le texte brut.
  * @returns {Promise<{ text: string, applied: number, ignored: number }>}
  */
-async function correct({ text, mode, catalog }) {
+async function correct({ text, mode, catalog, pseudo }) {
   const raw = String(text ?? '').trim();
   if (!raw) return { text: '', applied: 0, ignored: 0 };
-  const messages = buildCorrectionMessages({ text: raw, mode, vocabulary: buildVocabulary(catalog) });
+  // Le modèle ne reçoit jamais l'identité en clair : masquée avant l'envoi, réhydratée sur le texte rendu
+  const masked = pseudo ? pseudo.mask(raw) : raw;
+  const messages = buildCorrectionMessages({ text: masked, mode, vocabulary: buildVocabulary(catalog) });
   let ops;
   for (let attempt = 1; attempt <= 2 && !ops; attempt += 1) {
     try {
@@ -197,9 +202,10 @@ async function correct({ text, mode, catalog }) {
     }
   }
   if (!ops) return { text: raw, applied: 0, ignored: 0 };
-  const r = applyOps(raw, ops, mode);
-  logger.info(`Correction dictée (${mode}) : ${r.applied} appliquée(s), ${r.ignored} ignorée(s)`);
-  return r;
+  const r = applyOps(masked, ops, mode);
+  const tokenCount = pseudo ? Object.values(pseudo.stats()).reduce((a, b) => a + b, 0) : 0;
+  logger.info(`Correction dictée (${mode}) : ${r.applied} appliquée(s), ${r.ignored} ignorée(s), ${tokenCount} jeton(s)`);
+  return { ...r, text: pseudo ? pseudo.unmask(r.text) : r.text };
 }
 
 module.exports = {

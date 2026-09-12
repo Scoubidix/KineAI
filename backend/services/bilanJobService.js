@@ -6,6 +6,7 @@ const prismaService = require('./prismaService');
 const logger = require('../utils/logger');
 const asrService = require('./asrService');
 const dictationCorrectionService = require('./dictationCorrectionService');
+const { createPseudonymizer } = require('./pseudonymService');
 const composeService = require('./bilanComposeService');
 const { getCatalog } = require('./bilanRenderService');
 const { DraftError } = require('./bilanDraftService');
@@ -214,7 +215,7 @@ async function finishRecording({ kineId, bilanId, segmentsTotal }) {
   return getJobView({ kineId, bilanId });
 }
 
-const JOB_INCLUDE = { segments: true, kine: { select: { uid: true } }, bilan: { select: { rawNotes: true, status: true } } };
+const JOB_INCLUDE = { segments: true, kine: { select: { uid: true, firstName: true, lastName: true, email: true } }, bilan: { select: { rawNotes: true, status: true, patient: { select: { firstName: true, lastName: true, birthDate: true } } } } };
 
 /** Si la transcription est complète, tente la transition atomique TRANSCRIBING → CORRECTING et lance la queue. */
 async function evaluate(jobId) {
@@ -248,7 +249,8 @@ async function runTail(jobId, stage) {
       const raw = rules.assembleSegments(job.segments);
       if (!raw) throw new DraftError('NOTES_REQUIRED', 400, 'Rien n’a été entendu');
       const catalog = await getCatalog();
-      const { text, applied, ignored } = await dictationCorrectionService.correct({ text: raw, mode: job.kind === 'SESSION' ? 'session' : 'dictation', catalog });
+      const pseudo = createPseudonymizer({ patient: job.bilan.patient, kine: job.kine });
+      const { text, applied, ignored } = await dictationCorrectionService.correct({ text: raw, mode: job.kind === 'SESSION' ? 'session' : 'dictation', catalog, pseudo });
       if (source === 'dialogue') logger.info(`Traitement dictée ${jobId} : séance, rédaction depuis le dialogue`);
       // La transition sert de verrou : une queue qui a perdu la main n'ajoute pas les notes une 2e fois.
       // Les trois écritures (statut, notes, segments) réussissent ou échouent ensemble.
