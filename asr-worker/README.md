@@ -132,10 +132,16 @@ Corpus synthétique : cinq dictées (`eval/scripts/dictee-0N.txt`, une par patho
 épaule opérée, genou/ligamentoplastie, cervicalgie, entorse de cheville), générées en audio par
 `eval/gen_dictation.py` (edge-tts, voix `fr-FR-HenriNeural`) en deux variantes chacune :
 `_clean` (voix seule) et `_cabinet` (bruit rose + réverb + filtrage passe-bande, simulant un micro
-éloigné en salle de kiné). `eval/bench.py` transcrit chaque fichier (découpé en tranches de 45 s,
-le worker refusant plus de 60 s), calcule le WER (référence = script tel quel, normalisé
-casse/ponctuation/espaces via `jiwer`), le RTF (temps de traitement / durée audio) et le nombre de
-termes kiné reconnus (`TERMES`, 18 termes), et écrit `eval/out/<nom>.txt`.
+éloigné en salle de kiné). `eval/bench.py` transcrit chaque fichier (découpé en tranches d'environ
+45 s, le worker refusant plus de 60 s — la coupe cherche le point le plus silencieux dans les 5
+dernières secondes de chaque fenêtre, comme le recorder du navigateur, pour ne pas trancher en
+pleine réplique), calcule le WER (référence = script tel quel, normalisé casse/ponctuation/espaces
+via `jiwer`), le RTF (temps de traitement / durée audio) et le nombre de termes kiné reconnus
+(`TERMES`, 18 termes), et écrit `eval/out/<nom>.txt`.
+
+`--concurrency` n'est qu'un interrupteur (un thread par segment au-delà de 1, utile uniquement avec
+`--url` pour paralléliser sur les places du worker HTTP) ; avec une séance découpée en une vingtaine
+de segments, le mode local (sans `--url`, in-process) reste préférable.
 
 Le WER référence-hypothèse compare deux textes dont les nombres ne s'écrivent pas pareil : la
 référence les a en toutes lettres (dictées telles quelles), faster-whisper les transcrit en
@@ -182,6 +188,11 @@ montre l'ampleur du delta expliqué par les nombres seuls : 5,7 à 10,4 points d
 fichier. Le résidu restant après normalisation vient d'erreurs de reconnaissance authentiques mais
 mineures (ex. « Schober » → « Chobet », « sept » → « c'est », désaccords singulier/pluriel,
 conjugaisons).
+
+Ces mesures datent d'avant le passage de `split_segments` à la coupe au silence (tranches fixes de
+45 s à l'époque) : une dictée est un monologue continu sans réplique à préserver, donc la coupe fixe
+ne perdait pas de mots ici comme elle le faisait sur le corpus de séances (voir plus bas) — ces
+chiffres restent valables tels quels, non rejoués.
 
 ### Run HTTP, `--concurrency 4` (worker `ASR_SLOTS=2`, `ASR_THREADS=2`, `dictee-01` uniquement)
 
@@ -245,29 +256,69 @@ places/priorités du scheduler HTTP.
 
 ### Résultats (dix fichiers, in-process, `ASR_THREADS=4`)
 
+Run rejoué le 2026-09-12 après le passage de `split_segments` à la coupe au silence, le déplacement
+de `EVA` en fin d'amorce (il faisait transcrire des « euh » en « EVA »), et la correction du script
+`seance-04` (« Signe de Tinel négatif » → « … négatif à droite »).
+
 ```
 fichier                       audio  temps   RTF    WER  WER brut termes
-seance-01_cabinet               694    142  0.21   4.3%      5.6% 2/18
-seance-01_clean                 694    142  0.21   3.8%      4.9% 4/18
-seance-02_cabinet               645    139  0.22   5.0%      7.0% 0/18
-seance-02_clean                 644    138  0.21   5.3%      7.6% 0/18
-seance-03_cabinet               870    181  0.21   4.6%      7.3% 0/18
-seance-03_clean                 869    180  0.21   4.0%      6.9% 0/18
-seance-04_cabinet               752    163  0.22   5.9%      6.9% 5/18
-seance-04_clean                 751    162  0.22   3.5%      4.3% 3/18
-seance-05_cabinet               903    188  0.21   7.3%      8.7% 3/18
-seance-05_clean                 903    185  0.21   5.4%      6.8% 2/18
+seance-01_cabinet               694    152  0.22   4.2%      5.5% 3/18
+seance-01_clean                 694    151  0.22   4.9%      6.5% 4/18
+seance-02_cabinet               645    144  0.22   2.8%      4.8% 0/18
+seance-02_clean                 644    148  0.23   2.4%      4.7% 0/18
+seance-03_cabinet               870    190  0.22   2.9%      4.8% 0/18
+seance-03_clean                 869    193  0.22   2.7%      5.5% 0/18
+seance-04_cabinet               752    169  0.22   2.5%      3.4% 3/18
+seance-04_clean                 752    176  0.23   2.4%      3.2% 3/18
+seance-05_cabinet               903    199  0.22   2.1%      3.4% 4/18
+seance-05_clean                 903    204  0.23   2.2%      3.5% 3/18
 ```
 
-RTF ≤ 0,22 sur les dix fichiers (cible < 0,5 largement atteinte). WER (nombres normalisés) 3,5 à
-7,3 %, largement sous la cible de la spec (8-18 % visé, plus proche en réalité des cibles dictée
-< 10 %/< 20 %) : le corpus de séances synthétique reste plus propre qu'attendu — les deux voix
-edge-tts restent nettes même en dialogue, et la dégradation `_cabinet` (bruit rose + réverb) ne
-pénalise pas autant qu'espéré un modèle habitué au bruit de fond. `_cabinet` est systématiquement un
-peu au-dessus de `_clean` (effet attendu), sauf `seance-02` où l'écart est négligeable. Aucun terme
-kiné dans les scripts de séance (dialogue naturel, pas de jargon dicté) : la colonne `termes`
-(0 à 5 sur 18) n'est pas significative ici, contrairement à la dictée où elle mesure la
-reconnaissance du vocabulaire spécialisé.
+RTF ≤ 0,23 sur les dix fichiers (cible < 0,5 largement atteinte). WER (nombres normalisés) 2,1 à
+4,9 %, en net retrait par rapport au run précédent (3,5-7,3 %), largement sous la cible de la spec
+(8-18 % visé, plus proche en réalité des cibles dictée < 10 %/< 20 %). La baisse la plus nette est
+sur `seance-05` (7,3 % → 2,1 % cabinet, 5,4 % → 2,2 % clean) : la coupe au silence récupère les deux
+répliques courtes du « knee to wall » (« droit », « dix centimètres ») qu'une coupe à date fixe
+avalait — `knee_to_wall:D=10` (attendu dans `backend/eval/session/cases.json`) est maintenant bien
+présent dans la transcription. `seance-02` à `seance-04` progressent aussi nettement (5,0-5,9 % →
+2,4-2,9 %), pour partie grâce au retrait d'« EVA » de la tête de l'amorce. Seul `seance-01_clean`
+remonte légèrement (3,8 % → 4,9 %) : l'amorce modifiée change la conditionnalisation du modèle sur
+ce fichier précis, sans lien avec la segmentation (aucune réplique courte n'y était perdue). Le
+corpus de séances synthétique reste plus propre qu'attendu — les deux voix edge-tts restent nettes
+même en dialogue, et la dégradation `_cabinet` (bruit rose + réverb) ne pénalise pas autant
+qu'espéré un modèle habitué au bruit de fond. `_cabinet` est systématiquement un peu au-dessus de
+`_clean` (effet attendu), sauf `seance-02` où l'écart est négligeable.
+
+Le corpus de séances contient bien du jargon kiné, contrairement à ce qu'affirmait une version
+précédente de ce README (dialogue scripté, pas dicté, mais les tests et cotations y apparaissent
+naturellement dans les répliques du kiné). Sur les 18 `TERMES` du bench, voici comment chacun
+ressort des transcriptions `_clean` :
+
+| Terme | Transcription obtenue |
+|---|---|
+| lasègue | intact (« Lasègue négatif à droite ») |
+| schober | « Chobet » |
+| sorensen | intact |
+| mckenzie | intact (« méthode McKenzie ») |
+| kinésiophobie | intact |
+| supra-épineux | « supraépineux » (trait d'union perdu) |
+| didt | « DID » (T final perdu) |
+| lachman | « le lâchement » (homophone) |
+| spurling | intact |
+| phalen | « Phalan » |
+| tinel | intact (« Tinel négatif à droite », depuis la correction du script) |
+| jamar | absent des scripts de séance (n'apparaît que dans le corpus dictée) |
+| dn4 | absent des scripts de séance (n'apparaît que dans le corpus dictée) |
+| kleiger | « clé G » (homophone) |
+| thompson | « Thomson » (un p perdu) |
+| knee to wall | intact |
+| fibulaires | intact |
+| ottawa | intact |
+
+La colonne `termes` (0 à 4 sur 18) mesure donc bien quelque chose ici, mais sous-compte : plusieurs
+termes sont reconnus par le modèle sans matcher le libellé exact attendu par `TERMES` (accent,
+espace, orthographe). La passe de correction (mode session) est obligatoire avant l'extraction ; le
+harnais `eval:session` l'applique toujours.
 
 Fichiers écrits : `eval/out/seance-0{1..5}_{clean,cabinet}.txt` (dix fichiers, vérifiés présents).
 

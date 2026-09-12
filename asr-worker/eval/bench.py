@@ -10,7 +10,7 @@ import jiwer
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 
-PROMPT = ("Bilan kinésithérapique. EVA, Lasègue, Schober, Lachman, Neer, Jobe, Hawkins, Spurling, Phalen, Tinel, "
+PROMPT = ("Bilan kinésithérapique. Lasègue, Schober, Lachman, Neer, Jobe, Hawkins, Spurling, Phalen, Tinel, EVA, "
           "Thompson, Kleiger, flexion, extension, abduction, rotation, testing quatre sur cinq, DN4, Jamar, "
           "knee to wall, ischio-jambiers, fibulaires, paravertébraux, kinésiophobie, DIDT, LLE.")
 TERMES = ["lasègue", "schober", "sorensen", "mckenzie", "kinésiophobie", "supra-épineux", "didt", "lachman",
@@ -151,21 +151,85 @@ def duration(path):
         return w.getnframes() / w.getframerate()
 
 
-def split_segments(path, seconds=45.0):
-    """Le worker refuse plus de 60 s : le bench découpe comme le navigateur (tranches de 45 s) et concatène."""
+def _write_wav(rate, frames):
     import io
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as o:
+        o.setnchannels(1); o.setsampwidth(2); o.setframerate(rate); o.writeframes(frames)
+    return buf.getvalue()
+
+
+def split_segments(path, seconds=45.0):
+    """Le worker refuse plus de 60 s : le bench découpe en tranches de ~45 s, mais coupe au silence
+    comme le recorder du navigateur — une coupe en pleine réplique perdait des mots (deux répliques
+    courtes de seance-05 avalées par une coupe à date fixe). Pour chaque fenêtre, on cherche le point
+    le plus silencieux (RMS minimal sur des trames de 20 ms) dans les 5 dernières secondes de la
+    fenêtre et on coupe là plutôt qu'à `seconds` pile."""
+    import array
+
     out = []
     with wave.open(path) as w:
         rate, n = w.getframerate(), w.getnframes()
-        step = int(seconds * rate)
-        for start in range(0, n, step):
-            w.setpos(start)
-            frames = w.readframes(min(step, n - start))
-            buf = io.BytesIO()
-            with wave.open(buf, "wb") as o:
-                o.setnchannels(1); o.setsampwidth(2); o.setframerate(rate); o.writeframes(frames)
-            out.append(buf.getvalue())
+        all_frames = w.readframes(n)
+    samples = array.array("h")
+    samples.frombytes(all_frames)
+
+    step = int(seconds * rate)
+    min_len = int(15.0 * rate)
+    frame_len = int(0.02 * rate)  # 20 ms
+    start = 0
+    while start < n:
+        remaining = n - start
+        if remaining <= step:
+            cut = n
+        else:
+            window_start = min(start + int(40.0 * rate), n)
+            window_end = min(start + step, n)
+            if window_end - window_start < frame_len:
+                cut = window_end
+            else:
+                best_pos, best_rms = window_end, None
+                pos = window_start
+                while pos + frame_len <= window_end:
+                    chunk = samples[pos:pos + frame_len]
+                    rms = (sum(x * x for x in chunk) / len(chunk)) ** 0.5
+                    if best_rms is None or rms < best_rms:
+                        best_rms, best_pos = rms, pos
+                    pos += frame_len
+                cut = best_pos
+            if cut - start < min_len:
+                cut = min(start + min_len, n)
+        out.append(_write_wav(rate, samples[start:cut].tobytes()))
+        start = cut
     return out
+
+
+def _selftest_split_segments():
+    """Vérifie que la coupe tombe bien dans le silence : wav de 100 s, tonalité 1 kHz sauf un
+    trou d'1 s à 42 s et un autre à 87 s ; la première coupe doit tomber entre 41 et 43 s."""
+    import math, tempfile
+
+    rate = 16000
+    total = 100 * rate
+    gaps = [(42 * rate, 43 * rate), (87 * rate, 88 * rate)]
+    samples = []
+    for i in range(total):
+        in_gap = any(g0 <= i < g1 for g0, g1 in gaps)
+        samples.append(0 if in_gap else int(8000 * math.sin(2 * math.pi * 1000 * i / rate)))
+    data = _write_wav(rate, array_to_bytes(samples))
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "selftest.wav")
+        with open(path, "wb") as f:
+            f.write(data)
+        segs = split_segments(path)
+        first_len_s = len(segs[0]) / (2 * rate)
+        assert 41 <= first_len_s <= 43, f"première coupe hors fenêtre attendue : {first_len_s:.2f} s"
+
+
+def array_to_bytes(samples):
+    import array
+    a = array.array("h", samples)
+    return a.tobytes()
 
 
 def reference_text(ref_name):
@@ -180,13 +244,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url"); ap.add_argument("--token", default=os.environ.get("ASR_WORKER_TOKEN", "dev-token"))
     ap.add_argument("--concurrency", type=int, default=1); ap.add_argument("--only")
-    ap.add_argument("--selftest", action="store_true", help="Vérifie normalize_numbers puis quitte, sans lancer le bench.")
+    ap.add_argument("--selftest", action="store_true", help="Vérifie normalize_numbers et split_segments puis quitte, sans lancer le bench.")
     a = ap.parse_args()
     if a.selftest:
         assert normalize_numbers(
             "cinquante-deux ans, deux mille dix-huit, cent vingt degrés, quatre-vingt-dix, un degré, une fois, un carton, mille"
         ) == "52 ans, 2018, 120 degrés, 90, 1 degré, 1 fois, un carton, 1000"
         assert reference_text("seance-01").startswith("Bonjour madame Martin")
+        _selftest_split_segments()
         print("selftest ok")
         return
     files = sorted(glob.glob(os.path.join(HERE, "audio", "*.wav")) + glob.glob(os.path.join(HERE, "audio", "real", "*.wav")))
