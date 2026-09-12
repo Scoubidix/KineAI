@@ -129,3 +129,48 @@ insensible à la casse), pas un score d'extraction.
 Si un fichier `asr-worker/eval/out/dictee-0N_<variante>.txt` est absent, le cas correspondant est
 signalé `ABSENT` et compte en erreur (rappel non calculé) — relancer `asr-worker/eval/bench.py`
 pour régénérer les transcriptions.
+
+## Eval — séance (dialogue kiné-patient)
+
+Chaîne complète de la séance (plan 8b) : transcription (`asr-worker/eval/out/seance-0N_*.txt`,
+dialogue à deux voix) → **passe de correction obligatoire**
+(`services/dictationCorrectionService.correct`, mode `session`) → compte rendu en sept sections
+(`services/sessionReportService.report`) → extraction (même logique partagée `runCase`/`printResult`/
+`summarize` que `eval:extraction`/`eval:dictation`, sur les notes produites par le compte rendu).
+
+Contrairement à `eval:dictation`, il n'y a pas de flag `--correct` ici : la correction fait partie
+intégrante de la chaîne de séance (le compte rendu est toujours produit à partir du dialogue
+corrigé), donc toujours appliquée.
+
+```bash
+cd backend
+npm run eval:session                        # 5 cas, variante clean (défaut)
+npm run eval:session -- --variant cabinet   # variante cabinet (bruit de salle)
+npm run eval:session -- --only seance-03    # un seul cas
+npm run eval:session -- --json out.json     # + dump JSON des résultats
+```
+
+⚠️ Coût : **3 appels réels au provider par cas** (correction, compte rendu, extraction), soit
+15 appels pour les 5 cas d'une variante (quelques dizaines de centimes, run réel du 2026-09-12
+avec `mistral-medium-3-5`). Aucun log de tokens/coût par appel n'est actuellement émis par
+`dictationCorrectionService`, `sessionReportService` ni `bilanExtractionService` (seuls le nombre
+d'opérations et de sections sont journalisés) : le coût par séance n'est donc pas mesurable
+depuis les logs applicatifs, seulement estimable par le nombre d'appels × la taille du dialogue
+(1500 à 2100 mots par séance ici).
+
+Ce qui est mesuré, en plus du rappel d'extraction habituel :
+- **sections attendues retrouvées** : sur les 7 sections du document (`anamnese`, `antecedents`,
+  `examen`, `limitations`, `diagnostic`, `objectifs`, `traitement`), combien de celles que le cas
+  attend (`expectSections`) sont effectivement non vides dans le compte rendu.
+- **sections vidées par la garde** (`dropped`) : `sessionReportService.guardReport` vide toute
+  section citant un nombre absent du dialogue (aucun nombre inventé toléré). C'est la mesure du
+  « nombre inventé » pour ce harnais (la garde vide la section plutôt que de laisser passer un
+  chiffre halluciné) — l'objectif est **zéro** sur la variante clean.
+
+Seuils d'ouverture du bouton (spec §6), vérifiés en fin de run : sections attendues retrouvées
+≥ 80 %, rappel d'extraction moyen ≥ 85 % (variante clean), 0 section vidée par la garde. Code de
+sortie 1 si un seuil n'est pas atteint (en plus des cas déjà gérés par `summarize` : interdits,
+cas en erreur).
+
+Run de référence, détail par séance et conclusion : `asr-worker/README.md`, section
+« Correction → Séance ».

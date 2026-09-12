@@ -389,6 +389,12 @@ Rappel moyen : clean 95,5 % sans correction → 94,4 % avec ; cabinet 94,0 % san
 96,9 % avec. Aucune passe abandonnée (0 sur 10, contre 8 sur 10 avec le prompt initial et 1 sur 10
 au run intermédiaire). 0 interdit dans tous les runs.
 
+Rejoué le 2026-09-12 (clean, `--correct`) après le déplacement d'« EVA » en fin d'amorce de
+vocabulaire (plan 8a — les transcriptions `dictee-0N` elles-mêmes datent d'avant ce changement,
+donc ce rejeu ne mesure que le côté LLM, pas l'ASR) : rappel moyen **95,5 %**, 0 interdit — pas de
+régression par rapport à la référence 94,4 % ci-dessus (même ordre de grandeur, écart dans le bruit
+du non-déterminisme de l'appel). Aucun réglage effectué.
+
 Lecture : la passe corrige des termes réels (`Schober` récupéré sur dictee-01 dans les deux
 variantes, `Spurling` sur dictee-04 cabinet, 7 opérations appliquées sur dictee-05 cabinet) et ne
 dégrade jamais le rappel de plus d'un champ ; les deux écarts restants (`douleur_nocturne` sur
@@ -396,6 +402,70 @@ dictee-05 clean, `eva_effort` sur dictee-01 dans tous les runs — la transcript
 l'effort », homophone « sept »/« c'est » déjà documenté dans le bench WER) ne sont pas touchés par
 les opérations appliquées : ils tiennent à la transcription et au non-déterminisme de l'appel
 d'extraction, comme observé aux runs précédents. Noté tel quel, sans retouche.
+
+### Séance
+
+Chaîne complète du corpus de séances (`backend/eval/session/run.js`, `npm run eval:session`) :
+transcription (`asr-worker/eval/out/seance-0N_*.txt`, voir plus haut) → passe de correction
+obligatoire (mode `session`, toujours appliquée ici, pas de flag) → compte rendu en sept sections
+(`sessionReportService.report`) → extraction. Détail du harnais : `backend/eval/README.md`. Run
+réel du 2026-09-12, un cas = 3 appels provider (`mistral-medium-3-5`) :
+
+| Séance | Mots dialogue | Sections attendues/obtenues (clean) | Vidées (clean) | Rappel extraction (clean) | Sections attendues/obtenues (cabinet) | Vidées (cabinet) | Rappel extraction (cabinet) |
+|---|---|---|---|---|---|---|---|
+| seance-01 | 1521 / 1542 | 7/7 | 0 | 100 % | 7/7 | 0 | 100 % |
+| seance-02 | 1676 / 1676 | 5/7 | 2 (anamnese, antecedents) | 75 % | 5/7 | 2 (anamnese, antecedents) | 75 % |
+| seance-03 | 1967 / 1964 | 5/7 | 2 (anamnese, objectifs) | 100 % | 5/7 | 2 (anamnese, objectifs) | 80 % |
+| seance-04 | 2063 / 2080 | 7/7 | 0 | 100 % | 7/7 | 0 | 100 % |
+| seance-05 | 2068 / 2069 | 7/7 | 0 | 90 % | 7/7 | 0 | 90 % |
+| **Moyenne/total** | — | **31/35 (88,6 %)** | **4** | **93,0 %** | **31/35 (88,6 %)** | **4** | **89,0 %** |
+
+Caveat connu du corpus : `seance-01` porte `eva_effort=7` transcrit « A7 à l'effort » (les deux
+variantes) — recouvré à 100 % dans les deux runs (la garde des nombres accepte « 7 » comme
+sous-chaîne de « A7 », et l'extraction retrouve `eva_effort=7`) : pas de perte sur ce cas connu.
+
+**Seuils d'ouverture (spec §6) : sections attendues ≥ 80 % (atteint, 88,6 % sur les deux
+variantes), rappel d'extraction ≥ 85 % variante clean (atteint, 93,0 %), 0 section vidée par la
+garde des nombres inventés variante clean (NON ATTEINT — 4 sections vidées sur seance-02 et
+seance-03, identiquement en cabinet).** Conclusion : seuils NON ATTEINTS dans l'ensemble, à cause
+du seul critère « 0 inventé ».
+
+Mécanismes observés (aucune retouche de prompt : règle projet « pas de nouvelle règle sans
+mécanisme vu ≥ 2 fois ») :
+
+1. **Chiffre de délai clinique plausible mais non énoncé, halluciné par la rédaction du compte
+   rendu.** `seance-02` : le compte rendu écrit « infiltration de l'épaule droite il y a 18 mois »
+   dans `anamnese` et `antecedents`, alors que le dialogue dit seulement « ça faisait deux ans que
+   ça me tirait. On m'avait fait une infiltration, ça a calmé six mois » — sans jamais dater
+   l'infiltration elle-même à 18 mois, et « 18 » n'apparaît nulle part dans la transcription.
+   `seance-03` : le compte rendu écrit « reprise de la course à 4 mois » dans `anamnese` et
+   `objectifs` ; « 4 » (chiffre ou lettres) n'apparaît nulle part dans la transcription — le
+   dialogue ne donne que « on vise 130 [degrés] à 3 mois » et « retour au handball [...] après
+   9 mois ». Dans les deux cas, le même chiffre inventé apparaît identiquement dans les deux
+   sections concernées et dans les deux variantes (clean et cabinet), donc reproductible — pas un
+   artefact de bruit ASR ponctuel. La garde fonctionne comme conçu (elle vide la section plutôt que
+   de publier un chiffre halluciné), mais son rayon d'action est la section entière : les autres
+   nombres corrects de la même section (âge, ancienneté, EVA, amplitudes...) sont perdus avec elle.
+   Observé sur 2 séances sur 5, aux deux variantes (4 occurrences au total) : mécanisme confirmé,
+   mais aucun réglage de prompt fait sur la base de cette seule tâche.
+2. **`customContains` qui ne remonte pas malgré une présence avérée dans le dialogue, voire dans le
+   compte rendu.** `kinésiophobie` (seance-01, seance-04) : le mot est bien dans la transcription
+   mais aucune mesure libre ne le porte en sortie d'extraction. `seance-05` : « Ottawa » (3
+   occurrences dans le dialogue) ne survit pas jusqu'au compte rendu ; « Œdème » survit
+   littéralement dans la section `examen` (« Œdème périmalléolaire gauche (27 cm vs 25 cm à
+   droite)... », vérifié) mais n'est jamais extrait comme mesure libre distincte (probablement
+   fondu dans la mesure `circonference_cheville_huit` déjà extraite) ; « bimalléolaire » (dans le
+   script d'origine) est devenu « périmalléolaire » à la transcription — une dérive de synthèse/ASR
+   sur ce terme précis, pas un défaut du compte rendu ou de l'extraction. Même catégorie que le
+   biais déjà documenté côté dictée (cases.json qui teste un concept que le pipeline capture
+   autrement) plutôt qu'un défaut nouveau ; comportement identique aux deux variantes.
+
+Note d'environnement pour le déploiement des séances : la file `batch` (priorité des dictées de
+séance) partage l'ordonnanceur avec les dictées `interactive`. `ASR_BATCH_QUEUE_MAX` (défaut `20`
+dans le code, voir tableau des variables ci-dessus) vaut la peine d'être relevé à **60** sur le
+worker en production pour les séances (une séance de 10-15 minutes se découpe en une vingtaine de
+segments par appel ; plusieurs séances simultanées peuvent saturer une file à 20) — décision de
+déploiement, le défaut du code reste inchangé.
 
 ### Amorce de vocabulaire : essai A/B du 10 sept. 2026
 
