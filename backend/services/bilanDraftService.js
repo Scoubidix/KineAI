@@ -20,6 +20,11 @@ class DraftError extends Error {
 
 const PATIENT_SELECT = { id: true, firstName: true, lastName: true, birthDate: true };
 
+// Identité du kiné pour la pseudonymisation (spec 2026-09-12) : jamais l'objet Kine complet.
+async function loadIdentity(prisma, kineId) {
+  return prisma.kine.findUnique({ where: { id: kineId }, select: { firstName: true, lastName: true, email: true } });
+}
+
 async function findOwnedPatient(prisma, kineId, patientId) {
   const patient = await prisma.patient.findFirst({ where: { id: patientId, kineId, isActive: true } });
   if (!patient) throw new DraftError('PATIENT_NOT_FOUND', 404, 'Patient non trouvé ou accès refusé');
@@ -168,6 +173,7 @@ module.exports = {
   PATIENT_SELECT,
   BILAN_TYPES,
   DRAFT_STATUSES,
+  loadIdentity,
   createDraft,
   listMyBilans,
   getForEditor,
