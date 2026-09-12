@@ -49,7 +49,7 @@ export default function ProcessingScreen({ state, onSkipFailed, onRetryJob, onWr
           <p className="text-base font-medium">{nothingHeard ? 'Rien n’a été entendu' : 'La rédaction n’a pas abouti'}</p>
           {measurementsSaved && <p className="text-sm text-muted-foreground">Tes mesures ont été conservées.</p>}
           {nothingHeard ? (
-            <Button onClick={onRestart} className="btn-teal rounded-full px-6 h-10"><Mic className="h-4 w-4 mr-2" />Dicter à nouveau</Button>
+            <Button onClick={onRestart} className="btn-teal rounded-full px-6 h-10"><Mic className="h-4 w-4 mr-2" />Recommencer</Button>
           ) : (
             <div className="flex flex-col items-center gap-2">
               <Button onClick={onRetryJob} className="btn-teal rounded-full px-6 h-10"><RotateCcw className="h-4 w-4 mr-2" />Réessayer</Button>

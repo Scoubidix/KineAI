@@ -20,10 +20,10 @@ interface DictationFlowProps {
 
 // La durée maximale d'une prise dépend du type de traitement : la description est calculée au besoin
 const IMPORT_MESSAGES: Record<Exclude<ImportResult, 'ok'>, { title: string; description?: (kind: BilanJobKind) => string }> = {
-  busy: { title: 'Dictée en cours', description: () => 'Termine la prise avant d’importer un fichier' },
+  busy: { title: 'Enregistrement en cours', description: () => 'Termine la prise avant d’importer un fichier' },
   invalid: { title: 'Fichier audio illisible', description: () => 'Formats acceptés : wav, mp3, m4a, webm, ogg (au moins une seconde)' },
-  too_long: { title: 'Fichier trop long', description: (kind) => (kind === 'SESSION' ? '90 minutes maximum' : '10 minutes maximum') },
-  unavailable: { title: 'Dictée indisponible pour le moment' },
+  too_long: { title: 'Fichier trop long', description: (kind) => (kind === 'SESSION' ? '30 minutes maximum à l’import' : '10 minutes maximum à l’import') },
+  unavailable: { title: 'Indisponible pour le moment' },
 };
 
 // Flux « Dicter → Bilan » : enregistrement, puis attente ; l'éditeur n'apparaît qu'à la fin.
@@ -64,7 +64,7 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
   };
   const busy = state.phase === 'recording' || state.uploading > 0;
   const handleBack = () => {
-    if (busy) { toast({ title: 'Enregistrement en cours', description: 'Arrête la dictée et attends la fin des envois avant de quitter' }); return; }
+    if (busy) { toast({ title: 'Enregistrement en cours', description: 'Arrête l’enregistrement et attends la fin des envois avant de quitter' }); return; }
     router.push('/dashboard/kine/bilan-kine');
   };
   const who = bilan.patient ? `${bilan.patient.firstName} ${bilan.patient.lastName.toUpperCase()}` : 'Sans patient';
@@ -85,7 +85,14 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
           </Button>
         </div>
       ) : state.phase === 'processing' || state.phase === 'failed' ? (
-        <ProcessingScreen state={state} onSkipFailed={() => { void dictation.skipFailed(); }} onRetryJob={() => { void dictation.retryJob(); }} onWrite={onWrite} onRestart={dictation.restart} />
+        <ProcessingScreen
+          state={state}
+          onSkipFailed={() => { void dictation.skipFailed(); }}
+          onRetryJob={() => { void dictation.retryJob(); }}
+          onWrite={onWrite}
+          // Un nouveau consentement doit être un acte, pas un état résiduel
+          onRestart={() => { setConsent(false); dictation.restart(); }}
+        />
       ) : (
         <RecordingScreen state={state} kind={kind} consent={consent} onConsentChange={setConsent} onStart={() => { void dictation.start(); }} onStop={dictation.stop} onGenerate={() => { void dictation.generate(); }} onImport={handleImport} onRetryUploads={dictation.retryUploads} onWrite={onWrite} />
       )}

@@ -23,14 +23,12 @@ const mmss = (ms: number) => { const s = Math.floor(ms / 1000); return `${String
 const START_ERRORS: Record<StartError, string> = {
   done: 'Ce bilan est déjà rédigé : ouvre-le pour le vérifier',
   busy: 'Un traitement est déjà en cours pour ce bilan',
-  finalized: 'Ce bilan est enregistré, il ne peut plus être dicté',
-  limit: 'Limite de la dictée atteinte : génère le bilan',
+  finalized: 'Ce bilan est enregistré, il ne peut plus être modifié par la voix',
+  limit: 'Limite d’enregistrement atteinte : génère le bilan',
   network: 'Impossible de démarrer, vérifie ta connexion',
   consent: 'Confirme avoir informé le patient avant d’enregistrer',
+  mismatch: 'Un enregistrement d’un autre type est en cours pour ce bilan : recharge la page',
 };
-// La borne d'une prise dépend du type de traitement (10 min en dictée, 90 min en séance)
-const startErrorLabel = (error: StartError, session: boolean) =>
-  session && error === 'limit' ? 'Limite de 90 minutes atteinte : génère le bilan' : START_ERRORS[error];
 
 // Écran d'enregistrement plein cadre : bouton central, chrono, vumètre, puis Stop → « Générer le bilan ».
 export default function RecordingScreen({ state, kind, consent, onConsentChange, onStart, onStop, onGenerate, onImport, onRetryUploads, onWrite }: RecordingScreenProps) {
@@ -85,6 +83,7 @@ export default function RecordingScreen({ state, kind, consent, onConsentChange,
         onClick={recording ? onStop : () => onStart()}
         disabled={unavailable || blocked || state.starting || state.importing || state.generating}
         aria-pressed={recording}
+        aria-describedby="recording-hint"
         aria-label={session
           ? (recording ? 'Arrêter' : stopped ? 'Enregistrer la suite' : 'Enregistrer la séance')
           : (recording ? 'Arrêter' : stopped ? 'Dicter la suite' : 'Dicter')}
@@ -92,10 +91,10 @@ export default function RecordingScreen({ state, kind, consent, onConsentChange,
       >
         {state.starting ? <Loader2 className="h-9 w-9 animate-spin" /> : recording ? <Square className="h-9 w-9" /> : <Mic className="h-9 w-9" />}
       </button>
-      <p className="text-sm text-muted-foreground" role="status">
+      <p id="recording-hint" className="text-sm text-muted-foreground" role="status">
         {!state.supported ? 'Ton navigateur ne permet pas l’enregistrement audio'
-          : !state.available ? 'Dictée indisponible pour le moment'
-          : state.permissionDenied ? 'Autorise le micro dans ton navigateur pour dicter'
+          : !state.available ? 'Indisponible pour le moment'
+          : state.permissionDenied ? 'Autorise le micro dans ton navigateur'
           : session
             ? (recording ? 'La séance est enregistrée, appuie sur Stop à la fin'
               : stopped ? 'Enregistrer la suite, ou générer le bilan'
@@ -105,7 +104,7 @@ export default function RecordingScreen({ state, kind, consent, onConsentChange,
               : stopped ? 'Dicter la suite, ou générer le bilan'
               : 'Appuie pour dicter ton bilan')}
       </p>
-      {state.startError && <p className="text-xs text-destructive">{startErrorLabel(state.startError, session)}</p>}
+      {state.startError && <p className="text-xs text-destructive">{START_ERRORS[state.startError]}</p>}
       {stopped && (
         <div className="flex flex-col items-center gap-2">
           <Button onClick={onGenerate} disabled={!canGenerate} className="btn-teal rounded-full px-6 h-11 text-base">

@@ -10,6 +10,8 @@ import { displayProgress, isProcessing } from './dictationJobProgress';
 
 // 10 min pour une dictée (mémo vocal court), 90 min pour une prise de séance posée sur la table
 export const MAX_TAKE_MS_BY_KIND: Record<BilanJobKind, number> = { DICTATION: 10 * 60 * 1000, SESSION: 90 * 60 * 1000 };
+// Un fichier de 90 minutes ne tient ni en mémoire au décodage ni sous le limiteur d'envois ; 30 minutes à l'import
+export const MAX_IMPORT_MS_BY_KIND: Record<BilanJobKind, number> = { DICTATION: 10 * 60 * 1000, SESSION: 30 * 60 * 1000 };
 const MAX_UPLOAD_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 2_000;
 const POLL_MS = 2_000;
@@ -22,7 +24,7 @@ const IMPORT_CONCURRENCY = 3;
 export type JobPhase = 'idle' | 'recording' | 'stopped' | 'processing' | 'done' | 'failed';
 export type ImportResult = 'ok' | 'busy' | 'unavailable' | 'invalid' | 'too_long';
 /** Raison pour laquelle une prise n'a pas pu démarrer (affichée sous l'invite de l'écran) */
-export type StartError = 'done' | 'busy' | 'finalized' | 'limit' | 'network' | 'consent';
+export type StartError = 'done' | 'busy' | 'finalized' | 'limit' | 'network' | 'consent' | 'mismatch';
 
 export interface DictationJobState {
   available: boolean;        // worker configuré et prêt
@@ -58,7 +60,7 @@ interface PendingUpload { blob: Blob; mimeType: string }
 
 /** Pourquoi la création du traitement a échoué, dans les termes de l'écran. */
 const startErrorOf = (e: unknown): StartError => {
-  if (e instanceof ApiError) return e.code === 'CONSENT_REQUIRED' ? 'consent' : e.code === 'ALREADY_FINALIZED' ? 'finalized' : e.status === 409 ? 'busy' : 'network';
+  if (e instanceof ApiError) return e.code === 'CONSENT_REQUIRED' ? 'consent' : e.code === 'ALREADY_FINALIZED' ? 'finalized' : e.code === 'JOB_KIND_MISMATCH' ? 'mismatch' : e.status === 409 ? 'busy' : 'network';
   if (e instanceof Error && e.message === 'JOB_DONE') return 'done';
   if (e instanceof Error && e.message === 'CONSENT_REQUIRED') return 'consent';
   return 'network';
@@ -127,9 +129,16 @@ export function useDictationJob({ bilanId, initialJob, enabled, kind = 'DICTATIO
     return () => clearInterval(timer);
   }, [state.available, refreshAvailability]);
 
-  // L'écran ne doit pas se mettre en veille pendant une séance posée sur la table ; sans support, on ignore
+  // L'écran ne doit pas se mettre en veille pendant une séance posée sur la table ; sans support, on ignore.
+  // La plateforme relâche le verrou quand l'onglet est masqué ; sans ce test, il n'était jamais repris.
   const requestWakeLock = useCallback(async () => {
-    try { if (typeof navigator !== 'undefined' && 'wakeLock' in navigator && !wakeLockRef.current) wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch { /* non supporté ou refusé */ }
+    try {
+      if (typeof navigator === 'undefined' || !('wakeLock' in navigator)) return;
+      if (wakeLockRef.current && !wakeLockRef.current.released) return;
+      const sentinel = await navigator.wakeLock.request('screen');
+      wakeLockRef.current = sentinel;
+      sentinel.addEventListener('release', () => { if (wakeLockRef.current === sentinel) wakeLockRef.current = null; });
+    } catch { /* non supporté ou refusé */ }
   }, []);
   const releaseWakeLock = useCallback(() => { const w = wakeLockRef.current; wakeLockRef.current = null; void w?.release().catch(() => undefined); }, []);
 
@@ -243,8 +252,8 @@ export function useDictationJob({ bilanId, initialJob, enabled, kind = 'DICTATIO
       let pcm: Float32Array;
       try { pcm = await decodeToMono16k(file); } catch { return 'invalid'; }
       if (pcm.length < TARGET_RATE) return 'invalid';
-      const maxTakeMs = MAX_TAKE_MS_BY_KIND[effectiveKind];
-      if (pcm.length > (maxTakeMs / 1000) * TARGET_RATE) return 'too_long';
+      const maxImportMs = MAX_IMPORT_MS_BY_KIND[effectiveKind];
+      if (pcm.length > (maxImportMs / 1000) * TARGET_RATE) return 'too_long';
       try { await ensureJob(); } catch (e) { patch({ startError: startErrorOf(e) }); return 'busy'; }
       const base = nextIndexRef.current;
       const slices = sliceAtSilences(pcm);
