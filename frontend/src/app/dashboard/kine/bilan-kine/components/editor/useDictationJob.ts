@@ -3,12 +3,13 @@
 // sans attendre la transcription ; « Générer » clôt l'enregistrement, puis on sonde l'avancement.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, createJob, finishJob, getDictationStatus, getJob, retryJob as apiRetryJob, skipFailedSegments, uploadJobSegment } from '@/utils/bilanApi';
-import type { BilanJobView } from '@/types/bilan';
+import type { BilanJobKind, BilanJobView } from '@/types/bilan';
 import { DictationRecorder, pickMimeType } from './dictationRecorder';
 import { decodeToMono16k, encodeWav, sliceAtSilences, TARGET_RATE } from './audioSlicer';
 import { displayProgress, isProcessing } from './dictationJobProgress';
 
-export const MAX_TAKE_MS = 10 * 60 * 1000;
+// 10 min pour une dictée (mémo vocal court), 90 min pour une prise de séance posée sur la table
+export const MAX_TAKE_MS_BY_KIND: Record<BilanJobKind, number> = { DICTATION: 10 * 60 * 1000, SESSION: 90 * 60 * 1000 };
 const MAX_UPLOAD_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 2_000;
 const POLL_MS = 2_000;
@@ -21,7 +22,7 @@ const IMPORT_CONCURRENCY = 3;
 export type JobPhase = 'idle' | 'recording' | 'stopped' | 'processing' | 'done' | 'failed';
 export type ImportResult = 'ok' | 'busy' | 'unavailable' | 'invalid' | 'too_long';
 /** Raison pour laquelle une prise n'a pas pu démarrer (affichée sous l'invite de l'écran) */
-export type StartError = 'done' | 'busy' | 'finalized' | 'limit' | 'network';
+export type StartError = 'done' | 'busy' | 'finalized' | 'limit' | 'network' | 'consent';
 
 export interface DictationJobState {
   available: boolean;        // worker configuré et prêt
@@ -48,6 +49,8 @@ export interface UseDictationJobArgs {
   bilanId: number;
   initialJob: BilanJobView | null;
   enabled: boolean;
+  kind?: BilanJobKind;
+  consent?: boolean;
   onAutoStop?: () => void;
 }
 
@@ -55,8 +58,9 @@ interface PendingUpload { blob: Blob; mimeType: string }
 
 /** Pourquoi la création du traitement a échoué, dans les termes de l'écran. */
 const startErrorOf = (e: unknown): StartError => {
-  if (e instanceof ApiError) return e.code === 'ALREADY_FINALIZED' ? 'finalized' : e.status === 409 ? 'busy' : 'network';
+  if (e instanceof ApiError) return e.code === 'CONSENT_REQUIRED' ? 'consent' : e.code === 'ALREADY_FINALIZED' ? 'finalized' : e.status === 409 ? 'busy' : 'network';
   if (e instanceof Error && e.message === 'JOB_DONE') return 'done';
+  if (e instanceof Error && e.message === 'CONSENT_REQUIRED') return 'consent';
   return 'network';
 };
 
@@ -68,7 +72,9 @@ const phaseOf = (job: BilanJobView | null, recording: boolean, hasSegments: bool
   return job.status === 'DONE' ? 'done' : 'failed';
 };
 
-export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: UseDictationJobArgs) {
+export function useDictationJob({ bilanId, initialJob, enabled, kind = 'DICTATION', consent = false, onAutoStop }: UseDictationJobArgs) {
+  // Un traitement déjà en cours impose son propre genre (un rechargement ne peut pas le changer)
+  const effectiveKind = initialJob?.kind ?? kind;
   const [state, setState] = useState<DictationJobState>({
     available: false, supported: true, phase: phaseOf(initialJob, false, (initialJob?.nextIndex ?? 0) > 0), starting: false, elapsedMs: 0, totalMs: 0, level: 0,
     permissionDenied: false, importing: false, segmentsSent: initialJob?.nextIndex ?? 0, uploading: 0, uploadFailed: 0,
@@ -91,6 +97,7 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
   const stageRef = useRef<{ status: string | null; startedAt: number }>({ status: initialJob?.status ?? null, startedAt: Date.now() });
   const onAutoStopRef = useRef(onAutoStop);
   onAutoStopRef.current = onAutoStop;
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   const setJob = useCallback((job: BilanJobView | null) => {
     jobRef.current = job;
@@ -120,19 +127,27 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
     return () => clearInterval(timer);
   }, [state.available, refreshAvailability]);
 
+  // L'écran ne doit pas se mettre en veille pendant une séance posée sur la table ; sans support, on ignore
+  const requestWakeLock = useCallback(async () => {
+    try { if (typeof navigator !== 'undefined' && 'wakeLock' in navigator && !wakeLockRef.current) wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch { /* non supporté ou refusé */ }
+  }, []);
+  const releaseWakeLock = useCallback(() => { const w = wakeLockRef.current; wakeLockRef.current = null; void w?.release().catch(() => undefined); }, []);
+
   // Le traitement est créé au premier segment (Dicter ou import), pas à l'ouverture de l'écran
   const ensureJob = useCallback(async () => {
     if (jobRef.current && jobRef.current.status === 'RECORDING') return jobRef.current;
     // Un traitement terminé ne se remet pas à zéro depuis cet écran : le bilan est déjà rédigé
     if (jobRef.current?.status === 'DONE') throw new Error('JOB_DONE');
-    const job = await createJob(bilanId);
+    // Le serveur exige le consentement explicite à chaque création d'un traitement de séance
+    if (effectiveKind === 'SESSION' && !consent) throw new Error('CONSENT_REQUIRED');
+    const job = await createJob(bilanId, effectiveKind, consent);
     nextIndexRef.current = job.nextIndex;
     sentRef.current = 0;
     failedRef.current = new Map();
     setJob(job);
     refreshUploads();
     return job;
-  }, [bilanId, setJob, refreshUploads]);
+  }, [bilanId, effectiveKind, consent, setJob, refreshUploads]);
 
   const uploadSegment = useCallback(async (index: number, upload: PendingUpload) => {
     uploadingRef.current += 1;
@@ -161,9 +176,10 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
     const rec = recorderRef.current;
     recorderRef.current = null;
     if (rec) rec.stop();
+    releaseWakeLock();
     patch({ level: 0 });
     refreshUploads();
-  }, [patch, refreshUploads]);
+  }, [patch, refreshUploads, releaseWakeLock]);
 
   /** Nouvelle prise (« Dicter », « Dicter la suite ») : les indices continuent après ceux déjà envoyés. */
   const start = useCallback(async () => {
@@ -184,6 +200,7 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
       return;
     }
     const base = nextIndexRef.current;
+    const maxTakeMs = MAX_TAKE_MS_BY_KIND[effectiveKind];
     const rec = new DictationRecorder(mimeType, {
       onSegment: (blob, index) => {
         const i = base + index;
@@ -195,7 +212,7 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
       onLevel: (level) => patch({ level }),
       onTick: (elapsedMs) => {
         patch({ elapsedMs, totalMs: takeStartMsRef.current + elapsedMs });
-        if (elapsedMs >= MAX_TAKE_MS) { stop(); onAutoStopRef.current?.(); }
+        if (elapsedMs >= maxTakeMs) { stop(); onAutoStopRef.current?.(); }
       },
       onStopped: () => { refreshUploads(); },
     });
@@ -209,10 +226,11 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
     }
     if (token !== startTokenRef.current) { rec.stop(); startingRef.current = false; patch({ starting: false }); return; }
     recorderRef.current = rec;
+    void requestWakeLock();
     startingRef.current = false;
     takeStartMsRef.current = state.totalMs;
     patch({ starting: false, elapsedMs: 0, permissionDenied: false, interrupted: false, phase: 'recording' });
-  }, [enabled, refreshAvailability, ensureJob, uploadSegment, stop, patch, state.totalMs]);
+  }, [enabled, refreshAvailability, ensureJob, uploadSegment, stop, patch, state.totalMs, effectiveKind, requestWakeLock]);
 
   /** Fichier audio (mémo vocal, test sans micro) : découpé aux silences, envoyé comme une prise. */
   const importingRef = useRef(false);
@@ -225,7 +243,8 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
       let pcm: Float32Array;
       try { pcm = await decodeToMono16k(file); } catch { return 'invalid'; }
       if (pcm.length < TARGET_RATE) return 'invalid';
-      if (pcm.length > (MAX_TAKE_MS / 1000) * TARGET_RATE) return 'too_long';
+      const maxTakeMs = MAX_TAKE_MS_BY_KIND[effectiveKind];
+      if (pcm.length > (maxTakeMs / 1000) * TARGET_RATE) return 'too_long';
       try { await ensureJob(); } catch (e) { patch({ startError: startErrorOf(e) }); return 'busy'; }
       const base = nextIndexRef.current;
       const slices = sliceAtSilences(pcm);
@@ -252,7 +271,7 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
       importingRef.current = false;
       patch({ importing: false });
     }
-  }, [enabled, refreshAvailability, ensureJob, uploadSegment, refreshUploads, patch, state.totalMs]);
+  }, [enabled, refreshAvailability, ensureJob, uploadSegment, refreshUploads, patch, state.totalMs, effectiveKind]);
 
   const retryUploads = useCallback(() => {
     const items = [...failedRef.current.entries()];
@@ -318,10 +337,17 @@ export function useDictationJob({ bilanId, initialJob, enabled, onAutoStop }: Us
     return () => window.removeEventListener('beforeunload', handler);
   }, [busy]);
 
+  // Le Wake Lock est relâché par le système en arrière-plan (onglet masqué, verrouillage) : on le redemande au retour
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible' && recorderRef.current) void requestWakeLock(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [requestWakeLock]);
+
   useEffect(() => { if (!enabled) { startTokenRef.current += 1; if (recorderRef.current) stop(); } }, [enabled, stop]);
   // Démontage : le jeton coupe une demande de micro encore en vol, sinon le témoin d'enregistrement
   // de l'onglet resterait allumé après avoir quitté la page.
-  useEffect(() => () => { startTokenRef.current += 1; recorderRef.current?.stop(); }, []);
+  useEffect(() => () => { startTokenRef.current += 1; recorderRef.current?.stop(); releaseWakeLock(); }, []);
 
   return { state, start, stop, generate, importFile, retryUploads, skipFailed, retryJob, restart };
 }
