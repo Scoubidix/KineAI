@@ -146,6 +146,9 @@ candidats, sections rédigées) — les notes réelles ne quittent jamais le ser
   `[Prénom]` plutôt que de le recopier. Aucun nom, réel ou synthétique, n'apparaît en clair (ni fuite
   RGPD ni fuite de test) : c'est une non-conformité au gabarit du guide de rédaction, à corriger côté
   prompt (`SECTION_GUIDE.anamnese`) si le format « Prénom NOM » est requis à l'affichage.
+  **Corrigé le 2026-09-12** (gabarit d'identité obligatoire, commit `f28c0e9`,
+  `docs/superpowers/specs/2026-09-12-anamnese-identite-design.md`) : voir le run de référence dans
+  la section « Eval — séance » ci-dessous.
 
 ## Eval — pseudonymisation (gratuit, déterministe)
 
@@ -289,3 +292,34 @@ fourchette 93–98 % ci-dessus), 0 nombre non vérifié, 4 sections avec doublon
 3 « interdits » relevés par `summarize` sont les 3 mesures libres attendues absentes sur `seance-05`
 déjà documentées ci-dessus (préexistant, sans lien avec la pseudonymisation) ; `seance-02` garde le
 même sujet extracteur (80/90). Seuils d'ouverture : ATTEINTS.
+
+### Critère d'acceptation : identité en tête d'anamnèse (2026-09-12, gabarit obligatoire)
+
+Depuis le commit `f28c0e9` (gabarit d'identité obligatoire en tête d'anamnèse, voir
+`docs/superpowers/specs/2026-09-12-anamnese-identite-design.md`), la première phrase de la section
+Identification & anamnèse doit commencer par « `<Prénom> <NOM>, <âge> ans,` » avec l'identité de la
+fiche patient rattachée — ici l'identité synthétique du cas (`eval/session/cases.json`) — et l'âge
+calculé à la date du bilan. C'est désormais un critère d'acceptation à part entière du run
+`eval:session --dump`, en plus des seuils d'ouverture existants.
+
+Run de référence (variante clean, `mistral-medium-3-5`) : les cinq anamnèses commencent
+conformément au gabarit, recopiées telles quelles depuis le dump —
+
+```
+Sophie MARTIN, 46 ans, coiffeuse, consulte pour une lombalgie basse évoluant depuis trois mois…
+Marc DELCOURT, 63 ans, ancien chef d'équipe dans le bâtiment à la retraite depuis trois ans, consulte pour une réparation de coiffe droite…
+Camille ROSIER, 29 ans, technicienne de laboratoire, consulte pour une ligamentoplastie du ligament croisé antérieur…
+Nadia VASSEUR, 51 ans, comptable, consulte pour une cervicalgie droite irradiante dans le bras droit…
+Julien BERTHIER, 34 ans, coursier à vélo, consulte pour une entorse latérale de cheville gauche…
+```
+
+Aucun écart : le prénom, qui manquait cinq fois sur cinq avant le lot (cf. « Anamnèse — défaut de
+guide relevé, sans fuite » plus haut), est présent dans les cinq cas, et l'âge correspond à la date
+de naissance de chaque identité synthétique calculée au jour du run (2026-09-12).
+
+Non-régression sur la même sortie : sections attendues rédigées **100 %** (inchangé), rappel
+d'extraction moyen **96,7 %** (dans la fourchette 93–98 % déjà retenue ci-dessus), 0 nombre non
+vérifié, 4 sections avec doublon de tableau (même compte que les runs précédents), **0 fuite**.
+4 « interdits » relevés par `summarize` — les 3 mesures libres attendues absentes sur `seance-05`
+déjà documentées, plus le sujet extracteur déjà connu sur `seance-02` (abduction 80/90) — aucun des
+deux lié au changement d'identité. Seuils d'ouverture : ATTEINTS.
