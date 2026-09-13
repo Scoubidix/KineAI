@@ -347,7 +347,11 @@ export default function BilanEditorPage() {
     return <DictationFlow key={`flow-${state.bilan.id}`} bilan={state.bilan} kind={flowKind} initialJob={job} onDone={handleDone} onWrite={handleWrite} />;
   }
   const initialAi = job?.status === 'DONE' && job.result ? toInitialAi(job.result) : undefined;
-  // Bilan rédigé par dictée : on ouvre sur le document, sauf si l'URL demande explicitement une étape
-  const step: EditorStep = initialAi && (flow === 'editor' || stepParam === null) ? 'document' : initialStep;
+  // Bilan déjà rédigé : on ouvre sur le document, pas sur les notes — soit parce que le traitement
+  // de dictée vient d'aboutir (initialAi), soit parce que le document a déjà été composé (statut
+  // GENERE, posé à la première composition). Le statut n'est consulté qu'à l'ouverture (flow
+  // « auto ») : après « Rédiger moi-même », le kiné veut ses notes même sur un bilan déjà généré.
+  const composed = initialAi !== undefined || (flow === 'auto' && state.bilan.status === 'GENERE');
+  const step: EditorStep = composed && (flow === 'editor' || stepParam === null) ? 'document' : initialStep;
   return <BilanEditor key={`${state.bilan.id}-${flow}`} initial={state.bilan} initialStep={step} initialAi={initialAi} forceDrawerOpen={Boolean(initialAi && initialAi.candidates.length > 0)} />;
 }
