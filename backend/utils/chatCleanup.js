@@ -2,6 +2,7 @@
 const cron = require('node-cron');
 const prismaService = require('../services/prismaService');
 const notificationService = require('../services/notificationService');
+const bilanDraftService = require('../services/bilanDraftService');
 const logger = require('./logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('./logSanitizer');
 
@@ -185,6 +186,12 @@ const createProgramCompletedNotificationsTask = async () => {
 };
 
 // Archiver les programmes terminés
+// Brouillons de bilan créés au clic puis jamais remplis : supprimés après le délai
+const purgeEmptyBilanDraftsTask = async () => {
+  const count = await bilanDraftService.purgeEmptyDrafts();
+  return { purged: count };
+};
+
 const archiveFinishedProgramsTask = async () => {
   const now = new Date();
   logger.info(`📊 Début archivage`);
@@ -389,8 +396,22 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  logger.info('✅ PRODUCTION configurée - 6 tâches avec backup automatique + notifications');
-  logger.info('📅 Planning: 00h01+00h09 notifications, 00h10+00h18 archivage, mercredi 01h15+01h23 nettoyage programmes');
+  // PRODUCTION: Purge des brouillons de bilan vides - 02h40
+  cron.schedule('40 2 * * *', async () => {
+    logger.info(`🗑️ [02h40] Purge des brouillons de bilan vides`);
+
+    await executeWithTimeout(
+      'purge brouillons de bilan vides (02h40)',
+      purgeEmptyBilanDraftsTask,
+      60000
+    );
+  }, {
+    timezone: "Europe/Paris",
+    scheduled: true
+  });
+
+  logger.info('✅ PRODUCTION configurée - 7 tâches avec backup automatique + notifications');
+  logger.info('📅 Planning: 00h01+00h09 notifications, 00h10+00h18 archivage, mercredi 01h15+01h23 nettoyage programmes, 02h40 purge brouillons vides');
   logger.info('🔒 Toutes les tâches utilisent le singleton prismaService');
 };
 

@@ -18,20 +18,15 @@ interface BilanStartBlockProps {
 
 const TYPES: BilanType[] = ['INITIAL', 'INTERMEDIAIRE', 'FINAL'];
 const GATED_PLANS = ['FREE', 'DECLIC'];
-// Drapeau d'activation de l'enregistrement de séance (levé une fois le run de référence validé)
-const SESSION_ENABLED = process.env.NEXT_PUBLIC_SESSION_ENABLED === '1';
 
 interface ModeDef {
   value: StartMode;
   emoji: string;
   title: string;
-  subtitle: string;
   ariaLabel: string;
   /** Pastille carrée pastel, même facture que les actions rapides de l'accueil */
   badgeClass: string;
   badgeStyle?: React.CSSProperties;
-  hoverClass: string;
-  enabled: boolean;
 }
 
 const MODES: ModeDef[] = [
@@ -39,33 +34,24 @@ const MODES: ModeDef[] = [
     value: 'write',
     emoji: '✍️',
     title: 'Écrire',
-    subtitle: 'Saisie guidée',
     ariaLabel: 'Rédiger le bilan en saisie guidée',
     badgeClass: 'bg-[#ecfdf5]',
-    hoverClass: 'hover:border-[#3899aa]/60 hover:bg-[#3899aa]/5',
-    enabled: true,
   },
   {
     value: 'dictation',
     emoji: '🎙️',
     title: 'Dicter',
-    subtitle: 'L’IA rédige à ta voix',
     ariaLabel: 'Rédiger le bilan en dictée',
     // Dégradé du Copilote IA de l'accueil : c'est le mode où l'IA rédige
     badgeClass: '',
     badgeStyle: { background: 'linear-gradient(135deg, #dbeafe, #c4b5fd)' },
-    hoverClass: 'hover:border-indigo-500/60 hover:bg-indigo-500/5',
-    enabled: true,
   },
   {
     value: 'session',
     emoji: '🩺',
     title: 'Enregistrer la séance',
-    subtitle: 'Bientôt disponible',
-    ariaLabel: 'Enregistrer la séance (bientôt disponible)',
+    ariaLabel: 'Enregistrer la séance',
     badgeClass: 'bg-[#fffbeb]',
-    hoverClass: 'hover:border-amber-500/60 hover:bg-amber-500/5',
-    enabled: SESSION_ENABLED,
   },
 ];
 
@@ -101,26 +87,22 @@ export default function BilanStartBlock({ onStarted }: BilanStartBlockProps) {
   // Pas de carte autour : la pastille et son libellé forment l'élément cliquable
   const modeCard = (m: ModeDef) => {
     const busy = creating === m.value;
-    const locked = !m.enabled;
     // Pendant une création, les autres modes sont neutralisés sans changer d'apparence
-    const disabled = locked || (creating !== null && !busy);
+    const disabled = creating !== null && !busy;
     return (
       <button
         key={m.value}
         type="button"
-        onClick={() => { if (!locked) handleStart(m.value); }}
+        onClick={() => handleStart(m.value)}
         disabled={disabled}
         aria-busy={busy}
         aria-label={m.ariaLabel}
-        title={locked ? 'Bientôt disponible' : undefined}
-        className={`w-32 flex flex-col items-center gap-3 rounded-2xl px-2 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3899aa] focus-visible:ring-offset-2 ${
-          locked ? 'opacity-60 cursor-not-allowed' : 'hover:bg-muted/60 disabled:opacity-60 disabled:hover:bg-transparent'
-        }`}
+        className="w-32 flex flex-col items-center gap-3 rounded-2xl px-2 py-3 transition-colors hover:bg-muted/60 disabled:opacity-60 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3899aa] focus-visible:ring-offset-2"
       >
         <span
           aria-hidden="true"
-          className={`w-24 h-24 shrink-0 rounded-3xl flex items-center justify-center text-5xl ${locked ? 'bg-muted grayscale' : m.badgeClass}`}
-          style={locked ? undefined : m.badgeStyle}
+          className={`w-24 h-24 shrink-0 rounded-3xl flex items-center justify-center text-5xl ${m.badgeClass}`}
+          style={m.badgeStyle}
         >
           {busy ? <Loader2 className="h-8 w-8 animate-spin text-[#3899aa]" /> : m.emoji}
         </span>

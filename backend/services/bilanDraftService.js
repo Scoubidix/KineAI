@@ -177,6 +177,33 @@ async function finalizeBilan({ kineId, bilanId }) {
   return updated;
 }
 
+// Un brouillon naît au clic sur un mode de saisie, avant toute frappe : celui qui reste vide
+// — rien tapé, rien enregistré, aucun traitement — n'a aucune valeur de récupération et
+// encombre la liste. Suppression en dur, comme le fait déjà `removeBilan` sur un BROUILLON.
+const EMPTY_DRAFT_DAYS = Number(process.env.BILAN_EMPTY_DRAFT_DAYS) || 7;
+const EMPTY_DRAFT_BATCH = 500;
+
+/** Supprime les brouillons restés vides au-delà du délai. @returns {Promise<number>} nombre supprimé */
+async function purgeEmptyDrafts() {
+  const prisma = prismaService.getInstance();
+  const before = new Date(Date.now() - EMPTY_DRAFT_DAYS * 24 * 60 * 60 * 1000);
+  // `job: null` écarte tout bilan qui porte un traitement, même échoué : il est repris, pas vide.
+  const candidates = await prisma.bilanKine.findMany({
+    where: { status: 'BROUILLON', isActive: true, updatedAt: { lt: before }, job: null },
+    select: { id: true, rawNotes: true, bilanHtml: true, document: true },
+    take: EMPTY_DRAFT_BATCH,
+  });
+  // Le vide se juge en JS : les espaces seuls comptent comme vide, et un document JSON
+  // ne se teste pas depuis une clause `where`.
+  const ids = candidates
+    .filter((b) => !String(b.rawNotes || '').trim() && !b.bilanHtml && isDocumentEmpty(b.document))
+    .map((b) => b.id);
+  if (ids.length === 0) return 0;
+  const { count } = await prisma.bilanKine.deleteMany({ where: { id: { in: ids } } });
+  logger.info(`Brouillons vides purgés : ${count} (sans activité depuis ${EMPTY_DRAFT_DAYS} jours)`);
+  return count;
+}
+
 async function removeBilan({ kineId, bilanId }) {
   const prisma = prismaService.getInstance();
   const bilan = await findOwnedBilan(prisma, kineId, bilanId);
@@ -203,4 +230,5 @@ module.exports = {
   attachPatient,
   finalizeBilan,
   removeBilan,
+  purgeEmptyDrafts,
 };

@@ -122,7 +122,24 @@ function checkTableDuplicate(text, entries) {
   return null;
 }
 
-function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys, source = 'notes' }) {
+const MAX_MOTIF_WORDS = 4;
+const MAX_MOTIF_CHARS = 80;
+
+/**
+ * Assainit un motif proposé par un modèle : 4 mots maximum, espaces normalisés, ponctuation
+ * finale retirée. Un jeton de pseudonymisation ([Libellé] ou [Libellé n]) ne peut pas figurer
+ * dans un motif : sa présence signe un artefact du modèle, on rejette tout. Appelé AVANT toute
+ * réhydratation, sans quoi un jeton deviendrait une identité réelle avant d'être détecté.
+ * @returns {string} le motif, ou '' s'il est inexploitable
+ */
+function sanitizeMotif(raw) {
+  const s = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  if (!s || /[[\]]/.test(s)) return '';
+  const words = s.split(' ').slice(0, MAX_MOTIF_WORDS).join(' ');
+  return words.replace(/[.,;:!?]+$/, '').trim().slice(0, MAX_MOTIF_CHARS);
+}
+
+function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys, source = 'notes', withMotif = false }) {
   const dialogue = source === 'dialogue';
   const user = [
     `Type de bilan : ${BILAN_TYPE_LABELS[type] || type}`,
@@ -140,6 +157,7 @@ function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys,
     'Mesures déjà présentées en tableau (ne les cite pas, ni leur valeur) :',
     tableLabels.length ? tableLabels.map((l) => `- ${l}`).join('\n') : '(aucune)',
     '',
+    ...(withMotif ? ['Ce bilan n’a pas encore de motif : renvoie aussi "motif", le motif de consultation en 4 mots maximum, tiré des notes (ex. « Lombalgie chronique », « Suites de PTG »). Pas de phrase, pas de verbe conjugué, jamais le nom ni le prénom du patient. Si les notes ne permettent pas de le déterminer, renvoie "".', ''] : []),
     'Sections à rédiger (clé : titre — contenu attendu) :',
     keys.map((k) => `- ${k} : ${SECTION_TITLES[k]} — ${SECTION_GUIDE[k]}`).join('\n'),
     '',
@@ -150,14 +168,15 @@ function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys,
 }
 
 // Schéma strict limité aux clés demandées
-function buildComposeJsonSchema(keys) {
+function buildComposeJsonSchema(keys, withMotif = false) {
   return {
     name: 'bilan_compose',
     schema: {
       type: 'object',
       additionalProperties: false,
-      required: ['sections'],
+      required: withMotif ? ['sections', 'motif'] : ['sections'],
       properties: {
+        ...(withMotif ? { motif: { type: 'string' } } : {}),
         sections: {
           type: 'object',
           additionalProperties: false,
@@ -169,7 +188,10 @@ function buildComposeJsonSchema(keys) {
   };
 }
 
-const composeOutputSchema = z.object({ sections: z.record(z.string(), z.string()) });
+// `motif` est facultatif et vaut '' par défaut : Zod retire les clés non déclarées, et la voie
+// Mistral (json_object, sans schéma strict) peut l'omettre — son absence ne doit jamais faire
+// échouer une rédaction.
+const composeOutputSchema = z.object({ sections: z.record(z.string(), z.string()), motif: z.string().default('') });
 
 function parseComposeOutput(content) {
   const text = String(content ?? '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
@@ -202,7 +224,7 @@ async function callCompose(messages, jsonSchema) {
  * composeFromNotesForBilan. Renvoie les textes tronqués et les avertissements par section.
  * @throws {DraftError} COMPOSE_FAILED
  */
-async function composeSections({ bilanId, type, motif, notes, document, catalog, keys, source = 'notes', pseudo }) {
+async function composeSections({ bilanId, type, motif, notes, document, catalog, keys, source = 'notes', pseudo, withMotif = false }) {
   const maskedNotes = pseudo ? pseudo.mask(notes) : notes;
   const maskedMotif = pseudo ? pseudo.mask(motif || '') : motif;
   const lines = formatNarrativeMeasurements(document.measurements, catalog).map((l) => (pseudo ? pseudo.mask(l) : l));
@@ -211,9 +233,9 @@ async function composeSections({ bilanId, type, motif, notes, document, catalog,
   // puis réhydraté) : il part masqué comme le reste. `table.entries`, qui ne sert qu'à la détection
   // de doublon, reste sur le texte réel — un nom n'y change rien.
   const tableLabels = pseudo ? table.labels.map((l) => pseudo.mask(l)) : table.labels;
-  const messages = buildComposeMessages({ type, motif: maskedMotif, rawNotes: maskedNotes, lines, tableLabels, keys, source });
+  const messages = buildComposeMessages({ type, motif: maskedMotif, rawNotes: maskedNotes, lines, tableLabels, keys, source, withMotif });
   logMasked(`rédaction (bilan ${bilanId}, ${source})`, `Motif : ${maskedMotif || '(aucun)'}\n${maskedNotes}${lines.length ? `\nMesures : ${lines.join(' ; ')}` : ''}`, pseudo);
-  const jsonSchema = buildComposeJsonSchema(keys);
+  const jsonSchema = buildComposeJsonSchema(keys, withMotif);
 
   let output;
   try {
@@ -242,7 +264,9 @@ async function composeSections({ bilanId, type, motif, notes, document, catalog,
     if (w) warnings[k] = w;
     texts[k] = pseudo ? pseudo.unmask(t) : t;
   }
-  return { texts, warnings };
+  // Assaini sans réhydratation : un motif contenant un jeton est rejeté, donc celui qui sort
+  // ne porte aucune identité masquée et n'a rien à réhydrater.
+  return { texts, warnings, motif: withMotif ? sanitizeMotif(output.motif) : '' };
 }
 
 // Lecture et gardes communes aux deux rédactions
@@ -263,9 +287,11 @@ const applySections = (document, texts) => ({
 
 // Écriture check-and-set sur updatedAt. `generated` : des sections sont écrites → BROUILLON passe
 // GENERE et le temps gagné est compté (une seule fois par bilan). Non bloquant.
-async function writeDocument({ prisma, where, updatedAt, status, document, uid, generated }) {
+async function writeDocument({ prisma, where, updatedAt, status, document, uid, generated, motif }) {
   const firstGeneration = generated && status === 'BROUILLON';
   const data = firstGeneration ? { document, status: 'GENERE' } : { document };
+  // Motif déduit par la rédaction : n'est transmis que si le bilan n'en avait pas (cf. appelants).
+  if (motif) data.motif = motif;
   let updated;
   try {
     updated = await prisma.bilanKine.update({ where: { ...where, updatedAt }, data, include: { patient: { select: PATIENT_SELECT } } });
@@ -290,14 +316,16 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
   const keys = Array.isArray(sections) && sections.length ? SECTION_KEYS.filter((k) => sections.includes(k)) : SECTION_KEYS;
   const catalog = await getCatalog();
   const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId), at: bilan.createdAt });
-  const { texts, warnings } = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: bilan.document, catalog, keys, pseudo });
+  // Un motif ne se déduit que d'une rédaction complète : sur une section reprise seule, la question n'a pas de sens
+  const withMotif = !bilan.motif && keys.length === SECTION_KEYS.length;
+  const { texts, warnings, motif: composedMotif } = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: bilan.document, catalog, keys, pseudo, withMotif });
 
   // L'appel IA a duré plusieurs secondes : on relit la version la plus fraîche et on ne
   // remplace que les sections demandées, en check-and-set sur updatedAt (comme l'autosave).
   const fresh = await prisma.bilanKine.findFirst({ where, select: { status: true, document: true, updatedAt: true } });
   if (!fresh || !fresh.document) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
   if (fresh.status === 'ENREGISTRE') throw new DraftError('ALREADY_FINALIZED', 409, 'Ce bilan est déjà enregistré');
-  const updated = await writeDocument({ prisma, where, updatedAt: fresh.updatedAt, status: fresh.status, document: applySections(fresh.document, texts), uid, generated: true });
+  const updated = await writeDocument({ prisma, where, updatedAt: fresh.updatedAt, status: fresh.status, document: applySections(fresh.document, texts), uid, generated: true, motif: composedMotif });
   logger.info(`Rédaction bilan ${bilanId} : ${keys.length} section(s), ${Object.keys(warnings).length} avertissement(s)`);
   return { bilan: updated, warnings };
 }
@@ -322,7 +350,7 @@ async function composeFromNotesForBilan({ kineId, bilanId, uid, source = 'notes'
 
   let composed;
   try {
-    composed = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: withMeasures, catalog, keys: SECTION_KEYS, source, pseudo });
+    composed = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: withMeasures, catalog, keys: SECTION_KEYS, source, pseudo, withMotif: !bilan.motif });
   } catch (err) {
     // Les mesures acceptées ne sont pas perdues : écrites seules, le kiné relance la rédaction
     if (err instanceof DraftError && err.code === 'COMPOSE_FAILED' && accepted.length > 0) {
@@ -331,13 +359,15 @@ async function composeFromNotesForBilan({ kineId, bilanId, uid, source = 'notes'
     }
     throw err;
   }
-  const updated = await writeDocument({ ...base, document: applySections(withMeasures, composed.texts), generated: true });
+  const updated = await writeDocument({ ...base, document: applySections(withMeasures, composed.texts), generated: true, motif: composed.motif });
   logger.info(`Rédaction depuis les notes bilan ${bilanId} : ${accepted.length} acceptée(s), ${pending.length} en suspens, ${rejected} rejetée(s), ${Object.keys(composed.warnings).length} avertissement(s)`);
   return { bilan: updated, warnings: composed.warnings, accepted, pending, rejected };
 }
 
 module.exports = {
   SECTION_GUIDE,
+  MAX_MOTIF_WORDS,
+  sanitizeMotif,
   SOURCES,
   composeSections,
   formatNarrativeMeasurements,

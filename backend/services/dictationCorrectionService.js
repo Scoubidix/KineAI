@@ -6,7 +6,7 @@ const { z } = require('zod');
 const logger = require('../utils/logger');
 const { logMasked } = require('../utils/pseudonymDebug');
 const llmService = require('./llmService');
-const { numbersIn } = require('./bilanComposeService');
+const { numbersIn, sanitizeMotif, MAX_MOTIF_WORDS } = require('./bilanComposeService');
 const { parseJsonOutput } = require('./bilanExtractionService');
 const { EXTRA_TERMS } = require('../data/dictationExtraTerms');
 
@@ -25,8 +25,6 @@ const MIN_OPS_ALLOWED = 3;
 const MAX_DELETED_RATIO = 0.2;
 const MAX_TO_WORDS = 4;
 const MAX_OPS = 60;
-const MAX_MOTIF_WORDS = 4;
-const MAX_MOTIF_CHARS = 80;
 const PUNCT = /[.,;:!?()«»"]/g;
 // Ponctuation tolérée collée à la fin d'un mot (fermante uniquement)
 const PUNCT_TAIL = '[.,;:!?)»"]*';
@@ -160,19 +158,6 @@ const CORRECTION_JSON_SCHEMA = {
     },
   },
 };
-
-/**
- * Assainit le motif proposé par le modèle : 4 mots maximum, espaces normalisés, ponctuation
- * finale retirée. Un jeton de pseudonymisation ([Libellé] ou [Libellé n]) ne peut pas figurer
- * dans un motif : sa présence signe un artefact du modèle, on rejette tout.
- * @returns {string} le motif, ou '' s'il est inexploitable
- */
-function sanitizeMotif(raw) {
-  const s = normSpaces(raw);
-  if (!s || /[[\]]/.test(s)) return '';
-  const words = s.split(' ').slice(0, MAX_MOTIF_WORDS).join(' ');
-  return words.replace(/[.,;:!?]+$/, '').trim().slice(0, MAX_MOTIF_CHARS);
-}
 
 const correctionSchema = z.object({
   ops: z.array(z.object({
