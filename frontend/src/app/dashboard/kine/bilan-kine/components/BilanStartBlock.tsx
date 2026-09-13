@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, PenLine, Mic, Disc } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Loader2, ChevronDown, Check } from 'lucide-react';
 import { PaywallModal } from '@/components/PaywallModal';
 import { usePaywall } from '@/hooks/usePaywall';
 import { useToast } from '@/hooks/use-toast';
 import PatientCombobox from './PatientCombobox';
 import { createBilan, ApiError } from '@/utils/bilanApi';
-import { BILAN_TYPE_LABELS, type BilanRecord, type BilanType, type PatientSummary } from '@/types/bilan';
+import { BILAN_TYPE_COLORS, BILAN_TYPE_LABELS, type BilanRecord, type BilanType, type PatientSummary } from '@/types/bilan';
 
 type StartMode = 'write' | 'dictation' | 'session';
 
@@ -21,7 +21,56 @@ const GATED_PLANS = ['FREE', 'DECLIC'];
 // Drapeau d'activation de l'enregistrement de séance (levé une fois le run de référence validé)
 const SESSION_ENABLED = process.env.NEXT_PUBLIC_SESSION_ENABLED === '1';
 
-// Bloc de démarrage : patient (optionnel), type, mode de saisie, puis création du brouillon
+interface ModeDef {
+  value: StartMode;
+  emoji: string;
+  title: string;
+  subtitle: string;
+  ariaLabel: string;
+  /** Pastille carrée pastel, même facture que les actions rapides de l'accueil */
+  badgeClass: string;
+  badgeStyle?: React.CSSProperties;
+  hoverClass: string;
+  enabled: boolean;
+}
+
+const MODES: ModeDef[] = [
+  {
+    value: 'write',
+    emoji: '✍️',
+    title: 'Écrire',
+    subtitle: 'Saisie guidée',
+    ariaLabel: 'Rédiger le bilan en saisie guidée',
+    badgeClass: 'bg-[#ecfdf5]',
+    hoverClass: 'hover:border-[#3899aa]/60 hover:bg-[#3899aa]/5',
+    enabled: true,
+  },
+  {
+    value: 'dictation',
+    emoji: '🎙️',
+    title: 'Dicter',
+    subtitle: 'L’IA rédige à ta voix',
+    ariaLabel: 'Rédiger le bilan en dictée',
+    // Dégradé du Copilote IA de l'accueil : c'est le mode où l'IA rédige
+    badgeClass: '',
+    badgeStyle: { background: 'linear-gradient(135deg, #dbeafe, #c4b5fd)' },
+    hoverClass: 'hover:border-indigo-500/60 hover:bg-indigo-500/5',
+    enabled: true,
+  },
+  {
+    value: 'session',
+    emoji: '🩺',
+    title: 'Enregistrer la séance',
+    subtitle: 'Bientôt disponible',
+    ariaLabel: 'Enregistrer la séance (bientôt disponible)',
+    badgeClass: 'bg-[#fffbeb]',
+    hoverClass: 'hover:border-amber-500/60 hover:bg-amber-500/5',
+    enabled: SESSION_ENABLED,
+  },
+];
+
+// Composeur de bilan : réglages en pastilles (patient, type) puis les 3 modes de saisie,
+// dans un seul panneau. Le clic sur un mode crée le brouillon.
 export default function BilanStartBlock({ onStarted }: BilanStartBlockProps) {
   // usePaywall (JS non typé) infère subscription en `null` côté TS ; caste minimale locale
   // (même limitation préexistante que dans AppLayout.tsx, non traitée ici — hors périmètre).
@@ -29,61 +78,90 @@ export default function BilanStartBlock({ onStarted }: BilanStartBlockProps) {
   const { toast } = useToast();
   const [patient, setPatient] = useState<PatientSummary | null>(null);
   const [type, setType] = useState<BilanType>('INITIAL');
-  const [mode, setMode] = useState<StartMode>('write');
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<StartMode | null>(null);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  // Même palette que les badges de type sur les cartes de brouillon
+  const typeColor = BILAN_TYPE_COLORS[type];
 
-  const handleStart = async () => {
+  const handleStart = async (mode: StartMode) => {
+    if (creating) return;
     if (subscription && GATED_PLANS.includes(subscription.planType)) { setPaywallOpen(true); return; }
-    setCreating(true);
+    setCreating(mode);
     try {
       const bilan = await createBilan({ type, patientId: patient?.id ?? null });
       onStarted(bilan, mode);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'PLAN_REQUIRED') setPaywallOpen(true);
       else toast({ title: 'Erreur', description: (e as Error).message || 'Impossible de créer le bilan', variant: 'destructive' });
-    } finally {
-      setCreating(false);
+      setCreating(null);
     }
+    // Succès : on laisse `creating` posé, la navigation démonte le bloc
   };
 
-  const modeChip = (value: StartMode, icon: React.ReactNode, label: string, enabled: boolean) => (
-    // `aria-disabled` plutôt que `disabled` : un bouton désactivé n'affiche pas son info-bulle native
-    <button type="button" role="radio" aria-checked={mode === value} aria-disabled={!enabled} tabIndex={enabled ? 0 : -1} title={enabled ? undefined : 'Bientôt disponible'} onClick={() => { if (enabled) setMode(value); }}
-      className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${mode === value ? 'bg-[#3899aa] text-white border-[#3899aa]' : enabled ? 'bg-background text-foreground border-border hover:border-[#3899aa]/60' : 'bg-muted text-muted-foreground border-transparent opacity-60 cursor-not-allowed'}`}>
-      {icon}{label}
-    </button>
-  );
+  // Pas de carte autour : la pastille et son libellé forment l'élément cliquable
+  const modeCard = (m: ModeDef) => {
+    const busy = creating === m.value;
+    const locked = !m.enabled;
+    // Pendant une création, les autres modes sont neutralisés sans changer d'apparence
+    const disabled = locked || (creating !== null && !busy);
+    return (
+      <button
+        key={m.value}
+        type="button"
+        onClick={() => { if (!locked) handleStart(m.value); }}
+        disabled={disabled}
+        aria-busy={busy}
+        aria-label={m.ariaLabel}
+        title={locked ? 'Bientôt disponible' : undefined}
+        className={`w-32 flex flex-col items-center gap-3 rounded-2xl px-2 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3899aa] focus-visible:ring-offset-2 ${
+          locked ? 'opacity-60 cursor-not-allowed' : 'hover:bg-muted/60 disabled:opacity-60 disabled:hover:bg-transparent'
+        }`}
+      >
+        <span
+          aria-hidden="true"
+          className={`w-24 h-24 shrink-0 rounded-3xl flex items-center justify-center text-5xl ${locked ? 'bg-muted grayscale' : m.badgeClass}`}
+          style={locked ? undefined : m.badgeStyle}
+        >
+          {busy ? <Loader2 className="h-8 w-8 animate-spin text-[#3899aa]" /> : m.emoji}
+        </span>
+        <span className="text-sm font-semibold text-center leading-tight">{busy ? 'Création…' : m.title}</span>
+      </button>
+    );
+  };
 
   return (
-    <div className="rounded-xl border border-[#3899aa]/40 bg-gradient-to-b from-[#3899aa]/5 to-transparent p-4 sm:p-6 space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="font-semibold text-base text-[#3899aa] flex items-center gap-2"><Sparkles className="h-4 w-4" />Nouveau bilan</h3>
-      </div>
-      <div className="grid grid-cols-[64px_1fr] items-center gap-x-3 gap-y-3">
-        <span className="text-xs font-semibold text-muted-foreground">Patient</span>
-        <PatientCombobox value={patient} onChange={setPatient} placeholder="Rechercher un patient (ou laisser vide)" />
-        <span className="text-xs font-semibold text-muted-foreground">Type</span>
-        <div className="inline-flex rounded-lg bg-muted p-1 gap-1 w-fit" role="radiogroup" aria-label="Type de bilan">
-          {TYPES.map((t) => (
-            <button key={t} type="button" role="radio" aria-checked={type === t} onClick={() => setType(t)} className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${type === t ? 'bg-background text-[#3899aa] shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
-              {BILAN_TYPE_LABELS[t]}
+    <div className="text-center">
+      {/* Réglages en phrase : les valeurs sont les déclencheurs, pas des champs étiquetés */}
+      <div className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-base text-muted-foreground">
+        <span>Bilan</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Type de bilan : ${BILAN_TYPE_LABELS[type]}. Changer de type`}
+              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-semibold transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3899aa] ${typeColor.bg} ${typeColor.text} ${typeColor.border}`}
+            >
+              {BILAN_TYPE_LABELS[type]}
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
             </button>
-          ))}
-        </div>
-        <span className="text-xs font-semibold text-muted-foreground">Mode</span>
-        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Mode de saisie">
-          {modeChip('write', <PenLine className="h-3.5 w-3.5" />, 'Écrire', true)}
-          {modeChip('dictation', <Mic className="h-3.5 w-3.5" />, 'Dicter', true)}
-          {modeChip('session', <Disc className="h-3.5 w-3.5" />, 'Enregistrer la séance', SESSION_ENABLED)}
-        </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center">
+            {TYPES.map((t) => (
+              <DropdownMenuItem key={t} onSelect={() => setType(t)} className="text-sm">
+                <Check className={`h-3.5 w-3.5 mr-2 ${type === t ? 'opacity-100 text-[#3899aa]' : 'opacity-0'}`} />
+                {BILAN_TYPE_LABELS[t]}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <span>pour</span>
+        <PatientCombobox variant="inline" value={patient} onChange={setPatient} />
       </div>
-      <div className="flex justify-end">
-        <Button onClick={handleStart} disabled={creating} className="btn-teal rounded-full px-6 h-10">
-          {creating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-          {mode === 'dictation' ? 'Dicter →' : mode === 'session' ? 'Enregistrer →' : 'Commencer →'}
-        </Button>
+
+      <div className="flex flex-wrap items-start justify-center gap-6 sm:gap-14 mt-7">
+        {MODES.map(modeCard)}
       </div>
+
       <PaywallModal isOpen={paywallOpen} onClose={() => setPaywallOpen(false)} subscription={subscription} />
     </div>
   );

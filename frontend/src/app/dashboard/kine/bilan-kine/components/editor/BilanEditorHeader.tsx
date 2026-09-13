@@ -32,12 +32,28 @@ export default function BilanEditorHeader({ record, onPatientChange, onTypeChang
       <div className="flex items-center gap-2 px-3 sm:px-4 py-2 flex-wrap">
         <Button variant="ghost" size="sm" onClick={onBack} className="h-8 px-2"><ArrowLeft className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Bilans</span></Button>
 
+        {/* Le patient peut n'avoir pas été choisi au démarrage : tant qu'il manque, le
+            sélecteur se porte en appel à l'action plutôt qu'en réglage discret. */}
         <Popover open={patientOpen} onOpenChange={setPatientOpen}>
           <PopoverTrigger asChild>
-            <button type="button" disabled={disabled || finalized} className="inline-flex items-center gap-1.5 rounded-md border border-input px-2 py-1 text-xs font-medium bg-background">
-              <User className="h-3.5 w-3.5 text-[#3899aa]" />
-              {record.patient ? `${record.patient.firstName} ${record.patient.lastName.toUpperCase()}` : 'Sans patient'}
-              {!finalized && <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+            <button
+              type="button"
+              disabled={disabled || finalized}
+              className={`inline-flex items-center gap-1.5 h-8 rounded-md border px-2.5 text-sm font-medium transition-colors ${
+                record.patient
+                  ? 'border-input bg-background'
+                  : 'border-[#3899aa]/50 bg-[#3899aa]/10 text-[#3899aa] hover:bg-[#3899aa]/15'
+              }`}
+            >
+              {record.patient ? (
+                <span className="w-5 h-5 shrink-0 rounded-full bg-[#3899aa]/10 text-[#3899aa] text-[10px] font-semibold inline-flex items-center justify-center">
+                  {record.patient.firstName[0]}{record.patient.lastName[0]}
+                </span>
+              ) : (
+                <User className="h-4 w-4 shrink-0" />
+              )}
+              {record.patient ? `${record.patient.firstName} ${record.patient.lastName.toUpperCase()}` : 'Choisir le patient'}
+              {!finalized && <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />}
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-80 p-3">
@@ -46,7 +62,7 @@ export default function BilanEditorHeader({ record, onPatientChange, onTypeChang
           </PopoverContent>
         </Popover>
 
-        <select value={record.type} onChange={(e) => onTypeChange(e.target.value as BilanType)} disabled={disabled || finalized} aria-label="Type de bilan" className={`h-7 rounded-md border text-xs font-medium px-2 ${c.bg} ${c.text} ${c.border}`}>
+        <select value={record.type} onChange={(e) => onTypeChange(e.target.value as BilanType)} disabled={disabled || finalized} aria-label="Type de bilan" className={`h-8 rounded-md border text-sm font-medium px-2 ${c.bg} ${c.text} ${c.border}`}>
           {(Object.keys(BILAN_TYPE_LABELS) as BilanType[]).map((t) => <option key={t} value={t}>{BILAN_TYPE_LABELS[t]}</option>)}
         </select>
 
