@@ -4,7 +4,7 @@ export type BilanStatus = 'BROUILLON' | 'GENERE' | 'ENREGISTRE';
 
 export const BILAN_STATUS_LABELS: Record<BilanStatus, string> = {
   BROUILLON: 'Brouillon',
-  GENERE: 'Généré',
+  GENERE: 'Rédigé',
   ENREGISTRE: 'Enregistré',
 };
 

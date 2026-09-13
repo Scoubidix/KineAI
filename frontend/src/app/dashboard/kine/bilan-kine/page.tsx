@@ -1,12 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
-import { FileText, Search, Layers, FolderOpen, ArrowRight } from 'lucide-react';
 import BilanStartBlock from './components/BilanStartBlock';
-import DraftsRow from './components/DraftsRow';
-import DraftsModal from './components/DraftsModal';
+import DraftsRow, { DRAFTS_HREF } from './components/DraftsRow';
 import PatientBilansModal from './components/PatientBilansModal';
 import TemplatesModal from './components/TemplatesModal';
 
@@ -14,49 +12,47 @@ export default function BilanHubPage() {
   const router = useRouter();
   const [bilansRealisesOpen, setBilansRealisesOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
-  const [draftsOpen, setDraftsOpen] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
-  const card = (icon: React.ReactNode, title: string, subtitle: string, onClick: () => void) => (
-    <Card className="card-hover cursor-pointer transition-all duration-300 hover:shadow-lg border-[#3899aa]/30 hover:border-[#3899aa]/60" onClick={onClick}>
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">{icon}<h3 className="font-semibold text-base text-[#3899aa]">{title}</h3></div>
-          <ArrowRight className="h-4 w-4 text-[#3899aa]/40" />
-        </div>
-        <p className="text-sm text-muted-foreground mt-2">{subtitle}</p>
-      </CardContent>
-    </Card>
+  // Même facture que les actions rapides de l'accueil kiné : pastille emoji, titre, sous-titre
+  const cardBody = (emoji: string, badgeClass: string, title: string, subtitle: string) => (
+    <>
+      <div aria-hidden="true" className={`w-10 h-10 mx-auto mb-2 rounded-lg flex items-center justify-center text-xl ${badgeClass}`}>{emoji}</div>
+      <div className="text-sm font-semibold">{title}</div>
+      <div className="text-[11px] text-muted-foreground">{subtitle}</div>
+    </>
+  );
+  const cardClass = 'card-hover rounded-xl p-4 text-center transition-all';
+
+  const card = (emoji: string, badgeClass: string, title: string, subtitle: string, onClick: () => void) => (
+    <button type="button" onClick={onClick} className={cardClass}>{cardBody(emoji, badgeClass, title, subtitle)}</button>
+  );
+  // Une liste se parcourt sur sa propre page : un vrai lien, pas un bouton qui ouvre une modale
+  const linkCard = (emoji: string, badgeClass: string, title: string, subtitle: string, href: string) => (
+    <Link href={href} className={`${cardClass} block`}>{cardBody(emoji, badgeClass, title, subtitle)}</Link>
   );
 
   return (
     <>
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
-        <div className="flex items-center gap-3">
-          <FileText className="text-[#3899aa] h-7 w-7 shrink-0" />
-          <div>
-            <h2 className="text-xl font-semibold text-[#3899aa]">Bilans</h2>
-            <p className="text-foreground text-sm">Rédige, suis et exporte tes bilans kinésithérapiques</p>
-          </div>
-        </div>
+      <div className="max-w-5xl mx-auto p-4 space-y-6">
+        {/* Titre masqué : la sidebar situe déjà la page, mais l'entête reste annoncé aux lecteurs d'écran */}
+        <h1 className="sr-only">Bilans</h1>
 
         <BilanStartBlock onStarted={(bilan, mode) => router.push(mode === 'write' ? `/dashboard/kine/bilan-kine/${bilan.id}` : `/dashboard/kine/bilan-kine/${bilan.id}?mode=${mode}`)} />
 
-        <DraftsRow refreshKey={refreshKey} onOpenAll={() => setDraftsOpen(true)} />
+        <DraftsRow />
 
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Actions rapides</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {card(<Search className="h-4 w-4 text-[#3899aa]" />, 'Bilans réalisés', 'Retrouve les bilans déjà réalisés par patient', () => setBilansRealisesOpen(true))}
-            {card(<Layers className="h-4 w-4 text-[#3899aa]" />, 'Mes templates', 'Modèles de bilan par pathologie', () => setTemplatesOpen(true))}
-            {card(<FolderOpen className="h-4 w-4 text-[#3899aa]" />, 'Mes brouillons', 'Reprends un bilan en cours', () => setDraftsOpen(true))}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {card('🔍', 'bg-[#eff6ff]', 'Bilans réalisés', 'Par patient', () => setBilansRealisesOpen(true))}
+            {card('📐', 'bg-[#f5f3ff]', 'Mes templates', 'Modèles par pathologie', () => setTemplatesOpen(true))}
+            {linkCard('📂', 'bg-[#fffbeb]', 'Mes brouillons', 'Reprendre un bilan', DRAFTS_HREF)}
           </div>
         </div>
       </div>
 
       <PatientBilansModal open={bilansRealisesOpen} onOpenChange={setBilansRealisesOpen} />
       <TemplatesModal open={templatesOpen} onOpenChange={setTemplatesOpen} />
-      <DraftsModal open={draftsOpen} onOpenChange={setDraftsOpen} onChanged={() => setRefreshKey((k) => k + 1)} />
     </>
   );
 }
