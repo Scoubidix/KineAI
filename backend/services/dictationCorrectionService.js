@@ -137,7 +137,7 @@ function applyOps(text, ops, mode) {
 const SYSTEM_PROMPT = `Tu relis la transcription automatique d'une dictée de kinésithérapeute (bilan de patient), en français, pour y repérer les rares termes mal transcrits et les hésitations.
 Tu ne réécris jamais le texte : tu renvoies uniquement un objet JSON { "motif": "…", "ops": [...] } — le motif de consultation, puis les corrections à appliquer.
 « motif » : le motif de consultation en 4 mots maximum, tiré du texte (ex. « Lombalgie chronique », « Suites de PTG », « Entorse cheville droite »). Pas de phrase, pas de verbe conjugué, jamais le nom ni le prénom du patient. Si le texte ne permet pas de le déterminer, renvoie "".
-Une dictée correcte a besoin de 0 à 5 opérations ; s'il n'y a rien à corriger, renvoie { "ops": [] }.
+Une dictée correcte a besoin de 0 à 5 opérations ; s'il n'y a rien à corriger, renvoie quand même le motif : { "motif": "…", "ops": [] }.
 Chaque opération :
 - { "op": "replace", "before": "…", "from": "…", "after": "…", "to": "…" } : remplacer « from » (le terme mal transcrit, tel qu'écrit) par « to » (le terme correct, du vocabulaire fourni ou un terme médical évident). « to » doit être différent de « from » : ne liste jamais un mot déjà correct.
 - { "op": "delete", "before": "…", "from": "…", "after": "…", "to": "" } : supprimer « from ».

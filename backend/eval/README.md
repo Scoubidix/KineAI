@@ -135,6 +135,12 @@ candidats, sections rédigées) — les notes réelles ne quittent jamais le ser
   `eval:dictation --correct` (5 cas) : rappel moyen **94,4 %**, 0 interdit. `eval:session --dump`
   (5 cas) : sections 100 %, rappel d'extraction **95,0 %** (dans la fourchette attendue), 3 interdits
   — préexistants, cf. « Run de référence » ci-dessous, sans lien avec la pseudonymisation.
+- **Rejeu du 2026-09-13** (`mistral-medium-3-5`) après le changement de `SYSTEM_PROMPT` de
+  `dictationCorrectionService.js` (le champ `motif` est désormais requis même quand `ops` est vide) :
+  `eval:dictation --correct` (5 cas) : rappel moyen **96,9 %**, 0 interdit. La passe de correction
+  déduit désormais aussi le motif de consultation dans le même appel (motif présent sur les 5 cas,
+  ex. « Lombalgie chronique », « Ligamentoplastie LCA droite ») sans dégrader l'extraction — chiffre
+  dans la fourchette du run précédent, pas de régression.
   Un premier essai avait signalé une fuite sur `seance-05` (identité synthétique `Thomas`, qui
   collidait avec l'alias catalogue « thomas » du champ `test_thomas`, envoyé au modèle dans le
   vocabulaire de correction pour **tous** les cas, pas seulement celui-ci) : corrigé en changeant le
