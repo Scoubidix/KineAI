@@ -37,7 +37,8 @@ export default function PatientBilansPage() {
   const [filter, setFilter] = useState<BilanType | 'all'>('all');
   const [pendingDelete, setPendingDelete] = useState<BilanSummary | null>(null);
 
-  // `GET /api/patients/:id` vérifie déjà l'appartenance au kiné et répond 404 sinon : on
+  // `GET /patients/:id` (sans /api : patientsRoutes est monté sur /patients, /api/patients
+  // sert les routes bilans) vérifie déjà l'appartenance au kiné et répond 404 sinon : on
   // distingue ainsi « pas ton patient » de « aucun bilan » et de « le serveur est tombé »,
   // au lieu de télécharger toute la patientèle pour n'en garder qu'un nom.
   useEffect(() => {
@@ -45,7 +46,7 @@ export default function PatientBilansPage() {
     let cancelled = false;
     const api = process.env.NEXT_PUBLIC_API_URL;
     Promise.all([
-      fetchWithAuth(`${api}/api/patients/${patientId}`),
+      fetchWithAuth(`${api}/patients/${patientId}`),
       fetchWithAuth(`${api}/api/patients/${patientId}/bilans`),
     ])
       .then(async ([rp, rb]) => {
