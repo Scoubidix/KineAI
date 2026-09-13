@@ -3,11 +3,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, MoreHorizontal, Search, Trash2, User } from 'lucide-react';
+import { MoreHorizontal, Search, Trash2, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -17,16 +16,8 @@ import { useToast } from '@/hooks/use-toast';
 import { listMyBilans, deleteBilan } from '@/utils/bilanApi';
 import { BILAN_TYPE_LABELS, BILAN_TYPE_COLORS, type BilanListItem } from '@/types/bilan';
 import { formatRelative, hasActiveJob, jobLabel, jobLabelClass, needsAction, patientName, shortMotif } from '../components/DraftsRow';
+import { CARD, EmptyState, FilterChip, Initials, ListSkeleton, PageHeader, fold } from '../components/listPage';
 
-// Surface commune aux blocs de la page : la carte blanche élevée du reste de l'app
-// (partie statique de .card-hover — le halo teal au survol est réservé au cliquable)
-const CARD = 'rounded-xl bg-white dark:bg-card border border-border shadow-md';
-
-// Recherche tolérante aux accents et à la casse : « lombalgie » trouve « Lombalgie »
-const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-
-const initials = (b: BilanListItem): string | null =>
-  (b.patient ? `${b.patient.firstName[0] ?? ''}${b.patient.lastName[0] ?? ''}`.toUpperCase() || null : null);
 
 /** Pourcentage à afficher en barre : seulement pendant un traitement qui avance. */
 const activeProgress = (b: BilanListItem): number | null => {
@@ -116,42 +107,13 @@ export default function BrouillonsPage() {
 
   const open = (b: BilanListItem) => router.push(`/dashboard/kine/bilan-kine/${b.id}`);
 
-  const chip = (key: Filter, label: string, count: number, amber = false) => {
-    const on = effective === key;
-    const tone = amber
-      ? 'border-amber-500 bg-amber-500/10 text-amber-700'
-      : 'border-[#3899aa] bg-[#3899aa]/10 text-[#3899aa]';
-    return (
-      <button
-        key={key}
-        type="button"
-        onClick={() => setFilter(key)}
-        aria-pressed={on}
-        className={`inline-flex items-center gap-1.5 h-8 rounded-full border px-3 text-xs font-medium transition-colors ${on ? tone : 'border-border bg-white dark:bg-card text-muted-foreground hover:bg-muted/60'}`}
-      >
-        {label}
-        <span className={`tabular-nums ${on ? '' : amber ? 'text-amber-700' : 'text-foreground/70'}`}>{count}</span>
-      </button>
-    );
-  };
+  const chip = (key: Filter, label: string, count: number, amber = false) => (
+    <FilterChip key={key} label={label} count={count} amber={amber} active={effective === key} onClick={() => setFilter(key)} />
+  );
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
-      {/* Barre d'application (MD3 top app bar) : le retour partage la ligne du titre au lieu de
-          flotter seul au-dessus. Bordé plutôt que fantôme, pour se voir sans attendre le survol. */}
-      <div className="flex items-center gap-3">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => router.push('/dashboard/kine/bilan-kine')}
-          aria-label="Retour aux bilans"
-          title="Retour aux bilans"
-          className="h-9 w-9 shrink-0"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="text-lg font-semibold truncate text-[#3899aa]">Mes brouillons</h1>
-      </div>
+      <PageHeader backHref="/dashboard/kine/bilan-kine" backLabel="Retour aux bilans" title="Mes brouillons" />
 
       {items !== null && items.length > 0 && (
         <div className="space-y-3">
@@ -174,26 +136,15 @@ export default function BrouillonsPage() {
         </div>
       )}
 
-      {items === null && (
-        <div className={`${CARD} divide-y divide-border/60 overflow-hidden`} aria-busy="true" aria-label="Chargement des brouillons">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="flex items-center gap-3 px-3 py-3">
-              <Skeleton className="h-9 w-9 rounded-full shrink-0" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-1/3" />
-                <Skeleton className="h-3 w-2/3" />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {items === null && <ListSkeleton label="Chargement des brouillons" />}
 
       {items !== null && items.length === 0 && (
-        <div className={`${CARD} py-12 text-center space-y-3`}>
-          <div aria-hidden="true" className="w-12 h-12 mx-auto rounded-xl bg-[#fffbeb] flex items-center justify-center text-2xl">📂</div>
-          <p className="text-sm text-muted-foreground">Aucun brouillon en cours</p>
-          <Button asChild size="sm"><Link href="/dashboard/kine/bilan-kine">Démarrer un bilan</Link></Button>
-        </div>
+        <EmptyState
+          emoji="📂"
+          badgeClass="bg-[#fffbeb]"
+          message="Aucun brouillon en cours"
+          action={<Button asChild size="sm"><Link href="/dashboard/kine/bilan-kine">Démarrer un bilan</Link></Button>}
+        />
       )}
 
       {items !== null && items.length > 0 && visible.length === 0 && (
@@ -208,16 +159,13 @@ export default function BrouillonsPage() {
             const c = BILAN_TYPE_COLORS[b.type];
             const label = jobLabel(b);
             const pct = activeProgress(b);
-            const ini = initials(b);
             return (
               <li
                 key={b.id}
                 /* Liseré ambre = le kiné doit agir ; transparent ailleurs pour garder l'alignement */
                 className={`group relative flex items-center gap-3 pl-3 pr-2 py-3 border-l-2 transition-colors hover:bg-muted/40 ${needsAction(b) ? 'border-l-amber-500' : 'border-l-transparent'}`}
               >
-                <span aria-hidden="true" className="shrink-0 w-9 h-9 rounded-full bg-[#3899aa]/10 text-[#3899aa] text-xs font-semibold inline-flex items-center justify-center">
-                  {ini ?? <User className="h-4 w-4" />}
-                </span>
+                <Initials first={b.patient?.firstName} last={b.patient?.lastName} fallback={<User className="h-4 w-4" />} />
 
                 {/* Un vrai lien, pas un bouton : Ctrl-clic, clic-milieu, URL au survol et « copier
                     le lien » doivent fonctionner comme sur la carte du hub. La barre de progression

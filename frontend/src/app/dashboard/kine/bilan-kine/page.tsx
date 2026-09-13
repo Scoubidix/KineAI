@@ -5,12 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BilanStartBlock from './components/BilanStartBlock';
 import DraftsRow, { DRAFTS_HREF } from './components/DraftsRow';
-import PatientBilansModal from './components/PatientBilansModal';
 import TemplatesModal from './components/TemplatesModal';
+import { BILANS_REALISES_HREF } from './bilans-realises/page';
 
 export default function BilanHubPage() {
   const router = useRouter();
-  const [bilansRealisesOpen, setBilansRealisesOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
 
   // Même facture que les actions rapides de l'accueil kiné : pastille emoji, titre, sous-titre
@@ -44,14 +43,13 @@ export default function BilanHubPage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Actions rapides</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {card('🔍', 'bg-[#eff6ff]', 'Bilans réalisés', 'Par patient', () => setBilansRealisesOpen(true))}
+            {linkCard('🔍', 'bg-[#eff6ff]', 'Bilans réalisés', 'Par patient', BILANS_REALISES_HREF)}
             {card('📐', 'bg-[#f5f3ff]', 'Mes templates', 'Modèles par pathologie', () => setTemplatesOpen(true))}
             {linkCard('📂', 'bg-[#fffbeb]', 'Mes brouillons', 'Reprendre un bilan', DRAFTS_HREF)}
           </div>
         </div>
       </div>
 
-      <PatientBilansModal open={bilansRealisesOpen} onOpenChange={setBilansRealisesOpen} />
       <TemplatesModal open={templatesOpen} onOpenChange={setTemplatesOpen} />
     </>
   );

@@ -95,13 +95,18 @@ export default function DraftsRow() {
         {items.map((b) => {
           const c = BILAN_TYPE_COLORS[b.type];
           const label = jobLabel(b);
+          // Le motif aide à reconnaître le bilan d'un coup d'œil, mais il peut être absent
+          // (brouillon de notes jamais rédigé) : pas de repli « Sans motif » sur une carte.
+          const motif = shortMotif(b.motif);
           return (
             <button key={b.id} type="button" onClick={() => router.push(`/dashboard/kine/bilan-kine/${b.id}`)} className="card-hover rounded-xl border border-border/60 p-3 text-left">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium text-sm truncate">{patientName(b)}</span>
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${c.bg} ${c.text} border ${c.border}`}>{BILAN_TYPE_LABELS[b.type]}</span>
               </div>
-              <div className={`text-xs mt-1 ${jobLabelClass(b)}`}>{label ?? (b.status === 'GENERE' ? 'Rédigé' : 'Brouillon')} · {formatRelative(b.updatedAt)}</div>
+              <div className={`text-xs mt-1 truncate ${jobLabelClass(b)}`}>
+                {label ?? (b.status === 'GENERE' ? 'Rédigé' : 'Brouillon')}{motif ? ` · ${motif}` : ''} · {formatRelative(b.updatedAt)}
+              </div>
             </button>
           );
         })}
