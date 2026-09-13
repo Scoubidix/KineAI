@@ -219,14 +219,19 @@ export default function BrouillonsPage() {
                   {ini ?? <User className="h-4 w-4" />}
                 </span>
 
-                <button type="button" onClick={() => open(b)} className="flex-1 text-left min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-medium text-sm truncate">{patientName(b)}</span>
-                    <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded ${c.bg} ${c.text} border ${c.border}`}>{BILAN_TYPE_LABELS[b.type]}</span>
-                  </div>
-                  <div className={`text-xs mt-0.5 truncate ${jobLabelClass(b)}`}>
-                    {label ?? (b.status === 'GENERE' ? 'Rédigé' : 'Brouillon')} · {shortMotif(b.motif) || 'Sans motif'} · {formatRelative(b.updatedAt)}
-                  </div>
+                {/* Un vrai lien, pas un bouton : Ctrl-clic, clic-milieu, URL au survol et « copier
+                    le lien » doivent fonctionner comme sur la carte du hub. La barre de progression
+                    en sort (contenu non-phrasing + son aria-label serait absorbé dans le nom du lien). */}
+                <div className="flex-1 min-w-0">
+                  <Link href={`/dashboard/kine/bilan-kine/${b.id}`} className="block text-left">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium text-sm truncate">{patientName(b)}</span>
+                      <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded ${c.bg} ${c.text} border ${c.border}`}>{BILAN_TYPE_LABELS[b.type]}</span>
+                    </div>
+                    <div className={`text-xs mt-0.5 truncate ${jobLabelClass(b)}`}>
+                      {label ?? (b.status === 'GENERE' ? 'Rédigé' : 'Brouillon')} · {shortMotif(b.motif) || 'Sans motif'} · {formatRelative(b.updatedAt)}
+                    </div>
+                  </Link>
                   {pct !== null && (
                     <Progress
                       value={pct}
@@ -235,7 +240,7 @@ export default function BrouillonsPage() {
                       indicatorClassName="bg-[#3899aa]"
                     />
                   )}
-                </button>
+                </div>
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
