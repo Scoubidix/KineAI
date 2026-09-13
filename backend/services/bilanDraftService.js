@@ -203,10 +203,16 @@ function isDraftUntouched(b) {
   return !(doc.sections || []).some((sec) => typeof sec.text === 'string' && sec.text.trim() !== '');
 }
 
-/** Supprime les brouillons restés vides au-delà du délai. @returns {Promise<number>} nombre supprimé */
-async function purgeEmptyDrafts() {
+/**
+ * Supprime les brouillons restés vides au-delà du délai.
+ * @param {{ olderThanMs?: number, dryRun?: boolean }} [opts] `dryRun` compte sans supprimer, et
+ *   `olderThanMs` abaisse le seuil : de quoi éprouver la purge sur staging avant le premier
+ *   passage du cron, que le cron, lui, n'utilise pas.
+ * @returns {Promise<number>} nombre supprimé (ou qui le serait, en essai à blanc)
+ */
+async function purgeEmptyDrafts({ olderThanMs, dryRun = false } = {}) {
   const prisma = prismaService.getInstance();
-  const before = new Date(Date.now() - EMPTY_DRAFT_DAYS * 24 * 60 * 60 * 1000);
+  const before = new Date(Date.now() - (olderThanMs ?? EMPTY_DRAFT_DAYS * 24 * 60 * 60 * 1000));
   // `job: null` écarte tout bilan qui porte un traitement, même échoué : il est repris, pas vide.
   const candidates = await prisma.bilanKine.findMany({
     // Le gros du tri est poussé en SQL : sans ça, des brouillons anciens mais remplis
@@ -224,8 +230,12 @@ async function purgeEmptyDrafts() {
     if (candidates.length === EMPTY_DRAFT_BATCH) logger.warn(`Purge des brouillons vides : lot de ${EMPTY_DRAFT_BATCH} entièrement rejeté, aucune progression`);
     return 0;
   }
+  if (dryRun) {
+    logger.info(`Purge des brouillons vides (essai à blanc) : ${ids.length} candidat(s), aucune suppression`);
+    return ids.length;
+  }
   const { count } = await prisma.bilanKine.deleteMany({ where: { id: { in: ids } } });
-  logger.info(`Brouillons vides purgés : ${count} (sans activité depuis ${EMPTY_DRAFT_DAYS} jours)`);
+  logger.info(`Brouillons vides purgés : ${count} (sans activité depuis le ${before.toISOString()})`);
   return count;
 }
 
@@ -256,4 +266,5 @@ module.exports = {
   finalizeBilan,
   removeBilan,
   purgeEmptyDrafts,
+  isDraftUntouched,
 };
