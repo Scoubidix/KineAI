@@ -212,7 +212,7 @@ const safeErrorLabel = (err) => (err instanceof SyntaxError ? 'JSON invalide' : 
  */
 async function correct({ text, mode, catalog, pseudo }) {
   const raw = String(text ?? '').trim();
-  if (!raw) return { text: '', applied: 0, ignored: 0 };
+  if (!raw) return { text: '', applied: 0, ignored: 0, motif: '' };
   // Le modèle ne reçoit jamais l'identité en clair : masquée avant l'envoi, réhydratée sur le texte rendu
   const masked = pseudo ? pseudo.mask(raw) : raw;
   logMasked(`correction (${mode})`, masked, pseudo);
@@ -232,11 +232,10 @@ async function correct({ text, mode, catalog, pseudo }) {
   const tokenCount = pseudo ? Object.values(pseudo.stats()).reduce((a, b) => a + b, 0) : 0;
   // Jamais le motif dans les logs : c'est du contenu clinique
   logger.info(`Correction dictée (${mode}) : ${r.applied} appliquée(s), ${r.ignored} ignorée(s), ${tokenCount} jeton(s), motif ${parsed.motif ? 'déduit' : 'absent'}`);
-  // Le motif vient du texte masqué : il doit être réhydraté comme le texte, puis réassaini
-  // (la réhydratation rallonge le libellé en rendant les vrais mots).
-  const motif = parsed.motif ? sanitizeMotif(pseudo ? pseudo.unmaskDeep(parsed.motif) : parsed.motif) : '';
+  // Le motif est déjà assaini et exempt de jeton par parseCorrection (sanitizeMotif rejette tout
+  // motif contenant [ ou ]) : rien à réhydrater, contrairement au texte corrigé ci-dessous.
   // Le texte corrigé rejoint les notes du kiné (pas un document rendu) : réhydratation verbatim, telle que saisie
-  return { ...r, motif, text: pseudo ? pseudo.unmaskDeep(r.text) : r.text };
+  return { ...r, motif: parsed.motif, text: pseudo ? pseudo.unmaskDeep(r.text) : r.text };
 }
 
 module.exports = {
