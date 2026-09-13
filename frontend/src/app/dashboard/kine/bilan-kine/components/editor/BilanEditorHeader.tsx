@@ -87,7 +87,6 @@ export default function BilanEditorHeader({ record, onPatientChange, onTypeChang
             type="button"
             disabled={disabled || finalized}
             onClick={() => { setMotifDraft(record.motif ?? ''); setMotifEditing(true); }}
-            aria-label="Motif du bilan"
             className={`inline-flex items-center h-8 rounded-md border px-2.5 text-sm font-medium transition-colors max-w-[14rem] truncate ${
               record.motif
                 ? 'border-input bg-background'
