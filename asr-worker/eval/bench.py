@@ -1,9 +1,12 @@
 r"""Bench de la dictée : WER, RTF, termes kiné, par fichier de eval/audio (et eval/audio/real s'il existe).
 
-Usage : .venv\Scripts\python.exe eval/bench.py [--url http://localhost:8100 --token dev-token] [--concurrency 4] [--only dictee-03]
+Usage : .venv\Scripts\python.exe eval/bench.py [--url http://localhost:8100 --token dev-token]
+        [--concurrency 2] [--priority batch] [--only dictee-03]
+--concurrency est un plafond de segments en vol (comme DICTATION_JOB_CONCURRENCY côté backend).
 Sans --url : appel direct du Transcriber (in-process). Écrit eval/out/<nom>_<variante>.txt.
 """
-import argparse, glob, os, re, sys, threading, time, wave
+import argparse, glob, os, re, sys, time, wave
+from concurrent.futures import ThreadPoolExecutor
 
 import jiwer
 
@@ -244,6 +247,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url"); ap.add_argument("--token", default=os.environ.get("ASR_WORKER_TOKEN", "dev-token"))
     ap.add_argument("--concurrency", type=int, default=1); ap.add_argument("--only")
+    ap.add_argument("--priority", choices=("interactive", "batch"), default="interactive",
+                    help="Priorité ASR : le backend envoie les séances en batch, les dictées en interactive.")
     ap.add_argument("--selftest", action="store_true", help="Vérifie normalize_numbers et split_segments puis quitte, sans lancer le bench.")
     a = ap.parse_args()
     if a.selftest:
@@ -260,9 +265,18 @@ def main():
     os.makedirs(os.path.join(HERE, "out"), exist_ok=True)
     if a.url:
         import httpx
-        run_bytes = lambda data: httpx.post(f"{a.url}/v1/transcribe", headers={"Authorization": f"Bearer {a.token}"},
-                                            files={"audio": ("seg.wav", data, "audio/wav")},
-                                            data={"language": "fr", "prompt": PROMPT, "priority": "interactive"}, timeout=120).json()["text"]
+        base = a.url.rstrip("/")
+
+        def run_bytes(data):
+            r = httpx.post(f"{base}/v1/transcribe", headers={"Authorization": f"Bearer {a.token}"},
+                           files={"audio": ("seg.wav", data, "audio/wav")},
+                           data={"language": "fr", "prompt": PROMPT, "priority": a.priority}, timeout=600)
+            # Un 503 « busy » renvoie {"error": ...} : sans ce contrôle, .json()["text"] lève un
+            # KeyError illisible et le bench meurt au milieu du corpus.
+            if r.status_code != 200:
+                raise SystemExit(f"worker {r.status_code} sur /v1/transcribe : {r.text[:200]}"
+                                 " — 503 busy = places saturées : baisse --concurrency, ou --priority batch")
+            return r.json()["text"]
     else:
         from transcriber import Transcriber, decode_audio
         t = Transcriber(threads=int(os.environ.get("ASR_THREADS", "2")), model_path=os.environ.get("ASR_MODEL_PATH") or None)
@@ -277,11 +291,9 @@ def main():
         results = [None] * len(segs)
         t0 = time.time()
         if a.concurrency > 1 and a.url:
-            def work(i):
-                results[i] = run_bytes(segs[i])
-            threads = [threading.Thread(target=work, args=(i,)) for i in range(len(segs))]
-            for th in threads: th.start()
-            for th in threads: th.join()
+            with ThreadPoolExecutor(max_workers=a.concurrency) as ex:
+                for i, text in zip(range(len(segs)), ex.map(run_bytes, segs)):
+                    results[i] = text
         else:
             for i, s in enumerate(segs):
                 results[i] = run_bytes(s)
