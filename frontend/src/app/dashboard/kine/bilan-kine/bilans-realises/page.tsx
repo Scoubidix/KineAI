@@ -6,39 +6,35 @@ import { ChevronRight, Search, User } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { matchesAllTokens } from '@/utils/textSearch';
-import { CARD, EmptyState, Initials, ListSkeleton, PageHeader, formatDateLong } from '../components/listPage';
+import { CARD, EmptyState, Initials, ListSkeleton, PageHeader, formatDateLong } from '../components/ListPage';
+import { BILANS_REALISES_HREF, type PatientWithBilans } from '../components/bilansRealises';
 
-export const BILANS_REALISES_HREF = '/dashboard/kine/bilan-kine/bilans-realises';
-
-export interface PatientWithBilans {
-  id: number;
-  firstName: string;
-  lastName: string;
-  birthDate: string;
-  lastBilanDate: string | null;
-  bilanCount: number;
-}
+const formatBirth = (iso: string) => new Date(iso).toLocaleDateString('fr-FR');
 
 export default function BilansRealisesPage() {
   const [patients, setPatients] = useState<PatientWithBilans[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [query, setQuery] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/bilans/patients-with-bilans`)
-      .then((r) => (r.ok ? r.json() : { success: false }))
-      .then((j) => { if (!cancelled) setPatients(j.success ? j.patients : []); })
-      .catch(() => { if (!cancelled) setPatients([]); });
+      .then(async (r) => {
+        if (cancelled) return;
+        if (!r.ok) { setLoadError(true); setPatients([]); return; }
+        const j = await r.json();
+        setPatients(j.success ? j.patients : []);
+        if (!j.success) setLoadError(true);
+      })
+      .catch(() => { if (!cancelled) { setLoadError(true); setPatients([]); } });
     return () => { cancelled = true; };
   }, []);
 
   // Recherche par nom seulement : des puces de filtre par type n'apprendraient rien sur une
-  // liste de patients, et le nom est la seule chose qu'un kiné a en tête en arrivant ici.
+  // liste de patients. `matchesAllTokens` accepte les jetons dans le désordre (« jean v »).
   const visible = useMemo(() => {
     const list = patients ?? [];
-    return query.trim()
-      ? list.filter((p) => matchesAllTokens(`${p.firstName} ${p.lastName}`, query))
-      : list;
+    return query.trim() ? list.filter((p) => matchesAllTokens(`${p.firstName} ${p.lastName}`, query)) : list;
   }, [patients, query]);
 
   return (
@@ -60,7 +56,13 @@ export default function BilansRealisesPage() {
 
       {patients === null && <ListSkeleton label="Chargement des patients" />}
 
-      {patients !== null && patients.length === 0 && (
+      {/* Une panne de chargement ne doit pas s'annoncer « aucun bilan » : le kiné croirait
+          à une perte de ses données de santé. */}
+      {loadError && (
+        <EmptyState emoji="⚠️" badgeClass="bg-[#fef2f2]" message="Impossible de charger la liste pour l’instant. Recharge la page dans un instant." />
+      )}
+
+      {!loadError && patients !== null && patients.length === 0 && (
         <EmptyState
           emoji="🔍"
           badgeClass="bg-[#eff6ff]"
@@ -79,13 +81,14 @@ export default function BilansRealisesPage() {
         <ul className={`${CARD} divide-y divide-border/60 overflow-hidden`}>
           {visible.map((p) => (
             <li key={p.id}>
-              <Link
-                href={`${BILANS_REALISES_HREF}/${p.id}`}
-                className="flex items-center gap-3 px-3 py-3 hover:bg-muted/40 transition-colors"
-              >
+              <Link href={`${BILANS_REALISES_HREF}/${p.id}`} className="flex items-center gap-3 px-3 py-3 hover:bg-muted/40 transition-colors">
                 <Initials first={p.firstName} last={p.lastName} fallback={<User className="h-4 w-4" />} />
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm truncate">{p.firstName} {p.lastName.toUpperCase()}</div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-medium text-sm truncate">{p.firstName} {p.lastName.toUpperCase()}</span>
+                    {/* Date de naissance : seul discriminant entre deux homonymes de la patientèle */}
+                    {p.birthDate && <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{formatBirth(p.birthDate)}</span>}
+                  </div>
                   <div className="text-xs text-muted-foreground truncate">
                     {p.bilanCount} bilan{p.bilanCount > 1 ? 's' : ''}
                     {p.lastBilanDate ? ` · dernier le ${formatDateLong(p.lastBilanDate)}` : ''}

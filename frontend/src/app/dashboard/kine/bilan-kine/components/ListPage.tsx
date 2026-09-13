@@ -16,9 +16,6 @@ import { Skeleton } from '@/components/ui/skeleton';
  *  sans son halo teal, réservé au cliquable). */
 export const CARD = 'rounded-xl bg-white dark:bg-card border border-border shadow-md';
 
-/** Repli pour comparer des textes sans accent ni casse : « lombalgie » trouve « Lombalgie ». */
-export const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-
 export const formatDateLong = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
 

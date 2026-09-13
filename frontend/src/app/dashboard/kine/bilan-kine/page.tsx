@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import BilanStartBlock from './components/BilanStartBlock';
 import DraftsRow, { DRAFTS_HREF } from './components/DraftsRow';
 import TemplatesModal from './components/TemplatesModal';
-import { BILANS_REALISES_HREF } from './bilans-realises/page';
+import { BILANS_REALISES_HREF } from './components/bilansRealises';
 
 export default function BilanHubPage() {
   const router = useRouter();

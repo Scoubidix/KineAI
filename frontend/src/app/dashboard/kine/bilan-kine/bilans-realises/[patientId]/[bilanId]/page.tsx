@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import DOMPurify from 'dompurify';
 import { Download, Edit, Loader2, Trash2 } from 'lucide-react';
@@ -14,8 +15,8 @@ import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { deleteBilan } from '@/utils/bilanApi';
 import { downloadBilanPdf, fetchBilanRender } from '@/utils/bilanExport';
 import { BILAN_TYPE_COLORS, BILAN_TYPE_LABELS, type BilanDocument, type BilanType } from '@/types/bilan';
-import { CARD, PageHeader, formatDateLong } from '../../../components/listPage';
-import { BILANS_REALISES_HREF } from '../../page';
+import { CARD, PageHeader, formatDateLong } from '../../../components/ListPage';
+import { BILANS_REALISES_HREF, parseId } from '../../../components/bilansRealises';
 
 interface BilanFull {
   id: number;
@@ -27,8 +28,8 @@ interface BilanFull {
 
 export default function BilanRealisePage() {
   const params = useParams<{ patientId: string; bilanId: string }>();
-  const patientId = Number(params.patientId);
-  const bilanId = Number(params.bilanId);
+  const patientId = parseId(params.patientId);
+  const bilanId = parseId(params.bilanId);
   const router = useRouter();
   const { toast } = useToast();
   const [bilan, setBilan] = useState<BilanFull | null>(null);
@@ -37,8 +38,11 @@ export default function BilanRealisePage() {
   const [renderError, setRenderError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!Number.isInteger(patientId) || !Number.isInteger(bilanId)) { setNotFound(true); return; }
+    if (patientId === null || bilanId === null) { setNotFound(true); return; }
     let cancelled = false;
+    // Remise à zéro en tête d'effet : sans elle, un changement de bilan sans démontage de la
+    // page (futur lien « précédent / suivant ») afficherait le document du bilan précédent.
+    setNotFound(false); setBilan(null); setHtml(null); setRenderError(null);
     fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patientId}/bilans/${bilanId}`)
       .then((r) => (r.ok ? r.json() : { success: false }))
       .then((j) => { if (!cancelled) { if (j.success) setBilan(j.bilan); else setNotFound(true); } })
@@ -57,16 +61,19 @@ export default function BilanRealisePage() {
     return () => { cancelled = true; };
   }, [bilan]);
 
-  const backHref = `${BILANS_REALISES_HREF}/${patientId}`;
+  // Sans la garde, une URL au patient invalide enverrait le retour sur /bilans-realises/NaN,
+  // soit un second cul-de-sac au lieu de remonter d'un niveau.
+  const backHref = patientId === null ? BILANS_REALISES_HREF : `${BILANS_REALISES_HREF}/${patientId}`;
 
   const handleDelete = async () => {
     if (!bilan) return;
     try {
       await deleteBilan(bilan.id);
       toast({ title: 'Bilan supprimé' });
-      router.push(backHref);
+      // replace et non push : « Précédent » ne doit pas ramener sur un bilan qui n'existe plus
+      router.replace(backHref);
     } catch (e) {
-      toast({ title: 'Erreur', description: (e as Error).message, variant: 'destructive' });
+      toast({ title: 'Erreur', description: (e as Error).message || 'Suppression impossible', variant: 'destructive' });
     }
   };
 
@@ -97,8 +104,10 @@ export default function BilanRealisePage() {
           <span className="text-xs text-muted-foreground flex-1">{formatDateLong(bilan.createdAt)}</span>
           {/* Un bilan hérité n'a pas de `document` : l'éditeur le refuse, on n'offre pas le bouton */}
           {bilan.document && (
-            <Button size="sm" onClick={() => router.push(`/dashboard/kine/bilan-kine/${bilan.id}?step=document`)} className="btn-teal h-8 rounded-full px-3">
-              <Edit className="h-3.5 w-3.5 mr-1.5" />Ouvrir dans l’éditeur
+            <Button asChild size="sm" className="btn-teal h-8 rounded-full px-3">
+              <Link href={`/dashboard/kine/bilan-kine/${bilan.id}?step=document`}>
+                <Edit className="h-3.5 w-3.5 mr-1.5" />Ouvrir dans l’éditeur
+              </Link>
             </Button>
           )}
           <Button size="sm" onClick={handlePdf} className="btn-teal h-8 rounded-full px-3">

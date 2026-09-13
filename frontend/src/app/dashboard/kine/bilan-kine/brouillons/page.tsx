@@ -16,7 +16,8 @@ import { useToast } from '@/hooks/use-toast';
 import { listMyBilans, deleteBilan } from '@/utils/bilanApi';
 import { BILAN_TYPE_LABELS, BILAN_TYPE_COLORS, type BilanListItem } from '@/types/bilan';
 import { formatRelative, hasActiveJob, jobLabel, jobLabelClass, needsAction, patientName, shortMotif } from '../components/DraftsRow';
-import { CARD, EmptyState, FilterChip, Initials, ListSkeleton, PageHeader, fold } from '../components/listPage';
+import { matchesAllTokens } from '@/utils/textSearch';
+import { CARD, EmptyState, FilterChip, Initials, ListSkeleton, PageHeader } from '../components/ListPage';
 
 
 /** Pourcentage à afficher en barre : seulement pendant un traitement qui avance. */
@@ -88,9 +89,9 @@ export default function BrouillonsPage() {
   // Tri figé sur le plus récent — le seul ordre utile pour des brouillons, la recherche
   // couvrant le besoin « retrouver le bilan d'un patient nommé ».
   const visible = useMemo(() => {
-    const q = fold(query.trim());
+    const q = query.trim();
     const kept = (items ?? []).filter((b) => (effective === 'all' || bucketOf(b) === effective)
-      && (!q || fold(`${patientName(b)} ${b.motif ?? ''}`).includes(q)));
+      && (!q || matchesAllTokens(`${patientName(b)} ${b.motif ?? ''}`, q)));
     return [...kept].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }, [items, query, effective]);
 
@@ -203,7 +204,9 @@ export default function BrouillonsPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={() => open(b)}>Ouvrir</DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href={`/dashboard/kine/bilan-kine/${b.id}`}>Ouvrir</Link>
+                    </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setPendingDelete(b)} className="text-red-600 focus:text-red-600">
                       <Trash2 className="h-4 w-4 mr-2" />Supprimer
                     </DropdownMenuItem>

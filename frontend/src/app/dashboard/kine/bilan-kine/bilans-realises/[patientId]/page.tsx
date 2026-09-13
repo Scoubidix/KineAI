@@ -15,8 +15,8 @@ import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { deleteBilan } from '@/utils/bilanApi';
 import { downloadBilanPdf } from '@/utils/bilanExport';
 import { BILAN_TYPE_COLORS, BILAN_TYPE_LABELS, type BilanType } from '@/types/bilan';
-import { CARD, EmptyState, FilterChip, ListSkeleton, PageHeader, formatDateLong } from '../../components/listPage';
-import { BILANS_REALISES_HREF, type PatientWithBilans } from '../page';
+import { CARD, EmptyState, FilterChip, ListSkeleton, PageHeader, formatDateLong } from '../../components/ListPage';
+import { BILANS_REALISES_HREF, parseId } from '../../components/bilansRealises';
 
 interface BilanSummary {
   id: number;
@@ -29,30 +29,36 @@ const TYPES: BilanType[] = ['INITIAL', 'INTERMEDIAIRE', 'FINAL'];
 
 export default function PatientBilansPage() {
   const params = useParams<{ patientId: string }>();
-  const patientId = Number(params.patientId);
+  const patientId = parseId(params.patientId);
   const { toast } = useToast();
   const [bilans, setBilans] = useState<BilanSummary[] | null>(null);
-  const [patient, setPatient] = useState<PatientWithBilans | null>(null);
+  const [patientName, setPatientName] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<'ok' | 'introuvable' | 'panne'>('ok');
   const [filter, setFilter] = useState<BilanType | 'all'>('all');
   const [pendingDelete, setPendingDelete] = useState<BilanSummary | null>(null);
 
-  // Deux appels en parallèle : la liste des bilans, et celle des patients pour le titre.
-  // Sur un lien profond, rien ne porte le nom du patient — et aucun endpoint ne renvoie
-  // l'identité avec ses bilans. On réutilise celui du niveau au-dessus plutôt que d'en inventer un.
+  // `GET /api/patients/:id` vérifie déjà l'appartenance au kiné et répond 404 sinon : on
+  // distingue ainsi « pas ton patient » de « aucun bilan » et de « le serveur est tombé »,
+  // au lieu de télécharger toute la patientèle pour n'en garder qu'un nom.
   useEffect(() => {
-    if (!Number.isInteger(patientId)) { setBilans([]); return; }
+    if (patientId === null) { setLoadState('introuvable'); setBilans([]); return; }
     let cancelled = false;
     const api = process.env.NEXT_PUBLIC_API_URL;
     Promise.all([
-      fetchWithAuth(`${api}/api/patients/${patientId}/bilans`).then((r) => (r.ok ? r.json() : { success: false })),
-      fetchWithAuth(`${api}/api/bilans/patients-with-bilans`).then((r) => (r.ok ? r.json() : { success: false })),
+      fetchWithAuth(`${api}/api/patients/${patientId}`),
+      fetchWithAuth(`${api}/api/patients/${patientId}/bilans`),
     ])
-      .then(([b, p]) => {
+      .then(async ([rp, rb]) => {
         if (cancelled) return;
+        if (rp.status === 404) { setLoadState('introuvable'); setBilans([]); return; }
+        if (!rp.ok || !rb.ok) { setLoadState('panne'); setBilans([]); return; }
+        const p = await rp.json();
+        const b = await rb.json();
+        setPatientName(`${p.firstName} ${String(p.lastName).toUpperCase()}`);
         setBilans(b.success ? b.bilans : []);
-        if (p.success) setPatient((p.patients as PatientWithBilans[]).find((x) => x.id === patientId) ?? null);
+        if (!b.success) setLoadState('panne');
       })
-      .catch(() => { if (!cancelled) setBilans([]); });
+      .catch(() => { if (!cancelled) { setLoadState('panne'); setBilans([]); } });
     return () => { cancelled = true; };
   }, [patientId]);
 
@@ -73,7 +79,7 @@ export default function PatientBilansPage() {
       setBilans((prev) => (prev ?? []).filter((x) => x.id !== b.id));
       toast({ title: 'Bilan supprimé' });
     } catch (e) {
-      toast({ title: 'Erreur', description: (e as Error).message, variant: 'destructive' });
+      toast({ title: 'Erreur', description: (e as Error).message || 'Suppression impossible', variant: 'destructive' });
     }
   };
 
@@ -82,7 +88,7 @@ export default function PatientBilansPage() {
     if (!r.success) toast({ title: 'Erreur', description: r.error ?? 'PDF impossible', variant: 'destructive' });
   };
 
-  const titre = patient ? `${patient.firstName} ${patient.lastName.toUpperCase()}` : 'Bilans du patient';
+  const titre = patientName ?? (loadState === 'introuvable' ? 'Patient introuvable' : 'Bilans du patient');
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
@@ -99,7 +105,16 @@ export default function PatientBilansPage() {
 
       {bilans === null && <ListSkeleton label="Chargement des bilans" />}
 
-      {bilans !== null && bilans.length === 0 && (
+      {loadState === 'introuvable' && (
+        <EmptyState emoji="🔍" badgeClass="bg-[#eff6ff]" message="Ce patient n’existe pas ou ne t’appartient pas."
+          action={<Link href={BILANS_REALISES_HREF} className="text-sm text-[#3899aa] underline underline-offset-4">Revenir aux patients</Link>} />
+      )}
+
+      {loadState === 'panne' && (
+        <EmptyState emoji="⚠️" badgeClass="bg-[#fef2f2]" message="Impossible de charger les bilans pour l’instant. Recharge la page dans un instant." />
+      )}
+
+      {loadState === 'ok' && bilans !== null && bilans.length === 0 && (
         <EmptyState
           emoji="🔍"
           badgeClass="bg-[#eff6ff]"
@@ -154,7 +169,7 @@ export default function PatientBilansPage() {
         </ul>
       )}
 
-      {/* Une seule boîte de confirmation pour toute la liste, pilotée par l'état */}
+      {/* Une seule boîte de confirmation pour toute la liste, pilotée par l'loadState */}
       <AlertDialog open={pendingDelete !== null} onOpenChange={(o) => { if (!o) setPendingDelete(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
