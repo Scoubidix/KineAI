@@ -92,39 +92,52 @@ de fond au démarrage, le serveur écoute dès le lancement), `"ok"` (code `200`
 
 ## Déploiement (Clever Cloud)
 
-- Runtime Python 3.13 (`CC_PYTHON_VERSION=3.13` — le lock `requirements.lock` a été figé sous
-  3.13.7, à utiliser tel quel)
-- `CC_PIP_REQUIREMENTS_FILE=requirements.lock` : indique à Clever Cloud d'installer le lock, pas
-  `requirements.txt`. `requirements.txt` reste le fichier de dev (inclut tests, edge-tts, jiwer,
-  inutiles — et plus lourds — en production)
-- `CC_RUN_COMMAND=uvicorn app:app --host 0.0.0.0 --port 8080 --workers 1`
-- `CC_POST_BUILD_HOOK=python download_model.py` (télécharge le modèle dans `./models` au build,
-  pour que les instances ajoutées par le scaling démarrent sans réseau)
-- `ASR_MODEL_PATH=./models/large-v3-turbo`
-- `CC_HEALTH_CHECK_PATH=/healthz` — répond `503 {"status": "loading"}` pendant 30 à 90 s après le
-  démarrage (chargement du modèle en tâche de fond, cf. « Lancement local » ci-dessus) : le health
-  check de déploiement doit tolérer cette fenêtre (Clever Cloud attend le premier `2xx`, mais le
-  délai avant qu'il arrive dépend de sa propre config de retry/timeout — à vérifier au premier
-  déploiement).
-- Flavor : M
-- Scaling : 1 → 3 instances
-- Dimensionnement : `ASR_SLOTS × ASR_THREADS` ne doit pas dépasser le nombre de vCPU du flavor
-  (chaque place tourne `ASR_THREADS` threads CPU, et `ASR_SLOTS` places peuvent tourner en
-  parallèle via `num_workers` faster-whisper).
+Déployé le 12 septembre 2026 : application Python dans l'organisation HDS, **zone `parhds`** (la zone
+est figée à la création de l'app). Dépôt GitHub du monorepo, **déploiement automatique désactivé** :
+Clever ne filtre pas par dossier, donc un commit ne touchant que `backend/` relancerait un build du
+worker — et donc un redémarrage de 30 à 90 s en pleine session de test.
 
-### Dimensionnement avant ouverture sur staging
+| Variable | Valeur | Pourquoi |
+|---|---|---|
+| `APP_FOLDER` | `asr-worker` | monorepo : sinon Clever cherche un projet Python à la racine |
+| `CC_PYTHON_VERSION` | `3.13` | `requirements.lock` figé sous 3.13.7 |
+| `CC_PIP_REQUIREMENTS_FILE` | `requirements.lock` | `requirements.txt` est le fichier de dev (pytest, edge-tts, jiwer) |
+| `CC_RUN_COMMAND` | `uvicorn app:app --host 0.0.0.0 --port 9000 --workers 1` | **port 9000**, cf. ci-dessous |
+| `CC_POST_BUILD_HOOK` | `cd asr-worker && python download_model.py` | **`cd` obligatoire**, cf. ci-dessous |
+| `ASR_MODEL_PATH` | `./models/large-v3-turbo` | modèle prétéléchargé au build |
+| `ASR_WORKER_TOKEN` | jeton partagé avec le backend | `ASR_WORKER_URL`/`ASR_WORKER_TOKEN` côté backend |
+| `ASR_SLOTS` / `ASR_THREADS` | `2` / `2` | `ASR_SLOTS × ASR_THREADS` ≤ vCPU du flavor |
 
-Le RTF du bench ci-dessous (0,26-0,37) a été mesuré sur un poste de développement (i7 de bureau),
-pas sur le flavor Clever Cloud réel. Avant d'ouvrir la fonctionnalité sur staging, relancer le
-bench HTTP contre le worker déployé :
+Flavor **M** (4 vCPU / 8 Go), 1 instance (scaling jusqu'à 3 possible, inutile aux volumes actuels).
 
-```bash
-python eval/bench.py --url https://<worker> --concurrency 2 --only dictee-01
-```
+**Le port d'écoute est 9000, pas 8080.** Le runtime Python de Clever Cloud place nginx devant
+l'application : nginx prend le port public 8080 et relaie vers 9000. Demander le 8080 à uvicorn donne
+`[Errno 98] address already in use`, uvicorn s'arrête — et **le déploiement est quand même annoncé
+réussi** (`Checking public port (8080) … as expected` : c'est nginx qui répond, pas nous).
 
-Si le RTF mesuré dépasse 0,7, augmenter `ASR_REQUEST_TIMEOUT_MS` côté backend (défaut 90 000 ms)
-et/ou réduire `MAX_SEGMENT_MS` dans `dictationRecorder.ts` (front) pour raccourcir les segments
-envoyés.
+**`CC_POST_BUILD_HOOK` s'exécute à la racine du dépôt, pas dans `APP_FOLDER`.** Sans le
+`cd asr-worker`, le hook échoue (`can't open file '…/download_model.py'`). Le `cd` règle aussi la
+destination : `download_model.py` lit `ASR_MODEL_PATH`, donc `./models/large-v3-turbo` se résout dans
+`asr-worker/` — là où uvicorn (qui, lui, tourne bien dans `APP_FOLDER`) ira le chercher. Sans le `cd`,
+le modèle atterrirait à la racine du dépôt et chaque démarrage d'instance le retéléchargerait
+silencieusement depuis Hugging Face, sans que le build échoue.
+
+**`CC_HEALTH_CHECK_PATH=/healthz` : à n'ajouter qu'une fois le temps de chargement connu.** Sans cette
+variable, Clever vérifie seulement que le port est ouvert — ce que uvicorn fait aussitôt. Avec elle,
+il exige un `2xx` sur `/healthz`, qui répond `503 {"status": "loading"}` pendant 30 à 90 s le temps du
+chargement du modèle. À poser une fois le délai réel relevé dans les logs (`modèle … chargé en X.Xs`) :
+c'est ce qui évite qu'un déploiement passe au vert alors que le service est mort.
+
+Le build produit une *build cache archive* : les redéploiements ne retéléchargent pas le modèle. Une
+app arrêtée n'est pas facturée (Clever Cloud facture à la seconde d'exécution) — arrêter le worker
+entre deux sessions de test est le bon réflexe, au prix des 30 à 90 s de chargement au redémarrage.
+
+### Dimensionnement
+
+Mesuré sur le worker déployé le 2026-09-12 (cf. « Run HTTP contre le worker Clever Cloud » plus bas) :
+RTF 0,10-0,15 en dictée, 0,18 en séance. Le seuil d'alerte de 0,7 n'est pas approché, aucun réglage à
+changer. Si un futur flavor le faisait dépasser 0,7 : augmenter `ASR_REQUEST_TIMEOUT_MS` côté backend
+(défaut 90 000 ms) et/ou réduire `MAX_SEGMENT_MS` dans `dictationRecorder.ts` (front).
 
 ## Bench
 
@@ -139,9 +152,10 @@ pleine réplique), calcule le WER (référence = script tel quel, normalisé cas
 via `jiwer`), le RTF (temps de traitement / durée audio) et le nombre de termes kiné reconnus
 (`TERMES`, 18 termes), et écrit `eval/out/<nom>.txt`.
 
-`--concurrency` n'est qu'un interrupteur (un thread par segment au-delà de 1, utile uniquement avec
-`--url` pour paralléliser sur les places du worker HTTP) ; avec une séance découpée en une vingtaine
-de segments, le mode local (sans `--url`, in-process) reste préférable.
+`--concurrency` plafonne le nombre de segments en vol (n'a d'effet qu'avec `--url`) : au-delà de 1,
+les segments partent par un pool de cette taille. `--priority` choisit la priorité ASR —
+`interactive` comme une dictée (défaut), `batch` comme une séance côté backend. Une réponse non-200
+du worker arrête le bench en affichant le code et le corps de la réponse.
 
 Le WER référence-hypothèse compare deux textes dont les nombres ne s'écrivent pas pareil : la
 référence les a en toutes lettres (dictées telles quelles), faster-whisper les transcrit en
@@ -211,6 +225,55 @@ Wall-clock : 50 s. RTF meilleur qu'en in-process (0,26 contre 0,37) grâce à la
 tranches de 45 s sur les 2 places du worker. WER identique au run in-process (même modèle, même
 texte) : 11,7 % sur les deux variantes, cible clean (< 10 %) ratée de peu, cible cabinet (< 20 %)
 atteinte.
+
+### Run HTTP contre le worker Clever Cloud (2026-09-12)
+
+Worker en zone HDS, flavor M (4 vCPU / 8 Go), `ASR_SLOTS=2`, `ASR_THREADS=2`. Appels émis depuis un
+poste de développement : les temps incluent la latence réseau, le calcul pur est plus rapide.
+
+```
+python eval/bench.py --url https://<worker> --token <jeton> --concurrency 2 --only dictee
+```
+
+```
+fichier                       audio  temps   RTF    WER  WER brut termes
+dictee-01_cabinet                97     13  0.14  12.2%     17.9% 4/18
+dictee-01_clean                  97     13  0.13  12.7%     18.4% 4/18
+dictee-02_cabinet                84     11  0.13   8.3%     16.8% 0/18
+dictee-02_clean                  84      9  0.11   8.3%     16.8% 0/18
+dictee-03_cabinet                81     12  0.14  12.8%     23.2% 0/18
+dictee-03_clean                  81     12  0.15  12.1%     22.5% 0/18
+dictee-04_cabinet                81      9  0.11   9.9%     21.4% 3/18
+dictee-04_clean                  81      9  0.11   9.9%     21.4% 4/18
+dictee-05_cabinet                84      9  0.11  10.8%     18.1% 4/18
+dictee-05_clean                  84      8  0.10   9.0%     16.3% 5/18
+```
+
+RTF 0,10-0,15, deux à trois fois meilleur que le run in-process sur i7 (0,34-0,37). Latence maximale
+observée : 16 s pour un segment, face aux 90 000 ms d'`ASR_REQUEST_TIMEOUT_MS`. WER conforme au run
+in-process aux écarts près expliqués par la coupe au silence, postérieure à ces chiffres.
+
+Séance, avec la forme de trafic réelle du backend (`priority=batch`, 2 segments en vol comme
+`DICTATION_JOB_CONCURRENCY`) :
+
+```
+python eval/bench.py --url https://<worker> --token <jeton> --concurrency 2 --priority batch --only seance-01_cabinet
+```
+
+```
+fichier                       audio  temps   RTF    WER  WER brut termes
+seance-01_cabinet               694    127  0.18   3.6%      4.9% 3/18
+```
+
+11,5 min d'audio transcrites en 2 min, 17 segments sur 17 en succès. Les batch n'occupant qu'une place
+sur deux (`ASR_BATCH_MAX_SLOTS = ASR_SLOTS − 1`), une dictée interactive garde une place libre pendant
+tout le traitement d'une séance.
+
+⚠️ Ces mêmes 17 segments envoyés **tous en même temps** en `priority=interactive` (ce que faisait
+l'ancien `--concurrency`) donnent 10 × `200` et 7 × `503 {"error":"busy"}` avec `Retry-After: 5`.
+C'est la contre-pression prévue par `scheduler.py`, pas une panne : le backend ne produit jamais cette
+forme de trafic (file bornée à `DICTATION_JOB_CONCURRENCY`, priorité `batch` sans délai d'attente
+maximum, et `ASR_BUSY` rejoué jusqu'à 3 fois par `bilanJobService`).
 
 ### Corpus de séances
 
