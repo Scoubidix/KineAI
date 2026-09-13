@@ -250,7 +250,7 @@ async function runTail(jobId, stage) {
       if (!raw) throw new DraftError('NOTES_REQUIRED', 400, 'Rien n’a été entendu');
       const catalog = await getCatalog();
       const pseudo = createPseudonymizer({ patient: job.bilan.patient, kine: job.kine });
-      const { text, applied, ignored } = await dictationCorrectionService.correct({ text: raw, mode: job.kind === 'SESSION' ? 'session' : 'dictation', catalog, pseudo });
+      const { text, applied, ignored, motif } = await dictationCorrectionService.correct({ text: raw, mode: job.kind === 'SESSION' ? 'session' : 'dictation', catalog, pseudo });
       if (source === 'dialogue') logger.info(`Traitement dictée ${jobId} : séance, rédaction depuis le dialogue`);
       // La transition sert de verrou : une queue qui a perdu la main n'ajoute pas les notes une 2e fois.
       // Les trois écritures (statut, notes, segments) réussissent ou échouent ensemble.
@@ -263,6 +263,11 @@ async function runTail(jobId, stage) {
         await tx.bilanKine.update({ where: { id: job.bilanId }, data: { rawNotes: rules.appendNotes(fresh?.rawNotes, text) } });
         // Le texte vit désormais dans les notes : les copies par segment n'ont plus de raison d'être
         await tx.bilanJobSegment.updateMany({ where: { jobId }, data: { text: null } });
+        // Motif déduit de la dictée : étiquette de liste et contexte du rédacteur. Jamais par-dessus
+        // celui du kiné — un updateMany qui ne matche rien ne fait simplement rien.
+        if (motif) {
+          await tx.bilanKine.updateMany({ where: { id: job.bilanId, OR: [{ motif: null }, { motif: '' }] }, data: { motif } });
+        }
       });
       logger.info(`Traitement dictée ${jobId} : notes écrites (${applied} correction(s), ${ignored} ignorée(s))`);
     }
