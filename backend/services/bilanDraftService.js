@@ -180,8 +180,28 @@ async function finalizeBilan({ kineId, bilanId }) {
 // Un brouillon naît au clic sur un mode de saisie, avant toute frappe : celui qui reste vide
 // — rien tapé, rien enregistré, aucun traitement — n'a aucune valeur de récupération et
 // encombre la liste. Suppression en dur, comme le fait déjà `removeBilan` sur un BROUILLON.
-const EMPTY_DRAFT_DAYS = Number(process.env.BILAN_EMPTY_DRAFT_DAYS) || 7;
+const EMPTY_DRAFT_DAYS = (() => {
+  const d = Number(process.env.BILAN_EMPTY_DRAFT_DAYS);
+  // Un délai négatif purgerait les brouillons créés à l'instant, un 0 mal interprété aussi :
+  // toute valeur qui n'est pas un entier d'au moins un jour retombe sur le défaut.
+  return Number.isFinite(d) && d >= 1 ? d : 7;
+})();
 const EMPTY_DRAFT_BATCH = 500;
+
+/**
+ * « Jamais touché » est plus strict que « vide à l’impression » (`isDocumentEmpty`, qui sert à
+ * refuser une finalisation) : une mesure ajoutée sans valeur, ou un bilan de référence choisi,
+ * sont des gestes du kiné même s’ils n’impriment rien. Un bilan de suivi préparé à l’avance ne
+ * doit jamais être emporté par la purge.
+ */
+function isDraftUntouched(b) {
+  if (String(b.rawNotes || '').trim() || b.bilanHtml) return false;
+  const doc = b.document;
+  if (!doc) return true;
+  if ((doc.measurements || []).length > 0) return false;
+  if (doc.comparison) return false;
+  return !(doc.sections || []).some((sec) => typeof sec.text === 'string' && sec.text.trim() !== '');
+}
 
 /** Supprime les brouillons restés vides au-delà du délai. @returns {Promise<number>} nombre supprimé */
 async function purgeEmptyDrafts() {
@@ -189,16 +209,21 @@ async function purgeEmptyDrafts() {
   const before = new Date(Date.now() - EMPTY_DRAFT_DAYS * 24 * 60 * 60 * 1000);
   // `job: null` écarte tout bilan qui porte un traitement, même échoué : il est repris, pas vide.
   const candidates = await prisma.bilanKine.findMany({
-    where: { status: 'BROUILLON', isActive: true, updatedAt: { lt: before }, job: null },
+    // Le gros du tri est poussé en SQL : sans ça, des brouillons anciens mais remplis
+    // satureraient le lot à chaque passage et la purge ne progresserait plus jamais.
+    // Contrepartie assumée : des notes faites uniquement d'espaces ne sont pas purgées.
+    where: { status: 'BROUILLON', isActive: true, updatedAt: { lt: before }, job: null, bilanHtml: null, OR: [{ rawNotes: null }, { rawNotes: '' }] },
     select: { id: true, rawNotes: true, bilanHtml: true, document: true },
+    orderBy: { updatedAt: 'asc' },
     take: EMPTY_DRAFT_BATCH,
   });
-  // Le vide se juge en JS : les espaces seuls comptent comme vide, et un document JSON
-  // ne se teste pas depuis une clause `where`.
-  const ids = candidates
-    .filter((b) => !String(b.rawNotes || '').trim() && !b.bilanHtml && isDocumentEmpty(b.document))
-    .map((b) => b.id);
-  if (ids.length === 0) return 0;
+  // Le document est du JSON : sa vacuité ne se teste pas depuis une clause `where`.
+  const ids = candidates.filter(isDraftUntouched).map((b) => b.id);
+  if (ids.length === 0) {
+    // Lot plein sans rien à purger : le filtre JS rejette tout, la purge n'avance plus — visible plutôt que muet
+    if (candidates.length === EMPTY_DRAFT_BATCH) logger.warn(`Purge des brouillons vides : lot de ${EMPTY_DRAFT_BATCH} entièrement rejeté, aucune progression`);
+    return 0;
+  }
   const { count } = await prisma.bilanKine.deleteMany({ where: { id: { in: ids } } });
   logger.info(`Brouillons vides purgés : ${count} (sans activité depuis ${EMPTY_DRAFT_DAYS} jours)`);
   return count;

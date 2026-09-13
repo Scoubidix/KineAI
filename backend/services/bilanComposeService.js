@@ -34,7 +34,7 @@ const SECTION_GUIDE = {
   traitement: 'uniquement le plan, le protocole ou les consignes présents dans les notes ; sinon chaîne vide',
 };
 
-const SYSTEM_PROMPT = `Tu rédiges des bilans diagnostiques kinésithérapiques (BDK) pour un kinésithérapeute, en français. Tu renvoies uniquement un objet JSON {"sections":{...}} avec exactement les clés demandées.
+const SYSTEM_PROMPT = `Tu rédiges des bilans diagnostiques kinésithérapiques (BDK) pour un kinésithérapeute, en français. Tu renvoies uniquement un objet JSON, avec exactement les clés demandées dans le message qui suit.
 Règles absolues :
 - Tu n'utilises QUE les informations présentes dans les notes, le motif et les mesures fournies. Interdiction d'inventer, de supposer ou de compléter.
 - Interdiction d'écrire un chiffre qui n'apparaît pas dans les notes ou dans les mesures fournies.
@@ -157,7 +157,7 @@ function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys,
     'Mesures déjà présentées en tableau (ne les cite pas, ni leur valeur) :',
     tableLabels.length ? tableLabels.map((l) => `- ${l}`).join('\n') : '(aucune)',
     '',
-    ...(withMotif ? ['Ce bilan n’a pas encore de motif : renvoie aussi "motif", le motif de consultation en 4 mots maximum, tiré des notes (ex. « Lombalgie chronique », « Suites de PTG »). Pas de phrase, pas de verbe conjugué, jamais le nom ni le prénom du patient. Si les notes ne permettent pas de le déterminer, renvoie "".', ''] : []),
+    ...(withMotif ? ['Réponds par { "motif": "…", "sections": { … } }. Ce bilan n’a pas encore de motif : le motif de consultation en 4 mots maximum, tiré des notes (ex. « Lombalgie chronique », « Suites de PTG »). Pas de phrase, pas de verbe conjugué, jamais le nom ni le prénom du patient. Si les notes ne permettent pas de le déterminer, renvoie "".', ''] : ['Réponds par { "sections": { … } }.', ''] ),
     'Sections à rédiger (clé : titre — contenu attendu) :',
     keys.map((k) => `- ${k} : ${SECTION_TITLES[k]} — ${SECTION_GUIDE[k]}`).join('\n'),
     '',
@@ -322,10 +322,10 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
 
   // L'appel IA a duré plusieurs secondes : on relit la version la plus fraîche et on ne
   // remplace que les sections demandées, en check-and-set sur updatedAt (comme l'autosave).
-  const fresh = await prisma.bilanKine.findFirst({ where, select: { status: true, document: true, updatedAt: true } });
+  const fresh = await prisma.bilanKine.findFirst({ where, select: { status: true, document: true, updatedAt: true, motif: true } });
   if (!fresh || !fresh.document) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
   if (fresh.status === 'ENREGISTRE') throw new DraftError('ALREADY_FINALIZED', 409, 'Ce bilan est déjà enregistré');
-  const updated = await writeDocument({ prisma, where, updatedAt: fresh.updatedAt, status: fresh.status, document: applySections(fresh.document, texts), uid, generated: true, motif: composedMotif });
+  const updated = await writeDocument({ prisma, where, updatedAt: fresh.updatedAt, status: fresh.status, document: applySections(fresh.document, texts), uid, generated: true, motif: fresh.motif ? undefined : composedMotif });
   logger.info(`Rédaction bilan ${bilanId} : ${keys.length} section(s), ${Object.keys(warnings).length} avertissement(s)`);
   return { bilan: updated, warnings };
 }
