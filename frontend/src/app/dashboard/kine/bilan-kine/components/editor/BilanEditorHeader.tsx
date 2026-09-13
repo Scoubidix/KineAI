@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ArrowLeft, User, ChevronDown, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,10 @@ export default function BilanEditorHeader({ record, onPatientChange, onTypeChang
   const [patientOpen, setPatientOpen] = useState(false);
   const [motifEditing, setMotifEditing] = useState(false);
   const [motifDraft, setMotifDraft] = useState('');
+  // Échap doit annuler sans écrire : démonter l'Input retire le focus, et certains navigateurs
+  // (Firefox) déclenchent quand même onBlur sur ce retrait. Le drapeau permet à onBlur de
+  // reconnaître une annulation volontaire et de ne rien enregistrer dans ce cas.
+  const motifCancelled = useRef(false);
   const c = BILAN_TYPE_COLORS[record.type];
   const finalized = record.status === 'ENREGISTRE';
 
@@ -73,10 +77,17 @@ export default function BilanEditorHeader({ record, onPatientChange, onTypeChang
             autoFocus
             value={motifDraft}
             onChange={(e) => setMotifDraft(e.target.value)}
-            onBlur={() => { setMotifEditing(false); onMotifChange(motifDraft.trim()); }}
+            onBlur={() => {
+              setMotifEditing(false);
+              if (motifCancelled.current) return;
+              const next = motifDraft.trim();
+              // N'écrit que si la valeur a réellement changé : sinon un simple clic puis clic
+              // ailleurs ferait bouger `updatedAt` pour rien (remontée artificielle dans les listes).
+              if (next !== (record.motif ?? '')) onMotifChange(next);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') { e.currentTarget.blur(); }
-              if (e.key === 'Escape') { setMotifEditing(false); }
+              if (e.key === 'Escape') { motifCancelled.current = true; setMotifEditing(false); }
             }}
             maxLength={120}
             aria-label="Motif du bilan"
@@ -86,14 +97,16 @@ export default function BilanEditorHeader({ record, onPatientChange, onTypeChang
           <button
             type="button"
             disabled={disabled || finalized}
-            onClick={() => { setMotifDraft(record.motif ?? ''); setMotifEditing(true); }}
-            className={`inline-flex items-center h-8 rounded-md border px-2.5 text-sm font-medium transition-colors max-w-[14rem] truncate ${
+            onClick={() => { motifCancelled.current = false; setMotifDraft(record.motif ?? ''); setMotifEditing(true); }}
+            className={`inline-flex items-center h-8 rounded-md border px-2.5 text-sm font-medium transition-colors max-w-[14rem] ${
               record.motif
                 ? 'border-input bg-background'
                 : 'border-[#3899aa]/50 bg-[#3899aa]/10 text-[#3899aa] hover:bg-[#3899aa]/15'
             }`}
           >
-            {record.motif || 'Ajouter un motif'}
+            {/* `truncate` doit être sur un span : posé sur ce conteneur inline-flex, text-overflow
+                ne s'applique pas à l'élément de flex anonyme et coupe le texte sans ellipse. */}
+            <span className="truncate">{record.motif || 'Ajouter un motif'}</span>
           </button>
         )}
 
