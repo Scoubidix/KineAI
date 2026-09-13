@@ -16,7 +16,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { listMyBilans, deleteBilan } from '@/utils/bilanApi';
 import { BILAN_TYPE_LABELS, BILAN_TYPE_COLORS, type BilanListItem } from '@/types/bilan';
-import { formatRelative, hasActiveJob, jobLabel, jobLabelClass, needsAction, patientName } from '../components/DraftsRow';
+import { formatRelative, hasActiveJob, jobLabel, jobLabelClass, needsAction, patientName, shortMotif } from '../components/DraftsRow';
 
 // Surface commune aux blocs de la page : la carte blanche élevée du reste de l'app
 // (partie statique de .card-hover — le halo teal au survol est réservé au cliquable)
@@ -225,7 +225,7 @@ export default function BrouillonsPage() {
                     <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded ${c.bg} ${c.text} border ${c.border}`}>{BILAN_TYPE_LABELS[b.type]}</span>
                   </div>
                   <div className={`text-xs mt-0.5 truncate ${jobLabelClass(b)}`}>
-                    {label ?? (b.status === 'GENERE' ? 'Rédigé' : 'Brouillon')} · {b.motif || 'Sans motif'} · {formatRelative(b.updatedAt)}
+                    {label ?? (b.status === 'GENERE' ? 'Rédigé' : 'Brouillon')} · {shortMotif(b.motif) || 'Sans motif'} · {formatRelative(b.updatedAt)}
                   </div>
                   {pct !== null && (
                     <Progress

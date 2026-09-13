@@ -12,6 +12,13 @@ export const DRAFTS_HREF = '/dashboard/kine/bilan-kine/brouillons';
 export const patientName = (b: BilanListItem): string =>
   (b.patient ? `${b.patient.firstName} ${b.patient.lastName.toUpperCase()}` : 'Sans patient');
 
+/** Le motif généré tient en 4 mots ; un motif saisi à la main peut être plus long. */
+export const shortMotif = (motif: string | null): string => {
+  const words = String(motif ?? '').trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '';
+  return words.length <= 4 ? words.join(' ') : `${words.slice(0, 4).join(' ')}…`;
+};
+
 export const formatRelative = (iso: string): string => {
   const diffMin = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
   if (diffMin < 1) return 'à l’instant';

@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Search, PenLine, Disc, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
+import { PenLine, Disc, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
 import type { BilanPatch, BilanRecord } from '@/types/bilan';
 import DictationBar from './DictationBar';
 import { useToast } from '@/hooks/use-toast';
@@ -78,11 +77,6 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
           <span className="flex-1" />
           {modeChip(<PenLine className="h-3 w-3" />, 'Notes', true)}
           {modeChip(<Disc className="h-3 w-3" />, 'Séance', false)}
-        </div>
-        <div className="flex items-center gap-2 px-1">
-          <Search className="h-3.5 w-3.5 text-[#3899aa] shrink-0" />
-          <span className="text-xs font-medium text-[#3899aa] shrink-0">Motif</span>
-          <Input value={record.motif ?? ''} onChange={(e) => update({ motif: e.target.value })} placeholder="Ex : Lombalgie chronique, rééducation post-opératoire..." disabled={disabled} maxLength={500} className="border-0 border-b border-border/60 rounded-none bg-transparent text-sm h-8 px-2 focus-visible:ring-0" />
         </div>
         <Textarea ref={textareaRef} value={record.rawNotes ?? ''} onChange={(e) => update({ rawNotes: e.target.value })} onSelect={rememberCaret} onBlur={rememberCaret} placeholder={PLACEHOLDER} disabled={disabled} maxLength={50000} className="min-h-[320px] lg:min-h-[480px] text-sm leading-relaxed resize-y rounded-xl border-2 border-border/60 bg-white dark:bg-card p-4 focus-visible:ring-[#3899aa]/50" />
         <DictationBar state={dictation.state} disabled={!!disabled} onStart={() => { void dictation.start(caretPos()); }} onStop={dictation.stop} onImport={handleImport} onRetry={dictation.retryFailed} onIgnore={dictation.ignoreFailed} />
