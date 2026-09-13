@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, User, ChevronDown, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import PatientCombobox from '../PatientCombobox';
 import SaveIndicator from './SaveIndicator';
@@ -19,11 +20,14 @@ interface BilanEditorHeaderProps {
   onReload: () => void;
   onRetry: () => void;
   onBack: () => void;
+  onMotifChange: (motif: string) => void;
   disabled?: boolean;
 }
 
-export default function BilanEditorHeader({ record, onPatientChange, onTypeChange, saveState, savedAt, pending, errorMessage, onReload, onRetry, onBack, disabled }: BilanEditorHeaderProps) {
+export default function BilanEditorHeader({ record, onPatientChange, onTypeChange, saveState, savedAt, pending, errorMessage, onReload, onRetry, onBack, onMotifChange, disabled }: BilanEditorHeaderProps) {
   const [patientOpen, setPatientOpen] = useState(false);
+  const [motifEditing, setMotifEditing] = useState(false);
+  const [motifDraft, setMotifDraft] = useState('');
   const c = BILAN_TYPE_COLORS[record.type];
   const finalized = record.status === 'ENREGISTRE';
 
@@ -61,6 +65,38 @@ export default function BilanEditorHeader({ record, onPatientChange, onTypeChang
             <PatientCombobox value={record.patient} onChange={(p) => { onPatientChange(p); setPatientOpen(false); }} />
           </PopoverContent>
         </Popover>
+
+        {/* Motif : déduit de la dictée par le correcteur, corrigeable par le kiné. Édition en
+            place plutôt qu'un champ de formulaire — il est rempli tout seul la plupart du temps. */}
+        {motifEditing ? (
+          <Input
+            autoFocus
+            value={motifDraft}
+            onChange={(e) => setMotifDraft(e.target.value)}
+            onBlur={() => { setMotifEditing(false); onMotifChange(motifDraft.trim()); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.currentTarget.blur(); }
+              if (e.key === 'Escape') { setMotifEditing(false); }
+            }}
+            maxLength={120}
+            aria-label="Motif du bilan"
+            className="h-8 w-56 px-2.5 text-sm"
+          />
+        ) : (
+          <button
+            type="button"
+            disabled={disabled || finalized}
+            onClick={() => { setMotifDraft(record.motif ?? ''); setMotifEditing(true); }}
+            aria-label="Motif du bilan"
+            className={`inline-flex items-center h-8 rounded-md border px-2.5 text-sm font-medium transition-colors max-w-[14rem] truncate ${
+              record.motif
+                ? 'border-input bg-background'
+                : 'border-[#3899aa]/50 bg-[#3899aa]/10 text-[#3899aa] hover:bg-[#3899aa]/15'
+            }`}
+          >
+            {record.motif || 'Ajouter un motif'}
+          </button>
+        )}
 
         <select value={record.type} onChange={(e) => onTypeChange(e.target.value as BilanType)} disabled={disabled || finalized} aria-label="Type de bilan" className={`h-8 rounded-md border text-sm font-medium px-2 ${c.bg} ${c.text} ${c.border}`}>
           {(Object.keys(BILAN_TYPE_LABELS) as BilanType[]).map((t) => <option key={t} value={t}>{BILAN_TYPE_LABELS[t]}</option>)}

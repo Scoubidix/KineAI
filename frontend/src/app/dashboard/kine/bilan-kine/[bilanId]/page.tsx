@@ -228,6 +228,7 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen }: { ini
           record={record}
           onPatientChange={handlePatientChange}
           onTypeChange={(t: BilanType) => update({ type: t })}
+          onMotifChange={(motif) => update({ motif })}
           saveState={saveState}
           savedAt={savedAt}
           pending={pending}
