@@ -261,7 +261,7 @@ export default function BilanEditorPage() {
   // Traitement serveur (dictée) : sert d'aiguillage à l'ouverture, puis d'état IA initial une fois terminé
   const [job, setJob] = useState<BilanJobView | null>(null);
   // Dictée et séance partagent le même flux d'écrans : seul le genre du traitement change
-  const [flow, setFlow] = useState<'auto' | 'dictation' | 'editor'>(modeParam === 'dictation' || modeParam === 'session' ? 'dictation' : 'auto');
+  const [flow, setFlow] = useState<'auto' | 'dictation' | 'editor'>(modeParam === 'session' ? 'dictation' : 'auto');
 
   useEffect(() => {
     if (!Number.isInteger(bilanId) || bilanId <= 0) { setState({ status: 'error', message: 'Identifiant de bilan invalide' }); return; }
@@ -347,7 +347,9 @@ export default function BilanEditorPage() {
   const showFlow = flow === 'dictation' || (flow === 'auto' && jobActive);
   if (showFlow) {
     // Un traitement déjà ouvert impose son genre : un rechargement avec une autre URL ne le change pas
-    const flowKind: BilanJobKind = job?.kind ?? (modeParam === 'session' ? 'SESSION' : 'DICTATION');
+    // Un traitement déjà ouvert impose son genre : les brouillons partis en dictée avant le
+    // retrait du mode se reprennent normalement, même si plus rien n'en crée de nouveaux.
+    const flowKind: BilanJobKind = job?.kind ?? 'SESSION';
     // Rappels stables (useCallback) : l'effet de fin de flux de DictationFlow ne doit se déclencher qu'une fois
     return <DictationFlow key={`flow-${state.bilan.id}`} bilan={state.bilan} kind={flowKind} initialJob={job} onDone={handleDone} onWrite={handleWrite} />;
   }

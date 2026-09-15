@@ -10,7 +10,7 @@ import PatientCombobox from './PatientCombobox';
 import { createBilan, ApiError } from '@/utils/bilanApi';
 import { BILAN_TYPE_COLORS, BILAN_TYPE_LABELS, type BilanRecord, type BilanType, type PatientSummary } from '@/types/bilan';
 
-type StartMode = 'write' | 'dictation' | 'session';
+type StartMode = 'write' | 'session';
 
 interface BilanStartBlockProps {
   onStarted: (bilan: BilanRecord, mode: StartMode) => void;
@@ -33,22 +33,13 @@ const MODES: ModeDef[] = [
   {
     value: 'write',
     emoji: '✍️',
-    title: 'Écrire',
-    ariaLabel: 'Rédiger le bilan en saisie guidée',
+    title: 'Prise de notes',
+    ariaLabel: 'Prendre des notes, au clavier ou à la voix',
     badgeClass: 'bg-[#ecfdf5]',
   },
   {
-    value: 'dictation',
-    emoji: '🎙️',
-    title: 'Dicter',
-    ariaLabel: 'Rédiger le bilan en dictée',
-    // Dégradé du Copilote IA de l'accueil : c'est le mode où l'IA rédige
-    badgeClass: '',
-    badgeStyle: { background: 'linear-gradient(135deg, #dbeafe, #c4b5fd)' },
-  },
-  {
     value: 'session',
-    emoji: '🩺',
+    emoji: '🎙️',
     title: 'Enregistrer la séance',
     ariaLabel: 'Enregistrer la séance',
     badgeClass: 'bg-[#fffbeb]',
