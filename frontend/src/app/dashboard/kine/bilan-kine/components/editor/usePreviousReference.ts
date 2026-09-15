@@ -39,9 +39,12 @@ const latestOf = <T extends { createdAt: string }>(items: T[]): T | undefined =>
  *   sélection volontairement vidée par le kiné → aucune référence) ;
  * - sinon (`hasComparison` faux) : le dernier bilan ENREGISTRE du patient, et `onAutoSelect` est
  *   appelé une seule fois pour que l'étape pose `comparison` et pré-remplisse les lignes.
+ *
+ * `autoSelect: false` coupe ce choix d'office : la correction d'un bilan enregistré lit la
+ * référence déjà posée mais n'écrit jamais dans un document remis au patient.
  */
-export function usePreviousReference(args: { patientId: number | null; type: BilanType; excludeId: number; hasComparison: boolean; comparisonIds: number[] | undefined; onAutoSelect: (ref: ReferenceBilan) => void }) {
-  const { patientId, type, excludeId, hasComparison, comparisonIds, onAutoSelect } = args;
+export function usePreviousReference(args: { patientId: number | null; type: BilanType; excludeId: number; hasComparison: boolean; comparisonIds: number[] | undefined; onAutoSelect: (ref: ReferenceBilan) => void; autoSelect?: boolean }) {
+  const { patientId, type, excludeId, hasComparison, comparisonIds, onAutoSelect, autoSelect = true } = args;
   const [reference, setReference] = useState<ReferenceBilan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -58,7 +61,8 @@ export function usePreviousReference(args: { patientId: number | null; type: Bil
     setError(false);
     (async () => {
       const ids = idsKey ? idsKey.split(',').map(Number) : [];
-      if (hasComparison && ids.length === 0) { if (!cancelled) setReference(null); return; }
+      // Sans auto-sélection, une sélection vide reste vide : on ne devine pas de référence.
+      if ((hasComparison || !autoSelect) && ids.length === 0) { if (!cancelled) setReference(null); return; }
       const [list, fieldsResult] = await Promise.all([
         fetchJson<{ bilans: BilanSummary[] }>(`${API}/api/patients/${patientId}/bilans`),
         fetchJson<{ fields: { key: string }[] }>(`${API}/api/bilan-fields`),
@@ -74,10 +78,10 @@ export function usePreviousReference(args: { patientId: number | null; type: Bil
       if (cancelled) return;
       if (!ref) { setError(true); return; }
       setReference(ref);
-      if (!hasComparison && !ids.length && !autoDoneRef.current) { autoDoneRef.current = true; onAutoSelectRef.current(ref); }
+      if (autoSelect && !hasComparison && !ids.length && !autoDoneRef.current) { autoDoneRef.current = true; onAutoSelectRef.current(ref); }
     })().finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [patientId, type, excludeId, hasComparison, idsKey]);
+  }, [patientId, type, excludeId, hasComparison, idsKey, autoSelect]);
 
   const previousValues = useMemo(() => (reference ? toPreviousValues(reference.measurements) : undefined), [reference]);
   return { reference, loading, error, previousValues, knownKeys };
