@@ -23,6 +23,21 @@ interface DocumentSheetProps {
 
 interface RenderedParts { header: string; title: string; patient: string; examen: string; observations: string }
 
+/**
+ * Retire le titre « Examen clinique » du bloc de mesures rendu par le serveur.
+ *
+ * Le PDF n'a qu'un titre : le moteur supprime celui de la section quand il rend les tableaux
+ * (bilanRenderer/index.js). Ici c'est l'inverse — la section garde son titre, qui porte le bouton
+ * de régénération — donc c'est celui des tableaux qui saute. Le sélecteur vise l'enfant direct de
+ * `.bilan-examen` : le titre « Évolution des mesures », dans sa propre section, n'est pas touché.
+ */
+function stripExamenHeading(html: string): string {
+  if (!html) return html;
+  const root = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+  root.querySelector('.bilan-examen > h2.bilan-h2')?.remove();
+  return root.body.innerHTML;
+}
+
 // Extrait du rendu serveur les parties non éditables (en-tête, titre, patient, tableaux, repli
 // d'observations) : la page affiche exactement ce que le PDF imprimera, sans dupliquer le moteur.
 function extractParts(html: string, examenHtml: string): RenderedParts {
@@ -32,7 +47,7 @@ function extractParts(html: string, examenHtml: string): RenderedParts {
     header: pick('.bilan-header'),
     title: root.querySelector('.bilan-title')?.textContent ?? '',
     patient: pick('.bilan-patient'),
-    examen: examenHtml,
+    examen: stripExamenHeading(examenHtml),
     observations: pick('.bilan-observations'),
   };
 }

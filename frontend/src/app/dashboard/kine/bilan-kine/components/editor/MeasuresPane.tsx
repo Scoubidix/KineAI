@@ -60,7 +60,7 @@ export default function MeasuresPane({ summary, open, onOpenChange, wide, childr
         aria-label="Mesures du bilan"
         aria-hidden={!open}
         style={{ width: open ? PANE_WIDTH : 0 }}
-        className={`shrink-0 overflow-hidden bg-white dark:bg-card transition-[width] duration-300 ease-out motion-reduce:transition-none lg:sticky lg:top-14 lg:self-start lg:max-h-[calc(100dvh-3.5rem)] ${open ? 'border-l border-border/40' : 'pointer-events-none'}`}
+        className={`shrink-0 overflow-hidden bg-white dark:bg-card transition-[width] duration-300 ease-out motion-reduce:transition-none lg:sticky lg:top-14 lg:self-start lg:h-[calc(100dvh-3.5rem)] ${open ? 'border-l border-border/40' : 'pointer-events-none'}`}
       >
         <div style={{ width: PANE_WIDTH }} className="flex h-full flex-col">
             <button

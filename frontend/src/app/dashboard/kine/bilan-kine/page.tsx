@@ -21,13 +21,17 @@ export default function BilanHubPage() {
     </>
   );
   const cardClass = 'card-hover rounded-xl p-4 text-center transition-all';
+  // Trois cartes dans une grille à deux colonnes : la dernière resterait collée à gauche.
+  // Elle occupe donc les deux colonnes et se recentre, à la largeur d'une seule (la moitié,
+  // moins la moitié de la gouttière de 0,75 rem). Au-delà de `sm`, les trois sont sur une ligne.
+  const lastOnRow = 'max-sm:col-span-2 max-sm:justify-self-center max-sm:w-[calc(50%-0.375rem)]';
 
   const card = (emoji: string, badgeClass: string, title: string, subtitle: string, onClick: () => void) => (
     <button type="button" onClick={onClick} className={cardClass}>{cardBody(emoji, badgeClass, title, subtitle)}</button>
   );
   // Une liste se parcourt sur sa propre page : un vrai lien, pas un bouton qui ouvre une modale
-  const linkCard = (emoji: string, badgeClass: string, title: string, subtitle: string, href: string) => (
-    <Link href={href} className={`${cardClass} block`}>{cardBody(emoji, badgeClass, title, subtitle)}</Link>
+  const linkCard = (emoji: string, badgeClass: string, title: string, subtitle: string, href: string, extra = '') => (
+    <Link href={href} className={`${cardClass} block ${extra}`}>{cardBody(emoji, badgeClass, title, subtitle)}</Link>
   );
 
   return (
@@ -45,7 +49,7 @@ export default function BilanHubPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {linkCard('🔍', 'bg-[#eff6ff]', 'Bilans réalisés', 'Par patient', BILANS_REALISES_HREF)}
             {card('📐', 'bg-[#f5f3ff]', 'Mes templates', 'Modèles par pathologie', () => setTemplatesOpen(true))}
-            {linkCard('📂', 'bg-[#fffbeb]', 'Mes brouillons', 'Reprendre un bilan', DRAFTS_HREF)}
+            {linkCard('📂', 'bg-[#fffbeb]', 'Mes brouillons', 'Reprendre un bilan', DRAFTS_HREF, lastOnRow)}
           </div>
         </div>
       </div>
