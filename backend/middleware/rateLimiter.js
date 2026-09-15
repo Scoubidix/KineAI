@@ -729,6 +729,29 @@ const pionnierReadLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter pour l'envoi d'une idée sur la Roadmap.
+ * Formulaire libre ouvert à tous les kinés : 10 idées par heure par utilisateur
+ * suffisent largement à un usage sincère et bloquent le spam.
+ */
+const roadmapIdeeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'roadmap_idee'),
+  handler: (req, res) => {
+    const safeUser = req.uid ? sanitizeUID(req.uid) : sanitizeIP(req.ip);
+    logger.warn(`Rate limit depasse - Roadmap idee - User: ${safeUser}`);
+    res.status(429).json({
+      success: false,
+      error: 'Tu as déjà envoyé beaucoup d\'idées, réessaie dans une heure.',
+      code: 'ROADMAP_IDEE_LIMIT',
+      retryAfter: 3600
+    });
+  }
+});
+
+/**
  * Middleware pour afficher les informations de rate limiting
  * Utile pour le debugging
  */
@@ -776,5 +799,6 @@ module.exports = {
   visioSendLimiter,
   pionnierMessageLimiter,
   pionnierReadLimiter,
+  roadmapIdeeLimiter,
   rateLimitLogger
 };

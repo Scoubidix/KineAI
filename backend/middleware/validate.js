@@ -229,6 +229,34 @@ const updatePionnierMessageSchema = z.object({
   removeImage: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
 });
 
+// ========== ROADMAP ==========
+
+const ROADMAP_HORIZONS = ['COURT_TERME', 'MOYEN_LONG_TERME'];
+const ROADMAP_STATUTS = ['A_L_ETUDE', 'PREVU', 'EN_COURS'];
+const ROADMAP_IDEE_STATUTS = ['NOUVELLE', 'VUE', 'RETENUE', 'ECARTEE'];
+
+// Idée proposée par un kiné (POST /api/roadmap/idees)
+const roadmapIdeeSchema = z.object({
+  titre: z.string().trim().min(3).max(120),
+  description: z.string().trim().min(10).max(2000),
+  itemId: z.number().int().positive().optional(), // card concernée (optionnelle)
+});
+
+// Card roadmap créée / modifiée depuis l'admin (POST/PUT /api/admin/roadmap/items)
+const roadmapItemSchema = z.object({
+  titre: z.string().trim().min(3).max(120),
+  description: z.string().trim().min(10).max(2000),
+  horizon: z.enum(ROADMAP_HORIZONS),
+  statut: z.enum(ROADMAP_STATUTS).default('PREVU'),
+  isObjectifPrincipal: z.boolean().default(false),
+  isActive: z.boolean().default(true),
+});
+
+// Changement de statut d'une idée (PATCH /api/admin/roadmap/idees/:id/statut)
+const roadmapIdeeStatutSchema = z.object({
+  statut: z.enum(ROADMAP_IDEE_STATUTS),
+});
+
 module.exports = {
   validate,
   createPatientSchema,
@@ -248,4 +276,10 @@ module.exports = {
   pionnierReadSchema,
   createPionnierMessageSchema,
   updatePionnierMessageSchema,
+  ROADMAP_HORIZONS,
+  ROADMAP_STATUTS,
+  ROADMAP_IDEE_STATUTS,
+  roadmapIdeeSchema,
+  roadmapItemSchema,
+  roadmapIdeeStatutSchema,
 };

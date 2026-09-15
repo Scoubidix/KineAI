@@ -562,6 +562,9 @@ app.use('/api/notifications', notificationRoutes);
 // Routes nouveautés (annonces produit) — kiné (lecture) + admin (gestion)
 app.use('/api/nouveautes', require('./routes/nouveautes'));
 
+// Routes roadmap publique (cards + boîte à idées) — kiné
+app.use('/api/roadmap', require('./routes/roadmap'));
+
 // Routes système paywall (LIBRES - navigation)
 app.use('/api/kine', subscriptionRoutes);
 app.use('/api/stripe', checkoutRoutes);     // Rate limiting dans le routeur APRÈS authenticate
@@ -613,6 +616,7 @@ app.use('/programmes', programmeRoutes);
 app.use('/admin/programmes', programmeAdminRoutes);  // Admin - LIBRES (requireAdmin protege)
 app.use('/admin/dashboard', require('./routes/adminDashboard'));  // Admin dashboard stats
 app.use('/api/admin/nouveautes', require('./routes/adminNouveautes'));  // Admin - gestion des nouveautés
+app.use('/api/admin/roadmap', require('./routes/adminRoadmap'));  // Admin - gestion de la roadmap + idées
 
 // SUPPORT, EXERCICES, EXERCICE-TEMPLATES : rate limiting dans le routeur APRÈS authenticate
 app.use('/api/support', supportRoutes);

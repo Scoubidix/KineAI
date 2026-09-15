@@ -63,6 +63,7 @@ model Kine {
   exerciceTemplates ExerciceTemplate[]
   notifications     Notification[]
   nouveauteVues     NouveauteVue[]
+  roadmapIdees      RoadmapIdee[]
 
   // ========== GROUPE PIONNIERS ==========
   pionnierMessages PionnierMessage[]
@@ -1224,4 +1225,70 @@ model PionnierRead {
   updatedAt         DateTime @updatedAt
 
   @@map("pionnier_reads")
+}
+
+// ========== ROADMAP (cards publiques + boîte à idées) ==========
+
+enum RoadmapHorizon {
+  COURT_TERME
+  MOYEN_LONG_TERME
+
+  @@map("roadmap_horizon")
+}
+
+enum RoadmapStatut {
+  A_L_ETUDE
+  PREVU
+  EN_COURS
+
+  @@map("roadmap_statut")
+}
+
+enum RoadmapIdeeStatut {
+  NOUVELLE
+  VUE
+  RETENUE
+  ECARTEE
+
+  @@map("roadmap_idee_statut")
+}
+
+/// Card de la roadmap publique, rédigée depuis l'admin. Contenu éditorial : hard delete accepté.
+model RoadmapItem {
+  id                  Int            @id @default(autoincrement())
+  titre               String
+  description         String         @db.Text
+  horizon             RoadmapHorizon
+  statut              RoadmapStatut  @default(PREVU)
+  isObjectifPrincipal Boolean        @default(false) // une seule card à true, garanti par roadmapService
+  isActive            Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  idees RoadmapIdee[]
+
+  @@index([isActive, horizon])
+  @@map("roadmap_items")
+}
+
+/// Idée proposée par un kiné. Privée : visible uniquement dans l'admin.
+model RoadmapIdee {
+  id          Int               @id @default(autoincrement())
+  titre       String
+  description String            @db.Text
+  statut      RoadmapIdeeStatut @default(NOUVELLE)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  kineId Int
+  kine   Kine @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
+  // Card concernée (optionnelle). SetNull : une card supprimée laisse l'idée intacte.
+  itemId Int?
+  item   RoadmapItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@index([statut, createdAt])
+  @@index([kineId])
+  @@index([itemId])
+  @@map("roadmap_idees")
 }
