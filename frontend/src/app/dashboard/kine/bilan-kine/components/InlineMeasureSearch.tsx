@@ -20,6 +20,11 @@ interface InlineMeasureSearchProps {
   // (le parent l'expose ailleurs) et reflète l'état d'ouverture passé en prop.
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Champ d'ajout permanent : ni bascule, ni bouton de fermeture. Ajouter un test est le geste
+   *  le plus fréquent du panneau — il ne mérite pas d'intermédiaire. */
+  permanent?: boolean;
+  /** Action posée à droite du champ (l'accès aux templates) */
+  trailing?: React.ReactNode;
 }
 
 const MAX_RESULTS = 5;
@@ -67,6 +72,8 @@ export default function InlineMeasureSearch({
   disabled = false,
   isOpen: controlledOpen,
   onOpenChange,
+  permanent = false,
+  trailing,
 }: InlineMeasureSearchProps) {
   const isControlled = controlledOpen !== undefined;
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
@@ -187,7 +194,7 @@ export default function InlineMeasureSearch({
   };
 
   // Mode controlled fermé : le parent expose son propre trigger, on ne rend rien.
-  if (!isOpen) {
+  if (!isOpen && !permanent) {
     if (isControlled) return null;
     // Mode uncontrolled : on rend nous-mêmes le "+".
     return (
@@ -208,27 +215,32 @@ export default function InlineMeasureSearch({
   return (
     <div
       ref={containerRef}
-      className="border border-[#3899aa]/30 rounded-lg bg-[#3899aa]/[0.03] p-2 space-y-1.5"
+      className={permanent ? 'space-y-1.5' : 'border border-[#3899aa]/30 rounded-lg bg-[#3899aa]/[0.03] p-2 space-y-1.5'}
     >
-      <div className="relative">
+      <div className="flex items-center gap-1.5">
+        <div className="relative flex-1 min-w-0">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
         <Input
           ref={inputRef}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Rechercher un test : EVA, Lasègue, lombaire…"
-          className="pl-8 pr-8 h-8 text-sm"
+          placeholder="Ajouter un test : EVA, Lasègue, lombaire…"
+          className={permanent ? 'pl-8 h-9 text-sm' : 'pl-8 pr-8 h-8 text-sm'}
           disabled={disabled}
         />
-        <button
-          type="button"
-          onClick={close}
-          aria-label="Fermer la recherche"
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 h-5 w-5 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
-        >
-          <X className="h-3 w-3" />
-        </button>
+        {!permanent && (
+          <button
+            type="button"
+            onClick={close}
+            aria-label="Fermer la recherche"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 h-5 w-5 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
+        </div>
+        {trailing}
       </div>
 
       {search.trim().length > 0 && (
@@ -291,11 +303,6 @@ export default function InlineMeasureSearch({
         </div>
       )}
 
-      {search.trim().length === 0 && (
-        <p className="text-[11px] text-muted-foreground italic px-2 py-0.5">
-          Tape un nom de test, une zone ou un type de mesure. ↑↓ pour naviguer, Entrée pour ajouter.
-        </p>
-      )}
     </div>
   );
 }

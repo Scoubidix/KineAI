@@ -27,10 +27,10 @@ export default function ProcessingScreen({ state, onSkipFailed, onRetryJob, onWr
     <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 py-10 text-center">
       {!failed && (
         <>
+          <h2 className="text-lg font-semibold">Rédaction du bilan en cours</h2>
           <div className="text-5xl font-semibold tabular-nums text-[#3899aa]" aria-hidden>{percent} %</div>
           <Progress value={percent} className="w-full max-w-md h-2" />
           <p className="text-sm text-muted-foreground inline-flex items-center gap-2" role="status"><Loader2 className="h-4 w-4 animate-spin" />{stageLabel(job)}</p>
-          <p className="text-xs text-muted-foreground max-w-md">Tu peux quitter cette page : le bilan continue de se rédiger et t’attendra dans tes brouillons.</p>
         </>
       )}
       {lostSegments && (

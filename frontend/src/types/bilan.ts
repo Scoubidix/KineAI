@@ -206,10 +206,16 @@ export interface StructuredData {
   measurements: Measurement[];
 }
 
+/**
+ * Libellés d'affichage. Ils se suffisent à eux-mêmes (« Bilan initial ») : partout côté front, le
+ * type est montré seul — pastille, filtre, menu — et « Initial » sans son nom ne veut rien dire.
+ * Le backend garde ses propres libellés courts (`bilanRenderer/format.js`) : là-bas ils sont des
+ * fragments de phrase, composés en « BILAN KINÉSITHÉRAPIQUE INITIAL » et « Bilan Initial - Nom ».
+ */
 export const BILAN_TYPE_LABELS: Record<BilanType, string> = {
-  INITIAL: 'Initial',
-  INTERMEDIAIRE: 'Intermédiaire',
-  FINAL: 'Final',
+  INITIAL: 'Bilan initial',
+  INTERMEDIAIRE: 'Bilan intermédiaire',
+  FINAL: 'Bilan final',
 };
 
 export const BILAN_TYPE_COLORS: Record<BilanType, { bg: string; text: string; border: string }> = {

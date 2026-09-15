@@ -4,7 +4,7 @@ import React, { useRef, useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { PenLine, Disc, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowRight, PanelRightOpen, Sparkles, Loader2 } from 'lucide-react';
 import type { BilanPatch, BilanRecord } from '@/types/bilan';
 import DictationBar from './DictationBar';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +20,9 @@ export interface StepProps {
   disabled?: boolean;
   onBack?: () => void;
   onNext: () => void;
+  /** Ouvre le panneau des mesures : fermé, il n'a pas de rail (cf. MeasuresPane) */
+  onOpenMeasures: () => void;
+  measuresOpen: boolean;
 }
 
 const PLACEHOLDER = `Note tes observations en vrac...
@@ -35,7 +38,7 @@ export interface CaptureStepProps extends StepProps {
 
 // Étape 1 : la source seule (notes écrites aujourd'hui, dictée et transcription demain).
 // Les mesures se saisissent ou se corrigent dans le tiroir, disponible ici comme à l'étape Document.
-export default function CaptureStep({ record, update, disabled, onNext, onCompose, composing, dictation }: CaptureStepProps) {
+export default function CaptureStep({ record, update, disabled, onNext, onCompose, composing, dictation, onOpenMeasures, measuresOpen }: CaptureStepProps) {
   const notesLength = (record.rawNotes ?? '').length;
   const hasNotes = (record.rawNotes ?? '').trim().length > 0;
   const anyText = (record.document?.sections ?? []).some((s) => s.text.trim() !== '');
@@ -61,30 +64,34 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
     ? 'Correction des termes en cours…'
     : dictating
     ? 'Transcription en cours…'
-    : hasNotes
-    ? 'L’IA extrait les mesures de tes notes et rédige le bilan ; tu vérifies ensuite'
-    : 'Écris tes notes, ou saisis directement les mesures dans le tiroir';
-
-  const modeChip = (icon: React.ReactNode, label: string, active: boolean) => (
-    <span title={active ? undefined : 'Bientôt disponible'} className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ${active ? 'bg-[#3899aa]/15 text-[#3899aa]' : 'text-muted-foreground opacity-60'}`}>{icon}{label}</span>
-  );
+    : '';
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 w-full max-w-3xl mx-auto px-3 sm:px-4 py-3 flex flex-col gap-3">
-        <div className="flex items-center gap-2 px-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Source</span>
-          <span className="flex-1" />
-          {modeChip(<PenLine className="h-3 w-3" />, 'Notes', true)}
-          {modeChip(<Disc className="h-3 w-3" />, 'Séance', false)}
-        </div>
-        <Textarea ref={textareaRef} value={record.rawNotes ?? ''} onChange={(e) => update({ rawNotes: e.target.value })} onSelect={rememberCaret} onBlur={rememberCaret} placeholder={PLACEHOLDER} disabled={disabled} maxLength={50000} className="min-h-[320px] lg:min-h-[480px] text-sm leading-relaxed resize-y rounded-xl border-2 border-border/60 bg-white dark:bg-card p-4 focus-visible:ring-[#3899aa]/50" />
-        <DictationBar state={dictation.state} disabled={!!disabled} onStart={() => { void dictation.start(caretPos()); }} onStop={dictation.stop} onImport={handleImport} onRetry={dictation.retryFailed} onIgnore={dictation.ignoreFailed} />
+      <div className="flex-1 w-full max-w-3xl mx-auto px-3 sm:px-4 pt-8 pb-3 flex flex-col gap-3">
+        {/* Surface d'écriture, pas champ de formulaire : ni bordure ni fond, colonne mesurée à
+            ~68 caractères et interligne aéré. Le curseur suffit à signaler le focus dans une
+            zone de texte — c'est ce que font les éditeurs de document. */}
+        <Textarea ref={textareaRef} value={record.rawNotes ?? ''} onChange={(e) => update({ rawNotes: e.target.value })} onSelect={rememberCaret} onBlur={rememberCaret} placeholder={PLACEHOLDER} disabled={disabled} maxLength={50000} className="mx-auto w-full max-w-[68ch] min-h-[320px] lg:min-h-[480px] text-[15px] leading-[1.75] resize-y rounded-none border-0 bg-transparent dark:bg-transparent px-0 py-1 focus-visible:ring-0" />
+        <DictationBar
+          state={dictation.state}
+          disabled={!!disabled}
+          onStart={() => { void dictation.start(caretPos()); }}
+          onStop={dictation.stop}
+          onImport={handleImport}
+          onRetry={dictation.retryFailed}
+          onIgnore={dictation.ignoreFailed}
+          trailing={measuresOpen ? undefined : (
+            <Button variant="outline" size="sm" onClick={onOpenMeasures} className="h-8 rounded-full text-xs border-[#3899aa]/50 text-[#3899aa] hover:bg-[#3899aa]/10">
+              <PanelRightOpen className="h-3.5 w-3.5 mr-1" />Tests et mesures
+            </Button>
+          )}
+        />
         {notesLength > 45000 && (
           <span className="text-[10px] text-muted-foreground -mt-2 self-end px-1">{notesLength} / 50000</span>
         )}
       </div>
-      <div className="sticky bottom-12 lg:bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2">
+      <div className="sticky bottom-12 lg:bottom-0 flex items-center justify-between gap-2 px-3 sm:px-4 py-2">
         <span className="text-[11px] text-muted-foreground hidden sm:inline">{hint}</span>
         <div className="flex items-center gap-2 ml-auto">
           {hasNotes ? (
@@ -95,7 +102,7 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
               </Button>
             </>
           ) : (
-            <Button onClick={onNext} disabled={disabled || dictating} className="btn-teal rounded-full px-5 h-9">Continuer<ArrowRight className="h-4 w-4 ml-1" /></Button>
+            <Button onClick={onNext} disabled={disabled || dictating} className="btn-teal rounded-full px-5 h-9">Continuer sans note<ArrowRight className="h-4 w-4 ml-1" /></Button>
           )}
         </div>
       </div>

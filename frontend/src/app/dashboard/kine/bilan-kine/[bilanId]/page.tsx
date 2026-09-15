@@ -7,17 +7,19 @@ import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useBilanAutosave } from '@/hooks/useBilanAutosave';
-import { getBilan, getJob, abandonJob, attachPatient, extractBilan, composeBilan, composeBilanFromNotes, ApiError, StaleDraftError } from '@/utils/bilanApi';
-import type { AiBusy, BilanJobKind, BilanJobResult, BilanJobView, BilanRecord, BilanSectionKey, ExtractionCandidate, PatientSummary, BilanType, SectionWarnings } from '@/types/bilan';
-import BilanEditorHeader from '../components/editor/BilanEditorHeader';
-import BilanStepper, { type EditorStep } from '../components/editor/BilanStepper';
+import { getBilan, getJob, abandonJob, attachPatient, composeBilan, composeBilanFromNotes, ApiError, StaleDraftError } from '@/utils/bilanApi';
+import { emptyBilanDocument, type AiBusy, type BilanJobKind, type BilanJobResult, type BilanJobView, type BilanRecord, type BilanSectionKey, type ExtractionCandidate, type PatientSummary, type BilanType, type SectionWarnings } from '@/types/bilan';
+import BilanEditorAlerts from '../components/editor/BilanEditorAlerts';
+import BilanSettingsLine from '../components/editor/BilanSettingsLine';
 import CaptureStep from '../components/editor/CaptureStep';
 import DictationFlow from '../components/editor/DictationFlow';
 import DocumentStep from '../components/editor/DocumentStep';
 import MeasuresDrawer, { DRAWER_SUGGESTIONS_ID } from '../components/editor/MeasuresDrawer';
 import { useDictation } from '../components/editor/useDictation';
 import { useMinWidth } from '../components/editor/useMinWidth';
+import { BILANS_REALISES_HREF } from '../components/bilansRealises';
 
+export type EditorStep = 'capture' | 'document';
 const isStep = (s: string | null): s is EditorStep => s === 'capture' || s === 'document';
 
 /** État IA repris du traitement serveur (dictée) pour rouvrir l'éditeur comme après « Rédiger avec l'IA » */
@@ -66,6 +68,9 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen }: { ini
       setDrawerOpen(v === null ? window.matchMedia('(min-width: 1280px)').matches : v === '1');
     } catch { /* stockage indisponible : replié */ }
   }, [forceDrawerOpen]);
+  // Ouvre le tiroir sans toucher à la préférence mémorisée : le kiné qui le referme toujours
+  // le retrouvera replié au bilan suivant. Une génération doit juste le lui remettre sous les yeux.
+  const revealDrawer = () => setDrawerOpen(true);
   const setDrawer = (open: boolean) => {
     setDrawerOpen(open);
     try { localStorage.setItem('bilan.drawer.open', open ? '1' : '0'); } catch { /* ignoré */ }
@@ -125,6 +130,7 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen }: { ini
       setQuotes(new Map(r.accepted.map((a) => [a.id, a.quote])));
       setLastRun({ extracted: r.accepted.length + r.pending.length, pending: r.pending.length });
       composedMeasurementsRef.current = fingerprint(r.bilan);
+      revealDrawer();
       await goTo('document');
     } catch (e) {
       // Rédaction en échec après l'écriture des mesures : rien n'est perdu, on montre le tableau
@@ -150,20 +156,6 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen }: { ini
   };
 
   // Extraction : flush d'abord (le serveur lit les notes en base), puis ouverture du tiroir Mesures
-  const handleAnalyze = async () => {
-    if (aiLockRef.current) return;
-    aiLockRef.current = true;
-    if (!(await flush())) { toast(FLUSH_PENDING); aiLockRef.current = false; return; }
-    setAiBusy('extract');
-    try {
-      const r = await extractBilan(record.id);
-      setCandidates(r.candidates);
-      setRejectedCount(r.rejected);
-      openSuggestions();
-    } catch (e) { handleAiError(e, 'Analyse impossible'); }
-    finally { setAiBusy(null); aiLockRef.current = false; }
-  };
-
   // Rédaction : flush, appel, puis l'état local est remplacé par le bilan renvoyé (sections écrites, statut GENERE)
   const handleCompose = async (sections?: BilanSectionKey[]): Promise<boolean> => {
     if (aiLockRef.current) return false;
@@ -174,6 +166,7 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen }: { ini
       const r = await composeBilan(record.id, sections);
       replaceRecord(r.bilan);
       composedMeasurementsRef.current = fingerprint(r.bilan);
+      revealDrawer();
       setWarnings((prev) => {
         if (!sections) return r.warnings;
         const next: SectionWarnings = { ...prev };
@@ -224,27 +217,30 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen }: { ini
   return (
     <TooltipProvider>
       <div className="flex flex-col min-h-full">
-        <BilanEditorHeader
-          record={record}
-          onPatientChange={handlePatientChange}
-          onTypeChange={(t: BilanType) => update({ type: t })}
-          onMotifChange={(motif) => update({ motif })}
+        <BilanEditorAlerts
           saveState={saveState}
-          savedAt={savedAt}
-          pending={pending}
           errorMessage={errorMessage}
           onReload={() => { void reload(); }}
           onRetry={() => { void flush(); }}
-          onBack={() => { void handleBack(); }}
-          disabled={locked || aiBusy !== null || dictating}
         />
-        <BilanStepper step={step} onStep={(s) => { void goTo(s); }} />
+        {/* Type et patient se règlent ici, en phrase, comme à l'accueil du module — et restent
+            visibles aux deux étapes. Pas de stepper : les boutons de bas de page font la navigation. */}
+        <div className="px-3 sm:px-4 py-2 border-b border-border/40">
+          <BilanSettingsLine
+            record={record}
+            onBack={() => { void handleBack(); }}
+            onTypeChange={(t: BilanType) => update({ type: t })}
+            onPatientChange={handlePatientChange}
+            onMotifChange={(motif) => update({ motif })}
+            disabled={locked || aiBusy !== null || dictating}
+          />
+        </div>
         <div className="flex-1 min-h-0 flex">
           <div className="flex-1 min-w-0 pb-12 lg:pb-0">
-            {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('document')} onCompose={() => { void handleComposeFromNotes(); }} composing={aiBusy === 'compose_from_notes'} dictation={dictation} />}
-            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} onComposeFromNotes={() => { void handleComposeFromNotes(); }} lastRun={lastRun} onVerify={openSuggestions} onDismissRun={() => setLastRun(null)} wide={wide} />}
+            {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('document')} onCompose={() => { void handleComposeFromNotes(); }} composing={aiBusy === 'compose_from_notes'} dictation={dictation} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} />}
+            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} lastRun={lastRun} onVerify={openSuggestions} onDismissRun={() => setLastRun(null)} wide={wide} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} />}
           </div>
-          <MeasuresDrawer record={record} update={update} disabled={locked || aiBusy !== null} candidates={candidates} rejectedCount={rejectedCount} onCandidatesChange={setCandidates} onAnalyze={() => { void handleAnalyze(); }} aiBusy={aiBusy} open={drawerOpen} onOpenChange={setDrawer} wide={wide} quotes={quotes} />
+          <MeasuresDrawer record={record} update={update} disabled={locked || aiBusy !== null} candidates={candidates} rejectedCount={rejectedCount} onCandidatesChange={setCandidates} aiBusy={aiBusy} open={drawerOpen} onOpenChange={setDrawer} wide={wide} quotes={quotes} />
         </div>
       </div>
     </TooltipProvider>
@@ -280,6 +276,14 @@ export default function BilanEditorPage() {
         if (!bilan.document) {
           toast({ title: 'Bilan en lecture seule', description: 'Les anciens bilans se consultent depuis la fiche patient.' });
           router.replace('/dashboard/kine/bilan-kine');
+          return;
+        }
+        // Un bilan enregistré ne se corrige pas ici : l'éditeur porte la dictée et la rédaction
+        // complète, qui écraseraient un document déjà remis au patient. Sa page de consultation
+        // est la surface de correction, et elle sait tout faire (texte, mesures, reprise IA
+        // d'une section). Seul un lien périmé mène encore ici.
+        if (bilan.status === 'ENREGISTRE' && bilan.patientId) {
+          router.replace(`${BILANS_REALISES_HREF}/${bilan.patientId}/${bilan.id}`);
           return;
         }
         setJob(j);

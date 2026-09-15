@@ -5,12 +5,9 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Copy, Mail, Download, Check, Eye, UserPlus, Loader2, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, Copy, Mail, Download, Check, PanelRightOpen, UserPlus, Loader2, Sparkles, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import DocumentSheet from './DocumentSheet';
-import BilanPreviewModal from './BilanPreviewModal';
 import { DRAWER_ACTIONS_ID } from './MeasuresDrawer';
 import PatientCombobox from '../PatientCombobox';
 import { attachPatient, finalizeBilan, ApiError } from '@/utils/bilanApi';
@@ -29,10 +26,11 @@ export interface DocumentStepProps {
   aiBusy: AiBusy;
   warnings: SectionWarnings;
   onSectionEdited: (key: BilanSectionKey) => void;
-  /** « Rédiger avec l'IA » (7 sections) : extraction + acceptation + rédaction */
-  onComposeFromNotes: () => void;
   lastRun: { extracted: number; pending: number } | null;
   onVerify: () => void;
+  /** Ouvre le panneau des mesures (fermé, il n'a plus de rail : sa commande est dans la barre) */
+  onOpenMeasures: () => void;
+  measuresOpen: boolean;
   onDismissRun: () => void;
   /** ≥ 1024 px : pied de page classique. Sinon, les actions se fondent dans la barre repliée du tiroir. */
   wide: boolean;
@@ -40,21 +38,16 @@ export interface DocumentStepProps {
 
 const FLUSH_PENDING_TOAST = { title: 'Sauvegarde en attente, réessaie dans un instant' };
 
-export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited, onComposeFromNotes, lastRun, onVerify, onDismissRun, wide }: DocumentStepProps) {
+export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited, lastRun, onVerify, onDismissRun, wide, onOpenMeasures, measuresOpen }: DocumentStepProps) {
   const { toast } = useToast();
   const doc = record.document ?? emptyBilanDocument();
   const [evolution, setEvolution] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [busy, setBusy] = useState<null | 'copy' | 'mail' | 'pdf' | 'save'>(null);
   const [attachOpen, setAttachOpen] = useState(false);
   const hasPrevious = (doc.comparison?.previousBilanIds?.length ?? 0) > 0;
   const finalized = record.status === 'ENREGISTRE';
 
   const hasNotes = (record.rawNotes ?? '').trim().length > 0;
-  const anyText = doc.sections.some((s) => s.text.trim() !== '');
-  const [composeConfirmOpen, setComposeConfirmOpen] = useState(false);
-  const composeAll = () => { setComposeConfirmOpen(false); onComposeFromNotes(); };
-  const handleComposeClick = () => { if (anyText) setComposeConfirmOpen(true); else composeAll(); };
 
   const setSection = (key: BilanSectionKey, text: string) => {
     update({ document: { ...doc, sections: doc.sections.map((s) => (s.key === key ? { ...s, text } : s)) } });
@@ -118,16 +111,21 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
     } catch (e) { toast({ title: 'Erreur', description: (e as Error).message, variant: 'destructive' }); setBusy(null); }
   };
 
-  // Barre d'outils au-dessus de la page : rédaction IA, évolution, retour aux mesures, aperçu
+  // Barre d'outils au-dessus de la page. Le panneau fermé n'a pas de rail : sa commande vit ici,
+  // comme le volet de navigation de Word ou les panneaux de Figma — on ne laisse pas un moignon
+  // de panneau accroché au bord du canevas.
   const toolbar = (
-    <div className="mx-auto w-full max-w-[794px] flex items-center justify-between gap-2 flex-wrap px-1">
-      <Tooltip>
-        <TooltipTrigger asChild><span><Button variant="outline" size="sm" onClick={handleComposeClick} disabled={disabled || !hasNotes || aiBusy !== null} className="h-8 text-xs rounded-full">{aiBusy === 'compose_from_notes' ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}Rédiger avec l’IA</Button></span></TooltipTrigger>
-        <TooltipContent>{hasNotes ? 'Rédige les 7 sections à partir de tes notes et de tes mesures' : 'Saisis des notes à l’étape Notes pour utiliser l’IA'}</TooltipContent>
-      </Tooltip>
-      <div className="flex items-center gap-2 flex-wrap">
+    <div className="mx-auto w-full max-w-[794px] grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-1">
+      <div className="flex items-center">
+        <Button variant="ghost" size="sm" onClick={onBack} className="h-9 text-sm"><ArrowLeft className="h-4 w-4 mr-1" />Notes</Button>
+      </div>
+      {measuresOpen ? <span /> : (
+        <Button variant="outline" size="sm" onClick={onOpenMeasures} className="h-9 text-sm rounded-full border-[#3899aa]/50 text-[#3899aa] hover:bg-[#3899aa]/10">
+          <PanelRightOpen className="h-4 w-4 mr-1.5" />Tests et mesures
+        </Button>
+      )}
+      <div className="flex items-center justify-end gap-2 flex-wrap">
         {hasPrevious && <label className="flex items-center gap-1.5 text-xs"><Switch checked={evolution} onCheckedChange={setEvolution} />Inclure l’évolution</label>}
-        <Button variant="ghost" size="sm" onClick={() => setPreviewOpen(true)} className="h-8 text-xs"><Eye className="h-3.5 w-3.5 mr-1" />Aperçu A4</Button>
       </div>
     </div>
   );
@@ -153,8 +151,10 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
       canRegenerate={hasNotes} onRegenerate={(key) => { void onCompose([key]); }} aiBusy={aiBusy} warnings={warnings} onDismissWarning={onSectionEdited} />
   );
 
+  // Enregistré : plus de bouton, l'état est déjà dit. Un bouton désactivé laissait croire
+  // qu'il restait quelque chose à faire ; les corrections, elles, partent par l'autosave.
   const saveButton = finalized ? (
-    <Button disabled aria-label="Enregistré" className="rounded-full h-9 px-4"><Check className="h-4 w-4 lg:mr-1" /><span className="hidden lg:inline">Enregistré</span></Button>
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 text-green-700 h-9 px-4 text-sm font-medium"><Check className="h-4 w-4" /><span className="hidden lg:inline">Enregistré</span></span>
   ) : record.patient ? (
     <Button onClick={doFinalize} disabled={disabled || busy !== null} aria-label={`Enregistrer pour ${record.patient.firstName}`} className="btn-teal rounded-full h-9 px-4">{busy === 'save' ? <Loader2 className="h-4 w-4 lg:mr-1 animate-spin" /> : <Check className="h-4 w-4 lg:mr-1" />}<span className="hidden lg:inline">Enregistrer pour {record.patient.firstName}</span></Button>
   ) : (
@@ -186,24 +186,12 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
         <div className="flex flex-col gap-3 bg-muted/30 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4">{toolbar}{banner}{sheet}</div>
       </div>
       {actionsHost ? createPortal(actions, actionsHost) : (
-        <div className="sticky bottom-12 lg:bottom-0 flex items-center justify-between gap-2 border-t border-border/40 bg-background/95 px-3 sm:px-4 py-2 flex-wrap">
-          <Button variant="ghost" size="sm" onClick={onBack} className="h-9"><ArrowLeft className="h-4 w-4 mr-1" />Notes</Button>
-          <div className="flex items-center gap-2 ml-auto">{actions}</div>
+        <div className="sticky bottom-12 lg:bottom-0 px-3 sm:px-4 py-2">
+          <div className="mx-auto w-fit max-w-full flex items-center justify-center gap-2 flex-wrap bg-white dark:bg-card border-2 border-border rounded-full px-4 py-1.5 shadow-sm">
+            {actions}
+          </div>
         </div>
       )}
-      <AlertDialog open={composeConfirmOpen} onOpenChange={setComposeConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remplacer les sections déjà rédigées ?</AlertDialogTitle>
-            <AlertDialogDescription>La rédaction IA écrit les 7 sections à partir de tes notes et de tes mesures. Les textes actuels seront écrasés.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={composeAll} className="btn-teal">Rédiger</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <BilanPreviewModal open={previewOpen} onOpenChange={setPreviewOpen} bilanId={record.id} evolution={evolution} />
     </div>
   );
 }

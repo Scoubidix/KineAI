@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, Activity, Layers, ChevronDown, CheckCircle2, Plus, Quote } from 'lucide-react';
+import { X, Activity, Layers, ChevronDown, CheckCircle2, Quote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -28,19 +28,18 @@ import {
 import InlineMeasureSearch from './InlineMeasureSearch';
 import ApplyTemplateModal from './ApplyTemplateModal';
 import SideSelector from './SideSelector';
-import PresentationToggle from './PresentationToggle';
 import { measurementIdentity } from './editor/suggestions';
 
 interface MeasurementsPanelProps {
   measurements: DocumentMeasurement[];
   onChange: (next: DocumentMeasurement[]) => void;
   disabled?: boolean;
-  // Étape Vérification du flux de rédaction : interrupteur Tableau/Littérature visible.
-  showPresentation?: boolean;
   /** Bilan de suivi : valeur du bilan de référence par identité de mesure, affichée « préc. … » */
   previousValues?: Map<string, CanonicalValue>;
   /** Citation des notes à l'origine de la valeur (mesures acceptées automatiquement), par identité de mesure */
   quotes?: Map<string, string>;
+  /** Conteneur étroit (tiroir, feuille du bas) : la ligne s'empile au lieu de se couper */
+  dense?: boolean;
 }
 
 const CUSTOM_CATEGORY = 'Mesures libres';
@@ -64,17 +63,14 @@ export default function MeasurementsPanel({
   measurements,
   onChange,
   disabled = false,
-  showPresentation = false,
   previousValues,
   quotes,
+  dense = false,
 }: MeasurementsPanelProps) {
   const { toast } = useToast();
   const [fields, setFields] = useState<CanonicalField[]>([]);
   const [applyTemplateOpen, setApplyTemplateOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
-  const previouslyCompleteRef = useRef<Set<string>>(new Set());
-  const pendingCollapseRef = useRef<Set<string>>(new Set());
   // Indices des lignes NUMERIC dont la dernière saisie était hors bornes (message d'aide local)
   const [rangeHints, setRangeHints] = useState<Map<number, string>>(new Map());
   // Brouillon local par ligne NUMERIC (texte tel que tapé, tant qu'il n'est pas commis) :
@@ -179,10 +175,6 @@ export default function MeasurementsPanel({
     );
   };
 
-  const handlePresentationAt = (index: number, presentation: Presentation) => {
-    onChange(measurements.map((x, i) => (i === index ? { ...x, presentation } : x)));
-  };
-
   // Application non-destructive d'un template : ajoute les items du template
   // qui ne sont pas déjà dans measurements, à la fin, dans l'ordre du template.
   // Les valeurs déjà saisies dans le bilan en cours ne sont jamais touchées.
@@ -277,26 +269,6 @@ export default function MeasurementsPanel({
     return { cats, globalFilled, globalTotal };
   }, [groups]);
 
-  // Auto-collapse : transition incomplet → complet → en attente, repli au blur
-  // pour ne pas couper la saisie en cours.
-  useEffect(() => {
-    const currentlyComplete = new Set<string>();
-    for (const [cat, s] of stats.cats.entries()) {
-      if (s.total > 0 && s.filled === s.total) currentlyComplete.add(cat);
-    }
-    for (const c of currentlyComplete) {
-      if (!previouslyCompleteRef.current.has(c)) {
-        pendingCollapseRef.current.add(c);
-      }
-    }
-    for (const c of previouslyCompleteRef.current) {
-      if (!currentlyComplete.has(c)) {
-        pendingCollapseRef.current.delete(c);
-      }
-    }
-    previouslyCompleteRef.current = currentlyComplete;
-  }, [stats]);
-
   const toggleCategory = (cat: string) => {
     setCollapsedCategories((prev) => {
       const next = new Set(prev);
@@ -304,20 +276,6 @@ export default function MeasurementsPanel({
       else next.add(cat);
       return next;
     });
-    pendingCollapseRef.current.delete(cat);
-  };
-
-  const handleCategoryBlur = (category: string, e: React.FocusEvent<HTMLDivElement>) => {
-    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-    if (pendingCollapseRef.current.has(category)) {
-      pendingCollapseRef.current.delete(category);
-      setCollapsedCategories((prev) => {
-        if (prev.has(category)) return prev;
-        const next = new Set(prev);
-        next.add(category);
-        return next;
-      });
-    }
   };
 
   const renderCanonicalInput = (
@@ -452,13 +410,6 @@ export default function MeasurementsPanel({
     }
   };
 
-  const renderOriginBadge = (origin: DocumentMeasurement['origin']) =>
-    origin !== 'manual' && (
-      <span className="text-[10px] rounded bg-muted px-1 text-muted-foreground shrink-0">
-        {origin === 'extracted' ? 'IA' : 'précédent'}
-      </span>
-    );
-
   const renderQuote = (m: DocumentMeasurement) => {
     const q = quotes?.get(measurementIdentity(m));
     return q === undefined ? null : (
@@ -476,91 +427,79 @@ export default function MeasurementsPanel({
     return v === undefined ? null : <span title="Valeur du bilan de référence" className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">préc. {formatPrevious(v, unit)}</span>;
   };
 
+  /**
+   * Une ligne de mesure. En conteneur étroit (tiroir de 380 px, feuille du bas sur téléphone),
+   * la ligne s'empile : le libellé prend sa propre ligne et se replie librement, le champ et la
+   * valeur antérieure passent dessous. Sinon tout tient sur une ligne, comme avant.
+   *
+   * Les réglages rares — présentation en tableau ou dans le texte, citation des notes — passent
+   * derrière un menu par ligne quand la place manque : ce sont des choix qu'on fait une fois.
+   */
   const renderRow = (row: RowWithIndex) => {
     const m = row.measurement;
-    if (m.kind === 'canonical') {
-      if (!row.field) {
-        return (
-          <div
-            key={`row-${row.index}`}
-            className="flex items-center gap-2 px-2 py-1 rounded bg-amber-500/5 border border-amber-500/20"
-          >
-            <span className="text-sm flex-1 text-muted-foreground italic">Champ inconnu : {m.key}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => handleRemoveAt(row.index)}
-              className="h-6 w-6 p-0"
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        );
-      }
+    const label = m.kind === 'canonical' ? row.field?.label ?? m.key : m.label;
+    const labelTitle = m.kind === 'canonical' && row.field?.description ? `${label} — ${row.field.description}` : label;
+
+    if (m.kind === 'canonical' && !row.field) {
       return (
-        <div key={`row-${row.index}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/40">
-          <span className="text-sm font-medium w-36 sm:w-56 shrink-0 truncate" title={row.field.description ?? undefined}>{row.field.label}</span>
-          {row.field.lateralized && (
-            <SideSelector value={m.side} onChange={(s) => handleSideAt(row.index, s)} disabled={disabled} />
-          )}
-          {renderCanonicalInput(row.field, m.value, row.index)}
-          {renderPrevious(m, row.field.unit)}
-          {showPresentation && (
-            <PresentationToggle
-              value={m.presentation}
-              onChange={(p) => handlePresentationAt(row.index, p)}
-              disabled={disabled}
-            />
-          )}
-          {renderOriginBadge(m.origin)}
-          {renderQuote(m)}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => handleRemoveAt(row.index)}
-            disabled={disabled}
-            className="h-6 w-6 p-0 shrink-0"
-          >
+        <div key={`row-${row.index}`} className="flex items-center gap-2 px-2 py-1 rounded bg-amber-500/5 border border-amber-500/20">
+          <span className="text-sm flex-1 min-w-0 text-muted-foreground italic break-words">Champ inconnu : {m.key}</span>
+          <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveAt(row.index)} className="h-6 w-6 p-0 shrink-0">
             <X className="h-3 w-3" />
           </Button>
         </div>
       );
     }
-    return (
-      <div key={`row-${row.index}`} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/40">
-        <span className="text-sm font-medium w-36 sm:w-56 shrink-0 truncate italic text-muted-foreground">
-          {m.label}
-        </span>
+
+    const field = row.field;
+    const sideSelector = m.kind === 'canonical' && field?.lateralized
+      ? <SideSelector value={m.side} onChange={(s) => handleSideAt(row.index, s)} disabled={disabled} />
+      : null;
+    const input = m.kind === 'canonical' && field
+      ? renderCanonicalInput(field, m.value, row.index)
+      : (
         <Input
           type="text"
-          value={m.value}
+          value={m.kind === 'custom' ? m.value : ''}
           onChange={(e) => handleChangeAt(row.index, e.target.value)}
           placeholder="Valeur libre"
           disabled={disabled}
-          className="h-8 text-sm flex-1"
+          className="h-8 text-sm flex-1 min-w-0"
         />
-        {renderPrevious(m)}
-        {showPresentation && (
-          <PresentationToggle
-            value={m.presentation}
-            onChange={(p) => handlePresentationAt(row.index, p)}
-            disabled={disabled}
-          />
-        )}
-        {renderOriginBadge(m.origin)}
+      );
+    const previous = renderPrevious(m, m.kind === 'canonical' ? field?.unit : undefined);
+    const removeButton = (
+      <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveAt(row.index)} disabled={disabled} className="h-6 w-6 p-0 shrink-0">
+        <X className="h-3 w-3" />
+      </Button>
+    );
+    const labelClass = `text-sm font-medium leading-snug break-words hyphens-auto${m.kind === 'custom' ? ' italic text-muted-foreground' : ''}`;
+
+    if (dense) {
+      return (
+        <div key={`row-${row.index}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
+          <div className="flex items-start gap-2">
+            <span className={`${labelClass} flex-1 min-w-0`} title={labelTitle}>{label}</span>
+            {renderQuote(m)}
+            {removeButton}
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            {sideSelector}
+            {input}
+            {previous}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div key={`row-${row.index}`} className="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-muted/40">
+        <span className={`${labelClass} w-36 sm:w-56 shrink-0`} title={labelTitle}>{label}</span>
+        {sideSelector}
+        {input}
+        {previous}
         {renderQuote(m)}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => handleRemoveAt(row.index)}
-          disabled={disabled}
-          className="h-6 w-6 p-0 shrink-0"
-        >
-          <X className="h-3 w-3" />
-        </Button>
+        {removeButton}
       </div>
     );
   };
@@ -575,37 +514,6 @@ export default function MeasurementsPanel({
 
   return (
     <div className="border border-border/60 rounded-xl bg-white dark:bg-card p-3 space-y-2">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-[#3899aa]" />
-          <span className="text-sm font-medium text-[#3899aa]">Tests & mesures</span>
-          <button
-            type="button"
-            onClick={() => setSearchOpen((v) => !v)}
-            disabled={disabled}
-            aria-label="Ajouter une mesure"
-            aria-pressed={searchOpen}
-            className="inline-flex items-center justify-center h-6 w-6 rounded-full border border-dashed border-[#3899aa]/40 text-[#3899aa] hover:border-[#3899aa] hover:bg-[#3899aa]/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setApplyTemplateOpen(true)}
-            disabled={disabled}
-            className="h-7 text-xs rounded-full"
-          >
-            <Layers className="h-3 w-3 mr-1" />
-            Appliquer un template
-          </Button>
-        </div>
-      </div>
-
       <InlineMeasureSearch
         fields={fields}
         isExhausted={isFieldExhausted}
@@ -613,9 +521,25 @@ export default function MeasurementsPanel({
         onAddCanonical={handleAddCanonical}
         onAddCustom={handleAddCustom}
         disabled={disabled}
-        isOpen={searchOpen}
-        onOpenChange={setSearchOpen}
+        permanent
+        trailing={hasMeasures ? (
+          <Button type="button" variant="ghost" size="sm" onClick={() => setApplyTemplateOpen(true)} disabled={disabled} aria-label="Appliquer un template" title="Appliquer un template" className="h-9 w-9 p-0 shrink-0 text-[#3899aa]">
+            <Layers className="h-4 w-4" />
+          </Button>
+        ) : undefined}
       />
+
+      {/* Tableau vide : c'est le seul moment où le template mérite de la place. Une fois des
+          mesures saisies, il redevient une icône à côté du champ d'ajout. */}
+      {!hasMeasures && (
+        <div className="flex flex-col items-center gap-2 py-6 text-center">
+          <Activity className="h-5 w-5 text-[#3899aa]/50" />
+          <p className="text-xs text-muted-foreground">Cherche un test ci-dessus, ou pars d’une liste toute prête.</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => setApplyTemplateOpen(true)} disabled={disabled} className="h-8 text-xs rounded-full">
+            <Layers className="h-3.5 w-3.5 mr-1.5" />Partir d’un template
+          </Button>
+        </div>
+      )}
 
       {hasMeasures && (
         <>
@@ -678,13 +602,12 @@ export default function MeasurementsPanel({
                   <div
                     key={category}
                     className="border border-border/40 rounded-lg overflow-hidden"
-                    onBlur={(e) => handleCategoryBlur(category, e)}
                   >
                     <button
                       type="button"
                       onClick={() => toggleCategory(category)}
                       className={`w-full flex items-center gap-2 px-2 py-1.5 text-left transition-colors ${
-                        isComplete ? 'bg-[#3899aa]/5 hover:bg-[#3899aa]/10' : 'bg-muted/30 hover:bg-muted/50'
+                        isComplete ? 'bg-[#3899aa]/15 hover:bg-[#3899aa]/20' : 'bg-[#3899aa]/[0.07] hover:bg-[#3899aa]/[0.12]'
                       }`}
                     >
                       <ChevronDown

@@ -115,7 +115,7 @@ export default function BilanStartBlock({ onStarted }: BilanStartBlockProps) {
     <div className="text-center">
       {/* Réglages en phrase : les valeurs sont les déclencheurs, pas des champs étiquetés */}
       <div className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-base text-muted-foreground">
-        <span>Bilan</span>
+        {/* Le libellé du type porte déjà le mot « Bilan » : pas de « Bilan » en tête de phrase */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

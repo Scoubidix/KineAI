@@ -14,12 +14,14 @@ interface DictationBarProps {
   onImport: (file: File) => void;
   onRetry: () => void;
   onIgnore: () => void;
+  /** Action posée en fin de barre (l'ouverture du panneau des mesures) */
+  trailing?: React.ReactNode;
 }
 
 const mmss = (ms: number) => { const s = Math.floor(ms / 1000); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
 
 // Barre de dictée sous les notes : un bouton Dicter/Arrêter, chrono, vumètre, état des segments.
-export default function DictationBar({ state, disabled, onStart, onStop, onImport, onRetry, onIgnore }: DictationBarProps) {
+export default function DictationBar({ state, disabled, onStart, onStop, onImport, onRetry, onIgnore, trailing }: DictationBarProps) {
   const recording = state.phase === 'recording';
   const unavailable = !state.available || !state.supported;
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +59,7 @@ export default function DictationBar({ state, disabled, onStart, onStop, onImpor
         </TooltipTrigger>
         <TooltipContent>{state.available ? 'Transcrit un fichier audio (mémo vocal, enregistrement) comme une dictée, 10 minutes max' : 'Dictée indisponible pour le moment'}</TooltipContent>
       </Tooltip>
+      {trailing}
       {recording && (
         <div className="flex items-end gap-0.5 h-4" aria-hidden>
           {bars.map((b) => <span key={b} className={`w-1 rounded-sm transition-colors ${state.level >= b ? 'bg-[#3899aa]' : 'bg-border'}`} style={{ height: `${4 + b * 12}px` }} />)}
