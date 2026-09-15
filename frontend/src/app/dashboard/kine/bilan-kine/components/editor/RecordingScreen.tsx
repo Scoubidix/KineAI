@@ -1,7 +1,7 @@
 'use client';
-import React, { useRef } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2, Mic, PenLine, Sparkles, Square, Upload } from 'lucide-react';
+import { Loader2, Mic, PanelRightOpen, Sparkles, Square } from 'lucide-react';
 import type { BilanJobKind } from '@/types/bilan';
 import type { DictationJobState, StartError } from './useDictationJob';
 
@@ -11,9 +11,10 @@ interface RecordingScreenProps {
   onStart: () => void;
   onStop: () => void;
   onGenerate: () => void;
-  onImport: (file: File) => void;
   onRetryUploads: () => void;
-  onWrite: () => void;
+  /** Ouvre le panneau des mesures : le kiné peut suivre un template pendant la séance */
+  onOpenMeasures: () => void;
+  measuresOpen: boolean;
 }
 
 const mmss = (ms: number) => { const s = Math.floor(ms / 1000); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
@@ -38,14 +39,12 @@ const HALO_MAX = 160;
  * envois en cours) restent dans leur zone — sans ça, le bouton micro, seule chose qui compte,
  * remontait et descendait à chaque changement d'état.
  */
-export default function RecordingScreen({ state, kind, onStart, onStop, onGenerate, onImport, onRetryUploads, onWrite }: RecordingScreenProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+export default function RecordingScreen({ state, kind, onStart, onStop, onGenerate, onRetryUploads, onOpenMeasures, measuresOpen }: RecordingScreenProps) {
   const recording = state.phase === 'recording';
   const stopped = state.phase === 'stopped';
   const session = kind === 'SESSION';
   const unavailable = !state.available || !state.supported;
   const canGenerate = stopped && state.uploading === 0 && state.uploadFailed === 0 && state.segmentsSent > 0 && !state.generating;
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onImport(f); };
   const plural = state.segmentsSent > 1 ? 's' : '';
   const passages = `${state.segmentsSent} passage${plural} enregistré${plural}`;
   // Après une interruption, le chrono ne reflète plus la prise : le compteur prend sa place
@@ -71,13 +70,13 @@ export default function RecordingScreen({ state, kind, onStart, onStop, onGenera
   const halo = HALO_MIN + (recording ? state.level : 0) * (HALO_MAX - HALO_MIN);
 
   return (
-    <div className="flex-1 flex flex-col px-4 py-6">
+    <div className="flex flex-col px-4 py-6">
       <div className="h-24 shrink-0 flex flex-col items-center justify-center gap-1.5 text-center">
         <h2 className="text-lg font-semibold">{title}</h2>
         <p id="recording-hint" role="status" className={`text-sm max-w-md ${statusClass}`}>{status.text}</p>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center gap-4">
+      <div className="h-72 shrink-0 flex flex-col items-center justify-center gap-4">
         {/* Le niveau vit dans le bouton : un halo qui respire, plutôt qu'un vumètre posé à côté
             qu'on ne relie pas au micro (Dictaphone iOS, WhatsApp, Otter). */}
         <div className="relative flex items-center justify-center" style={{ height: HALO_MAX, width: HALO_MAX }}>
@@ -128,14 +127,11 @@ export default function RecordingScreen({ state, kind, onStart, onStop, onGenera
             {state.generateError && <span className="text-xs text-destructive">La génération n’a pas pu démarrer, réessaie dans un instant</span>}
           </>
         )}
-        <div className="flex items-center gap-2 mt-auto">
-          <input ref={fileInputRef} type="file" accept="audio/*,.wav,.mp3,.m4a,.webm,.ogg" onChange={handleFile} className="hidden" aria-hidden tabIndex={-1} />
-          <Button type="button" variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={unavailable || recording || state.starting || state.importing} className="h-8 rounded-full text-xs">
-            {state.importing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1" />}Importer un audio
+        {!measuresOpen && (
+          <Button type="button" variant="outline" size="sm" onClick={onOpenMeasures} className="h-8 rounded-full text-xs border-[#3899aa]/50 text-[#3899aa] hover:bg-[#3899aa]/10 mt-auto">
+            <PanelRightOpen className="h-3.5 w-3.5 mr-1" />Tests et mesures
           </Button>
-          {/* Quitter pendant un envoi perdrait les passages en vol : le choix n'apparaît qu'une fois tout acquitté */}
-          {!recording && state.uploading === 0 && <Button type="button" variant="ghost" size="sm" onClick={onWrite} className="h-8 rounded-full text-xs"><PenLine className="h-3.5 w-3.5 mr-1" />Écrire plutôt</Button>}
-        </div>
+        )}
       </div>
     </div>
   );

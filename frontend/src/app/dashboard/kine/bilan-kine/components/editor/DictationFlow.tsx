@@ -5,11 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { emptyBilanDocument, type BilanJobKind, type BilanJobView, type BilanRecord, type BilanType, type PatientSummary } from '@/types/bilan';
-import { attachPatient, patchBilan } from '@/utils/bilanApi';
+import { emptyBilanDocument, type BilanJobKind, type BilanJobView, type BilanRecord, type DocumentMeasurement, type PatientSummary } from '@/types/bilan';
+import { attachPatient } from '@/utils/bilanApi';
+import { useBilanAutosave } from '@/hooks/useBilanAutosave';
+import BilanEditorAlerts from './BilanEditorAlerts';
 import BilanSettingsLine from './BilanSettingsLine';
+import MeasuresPane, { useDensePane } from './MeasuresPane';
+import MeasurementsPanel from '../MeasurementsPanel';
+import { useMinWidth } from './useMinWidth';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useDictationJob, type ImportResult } from './useDictationJob';
+import { useDictationJob } from './useDictationJob';
 import RecordingScreen from './RecordingScreen';
 import ProcessingScreen from './ProcessingScreen';
 
@@ -21,20 +26,17 @@ interface DictationFlowProps {
   onWrite: () => void;
 }
 
-// La durée maximale d'une prise dépend du type de traitement : la description est calculée au besoin
-const IMPORT_MESSAGES: Record<Exclude<ImportResult, 'ok'>, { title: string; description?: (kind: BilanJobKind) => string }> = {
-  busy: { title: 'Enregistrement en cours', description: () => 'Termine la prise avant d’importer un fichier' },
-  invalid: { title: 'Fichier audio illisible', description: () => 'Formats acceptés : wav, mp3, m4a, webm, ogg (au moins une seconde)' },
-  too_long: { title: 'Fichier trop long', description: (kind) => (kind === 'SESSION' ? '30 minutes maximum à l’import' : '10 minutes maximum à l’import') },
-  unavailable: { title: 'Indisponible pour le moment' },
-};
-
 // Flux « Dicter → Bilan » : enregistrement, puis attente ; l'éditeur n'apparaît qu'à la fin.
 export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite }: DictationFlowProps) {
   const router = useRouter();
-  // Le flux vit hors de l'autosave de l'éditeur : il tient son propre record.
-  const [record, setRecord] = useState<BilanRecord>(bilan);
+  // Même autosave que l'éditeur : un seul chemin d'écriture, débounce et contrôle de version
+  // compris. Sans lui, une mesure saisie caractère par caractère partirait en une requête par
+  // frappe, et les écritures concurrentes se refuseraient l'une l'autre.
+  const { record, update, saveState, errorMessage, reload, replaceRecord } = useBilanAutosave(bilan);
   const { toast } = useToast();
+  const wide = useMinWidth(1024);
+  const dense = useDensePane(wide);
+  const [measuresOpen, setMeasuresOpen] = useState(false);
   // Consentement du patient : exigé par le serveur à la création d'un traitement de séance
   const [consent, setConsent] = useState(false);
   const session = kind === 'SESSION';
@@ -60,46 +62,25 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
     onDone(state.job);
   }, [state.phase, state.job, onDone]);
 
-  const handleImport = (file: File) => {
-    void dictation.importFile(file).then((r) => {
-      if (r === 'ok') return;
-      const m = IMPORT_MESSAGES[r];
-      toast({ title: m.title, description: m.description?.(kind), variant: 'destructive' });
-    });
-  };
   const busy = state.phase === 'recording' || state.uploading > 0;
   const handleBack = () => {
     if (busy) { toast({ title: 'Enregistrement en cours', description: 'Arrête l’enregistrement et attends la fin des envois avant de quitter' }); return; }
     router.push('/dashboard/kine/bilan-kine');
   };
-  // Type et patient restent réglables pendant l'enregistrement : le flux n'a pas d'autosave,
-  // les écritures partent donc directement, et le record local suit la réponse du serveur.
-  const applySettings = async (run: () => Promise<BilanRecord>) => {
+  const doc = record.document ?? emptyBilanDocument();
+
+  const handlePatientChange = async (p: PatientSummary | null) => {
+    if (!p) { toast({ title: 'Patient conservé', description: 'Pour changer de patient, choisis-en un autre dans la liste' }); return; }
     try {
-      setRecord(await run());
+      replaceRecord(await attachPatient(record.id, p.id));
     } catch (e) {
       toast({ title: 'Erreur', description: (e as Error).message, variant: 'destructive' });
     }
   };
 
-  const handleTypeChange = (type: BilanType) => {
-    void applySettings(async () => {
-      const { updatedAt } = await patchBilan(record.id, { type }, record.updatedAt);
-      return { ...record, type, updatedAt };
-    });
-  };
-
-  const handlePatientChange = (p: PatientSummary | null) => {
-    if (!p) { toast({ title: 'Patient conservé', description: 'Pour changer de patient, choisis-en un autre dans la liste' }); return; }
-    void applySettings(() => attachPatient(record.id, p.id));
-  };
-
-  const handleMotifChange = (motif: string) => {
-    void applySettings(async () => {
-      const { updatedAt } = await patchBilan(record.id, { motif }, record.updatedAt);
-      return { ...record, motif, updatedAt };
-    });
-  };
+  // Le serveur écrit le bilan en fin de traitement (notes, document) : toute saisie pendant
+  // cette fenêtre serait écrasée par son retour, donc le panneau s'y verrouille.
+  const measuresLocked = saveState === 'stale' || state.phase === 'processing' || state.generating;
 
   return (
     <div className="flex flex-col min-h-full">
@@ -108,12 +89,16 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
         <BilanSettingsLine
           record={record}
           onBack={handleBack}
-          onTypeChange={handleTypeChange}
+          onTypeChange={(type) => update({ type })}
           onPatientChange={handlePatientChange}
-          onMotifChange={handleMotifChange}
+          onMotifChange={(motif) => update({ motif })}
           disabled={busy}
         />
       </div>
+      <BilanEditorAlerts saveState={saveState} errorMessage={errorMessage} onReload={() => { void reload(); }} onRetry={() => {}} />
+
+      <div className="flex-1 min-h-0 flex">
+        <div className="flex-1 min-w-0 flex flex-col pb-12 lg:pb-0">
       {state.phase === 'done' ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 py-10 text-center">
           <div className="text-5xl font-semibold tabular-nums text-[#3899aa]" aria-hidden>100 %</div>
@@ -133,8 +118,23 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
           onRestart={() => { setConsent(false); dictation.restart(); }}
         />
       ) : (
-        <RecordingScreen state={state} kind={kind} onStart={() => { void dictation.start(); }} onStop={dictation.stop} onGenerate={() => { void dictation.generate(); }} onImport={handleImport} onRetryUploads={dictation.retryUploads} onWrite={onWrite} />
+        <RecordingScreen state={state} kind={kind} onStart={() => { void dictation.start(); }} onStop={dictation.stop} onGenerate={() => { void dictation.generate(); }} onRetryUploads={dictation.retryUploads} onOpenMeasures={() => setMeasuresOpen(true)} measuresOpen={measuresOpen} />
       )}
+        </div>
+
+        {/* Le panneau seul : pendant une séance on coche des valeurs et on suit un template,
+            on n'analyse pas des notes — pas d'extraction ni de suggestions ici. */}
+        <MeasuresPane summary="Tests et mesures" open={measuresOpen} onOpenChange={setMeasuresOpen} wide={wide}>
+          <div className="p-3">
+            <MeasurementsPanel
+              measurements={doc.measurements}
+              onChange={(measurements: DocumentMeasurement[]) => update({ document: { ...doc, measurements } })}
+              disabled={measuresLocked}
+              dense={dense}
+            />
+          </div>
+        </MeasuresPane>
+      </div>
 
       {/* Le consentement n'est demandé qu'avant la création du traitement : après un rechargement
           il est déjà tracé côté serveur. Non refermable autrement que par un choix explicite. */}
