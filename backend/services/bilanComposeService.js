@@ -274,7 +274,8 @@ async function loadBilanForCompose(prisma, where) {
   const bilan = await prisma.bilanKine.findFirst({ where, select: { id: true, type: true, status: true, rawNotes: true, motif: true, document: true, updatedAt: true, createdAt: true, patient: { select: { firstName: true, lastName: true, birthDate: true } } } });
   if (!bilan) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
   if (!bilan.document) throw new DraftError('LEGACY_BILAN', 400, 'Les anciens bilans ne peuvent pas être rédigés par l’IA');
-  if (bilan.status === 'ENREGISTRE') throw new DraftError('ALREADY_FINALIZED', 409, 'Ce bilan est déjà enregistré');
+  // Un bilan enregistré reste rédigeable : il se corrige comme un document vivant. `writeDocument`
+  // ne promeut que BROUILLON → GENERE, le statut ENREGISTRE n'est donc jamais rétrogradé.
   const notes = (bilan.rawNotes || '').trim();
   if (!notes) throw new DraftError('NOTES_REQUIRED', 400, 'Saisis des notes avant de lancer la rédaction');
   return { bilan, notes };
@@ -305,7 +306,7 @@ async function writeDocument({ prisma, where, updatedAt, status, document, uid, 
 
 /**
  * Rédige les sections demandées (défaut : les 7) et les écrit dans le document.
- * @throws {DraftError} BILAN_NOT_FOUND | LEGACY_BILAN | ALREADY_FINALIZED | NOTES_REQUIRED | COMPOSE_FAILED | STALE_DRAFT
+ * @throws {DraftError} BILAN_NOT_FOUND | LEGACY_BILAN | NOTES_REQUIRED | COMPOSE_FAILED | STALE_DRAFT
  */
 async function composeForBilan({ kineId, bilanId, sections, uid }) {
   const prisma = prismaService.getInstance();
@@ -324,7 +325,6 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
   // remplace que les sections demandées, en check-and-set sur updatedAt (comme l'autosave).
   const fresh = await prisma.bilanKine.findFirst({ where, select: { status: true, document: true, updatedAt: true, motif: true } });
   if (!fresh || !fresh.document) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
-  if (fresh.status === 'ENREGISTRE') throw new DraftError('ALREADY_FINALIZED', 409, 'Ce bilan est déjà enregistré');
   const updated = await writeDocument({ prisma, where, updatedAt: fresh.updatedAt, status: fresh.status, document: applySections(fresh.document, texts), uid, generated: true, motif: fresh.motif ? undefined : composedMotif });
   logger.info(`Rédaction bilan ${bilanId} : ${keys.length} section(s), ${Object.keys(warnings).length} avertissement(s)`);
   return { bilan: updated, warnings };
@@ -334,7 +334,7 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
  * « Rédiger avec l'IA » en un appel : extraction, acceptation automatique, rédaction des 7 sections,
  * une seule écriture. Check-and-set sur l'updatedAt lu au départ : le front a flushé et verrouille
  * l'édition pendant l'appel ; toute autre modification (autre appareil) → STALE_DRAFT.
- * @throws {DraftError} BILAN_NOT_FOUND | LEGACY_BILAN | ALREADY_FINALIZED | NOTES_REQUIRED | EXTRACTION_FAILED | COMPOSE_FAILED | STALE_DRAFT
+ * @throws {DraftError} BILAN_NOT_FOUND | LEGACY_BILAN | NOTES_REQUIRED | EXTRACTION_FAILED | COMPOSE_FAILED | STALE_DRAFT
  */
 async function composeFromNotesForBilan({ kineId, bilanId, uid, source = 'notes' }) {
   const prisma = prismaService.getInstance();
