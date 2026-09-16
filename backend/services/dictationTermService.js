@@ -36,6 +36,10 @@ function validateTerm({ heard, expected }) {
   if (heardNorm === expectedNorm) throw new DraftError('VALIDATION_ERROR', 400, 'Le terme attendu est identique à celui entendu');
   // Le vocabulaire ne porte pas de nombres : ils sont déjà protégés par les gardes du correcteur
   if (/^[\d\s.,-]+$/.test(expectedNorm)) throw new DraftError('VALIDATION_ERROR', 400, 'Un nombre n’est pas un terme');
+  // Jetons de pseudonymisation : en mode libre les notes portent [Prénom], [NOM], [âge]. Retenu,
+  // un tel « terme » inviterait le modèle à écrire un jeton dans les notes d'autres kinés.
+  // Même garde que sanitizeMotif, qui rejette déjà tout motif porteur de crochet.
+  if (/[[\]]/.test(h) || /[[\]]/.test(e)) throw new DraftError('VALIDATION_ERROR', 400, 'Ce n’est pas un terme à signaler');
 
   return { heard: h, expected: e, heardNorm, expectedNorm };
 }
@@ -107,7 +111,10 @@ async function listRetained() {
     cache = { at: Date.now(), terms: rows.map((r) => r.expected) };
   } catch (err) {
     logger.warn(`Vocabulaire signalé : lecture impossible (${err?.message})`);
-    return cache.terms ?? [];
+    // Pas de nouvelle tentative avant le prochain TTL : sans ça, une base indisponible déclenche
+    // une requête et un avertissement par segment de chaque dictée.
+    cache = { at: Date.now(), terms: cache.terms ?? [] };
+    return cache.terms;
   }
   return cache.terms;
 }
@@ -122,10 +129,12 @@ async function adminList({ statut }) {
     orderBy: [{ statut: 'asc' }, { reportCount: 'desc' }],
     select: {
       id: true, heard: true, expected: true, statut: true, reportCount: true, lastReportedAt: true,
-      _count: { select: { reports: true } },
+      reports: { distinct: ['kineId'], select: { kineId: true } },
     },
   });
-  return rows.map(({ _count, ...r }) => ({ ...r, kineCount: _count.reports }));
+  // Kinés distincts, pas lignes de provenance : c'est ce chiffre qui distingue la prononciation
+  // d'un seul kiné d'un trou de vocabulaire partagé, et c'est sur lui que l'arbitrage se fait.
+  return rows.map(({ reports, ...r }) => ({ ...r, kineCount: reports.length }));
 }
 
 async function adminSetStatut({ id, statut }) {

@@ -61,7 +61,12 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
     let start = el.selectionStart; let end = el.selectionEnd;
     while (start < end && /\s/.test(raw[start])) start += 1;
     while (end > start && /\s/.test(raw[end - 1])) end -= 1;
-    setSelection(end > start ? { start, end, text: raw.slice(start, end) } : null);
+    // Le serveur n'accepte qu'un terme : 80 caractères et 4 mots au plus (dictationTermService).
+    // Au-delà, le kiné sélectionne pour tout autre chose — copier, effacer — et la barre n'a
+    // rien à faire là.
+    const text = end > start ? raw.slice(start, end) : '';
+    const isTerm = text.length > 0 && text.length <= 80 && text.split(/\s+/).length <= 4;
+    setSelection(isTerm ? { start, end, text } : null);
   };
 
   const confirmTerm = async (expected: string) => {

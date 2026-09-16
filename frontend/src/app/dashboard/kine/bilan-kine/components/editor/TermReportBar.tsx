@@ -52,6 +52,7 @@ export default function TermReportBar({ heard, onCancel, onConfirm, disabled }: 
     <div
       role="region"
       aria-label="Corriger un terme mal transcrit"
+      onKeyDown={(e) => { if (e.key === 'Escape') onCancel(); }}
       className="mx-auto w-full max-w-[68ch] rounded-xl border border-[#3899aa]/40 bg-[#3899aa]/[0.07] px-3 py-2"
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -59,7 +60,6 @@ export default function TermReportBar({ heard, onCancel, onConfirm, disabled }: 
         <span className="text-sm font-medium max-w-[14rem] truncate">« {heard} »</span>
         <span className="text-muted-foreground shrink-0" aria-hidden>→</span>
         <Input
-          autoFocus
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') onCancel(); }}
