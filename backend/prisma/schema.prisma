@@ -64,6 +64,7 @@ model Kine {
   notifications     Notification[]
   nouveauteVues     NouveauteVue[]
   roadmapIdees      RoadmapIdee[]
+  dictationTermReports DictationTermReport[]
 
   // ========== GROUPE PIONNIERS ==========
   pionnierMessages PionnierMessage[]
@@ -1291,4 +1292,52 @@ model RoadmapIdee {
   @@index([kineId])
   @@index([itemId])
   @@map("roadmap_idees")
+}
+
+enum DictationTermStatut {
+  NOUVEAU
+  RETENU
+  ECARTE
+
+  @@map("dictation_term_statut")
+}
+
+/// Vocabulaire signalé par les kinés : une ligne par paire (forme entendue → forme attendue).
+/// C'est cette table que lit la passe de correction, pour les lignes au statut RETENU.
+model DictationTerm {
+  id             Int                 @id @default(autoincrement())
+  /// Forme entendue, telle que sélectionnée la première fois (affichage admin)
+  heard          String              @db.VarChar(80)
+  /// Forme attendue, telle que saisie la première fois. C'est elle qui entre dans le vocabulaire.
+  expected       String              @db.VarChar(80)
+  /// Formes repliées (accents, casse, ponctuation, espaces) : clé de regroupement
+  heardNorm      String              @db.VarChar(80)
+  expectedNorm   String              @db.VarChar(80)
+  statut         DictationTermStatut @default(NOUVEAU)
+  reportCount    Int                 @default(0)
+  lastReportedAt DateTime            @default(now())
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  reports DictationTermReport[]
+
+  @@unique([heardNorm, expectedNorm])
+  @@index([statut])
+  @@map("dictation_terms")
+}
+
+/// Provenance d'un signalement : sert à compter les kinés distincts et à tenir le RGPD.
+/// La suppression d'un compte emporte ses lignes ; le terme survit avec un compteur en baisse.
+model DictationTermReport {
+  id        Int      @id @default(autoincrement())
+  termId    Int
+  kineId    Int
+  createdAt DateTime @default(now())
+
+  term DictationTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  kine Kine          @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
+  @@index([termId])
+  @@index([kineId])
+  @@map("dictation_term_reports")
 }
