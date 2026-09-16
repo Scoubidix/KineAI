@@ -1313,6 +1313,10 @@ model DictationTerm {
   /// Formes repliées (accents, casse, ponctuation, espaces) : clé de regroupement
   heardNorm      String              @db.VarChar(80)
   expectedNorm   String              @db.VarChar(80)
+  /// Ce que le correcteur avait écrit, quand le signalement porte sur SA sortie et non sur celle
+  /// de Whisper. `heard` porte alors la forme d'origine résolue. Renseigne l'arbitrage — une
+  /// valeur ici veut dire que le correcteur s'est trompé sur ce terme.
+  correctorOutput String?            @db.VarChar(80)
   statut         DictationTermStatut @default(NOUVEAU)
   reportCount    Int                 @default(0)
   lastReportedAt DateTime            @default(now())

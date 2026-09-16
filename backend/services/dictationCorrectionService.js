@@ -90,7 +90,7 @@ function numbersGuard(raw, corrected) {
 function applyOps(text, ops, mode) {
   const raw = String(text ?? '');
   const wordCount = tokens(raw).length;
-  const giveUp = (why, ignoredCount) => { logger.warn(`Correction dictée abandonnée : ${why} (${ops.length} opération(s), ${wordCount} mots)`); return { text: raw, applied: 0, ignored: ignoredCount ?? ops.length }; };
+  const giveUp = (why, ignoredCount) => { logger.warn(`Correction dictée abandonnée : ${why} (${ops.length} opération(s), ${wordCount} mots)`); return { text: raw, applied: 0, ignored: ignoredCount ?? ops.length, changes: [] }; };
   // Le modèle recopie parfois le texte en opérations strictement identiques (from === to, mot pour mot) :
   // elles ne changent rien, on les écarte avant le plafond — sans plier accents/casse, pour garder appliable
   // une vraie correction d'accent ou de casse sur un terme (ex. « lasegue » → « Lasègue »).
@@ -102,6 +102,10 @@ function applyOps(text, ops, mode) {
 
   let current = raw;
   let applied = 0; let ignored = identityIgnored; let deletedWords = 0;
+  // Remplacements réellement appliqués, dans l'ordre. Ils disent quels mots du texte rendu sont
+  // notre production et non celle de Whisper — un signalement portant dessus doit être résolu
+  // vers la forme d'origine, sans quoi on apprendrait au correcteur sa propre erreur.
+  const changes = [];
   for (const op of realOps) {
     // Un jeton de pseudonymisation ([Libellé] ou [Libellé n]) ne figure jamais dans une vraie transcription :
     // toute opération qui en touche un (dans from/to/before/after) est un artefact du modèle, jamais appliquée.
@@ -125,12 +129,13 @@ function applyOps(text, ops, mode) {
     const end = op.op === 'delete' ? tailEnd : wordsEnd;
     current = cleanup(current.slice(0, start) + (op.op === 'replace' ? to : '') + current.slice(end));
     if (op.op === 'delete') deletedWords += fromTokens.length;
+    else changes.push({ from, to });
     applied += 1;
   }
   // Un seul « from » sans plafond de longueur peut à lui seul dépasser le ratio : la garde s'applique dès une suppression.
   if (wordCount > 0 && deletedWords / wordCount > MAX_DELETED_RATIO) return giveUp('trop de suppressions');
   if (!numbersGuard(raw, current)) return giveUp('nombre nouveau');
-  return { text: current, applied, ignored };
+  return { text: current, applied, ignored, changes };
 }
 
 const SYSTEM_PROMPT = `Tu relis la transcription automatique d'une dictée de kinésithérapeute (bilan de patient), en français, pour y repérer les rares termes mal transcrits et les hésitations.

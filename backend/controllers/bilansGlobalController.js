@@ -348,12 +348,14 @@ exports.correctDictation = async (req, res) => {
       const kine = await prisma.kine.findUnique({ where: { id: kineId }, select: { firstName: true, lastName: true, email: true } });
       const pseudo = createPseudonymizer({ patient: bilan.patient, kine });
       const r = await dictationCorrectionService.correct({ text: req.body.text, mode: req.body.mode, catalog, pseudo });
-      return res.json({ success: true, text: r.text, applied: r.applied, ignored: r.ignored });
+      // `changes` n'est jamais montré au kiné : il sert à savoir, s'il signale un terme plus tard,
+      // que ce terme est une sortie du correcteur et non de Whisper.
+      return res.json({ success: true, text: r.text, applied: r.applied, ignored: r.ignored, changes: r.changes || [] });
     } catch (err) {
       if (err instanceof draftService.DraftError) throw err;
       // Repli silencieux (spec correction §3) : toute panne de la passe de correction renvoie le texte brut, jamais d'erreur au kiné
       logger.warn(`Correction dictée : passe en échec (${err?.name}: ${err?.message})`);
-      return res.json({ success: true, text: req.body.text, applied: 0, ignored: 0 });
+      return res.json({ success: true, text: req.body.text, applied: 0, ignored: 0, changes: [] });
     }
   } catch (err) {
     sendDraftError(res, err, 'correction de la dictée');
@@ -367,7 +369,7 @@ exports.reportDictationTerm = async (req, res) => {
     if (bilanId === null) return;
     const kineId = await getKineId(req, res);
     if (!kineId) return;
-    await dictationTermService.report({ kineId, bilanId, heard: req.body.heard, expected: req.body.expected });
+    await dictationTermService.report({ kineId, bilanId, heard: req.body.heard, expected: req.body.expected, correctorOutput: req.body.correctorOutput });
     // La réponse ne dit jamais si le terme était déjà connu : le kiné n'a pas à savoir ce que les autres signalent
     return res.status(201).json({ success: true });
   } catch (err) {

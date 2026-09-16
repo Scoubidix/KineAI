@@ -242,6 +242,9 @@ async function runTail(jobId, stage) {
   if (!job) return;
   // Vaut aussi pour une reprise en COMPOSING : les notes d'une séance sont le dialogue corrigé
   const source = job.kind === 'SESSION' ? 'dialogue' : 'notes';
+  // Remplacements appliqués par le correcteur, rendus au client dans le résultat. Vide sur une
+  // reprise en COMPOSING : la correction a déjà eu lieu, ses opérations ne sont plus connues.
+  let corrections = [];
   try {
     if (stage === 'CORRECTING') {
       // Un bilan enregistré pendant le traitement ne doit pas être modifié
@@ -250,7 +253,8 @@ async function runTail(jobId, stage) {
       if (!raw) throw new DraftError('NOTES_REQUIRED', 400, 'Rien n’a été entendu');
       const catalog = await getCatalog();
       const pseudo = createPseudonymizer({ patient: job.bilan.patient, kine: job.kine });
-      const { text, applied, ignored, motif } = await dictationCorrectionService.correct({ text: raw, mode: job.kind === 'SESSION' ? 'session' : 'dictation', catalog, pseudo });
+      const { text, applied, ignored, motif, changes } = await dictationCorrectionService.correct({ text: raw, mode: job.kind === 'SESSION' ? 'session' : 'dictation', catalog, pseudo });
+      corrections = changes || [];
       if (source === 'dialogue') logger.info(`Traitement dictée ${jobId} : séance, rédaction depuis le dialogue`);
       // La transition sert de verrou : une queue qui a perdu la main n'ajoute pas les notes une 2e fois.
       // Les trois écritures (statut, notes, segments) réussissent ou échouent ensemble.
@@ -273,7 +277,9 @@ async function runTail(jobId, stage) {
     }
     const r = await composeService.composeFromNotesForBilan({ kineId: job.kineId, bilanId: job.bilanId, uid: job.kine.uid, source });
     // Ce que le front recevait d'un « Rédiger avec l'IA » direct, gardé pour rouvrir le tiroir « à vérifier »
-    const result = { accepted: (r.accepted || []).map((a) => ({ id: a.id, quote: a.quote })), pending: r.pending || [], rejected: r.rejected || 0, warnings: r.warnings || {} };
+    // `corrections` voyage avec le résultat : en séance le kiné ne repasse pas par les notes avant
+    // la rédaction, c'est le seul moyen de savoir plus tard quels termes viennent du correcteur.
+    const result = { accepted: (r.accepted || []).map((a) => ({ id: a.id, quote: a.quote })), pending: r.pending || [], rejected: r.rejected || 0, warnings: r.warnings || {}, corrections };
     const finished = await prisma.bilanJob.updateMany({ where: { id: jobId, status: 'COMPOSING' }, data: { status: 'DONE', error: null, errorDetail: null, result, finishedAt: new Date() } });
     if (finished.count !== 1) {
       logger.warn(`Traitement dictée ${jobId} : une autre queue a repris ce traitement, résultat non écrit`);

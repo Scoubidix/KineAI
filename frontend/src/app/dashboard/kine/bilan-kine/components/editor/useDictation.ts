@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ApiError, correctDictation, getDictationStatus, transcribeDictationSegment } from '@/utils/bilanApi';
+import type { DictationChange } from '@/types/bilan';
 import { DictationRecorder, pickMimeType } from './dictationRecorder';
 import { cleanSegment, insertSegment, shiftAnchor } from './dictationText';
 import { decodeToMono16k, encodeWav, sliceAtSilences, TARGET_RATE } from './audioSlicer';
@@ -48,9 +49,14 @@ export interface UseDictationArgs {
   setNotes: (notes: string) => void;
   enabled: boolean;
   onAutoStop?: () => void;
+  /**
+   * Remplacements déjà faits par le correcteur avant l'ouverture de la page — en séance, la
+   * correction a lieu côté serveur et ses opérations arrivent par le résultat du traitement.
+   */
+  initialChanges?: DictationChange[];
 }
 
-export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: UseDictationArgs) {
+export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop, initialChanges }: UseDictationArgs) {
   const [state, setState] = useState<DictationState>({ available: false, supported: true, phase: 'idle', starting: false, elapsedMs: 0, level: 0, inFlight: 0, failed: 0, segmentsDone: 0, segmentsTotal: null, permissionDenied: false, importing: false });
   const patch = useCallback((p: Partial<DictationState>) => setState((s) => ({ ...s, ...p })), []);
 
@@ -59,6 +65,9 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
   const availableRef = useRef(false);  // dernière disponibilité connue, lue en synchrone dans start()
   const currentRef = useRef<Take | null>(null);       // prise en cours d'enregistrement
   const takesRef = useRef(new Set<Take>());           // prises vivantes (segments en vol ou en échec)
+  // Remplacements faits par le correcteur depuis l'ouverture de la page. Non persisté : après un
+  // rechargement, un signalement retombe sur le comportement d'avant — la forme lue fait foi.
+  const changesRef = useRef<DictationChange[]>(initialChanges ? [...initialChanges] : []);
   const notesRef = useRef(notes);
   const knownRef = useRef(notes);                     // dernière valeur vue : détecte les éditions du kiné
 
@@ -130,7 +139,12 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
     const timer = setTimeout(() => controller.abort(), 60_000);
     let text = raw;
     try {
-      text = (await correctDictation(bilanId, { text: raw, mode: 'dictation' }, controller.signal)).text || raw;
+      const c = await correctDictation(bilanId, { text: raw, mode: 'dictation' }, controller.signal);
+      text = c.text || raw;
+      // Ce que le correcteur a remplacé, gardé en mémoire le temps de la session d'édition.
+      // Jamais affiché : sert seulement à reconnaître, si le kiné signale un de ces termes,
+      // qu'il porte sur notre sortie et non sur celle de Whisper.
+      for (const ch of c.changes) changesRef.current.push(ch);
     } catch {
       text = raw;
     } finally {
@@ -279,5 +293,5 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop }: 
   // Démontage : on libère le micro ; les segments en vol terminent d'eux-mêmes
   useEffect(() => () => { recorderRef.current?.stop(); }, []);
 
-  return { state, start, stop, importFile, retryFailed, ignoreFailed };
+  return { state, start, stop, importFile, retryFailed, ignoreFailed, changes: changesRef };
 }

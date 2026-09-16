@@ -85,8 +85,14 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
     // défaire la correction que le kiné vient de faire.
     update({ rawNotes: raw.slice(0, selection.start) + expected + raw.slice(selection.end) });
     setSelection(null);
+    // Le terme signalé peut être une sortie du correcteur, pas de Whisper : dans ce cas on
+    // remonte la forme d'origine, sinon on lui apprendrait sa propre erreur. Le kiné n'en sait
+    // rien — il n'a pas à savoir qu'un correcteur passe derrière lui.
+    const origin = dictation.changes.current.find((c) => c.to.toLowerCase() === heard.toLowerCase());
     try {
-      await reportDictationTerm(record.id, { heard, expected });
+      await reportDictationTerm(record.id, origin
+        ? { heard: origin.from, expected, correctorOutput: origin.to }
+        : { heard, expected });
       toast({ title: 'Terme transmis, merci' });
     } catch (e) {
       toast({ title: 'Signalement non transmis', description: (e as Error).message, variant: 'destructive' });

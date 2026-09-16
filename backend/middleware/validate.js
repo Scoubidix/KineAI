@@ -261,10 +261,21 @@ const roadmapIdeeStatutSchema = z.object({
 const dictationTermSchema = z.object({
   heard: z.string().min(1).max(80),
   expected: z.string().min(1).max(80),
+  // Ce que le correcteur avait écrit, quand le signalement porte sur sa sortie : `heard` porte
+  // alors la forme d'origine. Jamais montré au kiné, résolu par le client.
+  correctorOutput: z.string().min(1).max(80).optional(),
 });
 
 const dictationTermStatutSchema = z.object({
   statut: z.enum(['NOUVEAU', 'RETENU', 'ECARTE']),
+});
+
+// Correction d'une paire depuis l'admin : au moins un des deux côtés, jamais les deux absents
+const dictationTermEditSchema = z.object({
+  heard: z.string().min(1).max(80).optional(),
+  expected: z.string().min(1).max(80).optional(),
+}).refine((v) => v.heard !== undefined || v.expected !== undefined, {
+  message: 'Renseigne au moins une des deux formes',
 });
 
 module.exports = {
@@ -294,4 +305,5 @@ module.exports = {
   roadmapIdeeStatutSchema,
   dictationTermSchema,
   dictationTermStatutSchema,
+  dictationTermEditSchema,
 };

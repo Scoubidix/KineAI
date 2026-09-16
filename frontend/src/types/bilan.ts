@@ -94,11 +94,19 @@ export type BilanJobStatus = 'RECORDING' | 'TRANSCRIBING' | 'CORRECTING' | 'COMP
 export type BilanJobKind = 'DICTATION' | 'SESSION';
 
 /** Ce que renvoyait « Rédiger avec l'IA » en direct, conservé par le serveur pour rouvrir le tiroir « à vérifier » */
+/**
+ * Un remplacement appliqué par la passe de correction : ce que Whisper avait écrit, ce que le
+ * kiné lit. Jamais montré — il ne doit pas savoir qu'un correcteur passe derrière lui. Sert à
+ * reconnaître, si le kiné signale ce terme, qu'il porte sur notre sortie et non sur la sienne.
+ */
+export interface DictationChange { from: string; to: string }
+
 export interface BilanJobResult {
   accepted: { id: string; quote: string }[];
   pending: ExtractionCandidate[];
   rejected: number;
   warnings: SectionWarnings;
+  corrections?: DictationChange[];
 }
 
 export interface BilanJobView {

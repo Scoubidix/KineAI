@@ -62,7 +62,7 @@ function assertNoIdentity(pseudo, ...values) {
  * Le statut n'est jamais touché à la mise à jour : une paire écartée voit son compteur monter sans
  * repasser NOUVEAU — une décision d'admin ne se défait pas toute seule.
  */
-async function report({ kineId, bilanId, heard, expected }) {
+async function report({ kineId, bilanId, heard, expected, correctorOutput = null }) {
   const prisma = prismaService.getInstance();
   const bilan = await prisma.bilanKine.findFirst({
     where: { id: bilanId, kineId, isActive: true },
@@ -71,8 +71,11 @@ async function report({ kineId, bilanId, heard, expected }) {
   if (!bilan) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
 
   const clean = validateTerm({ heard, expected });
+  // Ce que le correcteur avait écrit, quand le kiné signale SA sortie : `heard` porte alors la
+  // forme d'origine, résolue côté client. Soumis aux mêmes gardes que le reste.
+  const via = String(correctorOutput ?? '').trim().slice(0, MAX_CHARS) || null;
   const kine = await prisma.kine.findUnique({ where: { id: kineId }, select: { firstName: true, lastName: true, email: true } });
-  assertNoIdentity(createPseudonymizer({ patient: bilan.patient, kine }), clean.heard, clean.expected);
+  assertNoIdentity(createPseudonymizer({ patient: bilan.patient, kine }), clean.heard, clean.expected, ...(via ? [via] : []));
 
   await prisma.$transaction(async (tx) => {
     const term = await tx.dictationTerm.upsert({
@@ -81,6 +84,7 @@ async function report({ kineId, bilanId, heard, expected }) {
       create: {
         heard: clean.heard, expected: clean.expected,
         heardNorm: clean.heardNorm, expectedNorm: clean.expectedNorm,
+        correctorOutput: via,
         reportCount: 1,
       },
     });
@@ -134,13 +138,64 @@ async function adminList({ statut }) {
     where: statut ? { statut } : {},
     orderBy: [{ statut: 'asc' }, { reportCount: 'desc' }],
     select: {
-      id: true, heard: true, expected: true, statut: true, reportCount: true, lastReportedAt: true,
+      id: true, heard: true, expected: true, correctorOutput: true, statut: true, reportCount: true, lastReportedAt: true,
       reports: { distinct: ['kineId'], select: { kineId: true } },
     },
   });
   // Kinés distincts, pas lignes de provenance : c'est ce chiffre qui distingue la prononciation
   // d'un seul kiné d'un trou de vocabulaire partagé, et c'est sur lui que l'arbitrage se fait.
   return rows.map(({ reports, ...r }) => ({ ...r, kineCount: reports.length }));
+}
+
+/**
+ * Corrige une paire depuis l'admin. Sert surtout à rogner une sélection trop large : un kiné qui
+ * signale « de la saigue » produit une correspondance trop spécifique, qui ne se déclencherait
+ * presque jamais.
+ *
+ * Rogner fait justement converger les variantes vers une paire qui existe déjà : on fusionne alors
+ * plutôt que de refuser. Les signalements rejoignent la ligne cible, les compteurs s'additionnent,
+ * le doublon disparaît — le nombre de kinés distincts se recalcule seul, il se lit des lignes de
+ * provenance.
+ *
+ * La garde d'identité ne tourne pas ici : elle a besoin du patient du bilan, et à ce stade il n'y
+ * a plus de bilan. C'est l'admin qui édite, sous sa responsabilité.
+ */
+async function adminEdit({ id, heard, expected }) {
+  const prisma = prismaService.getInstance();
+  const current = await prisma.dictationTerm.findUnique({ where: { id } });
+  if (!current) throw new DraftError('TERM_NOT_FOUND', 404, 'Terme introuvable');
+
+  const clean = validateTerm({ heard: heard ?? current.heard, expected: expected ?? current.expected });
+  const unchanged = clean.heardNorm === current.heardNorm && clean.expectedNorm === current.expectedNorm;
+  const target = unchanged ? null : await prisma.dictationTerm.findUnique({
+    where: { heardNorm_expectedNorm: { heardNorm: clean.heardNorm, expectedNorm: clean.expectedNorm } },
+  });
+
+  let term;
+  if (target && target.id !== id) {
+    term = await prisma.$transaction(async (tx) => {
+      await tx.dictationTermReport.updateMany({ where: { termId: id }, data: { termId: target.id } });
+      const merged = await tx.dictationTerm.update({
+        where: { id: target.id },
+        data: {
+          reportCount: target.reportCount + current.reportCount,
+          lastReportedAt: current.lastReportedAt > target.lastReportedAt ? current.lastReportedAt : target.lastReportedAt,
+        },
+      });
+      await tx.dictationTerm.delete({ where: { id } });
+      return merged;
+    });
+    logger.info(`Vocabulaire signalé : terme ${id} fusionné dans ${target.id}`);
+  } else {
+    term = await prisma.dictationTerm.update({
+      where: { id },
+      data: { heard: clean.heard, expected: clean.expected, heardNorm: clean.heardNorm, expectedNorm: clean.expectedNorm },
+    });
+    logger.info(`Vocabulaire signalé : terme ${id} corrigé`);
+  }
+  // Éditer un terme déjà retenu doit prendre effet tout de suite, comme un changement de statut
+  invalidateCache();
+  return term;
 }
 
 async function adminSetStatut({ id, statut }) {
@@ -154,5 +209,5 @@ async function adminSetStatut({ id, statut }) {
 
 module.exports = {
   MAX_CHARS, MAX_WORDS, normalizeTerm, validateTerm, assertNoIdentity, report,
-  STATUTS, listRetained, invalidateCache, adminList, adminSetStatut,
+  STATUTS, listRetained, invalidateCache, adminList, adminEdit, adminSetStatut,
 };

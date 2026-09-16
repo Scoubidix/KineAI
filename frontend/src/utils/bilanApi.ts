@@ -1,5 +1,5 @@
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import type { BilanJobKind, BilanJobView, BilanListItem, BilanPatch, BilanRecord, BilanSectionKey, BilanStatus, BilanType, ComposeFromNotesResult, ComposeResult, ExtractionResult } from '@/types/bilan';
+import type { BilanJobKind, BilanJobView, BilanListItem, BilanPatch, BilanRecord, BilanSectionKey, BilanStatus, BilanType, ComposeFromNotesResult, ComposeResult, DictationChange, ExtractionResult } from '@/types/bilan';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -132,13 +132,20 @@ export async function transcribeDictationSegment(id: number, input: { blob: Blob
 }
 
 /** Passe de correction d'une prise (termes, hésitations) : renvoie le texte brut si le serveur n'a rien pu corriger. */
-export async function correctDictation(id: number, input: { text: string; mode: 'dictation' | 'session' }, signal?: AbortSignal): Promise<{ text: string; applied: number; ignored: number }> {
-  const r = await call<{ text: string; applied: number; ignored: number }>(`/${id}/dictation/correct`, { ...jsonInit('POST', input), signal });
-  return { text: r.text ?? input.text, applied: r.applied ?? 0, ignored: r.ignored ?? 0 };
+export async function correctDictation(id: number, input: { text: string; mode: 'dictation' | 'session' }, signal?: AbortSignal): Promise<{ text: string; applied: number; ignored: number; changes: DictationChange[] }> {
+  const r = await call<{ text: string; applied: number; ignored: number; changes?: DictationChange[] }>(`/${id}/dictation/correct`, { ...jsonInit('POST', input), signal });
+  return { text: r.text ?? input.text, applied: r.applied ?? 0, ignored: r.ignored ?? 0, changes: r.changes ?? [] };
 }
 
-/** Signale un terme mal transcrit. La correction du texte est locale : cet appel ne fait que transmettre la paire. */
-export async function reportDictationTerm(id: number, input: { heard: string; expected: string }): Promise<void> {
+/**
+ * Signale un terme mal transcrit. La correction du texte est locale : cet appel ne fait que
+ * transmettre la paire.
+ *
+ * `correctorOutput` est renseigné quand le kiné a signalé un terme que le correcteur avait
+ * lui-même produit : `heard` porte alors la forme sortie de Whisper, pas celle qu'il a lue.
+ * Sans cette résolution, on apprendrait au correcteur sa propre erreur.
+ */
+export async function reportDictationTerm(id: number, input: { heard: string; expected: string; correctorOutput?: string }): Promise<void> {
   await call<{ success: true }>(`/${id}/dictation/terms`, jsonInit('POST', input));
 }
 

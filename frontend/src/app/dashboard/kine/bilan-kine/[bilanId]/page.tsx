@@ -8,7 +8,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useBilanAutosave } from '@/hooks/useBilanAutosave';
 import { getBilan, getJob, abandonJob, attachPatient, composeBilan, composeBilanFromNotes, ApiError, StaleDraftError } from '@/utils/bilanApi';
-import { emptyBilanDocument, type AiBusy, type BilanJobKind, type BilanJobResult, type BilanJobView, type BilanRecord, type BilanSectionKey, type ExtractionCandidate, type PatientSummary, type BilanType, type SectionWarnings } from '@/types/bilan';
+import { emptyBilanDocument, type AiBusy, type BilanJobKind, type BilanJobResult, type BilanJobView, type BilanRecord, type BilanSectionKey, type DictationChange, type ExtractionCandidate, type PatientSummary, type BilanType, type SectionWarnings } from '@/types/bilan';
 import BilanEditorAlerts from '../components/editor/BilanEditorAlerts';
 import BilanSettingsLine from '../components/editor/BilanSettingsLine';
 import CaptureStep from '../components/editor/CaptureStep';
@@ -29,6 +29,8 @@ export interface InitialAi {
   quotes: Map<string, string>;
   lastRun: { extracted: number; pending: number } | null;
   warnings: SectionWarnings;
+  /** Remplacements faits par le correcteur pendant le traitement de séance (jamais affichés) */
+  corrections: DictationChange[];
 }
 
 const toInitialAi = (r: BilanJobResult): InitialAi => ({
@@ -37,6 +39,7 @@ const toInitialAi = (r: BilanJobResult): InitialAi => ({
   quotes: new Map(r.accepted.map((a) => [a.id, a.quote])),
   lastRun: { extracted: r.accepted.length + r.pending.length, pending: r.pending.length },
   warnings: r.warnings,
+  corrections: r.corrections ?? [],
 });
 
 // Éditeur de bilan V1 : un état (useBilanAutosave), deux étapes, tiroir Mesures
@@ -83,6 +86,9 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
     setNotes: (n) => update({ rawNotes: n }),
     enabled: !locked && aiBusy === null && record.status !== 'ENREGISTRE',
     onAutoStop: () => toast({ title: 'Dictée arrêtée', description: '10 minutes par prise maximum. Relance une prise pour continuer.' }),
+    // En séance la correction a eu lieu côté serveur : ses remplacements arrivent par le résultat
+    // du traitement, faute de quoi un signalement porterait sur la sortie du correcteur.
+    initialChanges: initialAi?.corrections,
   });
 
   const openSuggestions = () => {
