@@ -14,7 +14,7 @@ function normalizeTerm(s) {
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
-    .replace(/[.,;:!?()«»"'']/g, ' ')
+    .replace(/[.,;:!?()«»"'’]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -32,7 +32,7 @@ function validateTerm({ heard, expected }) {
   if (heardNorm.split(' ').length > MAX_WORDS || expectedNorm.split(' ').length > MAX_WORDS) throw tooLong();
   if (heardNorm === expectedNorm) throw new DraftError('VALIDATION_ERROR', 400, 'Le terme attendu est identique à celui entendu');
   // Le vocabulaire ne porte pas de nombres : ils sont déjà protégés par les gardes du correcteur
-  if (/^[\d\s.,-]+$/.test(expectedNorm)) throw new DraftError('VALIDATION_ERROR', 400, 'Un nombre n\'est pas un terme');
+  if (/^[\d\s.,-]+$/.test(expectedNorm)) throw new DraftError('VALIDATION_ERROR', 400, 'Un nombre n’est pas un terme');
 
   return { heard: h, expected: e, heardNorm, expectedNorm };
 }
