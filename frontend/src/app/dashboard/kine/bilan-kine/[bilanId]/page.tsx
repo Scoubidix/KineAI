@@ -40,7 +40,7 @@ const toInitialAi = (r: BilanJobResult): InitialAi => ({
 });
 
 // Éditeur de bilan V1 : un état (useBilanAutosave), deux étapes, tiroir Mesures
-function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen }: { initial: BilanRecord; initialStep: EditorStep; initialAi?: InitialAi; forceDrawerOpen?: boolean }) {
+function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSession }: { initial: BilanRecord; initialStep: EditorStep; initialAi?: InitialAi; forceDrawerOpen?: boolean; fromSession?: boolean }) {
   const router = useRouter();
   const { toast } = useToast();
   const { record, update, flush, saveState, savedAt, pending, errorMessage, reload, replaceRecord } = useBilanAutosave(initial);
@@ -236,7 +236,7 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen }: { ini
         <div className="flex-1 min-h-0 flex">
           <div className="flex-1 min-w-0 pb-12 lg:pb-0">
             {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('document')} onCompose={() => { void handleComposeFromNotes(); }} composing={aiBusy === 'compose_from_notes'} dictation={dictation} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} />}
-            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} lastRun={lastRun} onVerify={openSuggestions} onDismissRun={() => setLastRun(null)} wide={wide} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} />}
+            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} lastRun={lastRun} onVerify={openSuggestions} onDismissRun={() => setLastRun(null)} wide={wide} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} fromSession={fromSession} />}
           </div>
           <MeasuresDrawer record={record} update={update} disabled={locked || aiBusy !== null} candidates={candidates} rejectedCount={rejectedCount} onCandidatesChange={setCandidates} aiBusy={aiBusy} open={drawerOpen} onOpenChange={setDrawer} wide={wide} quotes={quotes} />
         </div>
@@ -358,5 +358,5 @@ export default function BilanEditorPage() {
   // « auto ») : après « Rédiger moi-même », le kiné veut ses notes même sur un bilan déjà généré.
   const composed = initialAi !== undefined || (flow === 'auto' && state.bilan.status === 'GENERE');
   const step: EditorStep = composed && (flow === 'editor' || stepParam === null) ? 'document' : initialStep;
-  return <BilanEditor key={`${state.bilan.id}-${flow}`} initial={state.bilan} initialStep={step} initialAi={initialAi} forceDrawerOpen={Boolean(initialAi && initialAi.candidates.length > 0)} />;
+  return <BilanEditor key={`${state.bilan.id}-${flow}`} initial={state.bilan} initialStep={step} initialAi={initialAi} forceDrawerOpen={Boolean(initialAi && initialAi.candidates.length > 0)} fromSession={job?.kind === 'SESSION'} />;
 }

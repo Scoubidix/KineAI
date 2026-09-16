@@ -34,11 +34,13 @@ export interface DocumentStepProps {
   onDismissRun: () => void;
   /** ≥ 1024 px : pied de page classique. Sinon, les actions se fondent dans la barre repliée du tiroir. */
   wide: boolean;
+  /** Bilan issu d'une séance : les notes sont la transcription, le bouton doit le dire */
+  fromSession?: boolean;
 }
 
 const FLUSH_PENDING_TOAST = { title: 'Sauvegarde en attente, réessaie dans un instant' };
 
-export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited, lastRun, onVerify, onDismissRun, wide, onOpenMeasures, measuresOpen }: DocumentStepProps) {
+export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited, lastRun, onVerify, onDismissRun, wide, onOpenMeasures, measuresOpen, fromSession }: DocumentStepProps) {
   const { toast } = useToast();
   const doc = record.document ?? emptyBilanDocument();
   const [evolution, setEvolution] = useState(false);
@@ -117,7 +119,7 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
   const toolbar = (
     <div className="mx-auto w-full max-w-[794px] grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-1">
       <div className="flex items-center">
-        <Button variant="ghost" size="sm" onClick={onBack} className="h-9 text-sm"><ArrowLeft className="h-4 w-4 mr-1" />Notes</Button>
+        <Button variant="ghost" size="sm" onClick={onBack} className="h-9 text-sm"><ArrowLeft className="h-4 w-4 mr-1" />{fromSession ? 'Transcription' : 'Notes'}</Button>
       </div>
       {measuresOpen ? <span /> : (
         <Button variant="outline" size="sm" onClick={onOpenMeasures} className="h-9 text-sm rounded-full border-[#3899aa]/50 text-[#3899aa] hover:bg-[#3899aa]/10">

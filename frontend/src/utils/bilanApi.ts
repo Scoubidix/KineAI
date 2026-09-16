@@ -137,6 +137,11 @@ export async function correctDictation(id: number, input: { text: string; mode: 
   return { text: r.text ?? input.text, applied: r.applied ?? 0, ignored: r.ignored ?? 0 };
 }
 
+/** Signale un terme mal transcrit. La correction du texte est locale : cet appel ne fait que transmettre la paire. */
+export async function reportDictationTerm(id: number, input: { heard: string; expected: string }): Promise<void> {
+  await call<{ success: true }>(`/${id}/dictation/terms`, jsonInit('POST', input));
+}
+
 // ---- Traitement de dictée côté serveur (plan 7) ----
 
 /** Crée (ou remet à zéro) le traitement du bilan : statut RECORDING. En séance, `consent` atteste que le patient a été informé. */
