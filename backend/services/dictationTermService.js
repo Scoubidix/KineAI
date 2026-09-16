@@ -1,6 +1,3 @@
-// Vocabulaire signalé par les kinés : normalisation, gardes, écriture et lecture.
-// Ce qui entre ici est du vocabulaire métier, jamais du contenu clinique : les gardes
-// ci-dessous refusent les noms et les phrases, et rien d'autre n'est stocké.
 const { DraftError } = require('./bilanDraftService');
 
 /** Bornes de la spec : un terme, pas une phrase. */
