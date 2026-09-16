@@ -68,6 +68,14 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
     if (!selection) return;
     const raw = record.rawNotes ?? '';
     const heard = selection.text;
+    // Les notes ont pu bouger depuis la sélection — une dictée insère son texte à une ancre,
+    // pas par onChange. Si les bornes mémorisées ne désignent plus le même texte, elles ont
+    // glissé : remplacer à l'aveugle écraserait un autre passage.
+    if (raw.slice(selection.start, selection.end) !== heard) {
+      setSelection(null);
+      toast({ title: 'Sélection perdue', description: 'Tes notes ont changé, resélectionne le terme' });
+      return;
+    }
     // Le texte est corrigé quoi qu'il arrive : un signalement qui ne part pas ne doit pas
     // défaire la correction que le kiné vient de faire.
     update({ rawNotes: raw.slice(0, selection.start) + expected + raw.slice(selection.end) });
