@@ -12,6 +12,7 @@ const dictationCorrectionService = require('../services/dictationCorrectionServi
 const jobService = require('../services/bilanJobService');
 const { MAX_SEGMENTS } = require('../services/bilanJobRules');
 const { createPseudonymizer } = require('../services/pseudonymService');
+const dictationTermService = require('../services/dictationTermService');
 
 /**
  * GET /api/bilans/patients-with-bilans
@@ -356,6 +357,21 @@ exports.correctDictation = async (req, res) => {
     }
   } catch (err) {
     sendDraftError(res, err, 'correction de la dictée');
+  }
+};
+
+/** POST /api/bilans/:id/dictation/terms — le kiné signale un terme mal transcrit */
+exports.reportDictationTerm = async (req, res) => {
+  try {
+    const bilanId = parseBilanId(req, res);
+    if (bilanId === null) return;
+    const kineId = await getKineId(req, res);
+    if (!kineId) return;
+    await dictationTermService.report({ kineId, bilanId, heard: req.body.heard, expected: req.body.expected });
+    // La réponse ne dit jamais si le terme était déjà connu : le kiné n'a pas à savoir ce que les autres signalent
+    return res.status(201).json({ success: true });
+  } catch (err) {
+    sendDraftError(res, err, 'signalement de terme');
   }
 };
 

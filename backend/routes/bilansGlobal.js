@@ -5,8 +5,8 @@ const multer = require('multer');
 
 const bilansGlobalController = require('../controllers/bilansGlobalController');
 const { authenticate } = require('../middleware/authenticate');
-const { pdfGenerationLimiter, crudWriteLimiter, gptLimiter, dictationLimiter, dictationCorrectLimiter } = require('../middleware/rateLimiter');
-const { validate } = require('../middleware/validate');
+const { pdfGenerationLimiter, crudWriteLimiter, gptLimiter, dictationLimiter, dictationCorrectLimiter, dictationTermLimiter } = require('../middleware/rateLimiter');
+const { validate, dictationTermSchema } = require('../middleware/validate');
 const { requireBilanEditor } = require('../middleware/authorization');
 const { SECTION_KEYS } = require('../services/bilanDocument');
 const { MODES } = require('../services/dictationCorrectionService');
@@ -69,6 +69,10 @@ router.post('/:id/dictation', authenticate, dictationLimiter, requireBilanEditor
 const correctDictationSchema = z.object({ text: z.string().max(20000), mode: z.enum(MODES) });
 // Passe de correction à la fin de la prise (spec correction §3) : rien n'est écrit, texte brut renvoyé sur échec
 router.post('/:id/dictation/correct', authenticate, dictationCorrectLimiter, requireBilanEditor, validate(correctDictationSchema), bilansGlobalController.correctDictation);
+
+// Signalement d'un terme mal transcrit. Pas de `requireBilanEditor` : signaler est une contribution,
+// pas une consommation d'IA — un kiné sans plan éditeur ne doit pas se voir opposer un 403 brut.
+router.post('/:id/dictation/terms', authenticate, dictationTermLimiter, validate(dictationTermSchema), bilansGlobalController.reportDictationTerm);
 
 // Traitement de dictée côté serveur (spec traitement serveur §4.2) : le navigateur envoie, le serveur enchaîne.
 const createJobSchema = z.object({ kind: z.enum(KINDS).optional(), consent: z.boolean().optional() });

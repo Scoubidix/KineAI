@@ -9,6 +9,8 @@ import type { BilanPatch, BilanRecord } from '@/types/bilan';
 import DictationBar from './DictationBar';
 import { useToast } from '@/hooks/use-toast';
 import { useDictation } from './useDictation';
+import TermReportBar from './TermReportBar';
+import { reportDictationTerm } from '@/utils/bilanApi';
 
 export interface StepProps {
   record: BilanRecord;
@@ -49,6 +51,47 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
   // le focus sur le textarea, mais on retombe ici si le focus a bougé entre-temps (ex. clavier virtuel).
   const lastCaretRef = useRef<number | null>(null);
   const rememberCaret = (e: React.SyntheticEvent<HTMLTextAreaElement>) => { lastCaretRef.current = e.currentTarget.selectionStart; };
+  // Sélection en cours dans les notes : ouvre la correction de terme. Les bornes sont resserrées
+  // sur le texte utile, sinon remplacer mangerait les espaces qui encadrent la sélection.
+  const [selection, setSelection] = useState<{ start: number; end: number; text: string } | null>(null);
+  const handleSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    rememberCaret(e);
+    const el = e.currentTarget;
+    const raw = record.rawNotes ?? '';
+    let start = el.selectionStart; let end = el.selectionEnd;
+    while (start < end && /\s/.test(raw[start])) start += 1;
+    while (end > start && /\s/.test(raw[end - 1])) end -= 1;
+    // Le serveur n'accepte qu'un terme : 80 caractères et 4 mots au plus (dictationTermService).
+    // Au-delà, le kiné sélectionne pour tout autre chose — copier, effacer — et la barre n'a
+    // rien à faire là.
+    const text = end > start ? raw.slice(start, end) : '';
+    const isTerm = text.length > 0 && text.length <= 80 && text.split(/\s+/).length <= 4;
+    setSelection(isTerm ? { start, end, text } : null);
+  };
+
+  const confirmTerm = async (expected: string) => {
+    if (!selection) return;
+    const raw = record.rawNotes ?? '';
+    const heard = selection.text;
+    // Les notes ont pu bouger depuis la sélection — une dictée insère son texte à une ancre,
+    // pas par onChange. Si les bornes mémorisées ne désignent plus le même texte, elles ont
+    // glissé : remplacer à l'aveugle écraserait un autre passage.
+    if (raw.slice(selection.start, selection.end) !== heard) {
+      setSelection(null);
+      toast({ title: 'Sélection perdue', description: 'Tes notes ont changé, resélectionne le terme' });
+      return;
+    }
+    // Le texte est corrigé quoi qu'il arrive : un signalement qui ne part pas ne doit pas
+    // défaire la correction que le kiné vient de faire.
+    update({ rawNotes: raw.slice(0, selection.start) + expected + raw.slice(selection.end) });
+    setSelection(null);
+    try {
+      await reportDictationTerm(record.id, { heard, expected });
+      toast({ title: 'Terme transmis, merci' });
+    } catch (e) {
+      toast({ title: 'Signalement non transmis', description: (e as Error).message, variant: 'destructive' });
+    }
+  };
   const caretPos = () => { const el = textareaRef.current; return el && document.activeElement === el ? el.selectionStart : (lastCaretRef.current ?? (record.rawNotes ?? '').length); };
   const dictating = dictation.state.phase !== 'idle';
   const hint = dictation.state.phase === 'correcting'
@@ -63,7 +106,15 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
         {/* Surface d'écriture, pas champ de formulaire : ni bordure ni fond, colonne mesurée à
             ~68 caractères et interligne aéré. Le curseur suffit à signaler le focus dans une
             zone de texte — c'est ce que font les éditeurs de document. */}
-        <Textarea ref={textareaRef} value={record.rawNotes ?? ''} onChange={(e) => update({ rawNotes: e.target.value })} onSelect={rememberCaret} onBlur={rememberCaret} placeholder={PLACEHOLDER} disabled={disabled} maxLength={50000} className="mx-auto w-full max-w-[68ch] min-h-[320px] lg:min-h-[480px] text-[15px] leading-[1.75] resize-y rounded-none border-0 bg-transparent dark:bg-transparent px-0 py-1 focus-visible:ring-0" />
+        {selection && !dictating && (
+          <TermReportBar
+            heard={selection.text}
+            onCancel={() => setSelection(null)}
+            onConfirm={(expected) => { void confirmTerm(expected); }}
+            disabled={disabled}
+          />
+        )}
+        <Textarea ref={textareaRef} value={record.rawNotes ?? ''} onChange={(e) => { setSelection(null); update({ rawNotes: e.target.value }); }} onSelect={handleSelect} onBlur={rememberCaret} placeholder={PLACEHOLDER} disabled={disabled} maxLength={50000} className="mx-auto w-full max-w-[68ch] min-h-[320px] lg:min-h-[480px] text-[15px] leading-[1.75] resize-y rounded-none border-0 bg-transparent dark:bg-transparent px-0 py-1 focus-visible:ring-0" />
         <DictationBar
           state={dictation.state}
           disabled={!!disabled}

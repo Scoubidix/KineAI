@@ -9,13 +9,14 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, TrendingDown, Minus, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, FileSignature, Gift, Activity, Layers, Zap, ImagePlus, X, Pencil, Trash2, Sparkles, Dumbbell, Map as MapIcon } from 'lucide-react';
+import { Users, UserCheck, ClipboardList, RefreshCw, ShieldCheck, CreditCard, TrendingUp, TrendingDown, Minus, UserPlus, UserMinus, ArrowRightLeft, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, FileSignature, Gift, Activity, Layers, Zap, ImagePlus, X, Pencil, Trash2, Sparkles, Dumbbell, Map as MapIcon, Mic } from 'lucide-react';
 import BilanFieldsTab from './components/BilanFieldsTab';
 import BilanTemplatesTab from './components/BilanTemplatesTab';
 import TokenUsageTab from './components/TokenUsageTab';
 import NouveautesTab from './components/NouveautesTab';
 import ExercicesPublicsTab from './components/ExercicesPublicsTab';
 import RoadmapTab from './components/RoadmapTab';
+import DictationTermsTab from './components/DictationTermsTab';
 import { Button } from '@/components/ui/button';
 
 interface LastPayout {
@@ -522,6 +523,10 @@ export default function AdminDashboardPage() {
                 <MapIcon className="h-3.5 w-3.5" />
                 Roadmap
               </TabsTrigger>
+              <TabsTrigger value="dictee" className="gap-1.5">
+                <Mic className="h-3.5 w-3.5" />
+                Dictée
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard" className="space-y-6 mt-4">
@@ -1020,6 +1025,10 @@ export default function AdminDashboardPage() {
 
             <TabsContent value="roadmap" className="space-y-4 mt-4">
               <RoadmapTab />
+            </TabsContent>
+
+            <TabsContent value="dictee" className="space-y-4 mt-4">
+              <DictationTermsTab />
             </TabsContent>
           </Tabs>
         </div>
