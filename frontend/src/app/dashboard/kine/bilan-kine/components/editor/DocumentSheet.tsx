@@ -14,11 +14,18 @@ interface DocumentSheetProps {
   doc: BilanDocument;
   onSectionChange: (key: BilanSectionKey, text: string) => void;
   disabled?: boolean;
-  canRegenerate: boolean;
-  onRegenerate: (key: BilanSectionKey) => void;
-  aiBusy: AiBusy;
-  warnings: SectionWarnings;
-  onDismissWarning: (key: BilanSectionKey) => void;
+  /**
+   * Reprise IA d'une section. Absente = feuille en correction manuelle seule : c'est le cas du
+   * bilan enregistré, dont les notes ne sont plus sous les yeux du kiné — lui offrir une reprise
+   * qui repart d'un texte qu'il ne voit pas serait une boîte noire. La rédaction IA appartient à
+   * l'éditeur, où les notes sont là.
+   */
+  onRegenerate?: (key: BilanSectionKey) => void;
+  /** Notes présentes : sans elles le serveur n'a rien à reprendre (NOTES_REQUIRED) */
+  canRegenerate?: boolean;
+  aiBusy?: AiBusy;
+  warnings?: SectionWarnings;
+  onDismissWarning?: (key: BilanSectionKey) => void;
 }
 
 interface RenderedParts { header: string; title: string; patient: string; examen: string; observations: string }
@@ -27,8 +34,8 @@ interface RenderedParts { header: string; title: string; patient: string; examen
  * Retire le titre « Examen clinique » du bloc de mesures rendu par le serveur.
  *
  * Le PDF n'a qu'un titre : le moteur supprime celui de la section quand il rend les tableaux
- * (bilanRenderer/index.js). Ici c'est l'inverse — la section garde son titre, qui porte le bouton
- * de régénération — donc c'est celui des tableaux qui saute. Le sélecteur vise l'enfant direct de
+ * (bilanRenderer/index.js). Ici c'est l'inverse — la section garde son titre, qui porte la reprise
+ * IA quand elle est offerte — donc c'est celui des tableaux qui saute. Le sélecteur vise l'enfant direct de
  * `.bilan-examen` : le titre « Évolution des mesures », dans sa propre section, n'est pas touché.
  */
 function stripExamenHeading(html: string): string {
@@ -56,7 +63,7 @@ const sanitize = (html: string) => DOMPurify.sanitize(html);
 
 // La page du bilan telle qu'elle sera imprimée : parties fixes rendues par le serveur,
 // paragraphes des sections éditables en place.
-export default function DocumentSheet({ bilanId, refreshKey, evolution, doc, onSectionChange, disabled, canRegenerate, onRegenerate, aiBusy, warnings, onDismissWarning }: DocumentSheetProps) {
+export default function DocumentSheet({ bilanId, refreshKey, evolution, doc, onSectionChange, disabled, canRegenerate, onRegenerate, aiBusy = null, warnings = {}, onDismissWarning }: DocumentSheetProps) {
   const [parts, setParts] = useState<RenderedParts | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,10 +99,10 @@ export default function DocumentSheet({ bilanId, refreshKey, evolution, doc, onS
           onChange={(t) => onSectionChange(key, t)}
           disabled={disabled}
           canRegenerate={canRegenerate}
-          onRegenerate={() => onRegenerate(key)}
+          onRegenerate={onRegenerate ? () => onRegenerate(key) : undefined}
           regenerating={aiBusy === key}
           warning={warnings[key]}
-          onDismissWarning={() => onDismissWarning(key)}
+          onDismissWarning={onDismissWarning ? () => onDismissWarning(key) : undefined}
           before={key === 'examen' && parts ? (
             <>
               {parts.examen && <div dangerouslySetInnerHTML={{ __html: sanitize(parts.examen) }} />}

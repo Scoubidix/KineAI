@@ -13,7 +13,8 @@ interface SectionBlockProps {
   onChange: (text: string) => void;
   disabled?: boolean;
   /** Notes présentes : la régénération IA est possible */
-  canRegenerate: boolean;
+  canRegenerate?: boolean;
+  /** Absent = section en correction manuelle seule : aucun bouton de reprise IA n'est rendu. */
   onRegenerate?: () => void;
   regenerating?: boolean;
   warning?: SectionWarning;
@@ -48,6 +49,7 @@ export default function SectionBlock({ sectionKey, title, text, onChange, disabl
     <section className="bilan-section group" aria-labelledby={`section-${sectionKey}`}>
       <div className="flex items-end gap-2">
         <h2 id={`section-${sectionKey}`} className={`bilan-h2 flex-1 ${empty ? 'opacity-50' : ''}`}>{title}</h2>
+        {onRegenerate && (
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="mb-1 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100 transition-opacity">
@@ -58,6 +60,7 @@ export default function SectionBlock({ sectionKey, title, text, onChange, disabl
           </TooltipTrigger>
           <TooltipContent>{canRegenerate ? 'Régénérer cette section avec l’IA' : 'Saisis des notes pour utiliser l’IA'}</TooltipContent>
         </Tooltip>
+        )}
       </div>
       {warning && (
         <div role="status" className="mb-1 flex items-center gap-1.5 text-[11px] text-amber-700">

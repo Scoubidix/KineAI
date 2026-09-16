@@ -69,8 +69,7 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
   };
   const doc = record.document ?? emptyBilanDocument();
 
-  const handlePatientChange = async (p: PatientSummary | null) => {
-    if (!p) { toast({ title: 'Patient conservé', description: 'Pour changer de patient, choisis-en un autre dans la liste' }); return; }
+  const handlePatientChange = async (p: PatientSummary) => {
     try {
       replaceRecord(await attachPatient(record.id, p.id));
     } catch (e) {

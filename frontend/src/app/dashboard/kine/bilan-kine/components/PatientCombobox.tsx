@@ -16,10 +16,17 @@ interface PatientComboboxProps {
   placeholder?: string;
   /** `field` = champ de formulaire pleine largeur ; `inline` = mot réglable dans une phrase */
   variant?: 'field' | 'inline';
+  /**
+   * Croix de retrait. À poser à `false` sur un bilan déjà rattaché : le serveur ne sait pas
+   * détacher — rattacher résout les jetons d'identité dans le texte, et détacher laisserait le
+   * nom du patient écrit en clair dans un bilan qui se déclare sans patient. Changer de patient
+   * reste possible : c'est un nouveau rattachement.
+   */
+  clearable?: boolean;
 }
 
 // Recherche et sélection d'un patient actif du kiné (liste chargée à la première ouverture)
-export default function PatientCombobox({ value, onChange, disabled, placeholder = 'Rechercher un patient…', variant = 'field' }: PatientComboboxProps) {
+export default function PatientCombobox({ value, onChange, disabled, placeholder = 'Rechercher un patient…', variant = 'field', clearable = true }: PatientComboboxProps) {
   const [open, setOpen] = useState(false);
   const [patients, setPatients] = useState<PatientSummary[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -92,7 +99,7 @@ export default function PatientCombobox({ value, onChange, disabled, placeholder
               <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
             </button>
           </PopoverTrigger>
-          {value && !disabled && (
+          {value && clearable && !disabled && (
             <button type="button" aria-label="Retirer le patient" onClick={() => onChange(null)} className="text-muted-foreground hover:text-foreground">
               <X className="h-3.5 w-3.5" />
             </button>
@@ -108,7 +115,7 @@ export default function PatientCombobox({ value, onChange, disabled, placeholder
       <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm">
         <User className="h-4 w-4 text-[#3899aa] shrink-0" />
         <span className="truncate flex-1">{value.firstName} {value.lastName.toUpperCase()}</span>
-        {!disabled && (
+        {clearable && !disabled && (
           <Button type="button" variant="ghost" size="sm" aria-label="Retirer le patient" onClick={() => onChange(null)} className="h-6 w-6 p-0">
             <X className="h-3.5 w-3.5" />
           </Button>

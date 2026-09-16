@@ -14,7 +14,7 @@ interface BilanSettingsLineProps {
   record: BilanRecord;
   onBack: () => void;
   onTypeChange: (t: BilanType) => void;
-  onPatientChange: (p: PatientSummary | null) => void;
+  onPatientChange: (p: PatientSummary) => void;
   onMotifChange: (motif: string) => void;
   disabled?: boolean;
 }
@@ -62,7 +62,7 @@ export default function BilanSettingsLine({ record, onBack, onTypeChange, onPati
       </DropdownMenu>
 
       <span>pour</span>
-      <PatientCombobox variant="inline" value={record.patient} onChange={onPatientChange} disabled={disabled} />
+      <PatientCombobox variant="inline" clearable={false} value={record.patient} onChange={(p) => { if (p) onPatientChange(p); }} disabled={disabled} />
 
       {/* Motif : déduit de la dictée par le correcteur, corrigeable par le kiné. Édition en
           place plutôt qu'un champ de formulaire — il est rempli tout seul la plupart du temps. */}

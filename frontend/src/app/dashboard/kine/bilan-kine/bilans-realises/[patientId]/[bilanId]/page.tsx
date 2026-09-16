@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import DOMPurify from 'dompurify';
-import { Download, History, Loader2, PanelRightOpen, RefreshCw, Trash2 } from 'lucide-react';
+import { Download, History, Loader2, PanelRightOpen, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -12,7 +13,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useBilanAutosave } from '@/hooks/useBilanAutosave';
-import { ApiError, composeBilan, deleteBilan, getBilan } from '@/utils/bilanApi';
+import { deleteBilan, getBilan } from '@/utils/bilanApi';
 import { downloadBilanPdf, fetchBilanRender } from '@/utils/bilanExport';
 import DocumentSheet from '../../../components/editor/DocumentSheet';
 import SaveIndicator from '../../../components/editor/SaveIndicator';
@@ -21,7 +22,7 @@ import CompareWithPreviousModal from '../../../components/CompareWithPreviousMod
 import { usePreviousReference } from '../../../components/editor/usePreviousReference';
 import MeasuresPane, { useDensePane } from '../../../components/editor/MeasuresPane';
 import { useMinWidth } from '../../../components/editor/useMinWidth';
-import { BILAN_TYPE_COLORS, BILAN_TYPE_LABELS, emptyBilanDocument, type AiBusy, type BilanRecord, type BilanSectionKey, type DocumentMeasurement, type SectionWarnings } from '@/types/bilan';
+import { BILAN_TYPE_COLORS, BILAN_TYPE_LABELS, emptyBilanDocument, type BilanRecord, type BilanSectionKey, type DocumentMeasurement } from '@/types/bilan';
 import { CARD, PageHeader, formatDateLong } from '../../../components/ListPage';
 import { BILANS_REALISES_HREF, parseId } from '../../../components/bilansRealises';
 
@@ -79,19 +80,74 @@ function ActionsRow({ bilan, backHref, extras, evolution }: { bilan: BilanRecord
 }
 
 /**
- * Surface unique de correction d'un bilan à document : le texte s'édite dans la feuille, les
- * mesures dans un tiroir, l'IA ne peut que reprendre une section.
+ * Le titre de la page est le motif du bilan, corrigeable sur place.
  *
- * Aucun chemin vers l'éditeur : corriger et créer sont deux gestes différents, et l'éditeur
- * porte la dictée et la rédaction complète, qui écraseraient le bilan rendu au patient.
+ * Le motif ne sort jamais de l'application : le moteur de rendu ne l'imprime pas. C'est
+ * l'étiquette qui permet au kiné de retrouver ce bilan dans ses listes — il doit donc pouvoir la
+ * rectifier là où il la lit. Le type, lui, reste figé : il compose le titre du document remis au
+ * patient (« BILAN KINÉSITHÉRAPIQUE FINAL ») et le nom du fichier PDF.
+ */
+function EditableMotif({ motif, onChange, disabled }: { motif: string; onChange: (motif: string) => void; disabled?: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  // Échap doit annuler sans écrire : démonter l'Input retire le focus, et certains navigateurs
+  // déclenchent quand même onBlur sur ce retrait (même garde que la ligne de réglages de l'éditeur).
+  const cancelled = useRef(false);
+
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          setEditing(false);
+          if (cancelled.current) return;
+          const next = draft.trim();
+          // N'écrit que si la valeur a changé : sinon un clic puis un clic ailleurs ferait bouger
+          // `updatedAt` pour rien, et le bilan remonterait artificiellement dans les listes.
+          if (next !== motif) onChange(next);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') { cancelled.current = true; setEditing(false); }
+        }}
+        maxLength={120}
+        aria-label="Motif du bilan"
+        className="h-9 text-lg font-semibold text-[#3899aa]"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => { cancelled.current = false; setDraft(motif); setEditing(true); }}
+      aria-label={`Motif : ${motif || 'aucun'}. Modifier le motif`}
+      className="group/motif inline-flex items-center gap-2 max-w-full -mx-1 px-1 rounded-md text-left hover:bg-muted transition-colors disabled:pointer-events-none"
+    >
+      <span className={`truncate ${motif ? '' : 'font-normal text-muted-foreground'}`}>{motif || 'Ajouter un motif'}</span>
+      {/* Crayon toujours visible, pas seulement au survol : au toucher il n'y a pas de survol,
+          et une zone éditable qui ne se signale pas ne se découvre jamais. */}
+      <Pencil className="h-3.5 w-3.5 shrink-0 opacity-40 group-hover/motif:opacity-100 transition-opacity" aria-hidden />
+    </button>
+  );
+}
+
+/**
+ * Surface unique de correction d'un bilan à document : le texte s'édite dans la feuille, les
+ * mesures dans un tiroir. Correction manuelle seulement — aucune reprise IA ici : la rédaction
+ * part des notes brutes, et sur un bilan enregistré le kiné ne les a plus sous les yeux. Lui
+ * offrir un bouton qui réécrit une section à partir d'un texte invisible serait une boîte noire.
+ *
+ * Aucun chemin vers l'éditeur non plus : corriger et créer sont deux gestes différents, et
+ * l'éditeur porte la dictée et la rédaction complète, qui écraseraient le bilan rendu au patient.
  */
 function LivingBilan({ initial, backHref }: { initial: BilanRecord; backHref: string }) {
-  const { toast } = useToast();
-  const { record, update, flush, replaceRecord, saveState, savedAt, pending, errorMessage, reload } = useBilanAutosave(initial);
+  const { record, update, saveState, savedAt, pending, errorMessage, reload } = useBilanAutosave(initial);
   const doc = record.document ?? emptyBilanDocument();
   const stale = saveState === 'stale';
-  const [aiBusy, setAiBusy] = useState<AiBusy>(null);
-  const [warnings, setWarnings] = useState<SectionWarnings>({});
   const wide = useMinWidth(1024);
   const dense = useDensePane(wide);
   // Ouvert d'emblée sur grand écran : sur un bilan déjà rédigé, les mesures font partie de ce
@@ -100,8 +156,6 @@ function LivingBilan({ initial, backHref }: { initial: BilanRecord; backHref: st
   useEffect(() => { setMeasuresOpen(wide); }, [wide]);
   const [compareOpen, setCompareOpen] = useState(false);
   const [evolution, setEvolution] = useState(false);
-  // La rédaction part des notes : sans notes, l'IA n'a rien à reprendre (NOTES_REQUIRED côté serveur)
-  const canRegenerate = (record.rawNotes ?? '').trim().length > 0;
   const comparisonIds = doc.comparison?.previousBilanIds;
   const hasPrevious = (comparisonIds?.length ?? 0) > 0;
 
@@ -123,28 +177,7 @@ function LivingBilan({ initial, backHref }: { initial: BilanRecord; backHref: st
 
   const setMeasurements = (measurements: DocumentMeasurement[]) => update({ document: { ...doc, measurements } });
 
-  // Une section à la fois : la réécriture complète reste réservée à la création.
-  const regenerate = async (key: BilanSectionKey) => {
-    if (aiBusy !== null) return;
-    if (!(await flush())) { toast({ title: 'Sauvegarde en attente', description: 'Réessaie dans un instant' }); return; }
-    setAiBusy(key);
-    try {
-      const r = await composeBilan(record.id, [key]);
-      replaceRecord(r.bilan);
-      setWarnings((prev) => { const next = { ...prev }; delete next[key]; return { ...next, ...r.warnings }; });
-    } catch (e) {
-      const message = e instanceof ApiError && e.status === 429
-        ? 'Patiente une minute avant de relancer l’IA'
-        : (e as Error).message || 'Reprise impossible';
-      toast({ title: 'Erreur', description: message, variant: 'destructive' });
-    } finally {
-      setAiBusy(null);
-    }
-  };
-
   const summary = 'Tests et mesures';
-
-  const clearWarning = (key: BilanSectionKey) => setWarnings((prev) => { if (!(key in prev)) return prev; const next = { ...prev }; delete next[key]; return next; });
 
   return (
     <div className="flex min-h-full">
@@ -157,7 +190,7 @@ function LivingBilan({ initial, backHref }: { initial: BilanRecord; backHref: st
       <PageHeader
         backHref={backHref}
         backLabel="Retour aux bilans du patient"
-        title={record.motif || 'Bilan'}
+        title={<EditableMotif motif={record.motif ?? ''} onChange={(motif) => update({ motif })} disabled={stale} />}
         right={saveState === 'idle' ? undefined : <span className="shrink-0"><SaveIndicator state={saveState} savedAt={savedAt} pending={pending} /></span>}
       />
       <ActionsRow
@@ -194,12 +227,7 @@ function LivingBilan({ initial, backHref }: { initial: BilanRecord; backHref: st
         evolution={evolution}
         doc={doc}
         onSectionChange={setSection}
-        disabled={stale || aiBusy !== null}
-        canRegenerate={canRegenerate}
-        onRegenerate={(key) => { void regenerate(key); }}
-        aiBusy={aiBusy}
-        warnings={warnings}
-        onDismissWarning={clearWarning}
+        disabled={stale}
       />
 
       </div>
@@ -220,7 +248,7 @@ function LivingBilan({ initial, backHref }: { initial: BilanRecord; backHref: st
 
       {/* Le panneau seul, sans l'extraction ni les suggestions du tiroir de rédaction :
           ici on corrige une valeur, on n'analyse pas des notes. */}
-      <MeasurementsPanel measurements={doc.measurements} onChange={setMeasurements} disabled={stale || aiBusy !== null} previousValues={previousValues} dense={dense} />
+      <MeasurementsPanel measurements={doc.measurements} onChange={setMeasurements} disabled={stale} previousValues={previousValues} dense={dense} />
         </div>
       </MeasuresPane>
 

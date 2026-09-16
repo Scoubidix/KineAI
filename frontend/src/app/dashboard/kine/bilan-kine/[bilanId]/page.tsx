@@ -191,14 +191,12 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen }: { ini
     }
   }, [flush, dictation.state.phase, dictation.stop, toast]);
 
-  const handlePatientChange = async (p: PatientSummary | null) => {
-    if (!p) { toast({ title: 'Patient conservé', description: 'Pour changer de patient, choisis-en un autre dans la liste' }); return; }
+  const handlePatientChange = async (p: PatientSummary) => {
     try {
       const ok = await flush();
       if (!ok) { toast({ title: 'Sauvegarde en attente', description: 'Réessaie dans un instant' }); return; }
       const updated = await attachPatient(record.id, p.id);
       replaceRecord(updated);
-      toast({ title: 'Patient associé', description: `${p.firstName} ${p.lastName.toUpperCase()}` });
     } catch (e) {
       toast({ title: 'Erreur', description: (e as Error).message, variant: 'destructive' });
     }

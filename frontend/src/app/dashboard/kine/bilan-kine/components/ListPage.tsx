@@ -27,7 +27,8 @@ export const formatDateLong = (iso: string) =>
 export function PageHeader({ backHref, backLabel, title, right }: {
   backHref: string;
   backLabel: string;
-  title: string;
+  /** Texte, ou contrôle d'édition sur place quand le titre est une donnée corrigeable */
+  title: React.ReactNode;
   right?: React.ReactNode;
 }) {
   return (
