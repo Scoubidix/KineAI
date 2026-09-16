@@ -617,6 +617,7 @@ app.use('/admin/programmes', programmeAdminRoutes);  // Admin - LIBRES (requireA
 app.use('/admin/dashboard', require('./routes/adminDashboard'));  // Admin dashboard stats
 app.use('/api/admin/nouveautes', require('./routes/adminNouveautes'));  // Admin - gestion des nouveautés
 app.use('/api/admin/roadmap', require('./routes/adminRoadmap'));  // Admin - gestion de la roadmap + idées
+app.use('/api/admin/dictation-terms', require('./routes/adminDictationTerms'));  // Admin - vocabulaire signalé par les kinés
 
 // SUPPORT, EXERCICES, EXERCICE-TEMPLATES : rate limiting dans le routeur APRÈS authenticate
 app.use('/api/support', supportRoutes);

@@ -257,6 +257,16 @@ const roadmapIdeeStatutSchema = z.object({
   statut: z.enum(ROADMAP_IDEE_STATUTS),
 });
 
+// Signalement d'un terme mal transcrit : bornes de la spec (80 caractères, 4 mots côté service)
+const dictationTermSchema = z.object({
+  heard: z.string().min(1).max(80),
+  expected: z.string().min(1).max(80),
+});
+
+const dictationTermStatutSchema = z.object({
+  statut: z.enum(['NOUVEAU', 'RETENU', 'ECARTE']),
+});
+
 module.exports = {
   validate,
   createPatientSchema,
@@ -282,4 +292,6 @@ module.exports = {
   roadmapIdeeSchema,
   roadmapItemSchema,
   roadmapIdeeStatutSchema,
+  dictationTermSchema,
+  dictationTermStatutSchema,
 };
