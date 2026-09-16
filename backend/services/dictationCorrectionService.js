@@ -142,6 +142,7 @@ Chaque opération :
 - { "op": "delete", "before": "…", "from": "…", "after": "…", "to": "" } : supprimer « from ».
 « before » : le ou les deux mots qui précèdent immédiatement « from » dans le texte ; « after » : le ou les deux mots qui le suivent immédiatement (vide en début ou fin de texte). Ils servent à retrouver l'endroit exact. Si le fragment apparaît plusieurs fois dans le texte, choisis le contexte qui le distingue.
 Exemple — texte : « Test de lâchement négatif. Chobet à 13 centimètres, euh, Lasègue négatif. » → { "motif": "Bilan genou", "ops": [ { "op": "replace", "before": "Test de", "from": "lâchement", "after": "négatif.", "to": "Lachman" }, { "op": "replace", "before": "", "from": "Chobet", "after": "à 13", "to": "Schober" }, { "op": "delete", "before": "centimètres,", "from": "euh,", "after": "Lasègue", "to": "" } ] }
+Si une section « Corrections connues » est fournie, elle liste des transcriptions fautives déjà observées et leur terme exact, validées une à une par l'équipe : quand l'une de ces formes apparaît dans le texte, applique la correspondance sans hésiter.
 Autorisé : corriger un terme médical, un test, un muscle, une technique, un sigle ou un nom propre mal transcrit ; supprimer une hésitation isolée (« euh », « hum », « bah », « ben », « hein », « voilà »).
 En mode dictée seulement : supprimer un fragment que le locuteur corrige lui-même juste après (« à droite, non pardon, » quand il dit ensuite « à gauche »).
 Interdit : reformuler, ajouter un mot, corriger la grammaire ou la ponctuation, modifier ou supprimer un nombre (en chiffres ou en lettres), une unité, une date. En cas de doute, ne rien faire.`;
@@ -183,10 +184,17 @@ function buildVocabulary(catalog, extra = []) {
   return out;
 }
 
-function buildCorrectionMessages({ text, mode, vocabulary }) {
+function buildCorrectionMessages({ text, mode, vocabulary, corrections = [] }) {
+  // Deux sections, deux rôles. Le vocabulaire dit quels termes existent et laisse le modèle
+  // rapprocher lui-même une graphie approchante — c'est ce qui couvre les variantes que personne
+  // n'a jamais signalées. Les correspondances donnent les fautes réellement observées, celles
+  // qu'il ne rapprocherait pas seul. La seconde section est absente tant que rien n'est retenu.
+  const known = corrections.length
+    ? `\n\nCorrections connues : ${corrections.map((c) => `« ${c.heard} » → ${c.expected}`).join(' ; ')}`
+    : '';
   return [
     { role: 'system', content: SYSTEM_PROMPT },
-    { role: 'user', content: `Mode : ${mode === 'session' ? 'séance (dialogue kiné-patient : ne supprimer que les hésitations)' : 'dictée'}\n\nVocabulaire : ${vocabulary.join(' ; ')}\n\nTexte :\n"""\n${text}\n"""` },
+    { role: 'user', content: `Mode : ${mode === 'session' ? 'séance (dialogue kiné-patient : ne supprimer que les hésitations)' : 'dictée'}\n\nVocabulaire : ${vocabulary.join(' ; ')}${known}\n\nTexte :\n"""\n${text}\n"""` },
   ];
 }
 
@@ -205,8 +213,11 @@ async function correct({ text, mode, catalog, pseudo }) {
   logMasked(`correction (${mode})`, masked, pseudo);
   // Les termes signalés par les kinés et retenus en admin rejoignent le vocabulaire des deux modes :
   // le mode ne change que les suppressions autorisées, jamais les remplacements.
-  const extraTerms = await dictationTermService.listRetained();
-  const messages = buildCorrectionMessages({ text: masked, mode, vocabulary: buildVocabulary(catalog, extraTerms) });
+  // Une seule lecture, deux usages : la forme attendue rejoint le vocabulaire (ce terme existe),
+  // la paire rejoint les correspondances (voici par quelle faute il arrive).
+  const corrections = await dictationTermService.listRetained();
+  const vocabulary = buildVocabulary(catalog, corrections.map((c) => c.expected));
+  const messages = buildCorrectionMessages({ text: masked, mode, vocabulary, corrections });
   let parsed;
   for (let attempt = 1; attempt <= 2 && !parsed; attempt += 1) {
     try {

@@ -97,8 +97,14 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 let cache = { at: 0, terms: null };
 
 /**
- * Termes retenus, pour la passe de correction. Cache de 5 minutes : sur plusieurs instances, c'est
- * le délai de propagation d'une validation en admin.
+ * Correspondances retenues, pour la passe de correction : `{ heard, expected }`.
+ *
+ * La forme entendue compte autant que la forme attendue. Le vocabulaire seul dit au modèle qu'un
+ * terme existe et le laisse deviner d'où vient la faute ; la paire lui donne la correspondance
+ * observée, pour les écorchages qu'il ne rapprocherait pas tout seul.
+ *
+ * Cache de 5 minutes : sur plusieurs instances, c'est le délai de propagation d'une validation
+ * en admin.
  *
  * Ne lève jamais : la correction a un contrat de dégradation propre (au pire, le texte brut), une
  * base indisponible ne doit pas faire échouer une dictée.
@@ -107,8 +113,8 @@ async function listRetained() {
   if (cache.terms && Date.now() - cache.at < CACHE_TTL_MS) return cache.terms;
   try {
     const prisma = prismaService.getInstance();
-    const rows = await prisma.dictationTerm.findMany({ where: { statut: 'RETENU' }, select: { expected: true } });
-    cache = { at: Date.now(), terms: rows.map((r) => r.expected) };
+    const rows = await prisma.dictationTerm.findMany({ where: { statut: 'RETENU' }, select: { heard: true, expected: true } });
+    cache = { at: Date.now(), terms: rows.map((r) => ({ heard: r.heard, expected: r.expected })) };
   } catch (err) {
     logger.warn(`Vocabulaire signalé : lecture impossible (${err?.message})`);
     // Pas de nouvelle tentative avant le prochain TTL : sans ça, une base indisponible déclenche
