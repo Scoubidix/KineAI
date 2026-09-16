@@ -9,6 +9,7 @@ const llmService = require('./llmService');
 const { numbersIn, sanitizeMotif, MAX_MOTIF_WORDS } = require('./bilanComposeService');
 const { parseJsonOutput } = require('./bilanExtractionService');
 const { EXTRA_TERMS } = require('../data/dictationExtraTerms');
+const dictationTermService = require('./dictationTermService');
 
 const MODES = ['dictation', 'session'];
 const FILLERS = ['euh', 'hum', 'bah', 'ben', 'hein', 'voilà', 'donc voilà'];
@@ -172,12 +173,13 @@ function parseCorrection(content) {
   return { ops: result.data.ops, motif: sanitizeMotif(result.data.motif) };
 }
 
-/** Libellés et alias des champs actifs, plus les termes hors catalogue, dédoublonnés. */
-function buildVocabulary(catalog) {
+/** Libellés et alias des champs actifs, les termes hors catalogue, puis les termes signalés retenus. */
+function buildVocabulary(catalog, extra = []) {
   const seen = new Set(); const out = [];
   const add = (t) => { const s = normSpaces(t); if (s && !seen.has(s)) { seen.add(s); out.push(s); } };
   for (const f of catalog) if (f.isActive !== false) { add(f.label); for (const a of Array.isArray(f.aliases) ? f.aliases : []) add(a); }
   for (const t of EXTRA_TERMS) add(t);
+  for (const t of extra) add(t);
   return out;
 }
 
@@ -201,7 +203,10 @@ async function correct({ text, mode, catalog, pseudo }) {
   // Le modèle ne reçoit jamais l'identité en clair : masquée avant l'envoi, réhydratée sur le texte rendu
   const masked = pseudo ? pseudo.mask(raw) : raw;
   logMasked(`correction (${mode})`, masked, pseudo);
-  const messages = buildCorrectionMessages({ text: masked, mode, vocabulary: buildVocabulary(catalog) });
+  // Les termes signalés par les kinés et retenus en admin rejoignent le vocabulaire des deux modes :
+  // le mode ne change que les suppressions autorisées, jamais les remplacements.
+  const extraTerms = await dictationTermService.listRetained();
+  const messages = buildCorrectionMessages({ text: masked, mode, vocabulary: buildVocabulary(catalog, extraTerms) });
   let parsed;
   for (let attempt = 1; attempt <= 2 && !parsed; attempt += 1) {
     try {
