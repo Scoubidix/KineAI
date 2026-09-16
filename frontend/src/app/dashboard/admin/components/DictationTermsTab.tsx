@@ -40,21 +40,28 @@ export default function DictationTermsTab() {
   const [rows, setRows] = useState<TermRow[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isCurrent: () => boolean = () => true) => {
     setRows(null);
     try {
       const url = `${process.env.NEXT_PUBLIC_API_URL}/api/admin/dictation-terms${filtre ? `?statut=${filtre}` : ''}`;
       const res = await fetchWithAuth(url);
       if (!res.ok) throw new Error('Lecture impossible');
       const data = await res.json();
+      // Filtre changé pendant la requête : cette réponse ne concerne plus ce que l'écran affiche
+      if (!isCurrent()) return;
       setRows(data.terms ?? []);
     } catch (e) {
+      if (!isCurrent()) return;
       setRows([]);
       toast({ title: 'Erreur', description: (e as Error).message, variant: 'destructive' });
     }
   }, [filtre, toast]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    void load(() => !cancelled);
+    return () => { cancelled = true; };
+  }, [load]);
 
   const setStatut = async (id: number, statut: Statut) => {
     setBusy(id);
