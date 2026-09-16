@@ -2,6 +2,9 @@
 // Ce qui entre ici est du vocabulaire métier, jamais du contenu clinique : les gardes
 // ci-dessous refusent les noms et les phrases, et rien d'autre n'est stocké.
 const { DraftError } = require('./bilanDraftService');
+const logger = require('../utils/logger');
+const prismaService = require('./prismaService');
+const { createPseudonymizer } = require('./pseudonymService');
 
 /** Bornes de la spec : un terme, pas une phrase. */
 const MAX_CHARS = 80;
@@ -48,4 +51,41 @@ function assertNoIdentity(pseudo, ...values) {
   }
 }
 
-module.exports = { MAX_CHARS, MAX_WORDS, normalizeTerm, validateTerm, assertNoIdentity };
+/**
+ * Enregistre un signalement. La route vit sous un bilan parce que c'est lui qui donne le patient,
+ * donc le pseudonymiseur, donc la garde d'identité.
+ *
+ * Le statut n'est jamais touché à la mise à jour : une paire écartée voit son compteur monter sans
+ * repasser NOUVEAU — une décision d'admin ne se défait pas toute seule.
+ */
+async function report({ kineId, bilanId, heard, expected }) {
+  const prisma = prismaService.getInstance();
+  const bilan = await prisma.bilanKine.findFirst({
+    where: { id: bilanId, kineId, isActive: true },
+    select: { patient: { select: { firstName: true, lastName: true, birthDate: true } } },
+  });
+  if (!bilan) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
+
+  const clean = validateTerm({ heard, expected });
+  const kine = await prisma.kine.findUnique({ where: { id: kineId }, select: { firstName: true, lastName: true, email: true } });
+  assertNoIdentity(createPseudonymizer({ patient: bilan.patient, kine }), clean.heard, clean.expected);
+
+  await prisma.$transaction(async (tx) => {
+    const term = await tx.dictationTerm.upsert({
+      where: { heardNorm_expectedNorm: { heardNorm: clean.heardNorm, expectedNorm: clean.expectedNorm } },
+      update: { reportCount: { increment: 1 }, lastReportedAt: new Date() },
+      create: {
+        heard: clean.heard, expected: clean.expected,
+        heardNorm: clean.heardNorm, expectedNorm: clean.expectedNorm,
+        reportCount: 1,
+      },
+    });
+    await tx.dictationTermReport.create({ data: { termId: term.id, kineId } });
+  });
+
+  // Jamais le terme dans les logs : c'est du texte dicté par le kiné
+  logger.info(`Signalement de terme : bilan ${bilanId}`);
+  return { success: true };
+}
+
+module.exports = { MAX_CHARS, MAX_WORDS, normalizeTerm, validateTerm, assertNoIdentity, report };
