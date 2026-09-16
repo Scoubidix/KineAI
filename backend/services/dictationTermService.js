@@ -88,4 +88,56 @@ async function report({ kineId, bilanId, heard, expected }) {
   return { success: true };
 }
 
-module.exports = { MAX_CHARS, MAX_WORDS, normalizeTerm, validateTerm, assertNoIdentity, report };
+const STATUTS = ['NOUVEAU', 'RETENU', 'ECARTE'];
+const CACHE_TTL_MS = 5 * 60 * 1000;
+let cache = { at: 0, terms: null };
+
+/**
+ * Termes retenus, pour la passe de correction. Cache de 5 minutes : sur plusieurs instances, c'est
+ * le délai de propagation d'une validation en admin.
+ *
+ * Ne lève jamais : la correction a un contrat de dégradation propre (au pire, le texte brut), une
+ * base indisponible ne doit pas faire échouer une dictée.
+ */
+async function listRetained() {
+  if (cache.terms && Date.now() - cache.at < CACHE_TTL_MS) return cache.terms;
+  try {
+    const prisma = prismaService.getInstance();
+    const rows = await prisma.dictationTerm.findMany({ where: { statut: 'RETENU' }, select: { expected: true } });
+    cache = { at: Date.now(), terms: rows.map((r) => r.expected) };
+  } catch (err) {
+    logger.warn(`Vocabulaire signalé : lecture impossible (${err?.message})`);
+    return cache.terms ?? [];
+  }
+  return cache.terms;
+}
+
+function invalidateCache() { cache = { at: 0, terms: null }; }
+
+/** Liste admin : NOUVEAU d'abord, puis les plus signalés. `statut` est optionnel. */
+async function adminList({ statut }) {
+  const prisma = prismaService.getInstance();
+  const rows = await prisma.dictationTerm.findMany({
+    where: statut ? { statut } : {},
+    orderBy: [{ statut: 'asc' }, { reportCount: 'desc' }],
+    select: {
+      id: true, heard: true, expected: true, statut: true, reportCount: true, lastReportedAt: true,
+      _count: { select: { reports: true } },
+    },
+  });
+  return rows.map(({ _count, ...r }) => ({ ...r, kineCount: _count.reports }));
+}
+
+async function adminSetStatut({ id, statut }) {
+  const prisma = prismaService.getInstance();
+  const term = await prisma.dictationTerm.update({ where: { id }, data: { statut }, select: { id: true, statut: true } });
+  // La promesse faite en admin est « effet immédiat » : le cache doit tomber tout de suite
+  invalidateCache();
+  logger.info(`Vocabulaire signalé : terme ${id} passé en ${statut}`);
+  return term;
+}
+
+module.exports = {
+  MAX_CHARS, MAX_WORDS, normalizeTerm, validateTerm, assertNoIdentity, report,
+  STATUTS, listRetained, invalidateCache, adminList, adminSetStatut,
+};
