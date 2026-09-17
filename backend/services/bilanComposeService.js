@@ -24,7 +24,9 @@ const DIALOGUE_GUIDE = `L'entrée est la transcription d'un dialogue entre le ki
 
 const { STYLE_PRINCIPLES, STYLE_EXAMPLES } = require('../data/bilanStyleExamples');
 
-const SECTION_GUIDE = {
+// Consignes de rédaction, par type de bilan (spec 2026-09-17). INITIAL reprend les consignes
+// historiques mot pour mot : c'est le cas le plus courant, il ne doit pas bouger.
+const INITIAL_GUIDE = {
   anamnese: 'commence exactement par « [Prénom] [NOM], [âge] ans, » puis le métier s’il est connu, puis « consulte pour » le motif. Ensuite, et seulement : l’ancienneté et les circonstances d’apparition, le mécanisme, l’évolution depuis le début (traitements essayés, ce qui soulage ou aggrave), le retentissement tel que le patient l’exprime, en une phrase, et ses attentes. Le contexte du patient (activités, sport, travail) quand les notes le donnent. Rien de ce que le kiné a constaté ou mesuré lui-même : aucun signe d’examen, aucun test, aucune valeur — cela appartient à l’examen clinique. Recopie les jetons entre crochets tels quels, n’écris jamais un nom.',
   antecedents: 'antécédents et traitements réellement rapportés, en une phrase',
   examen: 'ce que le kiné a constaté et mesuré lui-même le jour du bilan, et cela seulement : observation, palpation, qualité du mouvement, tests positifs ou négatifs qui orientent. C’est ici, et nulle part ailleurs, que les signes actuels sont décrits. Synthèse interprétative : ce que les signes et les tests, nommés sans leurs valeurs, suggèrent ensemble.',
@@ -34,9 +36,46 @@ const SECTION_GUIDE = {
   traitement: 'uniquement le plan, le protocole ou les consignes présents dans les notes ; sinon chaîne vide',
 };
 
-const SYSTEM_PROMPT = `Tu rédiges des bilans diagnostiques kinésithérapiques (BDK) pour un kinésithérapeute, en français. Tu renvoies uniquement un objet JSON, avec exactement les clés demandées dans le message qui suit.
+// Rappel d'identité commun aux bilans de suivi : même gabarit obligatoire qu'au bilan initial,
+// mais une seule phrase de rappel derrière — l'histoire est déjà écrite dans le bilan précédent.
+const FOLLOW_UP_ANAMNESE = 'commence exactement par « [Prénom] [NOM], [âge] ans, » puis un rappel en une seule phrase : le motif de la prise en charge et son ancienneté, tirés du bloc « Bilan précédent ». Rien d’autre : ni le mécanisme, ni les circonstances d’apparition, ni l’histoire détaillée, que le bilan précédent porte déjà. Aucun signe d’examen, aucune valeur. Recopie les jetons entre crochets tels quels, n’écris jamais un nom.';
+
+const FOLLOW_UP_ANTECEDENTS = 'les antécédents du bloc « Bilan précédent », repris tels quels. Complète seulement si les notes du jour en ajoutent un. Ni bilan précédent ni notes → chaîne vide.';
+
+const INTERMEDIAIRE_GUIDE = {
+  anamnese: FOLLOW_UP_ANAMNESE,
+  antecedents: FOLLOW_UP_ANTECEDENTS,
+  examen: INITIAL_GUIDE.examen,
+  limitations: 'uniquement les limitations d’activité et restrictions de participation qui persistent, telles que rapportées dans les notes du jour ; sinon chaîne vide',
+  diagnostic: 'où en est la prise en charge par rapport au bilan précédent : ce qui a progressé, ce qui stagne, ce qui reste à traiter. Deux ou trois dominantes, pronostic prudent. Décris l’évolution en mots (« gain net de flexion », « douleur nettement diminuée ») : ne chiffre jamais une mesure présentée en tableau.',
+  objectifs: 'les objectifs du bloc « Bilan précédent », repris et statués : atteints, maintenus, révisés. Plus les nouveaux objectifs énoncés dans les notes. Rien dans le bilan précédent ni dans les notes → chaîne vide.',
+  traitement: 'la suite du plan : ce qui est reconduit, ce qui change, les consignes données le jour du bilan — uniquement à partir des notes et du plan du bilan précédent ; sinon chaîne vide',
+};
+
+const FINAL_GUIDE = {
+  anamnese: FOLLOW_UP_ANAMNESE,
+  antecedents: FOLLOW_UP_ANTECEDENTS,
+  examen: INITIAL_GUIDE.examen,
+  limitations: 'uniquement les limitations d’activité et restrictions de participation résiduelles, telles que rapportées dans les notes ; aucune → chaîne vide',
+  diagnostic: 'synthèse du parcours et résultat obtenu au regard des objectifs du bilan précédent. Ce qui est récupéré, ce qui reste. Décris l’évolution en mots : ne chiffre jamais une mesure présentée en tableau.',
+  objectifs: 'statut final de chaque objectif du bloc « Bilan précédent » : atteint, partiellement atteint, non atteint. N\'énonce aucun objectif futur ; sinon chaîne vide',
+  traitement: 'conseils de sortie : autonomie, entretien, reprise d’activité, critères de reconsultation — uniquement ce que les notes contiennent ; sinon chaîne vide',
+};
+
+const SECTION_GUIDES = { INITIAL: INITIAL_GUIDE, INTERMEDIAIRE: INTERMEDIAIRE_GUIDE, FINAL: FINAL_GUIDE };
+
+/** Consignes du type demandé ; repli sur INITIAL pour un type inconnu (jamais d'appel sans guide). */
+const getSectionGuide = (type) => SECTION_GUIDES[type] || SECTION_GUIDES.INITIAL;
+
+// `hasPrevious` : un bloc « Bilan précédent » accompagne les notes. La règle « uniquement les notes »
+// doit alors le nommer, sinon le modèle s'interdit de s'en servir.
+function buildSystemPrompt({ hasPrevious = false } = {}) {
+  const sources = hasPrevious
+    ? `- Tu n'utilises QUE les informations présentes dans les notes, le motif, les mesures fournies et le bloc « Bilan précédent ». Interdiction d'inventer, de supposer ou de compléter.\n- Le bloc « Bilan précédent » décrit un bilan antérieur : sers-t'en pour le rappel, les antécédents et l'évolution, jamais pour décrire l'état du jour.`
+    : `- Tu n'utilises QUE les informations présentes dans les notes, le motif et les mesures fournies. Interdiction d'inventer, de supposer ou de compléter.`;
+  return `Tu rédiges des bilans diagnostiques kinésithérapiques (BDK) pour un kinésithérapeute, en français. Tu renvoies uniquement un objet JSON, avec exactement les clés demandées dans le message qui suit.
 Règles absolues :
-- Tu n'utilises QUE les informations présentes dans les notes, le motif et les mesures fournies. Interdiction d'inventer, de supposer ou de compléter.
+${sources}
 - Interdiction d'écrire un chiffre qui n'apparaît pas dans les notes ou dans les mesures fournies.
 - Si les notes ne contiennent rien pour une section, renvoie une chaîne vide "" pour cette section. Si elles ne contiennent que des mesures, une phrase de synthèse suffit.
 - Pas de titre, pas de puces, pas de retour à la ligne superflu.
@@ -47,6 +86,7 @@ Règles absolues :
 Style attendu :
 ${STYLE_PRINCIPLES.map((p) => `- ${p}`).join('\n')}
 Des exemples de style te sont fournis : imite leur forme, leur longueur et leur façon de raisonner ; ne reprends jamais leur contenu, qui concerne d'autres patients. Leurs sections sont toutes remplies parce que leurs notes l'étaient : si les notes ne disent rien pour une section, en particulier limitations, objectifs et traitement, laisse-la vide plutôt que de proposer un plan.`;
+}
 
 // Exemples de style limités aux sections demandées (les autres n'apportent rien et coûtent des tokens)
 function formatStyleExamples(keys) {
@@ -139,8 +179,9 @@ function sanitizeMotif(raw) {
   return words.replace(/[.,;:!?]+$/, '').trim().slice(0, MAX_MOTIF_CHARS);
 }
 
-function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys, source = 'notes', withMotif = false }) {
+function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys, source = 'notes', withMotif = false, previous = null }) {
   const dialogue = source === 'dialogue';
+  const guide = getSectionGuide(type);
   const user = [
     `Type de bilan : ${BILAN_TYPE_LABELS[type] || type}`,
     `Motif : ${motif || '(non renseigné)'}`,
@@ -151,6 +192,7 @@ function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys,
     '"""',
     '',
     ...(dialogue ? [DIALOGUE_GUIDE, ''] : []),
+    ...(previous ? [previous, ''] : []),
     'Mesures à intégrer en prose (déjà validées par le kiné) :',
     lines.length ? lines.map((l) => `- ${l}`).join('\n') : '(aucune)',
     '',
@@ -159,12 +201,12 @@ function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys,
     '',
     ...(withMotif ? ['Réponds par { "motif": "…", "sections": { … } }. Ce bilan n’a pas encore de motif : le motif de consultation en 4 mots maximum, tiré des notes (ex. « Lombalgie chronique », « Suites de PTG »). Pas de phrase, pas de verbe conjugué, jamais le nom ni le prénom du patient. Si les notes ne permettent pas de le déterminer, renvoie "".', ''] : ['Réponds par { "sections": { … } }.', ''] ),
     'Sections à rédiger (clé : titre — contenu attendu) :',
-    keys.map((k) => `- ${k} : ${SECTION_TITLES[k]} — ${SECTION_GUIDE[k]}`).join('\n'),
+    keys.map((k) => `- ${k} : ${SECTION_TITLES[k]} — ${guide[k]}`).join('\n'),
     '',
     'Exemples de style (forme à imiter, contenu à ne jamais reprendre) :',
     formatStyleExamples(keys),
   ].join('\n');
-  return [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: user }];
+  return [{ role: 'system', content: buildSystemPrompt({ hasPrevious: Boolean(previous) }) }, { role: 'user', content: user }];
 }
 
 // Schéma strict limité aux clés demandées
@@ -365,7 +407,9 @@ async function composeFromNotesForBilan({ kineId, bilanId, uid, source = 'notes'
 }
 
 module.exports = {
-  SECTION_GUIDE,
+  SECTION_GUIDES,
+  getSectionGuide,
+  buildSystemPrompt,
   MAX_MOTIF_WORDS,
   sanitizeMotif,
   SOURCES,
