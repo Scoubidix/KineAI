@@ -5,14 +5,14 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ArrowLeft, Copy, Mail, Download, Check, PanelRightOpen, UserPlus, Loader2, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Copy, Mail, Download, Check, PanelRightOpen, UserPlus, Loader2, Sparkles, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import DocumentSheet from './DocumentSheet';
 import { DRAWER_ACTIONS_ID } from './MeasuresDrawer';
 import PatientCombobox from '../PatientCombobox';
 import { attachPatient, finalizeBilan, ApiError } from '@/utils/bilanApi';
 import { fetchBilanRender, downloadBilanPdf, bilanRenderToText } from '@/utils/bilanExport';
-import { emptyBilanDocument, type AiBusy, type BilanPatch, type BilanRecord, type BilanSectionKey, type PatientSummary, type SectionWarnings } from '@/types/bilan';
+import { emptyBilanDocument, BILAN_TYPE_LABELS, type AiBusy, type BilanPatch, type BilanRecord, type BilanSectionKey, type BilanType, type PatientSummary, type SectionWarnings } from '@/types/bilan';
 
 // flush() renvoie Promise<boolean> (cf. useBilanAutosave) : true si tout est persisté
 export interface DocumentStepProps {
@@ -36,11 +36,13 @@ export interface DocumentStepProps {
   wide: boolean;
   /** Bilan issu d'une séance : les notes sont la transcription, le bouton doit le dire */
   fromSession?: boolean;
+  /** Type du bilan à la dernière rédaction : s'il diffère du type courant, le texte est décalé */
+  composedType?: BilanType | null;
 }
 
 const FLUSH_PENDING_TOAST = { title: 'Sauvegarde en attente, réessaie dans un instant' };
 
-export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited, lastRun, onVerify, onDismissRun, wide, onOpenMeasures, measuresOpen, fromSession }: DocumentStepProps) {
+export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited, lastRun, onVerify, onDismissRun, wide, onOpenMeasures, measuresOpen, fromSession, composedType }: DocumentStepProps) {
   const { toast } = useToast();
   const doc = record.document ?? emptyBilanDocument();
   const [evolution, setEvolution] = useState(false);
@@ -132,6 +134,20 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
     </div>
   );
 
+  // Le type a changé après la rédaction : le texte reste, on propose de le reprendre sous le bon angle.
+  const typeChanged = composedType != null && composedType !== record.type;
+  const typeBanner = typeChanged && (
+    <div role="status" className="mx-auto w-full max-w-[794px] flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs">
+      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+      <span className="flex-1">
+        Ce bilan a été rédigé comme un bilan <strong>{BILAN_TYPE_LABELS[composedType!].toLowerCase()}</strong>. Tu l’as passé en <strong>{BILAN_TYPE_LABELS[record.type].toLowerCase()}</strong>.
+      </span>
+      <Button size="sm" onClick={() => { void onCompose(); }} disabled={disabled || !hasNotes || aiBusy !== null} className="btn-teal h-7 text-xs rounded-full">
+        {aiBusy === 'compose' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}Régénérer
+      </Button>
+    </div>
+  );
+
   // Bandeau de résultat de la dernière rédaction IA : nombre de mesures extraites, à vérifier ou non
   const plural = (n: number, s: string) => `${n} ${s}${n > 1 ? 's' : ''}`;
   const banner = lastRun && (
@@ -185,7 +201,7 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 px-3 sm:px-4 py-3">
-        <div className="flex flex-col gap-3 bg-muted/30 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4">{toolbar}{banner}{sheet}</div>
+        <div className="flex flex-col gap-3 bg-muted/30 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4">{toolbar}{typeBanner}{banner}{sheet}</div>
       </div>
       {actionsHost ? createPortal(actions, actionsHost) : (
         <div className="sticky bottom-12 lg:bottom-0 px-3 sm:px-4 py-2">

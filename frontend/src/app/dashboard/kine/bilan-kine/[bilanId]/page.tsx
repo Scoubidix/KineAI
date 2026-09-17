@@ -104,6 +104,10 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
   // Empreinte des mesures à la dernière rédaction : si elles changent, Examen et Diagnostic sont signalées
   // (rédaction faite côté serveur : l'empreinte de départ est celle du bilan relu)
   const composedMeasurementsRef = useRef<string | null>(initialAi ? JSON.stringify(initial.document?.measurements ?? []) : null);
+  // Type du bilan au moment de la dernière rédaction. Le changer après coup ne casse rien (les
+  // sections sont les mêmes pour les trois types), mais le texte a été écrit sous un autre angle :
+  // on le signale, on ne réécrit rien. État de session, comme l'avertissement « mesures modifiées ».
+  const [composedType, setComposedType] = useState<BilanType | null>(initialAi ? initial.type : null);
   const fingerprint = (r: BilanRecord) => JSON.stringify(r.document?.measurements ?? []);
   useEffect(() => {
     const ref = composedMeasurementsRef.current;
@@ -136,6 +140,7 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
       setQuotes(new Map(r.accepted.map((a) => [a.id, a.quote])));
       setLastRun({ extracted: r.accepted.length + r.pending.length, pending: r.pending.length });
       composedMeasurementsRef.current = fingerprint(r.bilan);
+      setComposedType(r.bilan.type);
       revealDrawer();
       await goTo('document');
     } catch (e) {
@@ -172,6 +177,7 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
       const r = await composeBilan(record.id, sections);
       replaceRecord(r.bilan);
       composedMeasurementsRef.current = fingerprint(r.bilan);
+      setComposedType(r.bilan.type);
       revealDrawer();
       setWarnings((prev) => {
         if (!sections) return r.warnings;
@@ -242,7 +248,7 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
         <div className="flex-1 min-h-0 flex">
           <div className="flex-1 min-w-0 pb-12 lg:pb-0">
             {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('document')} onCompose={() => { void handleComposeFromNotes(); }} composing={aiBusy === 'compose_from_notes'} dictation={dictation} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} />}
-            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} lastRun={lastRun} onVerify={openSuggestions} onDismissRun={() => setLastRun(null)} wide={wide} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} fromSession={fromSession} />}
+            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} lastRun={lastRun} onVerify={openSuggestions} onDismissRun={() => setLastRun(null)} wide={wide} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} fromSession={fromSession} composedType={composedType} />}
           </div>
           <MeasuresDrawer record={record} update={update} disabled={locked || aiBusy !== null} candidates={candidates} rejectedCount={rejectedCount} onCandidatesChange={setCandidates} aiBusy={aiBusy} open={drawerOpen} onOpenChange={setDrawer} wide={wide} quotes={quotes} />
         </div>
