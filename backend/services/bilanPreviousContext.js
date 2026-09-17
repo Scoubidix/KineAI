@@ -78,4 +78,23 @@ function buildPreviousContext({ previous, currentMeasurements, catalog, patient,
   return parts.join('\n');
 }
 
-module.exports = { CONTEXT_SECTION_KEYS, SECTION_CHARS_MAX, formatDelay, maskAge, buildEvolutionLines, buildPreviousContext };
+const REFERENCE_SELECT = { id: true, type: true, motif: true, createdAt: true, document: true, structuredData: true, bilanHtml: true };
+
+/**
+ * Bilan de référence d'un bilan de suivi — même règle que le front (`usePreviousReference`) :
+ * le plus récent des bilans choisis pour la comparaison, sinon le dernier bilan ENREGISTRE du
+ * patient. Filtré sur le kiné, le patient et `isActive` : `comparison.previousBilanIds` est un
+ * tableau libre du document, il ne garantit rien sur l'appartenance ni sur la suppression.
+ */
+async function loadReferenceBilan({ prisma, kineId, patientId, excludeId, comparisonIds }) {
+  if (!patientId) return null;
+  const base = { kineId, patientId, isActive: true };
+  const ids = (Array.isArray(comparisonIds) ? comparisonIds : []).filter(Number.isInteger);
+  const where = ids.length
+    ? { ...base, status: { not: 'BROUILLON' }, id: { in: ids, not: excludeId } }
+    : { ...base, status: 'ENREGISTRE', id: { not: excludeId } };
+  const rows = await prisma.bilanKine.findMany({ where, select: REFERENCE_SELECT, orderBy: { createdAt: 'desc' }, take: 1 });
+  return rows[0] || null;
+}
+
+module.exports = { CONTEXT_SECTION_KEYS, SECTION_CHARS_MAX, formatDelay, maskAge, buildEvolutionLines, buildPreviousContext, loadReferenceBilan };

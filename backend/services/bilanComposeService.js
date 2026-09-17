@@ -14,6 +14,7 @@ const { createPseudonymizer } = require('./pseudonymService');
 const { BILAN_TYPE_LABELS } = require('./bilanRenderer/format');
 const extractionService = require('./bilanExtractionService');
 const { wordsToDigits, wordValues, ordinalValues } = require('../utils/frenchNumbers');
+const { buildPreviousContext, loadReferenceBilan } = require('./bilanPreviousContext');
 
 const SECTION_TEXT_MAX = 5000;
 
@@ -268,17 +269,19 @@ async function callCompose(messages, jsonSchema) {
  * composeFromNotesForBilan. Renvoie les textes tronqués et les avertissements par section.
  * @throws {DraftError} COMPOSE_FAILED
  */
-async function composeSections({ bilanId, type, motif, notes, document, catalog, keys, source = 'notes', pseudo, withMotif = false }) {
+async function composeSections({ bilanId, type, motif, notes, document, catalog, keys, source = 'notes', pseudo, withMotif = false, previous = null }) {
   const maskedNotes = pseudo ? pseudo.mask(notes) : notes;
   const maskedMotif = pseudo ? pseudo.mask(motif || '') : motif;
+  // Le bloc antérieur est du texte relu de la base, identités résolues : il part masqué comme les notes.
+  const maskedPrevious = previous ? (pseudo ? pseudo.mask(previous) : previous) : null;
   const lines = formatNarrativeMeasurements(document.measurements, catalog).map((l) => (pseudo ? pseudo.mask(l) : l));
   const table = tableMeasurementSummary(document.measurements, catalog);
   // Un libellé de mesure personnalisée est du texte libre (tapé par le kiné ou rédigé par le modèle
   // puis réhydraté) : il part masqué comme le reste. `table.entries`, qui ne sert qu'à la détection
   // de doublon, reste sur le texte réel — un nom n'y change rien.
   const tableLabels = pseudo ? table.labels.map((l) => pseudo.mask(l)) : table.labels;
-  const messages = buildComposeMessages({ type, motif: maskedMotif, rawNotes: maskedNotes, lines, tableLabels, keys, source, withMotif });
-  logMasked(`rédaction (bilan ${bilanId}, ${source})`, `Motif : ${maskedMotif || '(aucun)'}\n${maskedNotes}${lines.length ? `\nMesures : ${lines.join(' ; ')}` : ''}`, pseudo);
+  const messages = buildComposeMessages({ type, motif: maskedMotif, rawNotes: maskedNotes, lines, tableLabels, keys, source, withMotif, previous: maskedPrevious });
+  logMasked(`rédaction (bilan ${bilanId}, ${source})`, `Motif : ${maskedMotif || '(aucun)'}\n${maskedNotes}${maskedPrevious ? `\n${maskedPrevious}` : ''}${lines.length ? `\nMesures : ${lines.join(' ; ')}` : ''}`, pseudo);
   const jsonSchema = buildComposeJsonSchema(keys, withMotif);
 
   let output;
@@ -297,7 +300,7 @@ async function composeSections({ bilanId, type, motif, notes, document, catalog,
   // Un dialogue porte ses nombres en lettres (« trois sur dix », « le quatrième mois ») : l'ensemble
   // autorisé les accepte aussi, sinon chaque valeur serait « non vérifiée »
   const spoken = source === 'dialogue' ? [...numbersIn(wordsToDigits(maskedNotes)), ...wordValues(maskedNotes).map(String), ...ordinalValues(maskedNotes).map(String)] : [];
-  const allowed = new Set([...numbersIn(maskedNotes), ...numbersIn(maskedMotif), ...lines.flatMap(numbersIn), ...spoken]);
+  const allowed = new Set([...numbersIn(maskedNotes), ...numbersIn(maskedMotif), ...numbersIn(maskedPrevious || ''), ...lines.flatMap(numbersIn), ...spoken]);
   const texts = {};
   const warnings = {};
   for (const k of keys) {
@@ -315,7 +318,7 @@ async function composeSections({ bilanId, type, motif, notes, document, catalog,
 
 // Lecture et gardes communes aux deux rédactions
 async function loadBilanForCompose(prisma, where) {
-  const bilan = await prisma.bilanKine.findFirst({ where, select: { id: true, type: true, status: true, rawNotes: true, motif: true, document: true, updatedAt: true, createdAt: true, patient: { select: { firstName: true, lastName: true, birthDate: true } } } });
+  const bilan = await prisma.bilanKine.findFirst({ where, select: { id: true, type: true, status: true, rawNotes: true, motif: true, document: true, updatedAt: true, createdAt: true, patientId: true, patient: { select: { firstName: true, lastName: true, birthDate: true } } } });
   if (!bilan) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
   if (!bilan.document) throw new DraftError('LEGACY_BILAN', 400, 'Les anciens bilans ne peuvent pas être rédigés par l’IA');
   // Un bilan enregistré reste rédigeable : il se corrige comme un document vivant. `writeDocument`
@@ -348,6 +351,24 @@ async function writeDocument({ prisma, where, updatedAt, status, document, uid, 
   return updated;
 }
 
+// Bloc « Bilan précédent » d'un bilan de suivi, et motif de la référence. Chargé ici et non dans
+// `composeSections` : le harnais eval:session appelle `composeSections` sans Prisma.
+// `motif` n'est consommé qu'en Task 5 ; il est posé dès maintenant pour que la forme du retour
+// ne change plus.
+async function loadPreviousBlock({ prisma, kineId, bilan, catalog }) {
+  const empty = { block: null, motif: null };
+  if (bilan.type === 'INITIAL' || !bilan.patientId) return empty;
+  const previous = await loadReferenceBilan({
+    prisma, kineId, patientId: bilan.patientId, excludeId: bilan.id,
+    comparisonIds: bilan.document && bilan.document.comparison ? bilan.document.comparison.previousBilanIds : undefined,
+  });
+  if (!previous) return empty;
+  return {
+    block: buildPreviousContext({ previous, currentMeasurements: bilan.document.measurements, catalog, patient: bilan.patient, at: bilan.createdAt }),
+    motif: previous.motif || null,
+  };
+}
+
 /**
  * Rédige les sections demandées (défaut : les 7) et les écrit dans le document.
  * @throws {DraftError} BILAN_NOT_FOUND | LEGACY_BILAN | NOTES_REQUIRED | COMPOSE_FAILED | STALE_DRAFT
@@ -360,10 +381,11 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
   // Ordre canonique, doublons ignorés, clés inconnues ignorées (déjà filtrées par Zod en route)
   const keys = Array.isArray(sections) && sections.length ? SECTION_KEYS.filter((k) => sections.includes(k)) : SECTION_KEYS;
   const catalog = await getCatalog();
+  const { block: previous } = await loadPreviousBlock({ prisma, kineId, bilan, catalog });
   const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId), at: bilan.createdAt });
   // Un motif ne se déduit que d'une rédaction complète : sur une section reprise seule, la question n'a pas de sens
   const withMotif = !bilan.motif && keys.length === SECTION_KEYS.length;
-  const { texts, warnings, motif: composedMotif } = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: bilan.document, catalog, keys, pseudo, withMotif });
+  const { texts, warnings, motif: composedMotif } = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: bilan.document, catalog, keys, pseudo, withMotif, previous });
 
   // L'appel IA a duré plusieurs secondes : on relit la version la plus fraîche et on ne
   // remplace que les sections demandées, en check-and-set sur updatedAt (comme l'autosave).
@@ -387,6 +409,7 @@ async function composeFromNotesForBilan({ kineId, bilanId, uid, source = 'notes'
   const catalog = await getCatalog();
   if (!SOURCES.includes(source)) throw new Error(`source de rédaction inconnue : ${source}`);
 
+  const { block: previous } = await loadPreviousBlock({ prisma, kineId, bilan, catalog });
   const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId), at: bilan.createdAt });
   const { candidates, rejected } = await extractionService.extractFromText({ rawNotes: notes, motif: bilan.motif, catalog, document: bilan.document, logContext: `bilan ${bilanId}`, pseudo });
   const { document: withMeasures, accepted, pending } = extractionService.applyCandidates(bilan.document, candidates);
@@ -394,7 +417,7 @@ async function composeFromNotesForBilan({ kineId, bilanId, uid, source = 'notes'
 
   let composed;
   try {
-    composed = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: withMeasures, catalog, keys: SECTION_KEYS, source, pseudo, withMotif: !bilan.motif });
+    composed = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: withMeasures, catalog, keys: SECTION_KEYS, source, pseudo, withMotif: !bilan.motif, previous });
   } catch (err) {
     // Les mesures acceptées ne sont pas perdues : écrites seules, le kiné relance la rédaction
     if (err instanceof DraftError && err.code === 'COMPOSE_FAILED' && accepted.length > 0) {
@@ -424,6 +447,7 @@ module.exports = {
   numbersIn,
   checkNumbers,
   checkTableDuplicate,
+  loadPreviousBlock,
   composeForBilan,
   composeFromNotesForBilan,
 };
