@@ -13,7 +13,30 @@
     "expectSections": ["anamnese", "antecedents", "examen", "limitations", "diagnostic", "objectifs", "traitement"],
     "expect": ["eva_repos=2", "eva_effort=5", "flexion_epaule:D=120", "abduction_epaule:D=90", "rotation_externe_1:D=30", "flexion_epaule:G=170", "abduction_epaule:G=170", "testing_deltoide:D=3/5", "testing_biceps_brachial:D=4/5", "adherences_cicatrice=false", "chaleur_locale=false", "douleur_nocturne=true"],
     "forbid": ["test_neer", "test_jobe", "test_hawkins_kennedy"], "forbidValues": [63, 8, 80], "customContains": [],
-    "identity": { "firstName": "Marc", "lastName": "Delcourt", "birthDate": "1963-04-12" }, "mustNotReachModel": []
+    "identity": { "firstName": "Marc", "lastName": "Delcourt", "birthDate": "1963-04-12" }, "mustNotReachModel": [],
+    "previousBilan": {
+      "id": 901,
+      "type": "INITIAL",
+      "motif": "Réparation de coiffe droite",
+      "createdAt": "2026-08-06T00:00:00.000Z",
+      "document": {
+        "schemaVersion": 1,
+        "sections": [
+          { "key": "anamnese", "text": "[Prénom] [NOM], [âge] ans, consulte pour les suites d'une réparation de la coiffe des rotateurs de l'épaule droite." },
+          { "key": "antecedents", "text": "Tendinopathie de la coiffe droite suivie médicalement depuis plusieurs années. Hypertension traitée." },
+          { "key": "diagnostic", "text": "Épaule opérée en phase de protection : raideur antéro-supérieure et déficit de commande du deltoïde, douleurs nocturnes encore présentes." },
+          { "key": "objectifs", "text": "À court terme, calmer les douleurs nocturnes et récupérer les amplitudes passives. À moyen terme, restaurer la commande active du deltoïde et l'autonomie dans les gestes du quotidien." },
+          { "key": "traitement", "text": "Trois séances hebdomadaires : mobilisation passive dans le respect des consignes du chirurgien, travail de la cicatrice, réveil musculaire progressif." }
+        ],
+        "measurements": [
+          { "kind": "canonical", "key": "flexion_epaule", "side": "D", "value": 90, "presentation": "table", "origin": "manual" },
+          { "kind": "canonical", "key": "abduction_epaule", "side": "D", "value": 70, "presentation": "table", "origin": "manual" },
+          { "kind": "canonical", "key": "testing_deltoide", "side": "D", "value": "2/5", "presentation": "table", "origin": "manual" }
+        ]
+      },
+      "structuredData": null,
+      "bilanHtml": null
+    }
   },
   {
     "id": "seance-03", "title": "genou, ligamentoplastie LCA J+45", "motif": "Ligamentoplastie du LCA droit", "type": "INITIAL",

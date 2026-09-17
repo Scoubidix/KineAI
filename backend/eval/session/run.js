@@ -19,6 +19,7 @@ const { SECTION_KEYS, SECTION_TITLES } = require('../../services/bilanDocument')
 const { createPseudonymizer, fold } = require('../../services/pseudonymService');
 const llmService = require('../../services/llmService');
 const { runCase, printResult, summarize, installLeakGuard, identityOf, formatStats, leakLine } = require('../extraction/lib');
+const { buildPreviousContext } = require('../../services/bilanPreviousContext');
 const cases = require('./cases.json');
 // Kiné synthétique des harnais (jamais un vrai kiné) : masqué comme le patient, jamais envoyé au modèle.
 const KINE_IDENTITY = { firstName: 'Valentin', lastName: 'Durand', email: null };
@@ -93,7 +94,9 @@ function dump(id, sections, warnings) {
         // Comme en production : les mesures acceptées entrent au document avant la rédaction (tableau exclu de la prose)
         const { document, accepted } = applyCandidates(EMPTY_DOC, x.candidates);
         const t0 = Date.now();
-        const composed = await composeSections({ bilanId: kase.id, type: kase.type, motif: kase.motif, notes: c.text, document, catalog, keys: SECTION_KEYS, source: 'dialogue', pseudo });
+        // Contexte du bilan précédent, comme en production (le cas porte sa référence en dur)
+        const previous = buildPreviousContext({ previous: kase.previousBilan || null, currentMeasurements: document.measurements, catalog, patient: kase.identity, at: new Date() });
+        const composed = await composeSections({ bilanId: kase.id, type: kase.type, motif: kase.motif, notes: c.text, document, catalog, keys: SECTION_KEYS, source: 'dialogue', pseudo, previous });
         const sections = composed.texts;
         const warned = Object.keys(composed.warnings);
         sectionStats.warnings += warned.length;
