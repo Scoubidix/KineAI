@@ -237,7 +237,13 @@ function parseCorrection(content) {
 function buildVocabulary(catalog, extra = []) {
   const seen = new Set(); const out = [];
   const add = (t) => { const s = normSpaces(t); if (s && !seen.has(s)) { seen.add(s); out.push(s); } };
-  for (const f of catalog) if (f.isActive !== false) { add(f.label); for (const a of Array.isArray(f.aliases) ? f.aliases : []) add(a); }
+  // UN terme par champ, pas la fiche entière. Le libellé est une désignation de case (« Test de
+  // McMurray ») : le modèle ne remplacera jamais un mot par ça. Les alias suivants sont des clés
+  // de recherche pour l'extraction (« douleur au repos », « opéré le »), sans valeur ici. Le
+  // premier alias est la forme prononçable — « mcmurray », « neer », « flexion genou » — c'est
+  // elle que le correcteur doit pouvoir écrire. Ceux que ce choix laisse tomber et qui sont
+  // réellement à risque ont été versés dans EXTRA_TERMS.
+  for (const f of catalog) if (f.isActive !== false) add((Array.isArray(f.aliases) && f.aliases[0]) || f.label);
   for (const t of EXTRA_TERMS) add(t);
   for (const t of extra) add(t);
   return out;
