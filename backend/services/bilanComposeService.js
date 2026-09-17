@@ -338,7 +338,8 @@ const applySections = (document, texts) => ({
 async function writeDocument({ prisma, where, updatedAt, status, document, uid, generated, motif }) {
   const firstGeneration = generated && status === 'BROUILLON';
   const data = firstGeneration ? { document, status: 'GENERE' } : { document };
-  // Motif déduit par la rédaction : n'est transmis que si le bilan n'en avait pas (cf. appelants).
+  // Motif hérité du bilan précédent ou déduit par la rédaction : n'est transmis que si le bilan
+  // n'en avait pas déjà un (cf. appelants).
   if (motif) data.motif = motif;
   let updated;
   try {
@@ -351,10 +352,9 @@ async function writeDocument({ prisma, where, updatedAt, status, document, uid, 
   return updated;
 }
 
-// Bloc « Bilan précédent » d'un bilan de suivi, et motif de la référence. Chargé ici et non dans
-// `composeSections` : le harnais eval:session appelle `composeSections` sans Prisma.
-// `motif` n'est consommé qu'en Task 5 ; il est posé dès maintenant pour que la forme du retour
-// ne change plus.
+// Bloc « Bilan précédent » d'un bilan de suivi, et motif de la référence (repris tel quel par un
+// bilan de suivi qui n'a pas encore le sien). Chargé ici et non dans `composeSections` : le
+// harnais eval:session appelle `composeSections` sans Prisma.
 // `currentMeasurements` est explicite : la colonne « aujourd'hui » de la table d'évolution doit
 // décrire le document RÉELLEMENT rédigé. Sur « Rédiger avec l'IA », c'est le document d'APRÈS
 // extraction — sans quoi toute mesure tirée des notes du jour s'afficherait « — ».
@@ -384,17 +384,19 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
   // Ordre canonique, doublons ignorés, clés inconnues ignorées (déjà filtrées par Zod en route)
   const keys = Array.isArray(sections) && sections.length ? SECTION_KEYS.filter((k) => sections.includes(k)) : SECTION_KEYS;
   const catalog = await getCatalog();
-  const { block: previous } = await loadPreviousBlock({ prisma, kineId, bilan, catalog });
+  const { block: previous, motif: inheritedMotif } = await loadPreviousBlock({ prisma, kineId, bilan, catalog });
   const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId), at: bilan.createdAt });
+  // Un bilan de suivi prolonge le motif du bilan qu'il suit : inutile de le faire deviner au modèle.
+  const effectiveMotif = bilan.motif || inheritedMotif;
   // Un motif ne se déduit que d'une rédaction complète : sur une section reprise seule, la question n'a pas de sens
-  const withMotif = !bilan.motif && keys.length === SECTION_KEYS.length;
-  const { texts, warnings, motif: composedMotif } = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: bilan.document, catalog, keys, pseudo, withMotif, previous });
+  const withMotif = !effectiveMotif && keys.length === SECTION_KEYS.length;
+  const { texts, warnings, motif: composedMotif } = await composeSections({ bilanId, type: bilan.type, motif: effectiveMotif, notes, document: bilan.document, catalog, keys, pseudo, withMotif, previous });
 
   // L'appel IA a duré plusieurs secondes : on relit la version la plus fraîche et on ne
   // remplace que les sections demandées, en check-and-set sur updatedAt (comme l'autosave).
   const fresh = await prisma.bilanKine.findFirst({ where, select: { status: true, document: true, updatedAt: true, motif: true } });
   if (!fresh || !fresh.document) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
-  const updated = await writeDocument({ prisma, where, updatedAt: fresh.updatedAt, status: fresh.status, document: applySections(fresh.document, texts), uid, generated: true, motif: fresh.motif ? undefined : composedMotif });
+  const updated = await writeDocument({ prisma, where, updatedAt: fresh.updatedAt, status: fresh.status, document: applySections(fresh.document, texts), uid, generated: true, motif: fresh.motif ? undefined : (inheritedMotif || composedMotif) });
   logger.info(`Rédaction bilan ${bilanId} : ${keys.length} section(s), ${Object.keys(warnings).length} avertissement(s)`);
   return { bilan: updated, warnings };
 }
@@ -416,12 +418,14 @@ async function composeFromNotesForBilan({ kineId, bilanId, uid, source = 'notes'
   const { candidates, rejected } = await extractionService.extractFromText({ rawNotes: notes, motif: bilan.motif, catalog, document: bilan.document, logContext: `bilan ${bilanId}`, pseudo });
   const { document: withMeasures, accepted, pending } = extractionService.applyCandidates(bilan.document, candidates);
   // Après l'extraction : la colonne « aujourd'hui » doit porter les mesures qu'on est en train d'écrire.
-  const { block: previous } = await loadPreviousBlock({ prisma, kineId, bilan, catalog, currentMeasurements: withMeasures.measurements });
+  const { block: previous, motif: inheritedMotif } = await loadPreviousBlock({ prisma, kineId, bilan, catalog, currentMeasurements: withMeasures.measurements });
+  // Un bilan de suivi prolonge le motif du bilan qu'il suit : inutile de le faire deviner au modèle.
+  const effectiveMotif = bilan.motif || inheritedMotif;
   const base = { prisma, where, updatedAt: bilan.updatedAt, status: bilan.status, uid };
 
   let composed;
   try {
-    composed = await composeSections({ bilanId, type: bilan.type, motif: bilan.motif, notes, document: withMeasures, catalog, keys: SECTION_KEYS, source, pseudo, withMotif: !bilan.motif, previous });
+    composed = await composeSections({ bilanId, type: bilan.type, motif: effectiveMotif, notes, document: withMeasures, catalog, keys: SECTION_KEYS, source, pseudo, withMotif: !effectiveMotif, previous });
   } catch (err) {
     // Les mesures acceptées ne sont pas perdues : écrites seules, le kiné relance la rédaction
     if (err instanceof DraftError && err.code === 'COMPOSE_FAILED' && accepted.length > 0) {
@@ -430,7 +434,7 @@ async function composeFromNotesForBilan({ kineId, bilanId, uid, source = 'notes'
     }
     throw err;
   }
-  const updated = await writeDocument({ ...base, document: applySections(withMeasures, composed.texts), generated: true, motif: composed.motif });
+  const updated = await writeDocument({ ...base, document: applySections(withMeasures, composed.texts), generated: true, motif: bilan.motif ? undefined : (inheritedMotif || composed.motif) });
   logger.info(`Rédaction depuis les notes bilan ${bilanId} : ${accepted.length} acceptée(s), ${pending.length} en suspens, ${rejected} rejetée(s), ${Object.keys(composed.warnings).length} avertissement(s)`);
   return { bilan: updated, warnings: composed.warnings, accepted, pending, rejected };
 }
