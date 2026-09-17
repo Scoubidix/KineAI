@@ -49,6 +49,36 @@ const FILLERS_FOLDED = new Set(FILLERS.map(fold));
 const NUMBER_WORDS_FOLDED = new Set([...NUMBER_WORDS].map(fold));
 const SELF_CORRECTION_MARKERS_FOLDED = new Set(SELF_CORRECTION_MARKERS.map(fold));
 const hasNumberWord = (s) => tokens(fold(s)).some((w) => w.split('-').some((p) => NUMBER_WORDS_FOLDED.has(p)));
+
+// Une vraie erreur de transcription produit une forme PROCHE du terme : Whisper entend mal, il
+// n'entend pas autre chose. Au-delà de cet écart, ce n'est plus une réparation mais une
+// substitution — « Lyotard » remplacé par « Latarjet » se lit comme une vraie prescription.
+// Seuil calibré sur des cas connus : vraies corrections 0,00 à 0,33 ; substitutions 0,63 à 0,86.
+const MAX_CORRECTION_DISTANCE_RATIO = 0.4;
+/** Repli resserré aux lettres et chiffres : compare des suites de caractères, pas une mise en forme. */
+const squash = (s) => fold(s).replace(/[^a-z0-9]/g, '');
+
+/** Distance de Levenshtein, une seule ligne de travail (les termes comparés font quelques dizaines de caractères). */
+function editDistance(a, b) {
+  if (a === b) return 0;
+  if (!a.length || !b.length) return Math.max(a.length, b.length);
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i += 1) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j += 1) {
+      row[j] = Math.min(row[j - 1] + 1, prev[j] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+/** Le terme proposé ressemble-t-il assez à ce qu'il prétend corriger ? */
+function looksLikeCorrection(from, to) {
+  const a = squash(from); const b = squash(to);
+  const len = Math.max(a.length, b.length);
+  return len === 0 || editDistance(a, b) / len <= MAX_CORRECTION_DISTANCE_RATIO;
+}
 const hasSelfCorrectionMarker = (s) => tokens(fold(s)).some((w) => SELF_CORRECTION_MARKERS_FOLDED.has(w));
 
 // Motif d'un groupe de mots de contexte (before/after) : chaque mot entier, ponctuation collée tolérée, espaces souples
@@ -136,6 +166,10 @@ function applyOps(text, ops, mode, lexicon = null) {
       const validated = curated.has(`${fold(from)}→${fold(to)}`);
       if (!validated && !allowedTo.has(fold(to))) ok = false;        // cible inconnue : invention
       if (ok && !validated && exactKnown.has(from)) ok = false;      // mot déjà juste : on n'y touche pas
+      // Aucun terme assez proche : le modèle n'a rien reconnu, il a pris le moins mauvais de sa
+      // liste. Mieux vaut laisser le mot de Whisper, visiblement faux et donc signalable, qu'un
+      // terme plausible mis à sa place.
+      if (ok && !validated && !looksLikeCorrection(from, to)) ok = false;
     }
     if (ok && op.op === 'delete') {
       const isFiller = FILLERS_FOLDED.has(normSpaces(fold(from).replace(PUNCT, ' ')));
@@ -163,7 +197,7 @@ Tu ne réécris jamais le texte : tu renvoies uniquement un objet JSON { "motif"
 « motif » : le motif de consultation en 4 mots maximum, tiré du texte (ex. « Lombalgie chronique », « Suites de PTG », « Entorse cheville droite »). Pas de phrase, pas de verbe conjugué, jamais le nom ni le prénom du patient. Si le texte ne permet pas de le déterminer, renvoie "".
 Une dictée correcte a besoin de 0 à 5 opérations ; s'il n'y a rien à corriger, renvoie quand même le motif : { "motif": "…", "ops": [] }.
 Chaque opération :
-- { "op": "replace", "before": "…", "from": "…", "after": "…", "to": "…" } : remplacer « from » (le terme mal transcrit, tel qu'écrit) par « to ». « to » doit obligatoirement figurer dans le vocabulaire fourni ou dans les corrections connues : n'invente jamais un terme, même s'il te paraît évident — une opération dont la cible est absente de ces listes sera rejetée. « to » doit être différent de « from » : ne liste jamais un mot déjà correct. Un mot déjà écrit exactement comme dans le vocabulaire est correct : n'y touche pas.
+- { "op": "replace", "before": "…", "from": "…", "after": "…", "to": "…" } : remplacer « from » (le terme mal transcrit, tel qu'écrit) par « to ». « to » doit obligatoirement figurer dans le vocabulaire fourni ou dans les corrections connues : n'invente jamais un terme, même s'il te paraît évident — une opération dont la cible est absente de ces listes sera rejetée. « to » doit être différent de « from » : ne liste jamais un mot déjà correct. Un mot déjà écrit exactement comme dans le vocabulaire est correct : n'y touche pas. Et si aucun terme du vocabulaire ne ressemble vraiment au mot mal transcrit, ne propose rien pour ce mot : un terme éloigné n'est pas une correction, c'est une substitution, et elle sera rejetée. Laisser le texte tel quel est toujours préférable.
 - { "op": "delete", "before": "…", "from": "…", "after": "…", "to": "" } : supprimer « from ».
 « before » : le ou les deux mots qui précèdent immédiatement « from » dans le texte ; « after » : le ou les deux mots qui le suivent immédiatement (vide en début ou fin de texte). Ils servent à retrouver l'endroit exact. Si le fragment apparaît plusieurs fois dans le texte, choisis le contexte qui le distingue.
 Exemple — texte : « Test de lâchement négatif. Chobet à 13 centimètres, euh, Lasègue négatif. » → { "motif": "Bilan genou", "ops": [ { "op": "replace", "before": "Test de", "from": "lâchement", "after": "négatif.", "to": "Lachman" }, { "op": "replace", "before": "", "from": "Chobet", "after": "à 13", "to": "Schober" }, { "op": "delete", "before": "centimètres,", "from": "euh,", "after": "Lasègue", "to": "" } ] }
