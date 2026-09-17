@@ -1,15 +1,10 @@
-const { escapeHtml, formatValue, isFilled, formatDateFr, getMeasurements, BILAN_TYPE_LABELS } = require('./format');
+const { escapeHtml, formatValue, isFilled, formatDateFr, getMeasurements, BILAN_TYPE_LABELS, measurementId } = require('./format');
 const { CUSTOM_CATEGORY } = require('./examen');
 
 const UNKNOWN_CATEGORY = 'Autres';
 
-// Identifiant de ligne : clé canonique + côté, ou label custom normalisé
-function rowId(m) {
-  return m.kind === 'canonical' ? `c:${m.key}:${m.side ?? ''}` : `x:${m.label.trim().toLowerCase()}`;
-}
-
 function valueOf(measurements, id) {
-  const m = measurements.find((x) => rowId(x) === id);
+  const m = measurements.find((x) => measurementId(x) === id);
   return m && isFilled(m.value) ? m.value : null;
 }
 
@@ -33,7 +28,7 @@ function renderEvolutionHtml(current, previousBilans, catalog) {
   for (const b of [...all].reverse()) {
     for (const m of b.measurements) {
       if (m.presentation === 'narrative' || !isFilled(m.value)) continue;
-      const id = rowId(m);
+      const id = measurementId(m);
       if (meta.has(id)) continue;
       if (m.kind === 'canonical') {
         const field = fieldsByKey.get(m.key);

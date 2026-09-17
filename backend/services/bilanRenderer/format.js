@@ -39,4 +39,10 @@ function getMeasurements(bilanLike) {
   return [];
 }
 
-module.exports = { escapeHtml, formatDateFr, formatDateLongFr, formatValue, isFilled, getMeasurements, BILAN_TYPE_LABELS };
+// Identifiant de ligne d'une mesure : clé canonique + côté, ou label libre normalisé.
+// Partagé par le tableau d'évolution et le contexte du bilan précédent (une seule définition).
+function measurementId(m) {
+  return m.kind === 'canonical' ? `c:${m.key}:${m.side ?? ''}` : `x:${m.label.trim().toLowerCase()}`;
+}
+
+module.exports = { escapeHtml, formatDateFr, formatDateLongFr, formatValue, isFilled, getMeasurements, BILAN_TYPE_LABELS, measurementId };
