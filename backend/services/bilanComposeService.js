@@ -355,7 +355,10 @@ async function writeDocument({ prisma, where, updatedAt, status, document, uid, 
 // `composeSections` : le harnais eval:session appelle `composeSections` sans Prisma.
 // `motif` n'est consommé qu'en Task 5 ; il est posé dès maintenant pour que la forme du retour
 // ne change plus.
-async function loadPreviousBlock({ prisma, kineId, bilan, catalog }) {
+// `currentMeasurements` est explicite : la colonne « aujourd'hui » de la table d'évolution doit
+// décrire le document RÉELLEMENT rédigé. Sur « Rédiger avec l'IA », c'est le document d'APRÈS
+// extraction — sans quoi toute mesure tirée des notes du jour s'afficherait « — ».
+async function loadPreviousBlock({ prisma, kineId, bilan, catalog, currentMeasurements }) {
   const empty = { block: null, motif: null };
   if (bilan.type === 'INITIAL' || !bilan.patientId) return empty;
   const previous = await loadReferenceBilan({
@@ -364,7 +367,7 @@ async function loadPreviousBlock({ prisma, kineId, bilan, catalog }) {
   });
   if (!previous) return empty;
   return {
-    block: buildPreviousContext({ previous, currentMeasurements: bilan.document.measurements, catalog, patient: bilan.patient, at: bilan.createdAt }),
+    block: buildPreviousContext({ previous, currentMeasurements: currentMeasurements ?? bilan.document.measurements, catalog, patient: bilan.patient, at: bilan.createdAt }),
     motif: previous.motif || null,
   };
 }
@@ -409,10 +412,11 @@ async function composeFromNotesForBilan({ kineId, bilanId, uid, source = 'notes'
   const catalog = await getCatalog();
   if (!SOURCES.includes(source)) throw new Error(`source de rédaction inconnue : ${source}`);
 
-  const { block: previous } = await loadPreviousBlock({ prisma, kineId, bilan, catalog });
   const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId), at: bilan.createdAt });
   const { candidates, rejected } = await extractionService.extractFromText({ rawNotes: notes, motif: bilan.motif, catalog, document: bilan.document, logContext: `bilan ${bilanId}`, pseudo });
   const { document: withMeasures, accepted, pending } = extractionService.applyCandidates(bilan.document, candidates);
+  // Après l'extraction : la colonne « aujourd'hui » doit porter les mesures qu'on est en train d'écrire.
+  const { block: previous } = await loadPreviousBlock({ prisma, kineId, bilan, catalog, currentMeasurements: withMeasures.measurements });
   const base = { prisma, where, updatedAt: bilan.updatedAt, status: bilan.status, uid };
 
   let composed;
