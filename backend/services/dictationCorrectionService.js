@@ -146,11 +146,8 @@ function applyOps(text, ops, mode, lexicon = null) {
   //  - `exactKnown` : les mots qu'il ne doit pas toucher, parce qu'ils sont déjà écrits comme au
   //    vocabulaire. Comparaison EXACTE, pas repliée : sinon « lasegue » → « Lasègue » deviendrait
   //    impossible, alors que c'est une vraie correction.
-  //  - `curated` : les paires validées en admin priment sur les deux. Sans cette exception, une
-  //    correspondance retenue dont la forme entendue est un terme valide ne s'appliquerait jamais.
   const allowedTo = lexicon ? new Set((lexicon.vocabulary || []).map(fold)) : null;
   const exactKnown = lexicon ? new Set((lexicon.vocabulary || []).map(normSpaces)) : null;
-  const curated = new Set((lexicon?.corrections || []).map((c) => `${fold(c.from)}→${fold(c.to)}`));
   for (const op of realOps) {
     // Un jeton de pseudonymisation ([Libellé] ou [Libellé n]) ne figure jamais dans une vraie transcription :
     // toute opération qui en touche un (dans from/to/before/after) est un artefact du modèle, jamais appliquée.
@@ -163,13 +160,12 @@ function applyOps(text, ops, mode, lexicon = null) {
     // ne peut pas servir à insérer une phrase entière.
     if (ok && op.op === 'replace') ok = to.length > 0 && !hasDigit(to) && tokens(to).length <= MAX_TO_WORDS && tokens(to).length <= fromTokens.length + 1;
     if (ok && op.op === 'replace' && allowedTo) {
-      const validated = curated.has(`${fold(from)}→${fold(to)}`);
-      if (!validated && !allowedTo.has(fold(to))) ok = false;        // cible inconnue : invention
-      if (ok && !validated && exactKnown.has(from)) ok = false;      // mot déjà juste : on n'y touche pas
+      if (!allowedTo.has(fold(to))) ok = false;        // cible inconnue : invention
+      if (ok && exactKnown.has(from)) ok = false;      // mot déjà juste : on n'y touche pas
       // Aucun terme assez proche : le modèle n'a rien reconnu, il a pris le moins mauvais de sa
       // liste. Mieux vaut laisser le mot de Whisper, visiblement faux et donc signalable, qu'un
       // terme plausible mis à sa place.
-      if (ok && !validated && !looksLikeCorrection(from, to)) ok = false;
+      if (ok && !looksLikeCorrection(from, to)) ok = false;
     }
     if (ok && op.op === 'delete') {
       const isFiller = FILLERS_FOLDED.has(normSpaces(fold(from).replace(PUNCT, ' ')));
@@ -249,17 +245,67 @@ function buildVocabulary(catalog, extra = []) {
   return out;
 }
 
-function buildCorrectionMessages({ text, mode, vocabulary, corrections = [] }) {
-  // Deux sections, deux rôles. Le vocabulaire dit quels termes existent et laisse le modèle
-  // rapprocher lui-même une graphie approchante — c'est ce qui couvre les variantes que personne
-  // n'a jamais signalées. Les correspondances donnent les fautes réellement observées, celles
-  // qu'il ne rapprocherait pas seul. La seconde section est absente tant que rien n'est retenu.
-  const known = corrections.length
-    ? `\n\nCorrections connues : ${corrections.map((c) => `« ${c.heard} » → ${c.expected}`).join(' ; ')}`
-    : '';
+/**
+ * Applique les correspondances validées en admin, sans modèle, avant la passe de correction.
+ *
+ * Une paire retenue est une décision, pas une suggestion : elle doit s'appliquer partout et de
+ * façon reproductible. Le modèle, lui, n'émettait qu'une opération par terme même quand il
+ * apparaissait plusieurs fois.
+ *
+ * Deux règles qui mordent si on les oublie :
+ *  - **la plus longue d'abord** : « hawkins » appliqué avant « hawkins kennedy » couperait la
+ *    seconde en deux et laisserait un « kennedy » orphelin ;
+ *  - **une seule passe** : on repère toutes les occurrences sur le texte d'origine, puis on écrit.
+ *    Ce qui vient d'être écrit n'est jamais relu, sinon une paire re-transformerait la sortie
+ *    d'une autre.
+ *
+ * @returns {{ text: string, changes: {from: string, to: string}[] }}
+ */
+function applyKnownPairs(text, pairs) {
+  const src = String(text ?? '');
+  if (!src || !pairs?.length) return { text: src, changes: [] };
+  const folded = fold(src);
+
+  // Repérage sur le texte d'origine, la plus longue forme entendue en premier
+  const trouvees = [];
+  const pris = new Array(src.length).fill(false);
+  const ordre = [...pairs].filter((p) => p?.heard && p?.expected)
+    .sort((a, b) => normSpaces(b.heard).length - normSpaces(a.heard).length);
+
+  for (const p of ordre) {
+    const mots = tokens(fold(p.heard));
+    if (!mots.length) continue;
+    const motif = `(?<![${WORD_CHARS}])(${mots.map(escapeRe).join('\\s+')})(?![${WORD_CHARS}])`;
+    for (const m of folded.matchAll(new RegExp(motif, 'gd'))) {
+      const [start, end] = m.indices[1];
+      // Zone déjà prise par une paire plus longue : on ne la découpe pas
+      let libre = true;
+      for (let i = start; i < end; i += 1) if (pris[i]) { libre = false; break; }
+      if (!libre) continue;
+      for (let i = start; i < end; i += 1) pris[i] = true;
+      trouvees.push({ start, end, to: p.expected });
+    }
+  }
+
+  if (!trouvees.length) return { text: src, changes: [] };
+  trouvees.sort((a, b) => a.start - b.start);
+  let out = ''; let dernier = 0; const changes = [];
+  for (const t of trouvees) {
+    changes.push({ from: src.slice(t.start, t.end), to: t.to });
+    out += src.slice(dernier, t.start) + t.to;
+    dernier = t.end;
+  }
+  return { text: out + src.slice(dernier), changes };
+}
+
+function buildCorrectionMessages({ text, mode, vocabulary }) {
+  // Une seule section : le vocabulaire dit quels termes existent, et le modèle rapproche lui-même
+  // une graphie approchante — c'est ce qui couvre les variantes que personne n'a signalées. Les
+  // correspondances validées, elles, ont déjà été appliquées avant cet appel : le modèle n'a pas
+  // à les connaître, et les termes qu'elles ont écrits sont désormais protégés par les gardes.
   return [
     { role: 'system', content: SYSTEM_PROMPT },
-    { role: 'user', content: `Mode : ${mode === 'session' ? 'séance (dialogue kiné-patient : ne supprimer que les hésitations)' : 'dictée'}\n\nVocabulaire : ${vocabulary.join(' ; ')}${known}\n\nTexte :\n"""\n${text}\n"""` },
+    { role: 'user', content: `Mode : ${mode === 'session' ? 'séance (dialogue kiné-patient : ne supprimer que les hésitations)' : 'dictée'}\n\nVocabulaire : ${vocabulary.join(' ; ')}\n\nTexte :\n"""\n${text}\n"""` },
   ];
 }
 
@@ -276,13 +322,14 @@ async function correct({ text, mode, catalog, pseudo }) {
   // Le modèle ne reçoit jamais l'identité en clair : masquée avant l'envoi, réhydratée sur le texte rendu
   const masked = pseudo ? pseudo.mask(raw) : raw;
   logMasked(`correction (${mode})`, masked, pseudo);
-  // Les termes signalés par les kinés et retenus en admin rejoignent le vocabulaire des deux modes :
-  // le mode ne change que les suppressions autorisées, jamais les remplacements.
-  // Une seule lecture, deux usages : la forme attendue rejoint le vocabulaire (ce terme existe),
-  // la paire rejoint les correspondances (voici par quelle faute il arrive).
-  const corrections = await dictationTermService.listRetained();
-  const vocabulary = buildVocabulary(catalog, corrections.map((c) => c.expected));
-  const messages = buildCorrectionMessages({ text: masked, mode, vocabulary, corrections });
+  // Les correspondances validées en admin sont appliquées AVANT le modèle, sans lui : une décision
+  // d'arbitrage doit s'appliquer partout et de la même façon à chaque fois, pas une occurrence sur
+  // deux selon ce que le modèle repère. Le texte qu'il reçoit porte donc déjà ces termes écrits
+  // juste — et comme ils sont au vocabulaire, la garde du mot déjà juste les rend intouchables.
+  const pairs = await dictationTermService.listRetained();
+  const known = applyKnownPairs(masked, pairs);
+  const vocabulary = buildVocabulary(catalog, pairs.map((c) => c.expected));
+  const messages = buildCorrectionMessages({ text: known.text, mode, vocabulary });
   let parsed;
   for (let attempt = 1; attempt <= 2 && !parsed; attempt += 1) {
     try {
@@ -293,15 +340,15 @@ async function correct({ text, mode, catalog, pseudo }) {
       logger.warn(`Correction dictée : essai ${attempt} en échec (${safeErrorLabel(err)})`);
     }
   }
-  if (!parsed) return { text: raw, applied: 0, ignored: 0, motif: '' };
+  // Le texte brut reste rendu au kiné si le modèle échoue — mais les correspondances validées,
+  // elles, ont déjà été appliquées et n'ont pas à être défaites par une panne du modèle.
+  if (!parsed) return { text: known.text, applied: 0, ignored: 0, motif: '', changes: known.changes };
   // Le vocabulaire fait autorité : le modèle ne peut remplacer que par un terme connu, et ne peut
   // pas toucher un mot déjà juste. Le prompt le lui demande, ces gardes l'imposent.
-  // `applyOps` parle la langue des opérations du modèle (`from`/`to`), les correspondances celle du
-  // signalement (`heard`/`expected`) : la conversion se fait ici, à la frontière.
-  const r = applyOps(masked, parsed.ops, mode, {
-    vocabulary,
-    corrections: corrections.map((c) => ({ from: c.heard, to: c.expected })),
-  });
+  const r = applyOps(known.text, parsed.ops, mode, { vocabulary });
+  // Les substitutions déterministes comptent comme des remplacements pour la suite : un kiné qui
+  // signalerait l'un de ces termes doit voir sa forme d'origine remonter, pas la nôtre.
+  r.changes = [...known.changes, ...r.changes];
   const tokenCount = pseudo ? Object.values(pseudo.stats()).reduce((a, b) => a + b, 0) : 0;
   // Jamais le motif dans les logs : c'est du contenu clinique
   logger.info(`Correction dictée (${mode}) : ${r.applied} appliquée(s), ${r.ignored} ignorée(s), ${tokenCount} jeton(s), motif ${parsed.motif ? 'déduit' : 'absent'}`);
@@ -312,6 +359,6 @@ async function correct({ text, mode, catalog, pseudo }) {
 }
 
 module.exports = {
-  MODES, applyOps, numbersGuard,
+  MODES, applyOps, applyKnownPairs, numbersGuard,
   buildVocabulary, buildCorrectionMessages, parseCorrection, sanitizeMotif, MAX_MOTIF_WORDS, correct, CORRECTION_JSON_SCHEMA,
 };
