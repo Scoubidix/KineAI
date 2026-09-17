@@ -394,8 +394,16 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
 
   // L'appel IA a duré plusieurs secondes : on relit la version la plus fraîche et on ne
   // remplace que les sections demandées, en check-and-set sur updatedAt (comme l'autosave).
+  // `fresh.motif` (relu, pas `bilan.motif` lu avant l'appel) est la garde anti-STALE_DRAFT : si le
+  // kiné a saisi un motif pendant l'appel au modèle, celui-ci ne doit jamais être écrasé après coup
+  // par un motif hérité ou déduit sur la base d'un état désormais périmé.
   const fresh = await prisma.bilanKine.findFirst({ where, select: { status: true, document: true, updatedAt: true, motif: true } });
   if (!fresh || !fresh.document) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
+  // L'héritage (`inheritedMotif`) n'est PAS gardé par `keys.length`, contrairement à `withMotif`
+  // ci-dessus : cette garde n'existe que pour ne pas faire deviner un motif au modèle sur une
+  // section isolée (« la question n'a pas de sens »). Reprendre le motif du bilan précédent est un
+  // héritage déterministe et gratuit, jamais une déduction, et il n'écrase jamais un motif déjà
+  // saisi (cf. `fresh.motif` ci-dessus) : rien ne justifie de le bloquer sur une reprise partielle.
   const updated = await writeDocument({ prisma, where, updatedAt: fresh.updatedAt, status: fresh.status, document: applySections(fresh.document, texts), uid, generated: true, motif: fresh.motif ? undefined : (inheritedMotif || composedMotif) });
   logger.info(`Rédaction bilan ${bilanId} : ${keys.length} section(s), ${Object.keys(warnings).length} avertissement(s)`);
   return { bilan: updated, warnings };
