@@ -151,7 +151,7 @@ candidats, sections rédigées) — les notes réelles ne quittent jamais le ser
   au lieu de `Prénom NOM, âge ans,` attendu (« Sophie MARTIN, 46 ans, ») — le modèle omet le jeton
   `[Prénom]` plutôt que de le recopier. Aucun nom, réel ou synthétique, n'apparaît en clair (ni fuite
   RGPD ni fuite de test) : c'est une non-conformité au gabarit du guide de rédaction, à corriger côté
-  prompt (`SECTION_GUIDE.anamnese`) si le format « Prénom NOM » est requis à l'affichage.
+  prompt (`SECTION_GUIDES[type].anamnese`) si le format « Prénom NOM » est requis à l'affichage.
   **Corrigé le 2026-09-12** (gabarit d'identité obligatoire, commit `f28c0e9`,
   `docs/superpowers/specs/2026-09-12-anamnese-identite-design.md`) : voir le run de référence dans
   la section « Eval — séance » ci-dessous.

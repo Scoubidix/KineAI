@@ -34,8 +34,7 @@
           { "kind": "canonical", "key": "testing_deltoide", "side": "D", "value": "2/5", "presentation": "table", "origin": "manual" }
         ]
       },
-      "structuredData": null,
-      "bilanHtml": null
+      "structuredData": null
     }
   },
   {

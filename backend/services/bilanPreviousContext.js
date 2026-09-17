@@ -40,6 +40,7 @@ function buildEvolutionLines(previousMeasurements, currentMeasurements, catalog)
   const lines = [];
   for (const p of previousMeasurements) {
     if (!isFilled(p.value)) continue;
+    if (p.presentation === 'narrative') continue; // même exclusion que le tableau d'évolution imprimé
     const field = p.kind === 'canonical' ? byKey.get(p.key) : null;
     if (p.kind === 'canonical' && !field) continue; // clé retirée du catalogue
     const label = `${field ? field.label : p.label}${p.side ? ` (${p.side})` : ''}`;
@@ -70,7 +71,8 @@ function buildPreviousContext({ previous, currentMeasurements, catalog, patient,
   for (const key of CONTEXT_SECTION_KEYS) {
     const raw = String(sections.get(key) || '').trim();
     if (!raw) continue;
-    parts.push(`[${SECTION_TITLES[key]}] ${maskAge(raw.slice(0, SECTION_CHARS_MAX), age)}`);
+    const truncated = raw.length > SECTION_CHARS_MAX ? `${raw.slice(0, SECTION_CHARS_MAX)}…` : raw;
+    parts.push(`[${SECTION_TITLES[key]}] ${maskAge(truncated, age)}`);
   }
 
   const lines = buildEvolutionLines(getMeasurements(previous), currentMeasurements, catalog);
@@ -78,7 +80,7 @@ function buildPreviousContext({ previous, currentMeasurements, catalog, patient,
   return parts.join('\n');
 }
 
-const REFERENCE_SELECT = { id: true, type: true, motif: true, createdAt: true, document: true, structuredData: true, bilanHtml: true };
+const REFERENCE_SELECT = { id: true, type: true, motif: true, createdAt: true, document: true, structuredData: true };
 
 /**
  * Bilan de référence d'un bilan de suivi — même règle que le front (`usePreviousReference`) :
@@ -88,6 +90,9 @@ const REFERENCE_SELECT = { id: true, type: true, motif: true, createdAt: true, d
  */
 async function loadReferenceBilan({ prisma, kineId, patientId, excludeId, comparisonIds }) {
   if (!patientId) return null;
+  // Sélection volontairement vidée par le kiné (le front écrit `previousBilanIds: []` quand il
+  // retire la comparaison) : on ne devine pas de référence, même règle que `usePreviousReference`.
+  if (Array.isArray(comparisonIds) && comparisonIds.length === 0) return null;
   const base = { kineId, patientId, isActive: true };
   const ids = (Array.isArray(comparisonIds) ? comparisonIds : []).filter(Number.isInteger);
   const where = ids.length
@@ -97,4 +102,4 @@ async function loadReferenceBilan({ prisma, kineId, patientId, excludeId, compar
   return rows[0] || null;
 }
 
-module.exports = { CONTEXT_SECTION_KEYS, SECTION_CHARS_MAX, formatDelay, maskAge, buildEvolutionLines, buildPreviousContext, loadReferenceBilan };
+module.exports = { buildPreviousContext, loadReferenceBilan };
