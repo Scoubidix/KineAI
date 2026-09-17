@@ -47,7 +47,7 @@ const STYLE_EXAMPLES = {
       sections: {
         anamnese: 'Mme B., 47 ans, secrétaire médicale, termine une prise en charge engagée il y a quatre mois pour une épaule droite douloureuse d\'apparition progressive.',
         antecedents: 'Tendinopathie de la coiffe traitée médicalement en 2022, sans rééducation. Aucun traitement antalgique en cours.',
-        examen: 'L\'épaule est indolore en fin de prise en charge, y compris au travail nocturne. Les amplitudes actives sont symétriques et la coiffe est testée non douloureuse. Les manœuvres de conflit restent négatives, et le rythme scapulo-huméral est restauré au cours du mouvement complet.',
+        examen: 'L\'épaule est indolore en fin de prise en charge, y compris la nuit. Les amplitudes actives sont symétriques et la coiffe est testée non douloureuse. Les manœuvres de conflit restent négatives, et le rythme scapulo-huméral est restauré au cours du mouvement complet.',
         limitations: 'Aucune limitation résiduelle rapportée : le travail sur écran, la conduite et le port de charges du quotidien sont repris sans gêne.',
         diagnostic: 'Les objectifs fixés au bilan initial sont atteints. La disparition des douleurs nocturnes et la restauration du contrôle scapulaire rendent compte de la reprise complète des activités professionnelles et domestiques, sans signe de conflit résiduel.',
         objectifs: 'Objectif antalgique atteint. Récupération des amplitudes atteinte. Reprise des activités professionnelles sans gêne atteinte. Reprise de la natation partiellement atteinte, la patiente ne l\'ayant pas encore reprise à la fréquence souhaitée.',
