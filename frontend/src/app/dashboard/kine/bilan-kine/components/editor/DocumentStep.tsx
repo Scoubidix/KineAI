@@ -140,9 +140,10 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
     <div role="status" className="mx-auto w-full max-w-[794px] flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs">
       <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
       <span className="flex-1">
-        Ce bilan a été rédigé comme un bilan <strong>{BILAN_TYPE_LABELS[composedType!].toLowerCase()}</strong>. Tu l’as passé en <strong>{BILAN_TYPE_LABELS[record.type].toLowerCase()}</strong>.
+        {/* `BILAN_TYPE_LABELS` porte déjà le mot « Bilan » (« Bilan initial ») : ne pas le répéter. */}
+        Ce bilan a été rédigé comme un <strong>{BILAN_TYPE_LABELS[composedType!].toLowerCase()}</strong>. Tu l’as passé en <strong>{BILAN_TYPE_LABELS[record.type].toLowerCase()}</strong>.
       </span>
-      <Button size="sm" onClick={() => { void onCompose(); }} disabled={disabled || !hasNotes || aiBusy !== null} className="btn-teal h-7 text-xs rounded-full">
+      <Button size="sm" onClick={() => { void onCompose(); }} disabled={disabled || !hasNotes || aiBusy !== null} aria-label="Régénérer tout le bilan sous le bon type" className="btn-teal h-7 text-xs rounded-full">
         {aiBusy === 'compose' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}Régénérer
       </Button>
     </div>

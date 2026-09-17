@@ -177,7 +177,9 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
       const r = await composeBilan(record.id, sections);
       replaceRecord(r.bilan);
       composedMeasurementsRef.current = fingerprint(r.bilan);
-      setComposedType(r.bilan.type);
+      // Une reprise ciblée (une seule section) ne rédige pas les 6 autres : l'avertissement
+      // sur le type reste vrai pour elles, on ne le lève que sur une rédaction complète.
+      if (!sections) setComposedType(r.bilan.type);
       revealDrawer();
       setWarnings((prev) => {
         if (!sections) return r.warnings;
