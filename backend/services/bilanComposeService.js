@@ -88,9 +88,11 @@ ${STYLE_PRINCIPLES.map((p) => `- ${p}`).join('\n')}
 Des exemples de style te sont fournis : imite leur forme, leur longueur et leur façon de raisonner ; ne reprends jamais leur contenu, qui concerne d'autres patients. Leurs sections sont toutes remplies parce que leurs notes l'étaient : si les notes ne disent rien pour une section, en particulier limitations, objectifs et traitement, laisse-la vide plutôt que de proposer un plan.`;
 }
 
-// Exemples de style limités aux sections demandées (les autres n'apportent rien et coûtent des tokens)
-function formatStyleExamples(keys) {
-  return STYLE_EXAMPLES.map((ex) => [`Exemple — ${ex.title} :`, ...keys.map((k) => `[${SECTION_TITLES[k]}] ${ex.sections[k]}`)].join('\n')).join('\n\n');
+// Exemples de style du type demandé, limités aux sections demandées (les autres n'apportent rien
+// et coûtent des tokens). Un type sans exemple retombe sur ceux du bilan initial.
+function formatStyleExamples(keys, type) {
+  const examples = STYLE_EXAMPLES[type] || STYLE_EXAMPLES.INITIAL;
+  return examples.map((ex) => [`Exemple — ${ex.title} :`, ...keys.map((k) => `[${SECTION_TITLES[k]}] ${ex.sections[k]}`)].join('\n')).join('\n\n');
 }
 
 // Mesures narratives renseignées, formatées « Libellé (côté) : valeur unité »
@@ -204,7 +206,7 @@ function buildComposeMessages({ type, motif, rawNotes, lines, tableLabels, keys,
     keys.map((k) => `- ${k} : ${SECTION_TITLES[k]} — ${guide[k]}`).join('\n'),
     '',
     'Exemples de style (forme à imiter, contenu à ne jamais reprendre) :',
-    formatStyleExamples(keys),
+    formatStyleExamples(keys, type),
   ].join('\n');
   return [{ role: 'system', content: buildSystemPrompt({ hasPrevious: Boolean(previous) }) }, { role: 'user', content: user }];
 }
