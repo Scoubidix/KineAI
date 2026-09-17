@@ -84,10 +84,14 @@ function numbersGuard(raw, corrected) {
 }
 
 /**
- * Applique les opérations sous gardes. Pur.
- * @returns {{ text: string, applied: number, ignored: number }}
+ * Applique les opérations du modèle sous gardes déterministes. Pur.
+ * @returns {{ text: string, applied: number, ignored: number, changes: {from: string, to: string}[] }}
+ *
+ * `lexicon` est optionnel : `{ vocabulary, corrections }`. Quand il est fourni, le vocabulaire fait
+ * autorité — le modèle ne peut remplacer que PAR un terme connu, et ne peut pas toucher un mot
+ * qu'il reconnaît déjà. Sans lexique, le comportement historique est conservé.
  */
-function applyOps(text, ops, mode) {
+function applyOps(text, ops, mode, lexicon = null) {
   const raw = String(text ?? '');
   const wordCount = tokens(raw).length;
   const giveUp = (why, ignoredCount) => { logger.warn(`Correction dictée abandonnée : ${why} (${ops.length} opération(s), ${wordCount} mots)`); return { text: raw, applied: 0, ignored: ignoredCount ?? ops.length, changes: [] }; };
@@ -106,6 +110,17 @@ function applyOps(text, ops, mode) {
   // notre production et non celle de Whisper — un signalement portant dessus doit être résolu
   // vers la forme d'origine, sans quoi on apprendrait au correcteur sa propre erreur.
   const changes = [];
+  // Gardes lexicales, actives seulement si un lexique est fourni :
+  //  - `allowedTo` : ce par quoi le modèle a le droit de remplacer. Hors de cette liste, c'est une
+  //    invention — le cas « Stanish → Stanic », qu'aucune garde structurelle ne peut voir.
+  //  - `exactKnown` : les mots qu'il ne doit pas toucher, parce qu'ils sont déjà écrits comme au
+  //    vocabulaire. Comparaison EXACTE, pas repliée : sinon « lasegue » → « Lasègue » deviendrait
+  //    impossible, alors que c'est une vraie correction.
+  //  - `curated` : les paires validées en admin priment sur les deux. Sans cette exception, une
+  //    correspondance retenue dont la forme entendue est un terme valide ne s'appliquerait jamais.
+  const allowedTo = lexicon ? new Set((lexicon.vocabulary || []).map(fold)) : null;
+  const exactKnown = lexicon ? new Set((lexicon.vocabulary || []).map(normSpaces)) : null;
+  const curated = new Set((lexicon?.corrections || []).map((c) => `${fold(c.from)}→${fold(c.to)}`));
   for (const op of realOps) {
     // Un jeton de pseudonymisation ([Libellé] ou [Libellé n]) ne figure jamais dans une vraie transcription :
     // toute opération qui en touche un (dans from/to/before/after) est un artefact du modèle, jamais appliquée.
@@ -117,6 +132,11 @@ function applyOps(text, ops, mode) {
     // Ajout borné à un mot de plus que « from » (en plus du plafond absolu MAX_TO_WORDS) : un remplacement
     // ne peut pas servir à insérer une phrase entière.
     if (ok && op.op === 'replace') ok = to.length > 0 && !hasDigit(to) && tokens(to).length <= MAX_TO_WORDS && tokens(to).length <= fromTokens.length + 1;
+    if (ok && op.op === 'replace' && allowedTo) {
+      const validated = curated.has(`${fold(from)}→${fold(to)}`);
+      if (!validated && !allowedTo.has(fold(to))) ok = false;        // cible inconnue : invention
+      if (ok && !validated && exactKnown.has(from)) ok = false;      // mot déjà juste : on n'y touche pas
+    }
     if (ok && op.op === 'delete') {
       const isFiller = FILLERS_FOLDED.has(normSpaces(fold(from).replace(PUNCT, ' ')));
       const isSelfCorrection = mode === 'dictation' && fromTokens.length >= 2 && (hasSelfCorrectionMarker(from) || hasSelfCorrectionMarker(after));
@@ -143,7 +163,7 @@ Tu ne réécris jamais le texte : tu renvoies uniquement un objet JSON { "motif"
 « motif » : le motif de consultation en 4 mots maximum, tiré du texte (ex. « Lombalgie chronique », « Suites de PTG », « Entorse cheville droite »). Pas de phrase, pas de verbe conjugué, jamais le nom ni le prénom du patient. Si le texte ne permet pas de le déterminer, renvoie "".
 Une dictée correcte a besoin de 0 à 5 opérations ; s'il n'y a rien à corriger, renvoie quand même le motif : { "motif": "…", "ops": [] }.
 Chaque opération :
-- { "op": "replace", "before": "…", "from": "…", "after": "…", "to": "…" } : remplacer « from » (le terme mal transcrit, tel qu'écrit) par « to » (le terme correct, du vocabulaire fourni ou un terme médical évident). « to » doit être différent de « from » : ne liste jamais un mot déjà correct.
+- { "op": "replace", "before": "…", "from": "…", "after": "…", "to": "…" } : remplacer « from » (le terme mal transcrit, tel qu'écrit) par « to ». « to » doit obligatoirement figurer dans le vocabulaire fourni ou dans les corrections connues : n'invente jamais un terme, même s'il te paraît évident — une opération dont la cible est absente de ces listes sera rejetée. « to » doit être différent de « from » : ne liste jamais un mot déjà correct. Un mot déjà écrit exactement comme dans le vocabulaire est correct : n'y touche pas.
 - { "op": "delete", "before": "…", "from": "…", "after": "…", "to": "" } : supprimer « from ».
 « before » : le ou les deux mots qui précèdent immédiatement « from » dans le texte ; « after » : le ou les deux mots qui le suivent immédiatement (vide en début ou fin de texte). Ils servent à retrouver l'endroit exact. Si le fragment apparaît plusieurs fois dans le texte, choisis le contexte qui le distingue.
 Exemple — texte : « Test de lâchement négatif. Chobet à 13 centimètres, euh, Lasègue négatif. » → { "motif": "Bilan genou", "ops": [ { "op": "replace", "before": "Test de", "from": "lâchement", "after": "négatif.", "to": "Lachman" }, { "op": "replace", "before": "", "from": "Chobet", "after": "à 13", "to": "Schober" }, { "op": "delete", "before": "centimètres,", "from": "euh,", "after": "Lasègue", "to": "" } ] }
@@ -234,7 +254,14 @@ async function correct({ text, mode, catalog, pseudo }) {
     }
   }
   if (!parsed) return { text: raw, applied: 0, ignored: 0, motif: '' };
-  const r = applyOps(masked, parsed.ops, mode);
+  // Le vocabulaire fait autorité : le modèle ne peut remplacer que par un terme connu, et ne peut
+  // pas toucher un mot déjà juste. Le prompt le lui demande, ces gardes l'imposent.
+  // `applyOps` parle la langue des opérations du modèle (`from`/`to`), les correspondances celle du
+  // signalement (`heard`/`expected`) : la conversion se fait ici, à la frontière.
+  const r = applyOps(masked, parsed.ops, mode, {
+    vocabulary,
+    corrections: corrections.map((c) => ({ from: c.heard, to: c.expected })),
+  });
   const tokenCount = pseudo ? Object.values(pseudo.stats()).reduce((a, b) => a + b, 0) : 0;
   // Jamais le motif dans les logs : c'est du contenu clinique
   logger.info(`Correction dictée (${mode}) : ${r.applied} appliquée(s), ${r.ignored} ignorée(s), ${tokenCount} jeton(s), motif ${parsed.motif ? 'déduit' : 'absent'}`);
