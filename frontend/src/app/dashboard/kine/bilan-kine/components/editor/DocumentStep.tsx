@@ -11,7 +11,7 @@ import DocumentSheet from './DocumentSheet';
 import { DRAWER_ACTIONS_ID } from './MeasuresDrawer';
 import PatientCombobox from '../PatientCombobox';
 import { attachPatient, finalizeBilan, ApiError } from '@/utils/bilanApi';
-import { fetchBilanRender, downloadBilanPdf, bilanRenderToText } from '@/utils/bilanExport';
+import { fetchBilanRender, downloadBilanPdf, buildBilanClipboard, writeBilanToClipboard, type BilanClipboard } from '@/utils/bilanExport';
 import { emptyBilanDocument, BILAN_TYPE_LABELS, type AiBusy, type BilanPatch, type BilanRecord, type BilanSectionKey, type BilanType, type PatientSummary, type SectionWarnings } from '@/types/bilan';
 
 // flush() renvoie Promise<boolean> (cf. useBilanAutosave) : true si tout est persisté
@@ -41,6 +41,8 @@ export interface DocumentStepProps {
 }
 
 const FLUSH_PENDING_TOAST = { title: 'Sauvegarde en attente, réessaie dans un instant' };
+// Sentinelle interne : un flush non abouti annule l'export sans être une erreur à afficher telle quelle
+const FLUSH_ABORT = '__flush_pending__';
 
 export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited, lastRun, onVerify, onDismissRun, wide, onOpenMeasures, measuresOpen, fromSession, composedType }: DocumentStepProps) {
   const { toast } = useToast();
@@ -58,30 +60,47 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
     onSectionEdited(key);
   };
 
-  const withText = async (action: (text: string, title: string) => Promise<void> | void, kind: 'copy' | 'mail') => {
-    setBusy(kind);
+  /** Document prêt à exporter (copie, mail). Rejette FLUSH_ABORT si la sauvegarde n'a pas abouti. */
+  const prepareExport = async (): Promise<{ clip: BilanClipboard; title: string }> => {
+    // On n'exporte jamais un document périmé : si le flush échoue (hors ligne, 429, bilan obsolète), on abandonne l'action
+    if (!(await flush())) throw new Error(FLUSH_ABORT);
+    const r = await fetchBilanRender(record.id, { evolution });
+    return { clip: buildBilanClipboard(r.html), title: r.title };
+  };
+
+  const reportExportError = (e: unknown) => {
+    const msg = (e as Error).message;
+    toast(msg === FLUSH_ABORT ? FLUSH_PENDING_TOAST : { title: 'Erreur', description: msg, variant: 'destructive' });
+  };
+
+  // Pas d'await avant l'écriture : le ClipboardItem doit naître dans le geste utilisateur
+  // (cf. writeBilanToClipboard), on lui passe donc la préparation sous forme de Promise.
+  const handleCopy = () => {
+    setBusy('copy');
+    writeBilanToClipboard(prepareExport().then((r) => r.clip))
+      .then(() => toast({ title: 'Copié', description: 'Le bilan est dans le presse-papiers' }))
+      .catch(reportExportError)
+      .finally(() => setBusy(null));
+  };
+
+  const handleMail = async () => {
+    setBusy('mail');
     try {
-      // On n'exporte jamais un document périmé : si le flush échoue (hors ligne, 429, bilan obsolète), on abandonne l'action
-      if (!(await flush())) { toast(FLUSH_PENDING_TOAST); return; }
-      const r = await fetchBilanRender(record.id, { evolution });
-      await action(bilanRenderToText(r.html), r.title);
-    } catch (e) { toast({ title: 'Erreur', description: (e as Error).message, variant: 'destructive' }); }
+      const { clip, title } = await prepareExport();
+      // Certains clients mail tronquent ou refusent les liens mailto: trop longs :
+      // au-delà d'un seuil, on copie le bilan et on ne met qu'un message court dans le corps.
+      if (clip.text.length > 1800) {
+        await writeBilanToClipboard(Promise.resolve(clip));
+        const shortBody = 'Bilan copié dans le presse-papiers : colle-le ici (Ctrl+V).';
+        window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(shortBody)}`;
+        toast({ title: 'Bilan copié, colle-le dans ton mail' });
+        return;
+      }
+      window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(clip.text)}`;
+    } catch (e) { reportExportError(e); }
     finally { setBusy(null); }
   };
 
-  const handleCopy = () => withText(async (text) => { await navigator.clipboard.writeText(text); toast({ title: 'Copié', description: 'Le bilan est dans le presse-papiers' }); }, 'copy');
-  const handleMail = () => withText(async (text, title) => {
-    // Certains clients mail tronquent ou refusent les liens mailto: trop longs :
-    // au-delà d'un seuil, on copie le texte complet et on ne met qu'un message court dans le corps.
-    if (text.length > 1800) {
-      await navigator.clipboard.writeText(text);
-      const shortBody = 'Bilan copié dans le presse-papiers : colle-le ici (Ctrl+V).';
-      window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(shortBody)}`;
-      toast({ title: 'Bilan copié, colle-le dans ton mail' });
-      return;
-    }
-    window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text)}`;
-  }, 'mail');
   const handlePdf = async () => {
     setBusy('pdf');
     try {
