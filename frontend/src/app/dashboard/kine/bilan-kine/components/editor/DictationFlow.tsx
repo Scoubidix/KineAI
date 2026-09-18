@@ -12,6 +12,7 @@ import BilanEditorAlerts from './BilanEditorAlerts';
 import BilanSettingsLine from './BilanSettingsLine';
 import MeasuresPane, { useDensePane } from './MeasuresPane';
 import MeasurementsPanel from '../MeasurementsPanel';
+import { useMeasuresReference } from './useMeasuresReference';
 import { useMinWidth } from './useMinWidth';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -86,6 +87,13 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
   // cette fenêtre serait écrasée par son retour, donc le panneau s'y verrouille.
   const measuresLocked = saveState === 'stale' || state.phase === 'processing' || state.generating;
 
+  // Bilan de référence : le même bloc que dans l'éditeur (lignes du bilan précédent ajoutées
+  // vides, valeur antérieure affichée à côté du champ). Appelé ici et pas dans les enfants du
+  // meuble : replié, il ne rend pas ses enfants. L'auto-sélection écrit dans le document, donc
+  // jamais pendant que le serveur écrit le sien — l'écriture partirait en STALE_DRAFT. Au montage
+  // la phase est 'idle' : les lignes sont posées avant le premier mot enregistré.
+  const { previousValues, line: referenceLine, modal: referenceModal } = useMeasuresReference({ record, update, disabled: measuresLocked, autoSelect: !measuresLocked });
+
   return (
     <div className="flex flex-col min-h-full">
       {/* Même rappel qu'à l'accueil et qu'en saisie écrite : les trois chemins s'ouvrent pareil */}
@@ -126,17 +134,21 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
       )}
         </div>
 
-        {/* Le panneau seul : pendant une séance on coche des valeurs et on suit un template,
-            on n'analyse pas des notes — pas d'extraction ni de suggestions ici. */}
+        {/* Mesures et bilan de référence, comme dans l'éditeur ; sans les suggestions :
+            pendant une séance on coche des valeurs et on suit un template, on n'analyse pas
+            des notes — l'extraction est faite par le serveur à la génération. */}
         <MeasuresPane summary="Tests et mesures" open={measuresOpen} onOpenChange={setMeasuresOpen} wide={wide}>
-          <div className="p-3">
+          <div className="flex flex-col gap-3 p-3">
+            {referenceLine}
             <MeasurementsPanel
               measurements={doc.measurements}
               onChange={(measurements: DocumentMeasurement[]) => update({ document: { ...doc, measurements } })}
               disabled={measuresLocked}
+              previousValues={previousValues}
               dense={dense}
             />
           </div>
+          {referenceModal}
         </MeasuresPane>
       </div>
 
