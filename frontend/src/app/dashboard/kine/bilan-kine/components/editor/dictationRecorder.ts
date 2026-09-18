@@ -36,19 +36,26 @@ export class DictationRecorder {
   private threshold = 0.008;
   private stopping = false;
 
-  constructor(mimeType: string, private cb: RecorderCallbacks) { this.mimeType = mimeType; }
+  // L'AudioContext est créé ici, dans le constructeur, donc de façon synchrone : l'appelant doit
+  // construire l'enregistreur pendant le geste utilisateur du clic, avant tout await (création du
+  // traitement, vérification de disponibilité). Safari iOS crée sinon le contexte à l'état
+  // "suspended" : vumètre muet et coupes à l'aveugle. Un enregistreur construit puis abandonné
+  // sans `start()` doit être libéré par `dispose()`.
+  constructor(mimeType: string, private cb: RecorderCallbacks) { this.mimeType = mimeType; this.ctx = new AudioContext(); }
+
+  /** Libère le contexte audio d'un enregistreur jamais démarré (démarrage abandonné avant `start()`). */
+  dispose(): void { void this.ctx?.close(); this.ctx = null; }
 
   async start(): Promise<void> {
-    // Créé de façon synchrone, avant le premier await, pour rester dans le geste utilisateur du
-    // clic : Safari iOS crée sinon l'AudioContext à l'état "suspended" et le vumètre reste muet.
-    this.ctx = new AudioContext();
+    const ctx = this.ctx;
+    if (!ctx) throw new Error('Enregistreur déjà libéré');
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const source = this.ctx.createMediaStreamSource(this.stream);
-      this.analyser = this.ctx.createAnalyser();
+      const source = ctx.createMediaStreamSource(this.stream);
+      this.analyser = ctx.createAnalyser();
       this.analyser.fftSize = 1024;
       source.connect(this.analyser);
-      if (this.ctx.state === 'suspended') await this.ctx.resume();
+      if (ctx.state === 'suspended') await ctx.resume();
       this.takeStart = Date.now();
       this.startSegment();
       this.timer = setInterval(() => this.sample(), LEVEL_INTERVAL_MS);

@@ -14,6 +14,7 @@ import MeasuresPane, { useDensePane } from './MeasuresPane';
 import MeasurementsPanel from '../MeasurementsPanel';
 import { useMinWidth } from './useMinWidth';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useDictationJob } from './useDictationJob';
 import RecordingScreen from './RecordingScreen';
 import ProcessingScreen from './ProcessingScreen';
@@ -63,8 +64,12 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
   }, [state.phase, state.job, onDone]);
 
   const busy = state.phase === 'recording' || state.uploading > 0;
+  // Passages dont l'envoi a échoué : l'audio n'existe que dans cet onglet. Quitter les perd — on
+  // prévient et on laisse choisir, sans bloquer (le serveur peut rester indisponible longtemps).
+  const [leaveOpen, setLeaveOpen] = useState(false);
   const handleBack = () => {
     if (busy) { toast({ title: 'Enregistrement en cours', description: 'Arrête l’enregistrement et attends la fin des envois avant de quitter' }); return; }
+    if (state.uploadFailed > 0) { setLeaveOpen(true); return; }
     router.push('/dashboard/kine/bilan-kine');
   };
   const doc = record.document ?? emptyBilanDocument();
@@ -151,6 +156,19 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{state.uploadFailed > 1 ? `${state.uploadFailed} passages n’ont pas été envoyés` : 'Un passage n’a pas été envoyé'}</AlertDialogTitle>
+            <AlertDialogDescription>Ces passages n’existent que dans cet onglet. Si tu quittes maintenant, ils seront perdus et ne figureront pas dans le bilan.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => router.push('/dashboard/kine/bilan-kine')} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Quitter sans ces passages</AlertDialogAction>
+            <AlertDialogCancel onClick={dictation.retryUploads} className="btn-teal">Réessayer l’envoi</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

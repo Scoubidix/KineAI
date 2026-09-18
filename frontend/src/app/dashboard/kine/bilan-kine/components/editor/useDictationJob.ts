@@ -195,21 +195,16 @@ export function useDictationJob({ bilanId, initialJob, enabled, kind = 'DICTATIO
     if (!enabled || startingRef.current || recorderRef.current) return;
     // La demande de micro peut durer plusieurs secondes ; un Stop ou une désactivation pendant ce
     // temps ne doit pas laisser un enregistreur publié : `token` sert de point d'annulation.
+    const mimeType = pickMimeType();
+    if (!mimeType) { patch({ supported: false }); return; }
     startingRef.current = true;
     patch({ starting: true, startError: null });
     const token = ++startTokenRef.current;
-    if (!availableRef.current && !(await refreshAvailability())) { startingRef.current = false; patch({ starting: false }); return; }
-    const mimeType = pickMimeType();
-    if (!mimeType) { startingRef.current = false; patch({ starting: false, supported: false }); return; }
-    try {
-      await ensureJob();
-    } catch (e) {
-      startingRef.current = false;
-      patch({ starting: false, startError: startErrorOf(e) });
-      return;
-    }
-    const base = nextIndexRef.current;
+    // Premier index de la prise : connu seulement après `ensureJob`, lu par `onSegment` qui ne
+    // se déclenche qu'après `rec.start()`, donc toujours après l'affectation ci-dessous.
+    let base = 0;
     const maxTakeMs = MAX_TAKE_MS_BY_KIND[effectiveKind];
+    // Construit avant tout await : l'AudioContext naît dans le geste du clic (cf. DictationRecorder)
     const rec = new DictationRecorder(mimeType, {
       onSegment: (blob, index) => {
         const i = base + index;
@@ -225,6 +220,16 @@ export function useDictationJob({ bilanId, initialJob, enabled, kind = 'DICTATIO
       },
       onStopped: () => { refreshUploads(); },
     });
+    if (!availableRef.current && !(await refreshAvailability())) { rec.dispose(); startingRef.current = false; patch({ starting: false }); return; }
+    try {
+      await ensureJob();
+    } catch (e) {
+      rec.dispose();
+      startingRef.current = false;
+      patch({ starting: false, startError: startErrorOf(e) });
+      return;
+    }
+    base = nextIndexRef.current;
     try {
       await rec.start();
     } catch (e) {
@@ -337,8 +342,9 @@ export function useDictationJob({ bilanId, initialJob, enabled, kind = 'DICTATIO
     return () => clearInterval(timer);
   }, [processing, state.job?.status]);
 
-  // Fermer l'onglet pendant un enregistrement ou un envoi perdrait de l'audio : confirmation native
-  const busy = state.phase === 'recording' || state.uploading > 0;
+  // Fermer l'onglet pendant un enregistrement ou un envoi perdrait de l'audio : confirmation native.
+  // Les envois en échec aussi : leurs blobs n'existent que dans cet onglet, en attente de « Réessayer ».
+  const busy = state.phase === 'recording' || state.uploading > 0 || state.uploadFailed > 0;
   useEffect(() => {
     if (!busy) return;
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };

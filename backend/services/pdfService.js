@@ -12,6 +12,16 @@ function isPuppeteerEnabled() {
   return String(process.env.PUPPETEER_ENABLED ?? 'true').toLowerCase() !== 'false';
 }
 
+// Liste blanche de sortie du navigateur serveur. Le HTML rendu peut contenir du contenu utilisateur
+// (bilans hérités) : sans filtre, une balise <img>/<iframe> ferait charger n'importe quelle adresse
+// — y compris le réseau interne — depuis le serveur (SSRF). Seule ressource distante légitime des
+// rendus (bilans, contrats) : le logo du site. Les données embarquées (data:) restent permises.
+function isAllowedRequest(url) {
+  if (url.startsWith('data:') || url === 'about:blank') return true;
+  const base = (process.env.FRONTEND_URL || '').replace(/\/+$/, '');
+  return Boolean(base) && url === `${base}/logo.png`;
+}
+
 /**
  * Rend un document HTML complet en PDF A4 (marges 2 cm, fonds imprimés).
  * @param {string} html
@@ -33,6 +43,8 @@ async function generatePdfBuffer(html) {
     });
     const page = await browser.newPage();
     await page.setJavaScriptEnabled(false); // Le HTML rendu (contrats, bilans hérités) ne doit jamais exécuter de script côté serveur
+    await page.setRequestInterception(true);
+    page.on('request', (req) => { if (isAllowedRequest(req.url())) req.continue(); else req.abort(); });
     // networkidle0 attend que toutes les ressources (dont logo) soient chargées
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
     return await page.pdf({

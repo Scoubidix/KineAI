@@ -13,9 +13,27 @@ const PROMPT_MAX_WORDS = 200;
 
 let healthCache = { at: 0, ok: false };
 
+// Disjoncteur : après BREAKER_THRESHOLD pannes d'affilée (injoignable, délai dépassé, réponse
+// inattendue), on n'appelle plus le worker pendant BREAKER_COOLDOWN_MS et on échoue tout de suite,
+// au lieu de bloquer chaque segment jusqu'à REQUEST_TIMEOUT_MS. Passé le délai, un appel d'essai
+// passe : succès → refermé, échec → rouvert. « Occupé » (503) et audio invalide ne sont pas des pannes.
+const BREAKER_THRESHOLD = 3;
+const BREAKER_COOLDOWN_MS = 30_000;
+let breaker = { failures: 0, openUntil: 0 };
+const breakerOpen = () => Date.now() < breaker.openUntil;
+function recordFailure() {
+  breaker.failures += 1;
+  if (breaker.failures >= BREAKER_THRESHOLD) {
+    breaker.openUntil = Date.now() + BREAKER_COOLDOWN_MS;
+    logger.warn(`ASR : disjoncteur ouvert ${BREAKER_COOLDOWN_MS / 1000} s après ${breaker.failures} panne(s) d'affilée`);
+  }
+}
+function recordSuccess() { breaker = { failures: 0, openUntil: 0 }; }
+
 const config = () => ({ url: (process.env.ASR_WORKER_URL || '').replace(/\/+$/, ''), token: process.env.ASR_WORKER_TOKEN || '' });
 const isConfigured = () => { const c = config(); return Boolean(c.url && c.token); };
-const resetHealthCache = () => { healthCache = { at: 0, ok: false }; };
+/** Oublie l'état mémorisé du worker (cache de santé et disjoncteur). */
+const resetHealthCache = () => { healthCache = { at: 0, ok: false }; breaker = { failures: 0, openUntil: 0 }; };
 
 // Vocabulaire d'abord, contexte ensuite : si l'ensemble dépasse 200 mots, c'est le vocabulaire qui est rogné.
 function buildPrompt(prevText) {
@@ -24,7 +42,7 @@ function buildPrompt(prevText) {
 }
 
 async function checkHealth() {
-  if (!isConfigured()) return false;
+  if (!isConfigured() || breakerOpen()) return false;
   const now = Date.now();
   if (now - healthCache.at < HEALTH_CACHE_MS) return healthCache.ok;
   let ok = false;
@@ -43,6 +61,7 @@ const unavailable = () => new DraftError('ASR_UNAVAILABLE', 502, 'Transcription 
  */
 async function transcribeSegment({ buffer, mimeType, prompt, priority = 'interactive' }) {
   if (!isConfigured()) throw new DraftError('DICTATION_DISABLED', 503, 'La dictée n\'est pas disponible pour le moment');
+  if (breakerOpen()) throw unavailable();
   const { url, token } = config();
   const form = new FormData();
   form.append('audio', new Blob([buffer], { type: mimeType || 'application/octet-stream' }), 'segment');
@@ -54,6 +73,7 @@ async function transcribeSegment({ buffer, mimeType, prompt, priority = 'interac
     res = await fetch(`${url}/v1/transcribe`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   } catch (err) {
     logger.warn(`ASR injoignable (${err && err.name})`);
+    recordFailure();
     throw unavailable();
   }
   if (res.status === 503) {
@@ -62,14 +82,16 @@ async function transcribeSegment({ buffer, mimeType, prompt, priority = 'interac
   }
   if (res.status === 413 || res.status === 422) throw new DraftError('AUDIO_INVALID', 422, 'Segment audio invalide');
   if (res.status === 401) { logger.error('ASR : jeton refusé par le worker (ASR_WORKER_TOKEN)'); throw new DraftError('ASR_MISCONFIGURED', 500, 'Transcription indisponible'); }
-  if (!res.ok) { logger.error(`ASR : réponse ${res.status}`); throw unavailable(); }
+  if (!res.ok) { logger.error(`ASR : réponse ${res.status}`); recordFailure(); throw unavailable(); }
   let body;
   try {
     body = await res.json();
   } catch (err) {
     logger.error('ASR : réponse illisible');
+    recordFailure();
     throw unavailable();
   }
+  recordSuccess();
   return { text: String(body.text ?? ''), audioSeconds: Number(body.audio_seconds) || 0, processingSeconds: Number(body.processing_seconds) || 0 };
 }
 

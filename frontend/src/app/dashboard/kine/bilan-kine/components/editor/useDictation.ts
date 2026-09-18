@@ -196,15 +196,12 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop, in
 
   const start = useCallback(async (caretPos: number) => {
     if (!enabled || startingRef.current || recorderRef.current) return;
-    if (!availableRef.current) {
-      const ok = await refreshAvailability();
-      if (!ok) return;
-    }
     const mimeType = pickMimeType();
     if (!mimeType) { patch({ supported: false }); return; }
     const take: Take = { id: crypto.randomUUID(), mimeType, anchor: Math.min(Math.max(caretPos, 0), notesRef.current.length), results: new Map(), failed: new Map(), lastText: '', inFlight: 0, recording: true, sent: 0, total: null, correcting: false };
     startingRef.current = true;
     patch({ starting: true });
+    // Construit avant tout await : l'AudioContext naît dans le geste du clic (cf. DictationRecorder)
     const rec = new DictationRecorder(mimeType, {
       onSegment: (blob, index) => { take.sent += 1; void sendSegment(take, blob, index); },
       onLevel: (level) => patch({ level }),
@@ -214,6 +211,7 @@ export function useDictation({ bilanId, notes, setNotes, enabled, onAutoStop, in
       },
       onStopped: () => { take.recording = false; take.total = take.sent; void finalizeTake(take); },
     });
+    if (!availableRef.current && !(await refreshAvailability())) { rec.dispose(); startingRef.current = false; patch({ starting: false }); return; }
     try {
       await rec.start();
     } catch (e) {

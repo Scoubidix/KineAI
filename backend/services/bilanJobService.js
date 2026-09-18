@@ -98,9 +98,51 @@ async function receiveSegment({ kineId, bilanId, index, buffer, mimeType }) {
   const job = await loadOwnedJob(prisma, kineId, bilanId);
   const lateOk = job.status === 'TRANSCRIBING' && job.segmentsTotal !== null && index < job.segmentsTotal;
   if (job.status !== 'RECORDING' && !lateOk) throw new DraftError('JOB_NOT_RECORDING', 409, 'Ce traitement n’accepte plus de segments');
+  // Contre-pression : l'audio en attente vit en mémoire, on refuse au-delà du plafond avant
+  // d'écrire quoi que ce soit — le front réessaie après `Retry-After`, le blob reste chez lui.
+  if (heldBytes + buffer.length > maxHeldBytes()) throw new DraftError('ASR_BUSY', 503, 'Transcription saturée, réessaie dans un instant', { retryAfter: QUEUE_FULL_RETRY_S });
   await prisma.bilanJobSegment.upsert({ where: segmentKey(job.id, index), create: { jobId: job.id, index, status: 'QUEUED' }, update: { status: 'QUEUED', text: null, error: null } });
-  queue.push(() => transcribeQueued({ jobId: job.id, kind: job.kind, index, buffer, mimeType }));
+  hold(job.id, index, buffer.length);
+  queue.push(() => transcribeQueued({ jobId: job.id, kind: job.kind, index, buffer, mimeType }).finally(() => release(job.id, index)));
   return { index };
+}
+
+// Ce que cette instance porte en mémoire et qui disparaît avec elle : les tampons audio des segments
+// pas encore écrits en base, et les queues (correction, rédaction) en cours d'exécution.
+const heldSegments = new Map();
+const runningTails = new Set();
+let heldBytes = 0;
+// Lu à chaque appel (pas au chargement) pour rester réglable dans les tests
+const maxHeldBytes = () => Number(process.env.DICTATION_QUEUE_MAX_BYTES) || 64 * 1024 * 1024;
+const QUEUE_FULL_RETRY_S = 10;
+function hold(jobId, index, bytes) { heldSegments.set(`${jobId}:${index}`, { jobId, index, bytes }); heldBytes += bytes; }
+function release(jobId, index) {
+  const held = heldSegments.get(`${jobId}:${index}`);
+  if (!held) return;
+  heldSegments.delete(`${jobId}:${index}`);
+  heldBytes -= held.bytes;
+}
+
+/**
+ * Arrêt du processus : déclare perdu tout de suite ce que cette instance ne finira pas, au lieu
+ * d'attendre les délais de 10 min (`markLostSegments`, `markStaleTail`). Ne touche qu'aux segments
+ * et queues de cette instance, jamais à ceux d'une autre. Renvoie les compteurs.
+ */
+async function markInFlightLost() {
+  const prisma = prismaService.getInstance();
+  const keys = [...heldSegments.values()];
+  const tails = [...runningTails];
+  let segments = 0;
+  if (keys.length > 0) {
+    const r = await prisma.bilanJobSegment.updateMany({ where: { status: 'QUEUED', OR: keys.map(({ jobId, index }) => ({ jobId, index })) }, data: { status: 'FAILED', error: 'TRANSCRIPTION_LOST' } });
+    segments = r.count;
+    keys.forEach(({ jobId, index }) => release(jobId, index));   // déclarés perdus : plus portés par cette instance
+  }
+  if (tails.length > 0) {
+    await prisma.bilanJob.updateMany({ where: { id: { in: tails }, status: { in: ['CORRECTING', 'COMPOSING'] } }, data: { status: 'FAILED', error: 'TAIL_LOST', errorDetail: null } });
+  }
+  if (segments > 0 || tails.length > 0) logger.warn(`Traitement dictée : arrêt, ${segments} segment(s) et ${tails.length} queue(s) déclarés perdus`);
+  return { segments, tails: tails.length };
 }
 
 // Transcrit un segment reçu par cette instance ; le tampon est libéré à la sortie.
@@ -173,6 +215,10 @@ async function getJobView({ kineId, bilanId }) {
   if (job.status === 'RECORDING' || job.status === 'TRANSCRIBING') await markLostSegments(job.id);
   if (await markStaleTail(job)) job = await prisma.bilanJob.findUnique({ where: { id: job.id } });
   const segments = await prisma.bilanJobSegment.findMany({ where: { jobId: job.id }, select: { index: true, status: true } });
+  // Évaluation manquée (processus arrêté ou base en erreur juste après le dernier segment) : le
+  // traitement resterait TRANSCRIBING pour toujours. Le sondage du front sert de filet ; la
+  // transition conditionnelle dans `evaluate` garantit qu'une seule relance gagne.
+  if (job.status === 'TRANSCRIBING' && rules.isTranscriptionComplete({ segmentsTotal: job.segmentsTotal, segments })) detach(evaluate(job.id));
   return rules.toView(job, segments);
 }
 
@@ -237,6 +283,15 @@ async function evaluate(jobId) {
  * conditionnée au statut attendu : une queue qui a perdu la main se retire sans rien toucher.
  */
 async function runTail(jobId, stage) {
+  runningTails.add(jobId);
+  try {
+    await runTailInner(jobId, stage);
+  } finally {
+    runningTails.delete(jobId);
+  }
+}
+
+async function runTailInner(jobId, stage) {
   const prisma = prismaService.getInstance();
   const job = await prisma.bilanJob.findUnique({ where: { id: jobId }, include: JOB_INCLUDE });
   if (!job) return;
@@ -351,4 +406,4 @@ async function abandonJob({ kineId, bilanId }) {
   return { deleted: true, appended: raw.length > 0 };
 }
 
-module.exports = { LocalQueue, __setQueueForTests, createOrResetJob, receiveSegment, getJobView, markLostSegments, evaluate, finishRecording, skipFailed, retryJob, abandonJob, runTail, __drainForTests };
+module.exports = { LocalQueue, __setQueueForTests, createOrResetJob, receiveSegment, getJobView, markLostSegments, markInFlightLost, evaluate, finishRecording, skipFailed, retryJob, abandonJob, runTail, __drainForTests };

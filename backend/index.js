@@ -47,6 +47,7 @@ const { registerVisioNamespace } = require('./services/visioSignaling');
 // Import du nouveau système d'archivage
 const { startProgramCleanupCron } = require('./utils/chatCleanup');
 const { runBilanSeed } = require('./services/bilanSeedService');
+const bilanJobService = require('./services/bilanJobService');
 
 // 🚦 Rate limiters utilisés au niveau app.use (le reste est déplacé dans les routeurs après authenticate)
 const {
@@ -697,6 +698,13 @@ startProgramCleanupCron();
 // Gestion gracieuse de l'arrêt (SIGINT = Ctrl+C local, SIGTERM = Cloud Run)
 const gracefulShutdown = async (signal) => {
   logger.info(`🛑 ${signal} recu - fermeture connexions DB...`);
+  // Dictée : l'audio en attente et les queues en cours meurent avec le processus. Les déclarer
+  // perdus tout de suite évite au kiné 10 min d'attente avant « Continuer sans » / « Réessayer ».
+  // Borné : la base injoignable ne doit pas empêcher l'arrêt.
+  await Promise.race([
+    bilanJobService.markInFlightLost().catch((err) => logger.error(`Arrêt : segments en vol non marqués (${err?.name || 'Error'})`)),
+    new Promise((resolve) => setTimeout(resolve, 5_000)),
+  ]);
   await prismaService.disconnect();
   process.exit(0);
 };

@@ -406,6 +406,7 @@ exports.uploadJobSegment = async (req, res) => {
     const r = await jobService.receiveSegment({ kineId, bilanId, index: idx, buffer: req.file.buffer, mimeType: String(mimeType || req.file.mimetype || '') });
     res.status(202).json({ success: true, index: r.index });
   } catch (err) {
+    if (err instanceof draftService.DraftError && err.code === 'ASR_BUSY') res.set('Retry-After', String((err.extra && err.extra.retryAfter) || 5));
     sendDraftError(res, err, 'réception d’un segment de dictée');
   }
 };
