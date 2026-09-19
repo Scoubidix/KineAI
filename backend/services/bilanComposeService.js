@@ -29,10 +29,10 @@ const { STYLE_PRINCIPLES, STYLE_EXAMPLES } = require('../data/bilanStyleExamples
 // historiques mot pour mot : c'est le cas le plus courant, il ne doit pas bouger.
 const INITIAL_GUIDE = {
   anamnese: 'commence exactement par « [Prénom] [NOM], [âge] ans, » puis le métier s’il est connu, puis « consulte pour » le motif. Ensuite, et seulement : l’ancienneté et les circonstances d’apparition, le mécanisme, l’évolution depuis le début (traitements essayés, ce qui soulage ou aggrave), le retentissement tel que le patient l’exprime, en une phrase, et ses attentes. Le contexte du patient (activités, sport, travail) quand les notes le donnent. Rien de ce que le kiné a constaté ou mesuré lui-même : aucun signe d’examen, aucun test, aucune valeur — cela appartient à l’examen clinique. Recopie les jetons entre crochets tels quels, n’écris jamais un nom.',
-  antecedents: 'antécédents et traitements réellement rapportés, en une phrase',
+  antecedents: 'antécédents médicaux, chirurgicaux et traumatiques, et traitements médicamenteux en cours, réellement rapportés, en une phrase',
   examen: 'ce que le kiné a constaté et mesuré lui-même le jour du bilan, et cela seulement : observation, palpation, qualité du mouvement, tests positifs ou négatifs qui orientent. C’est ici, et nulle part ailleurs, que les signes actuels sont décrits. Synthèse interprétative : ce que les signes et les tests, nommés sans leurs valeurs, suggèrent ensemble.',
   limitations: 'uniquement les limitations d\'activité et restrictions de participation rapportées dans les notes ; sinon chaîne vide',
-  diagnostic: 'hypothèse kinésithérapique : déficiences, limitations, restrictions, deux ou trois dominantes, pronostic prudent',
+  diagnostic: 'hypothèse kinésithérapique : déficiences, limitations, restrictions, pronostic fonctionnel prudent',
   objectifs: 'uniquement les objectifs formulés dans les notes ou par le patient, à court, moyen et long terme ; sinon chaîne vide',
   traitement: 'uniquement le plan, le protocole ou les consignes présents dans les notes ; sinon chaîne vide',
 };
@@ -48,7 +48,7 @@ const INTERMEDIAIRE_GUIDE = {
   antecedents: FOLLOW_UP_ANTECEDENTS,
   examen: INITIAL_GUIDE.examen,
   limitations: 'uniquement les limitations d’activité et restrictions de participation qui persistent, telles que rapportées dans les notes du jour ; sinon chaîne vide',
-  diagnostic: 'où en est la prise en charge par rapport au bilan précédent : ce qui a progressé, ce qui stagne, ce qui reste à traiter. Deux ou trois dominantes, pronostic prudent. Décris l’évolution en mots (« gain net de flexion », « douleur nettement diminuée ») : ne chiffre jamais une mesure présentée en tableau.',
+  diagnostic: 'où en est la prise en charge par rapport au bilan précédent : ce qui a progressé, ce qui stagne, ce qui reste à traiter, et ce qui pèse le plus aujourd’hui. Pronostic fonctionnel prudent. Décris l’évolution en mots (« gain net de flexion », « douleur nettement diminuée ») : ne chiffre jamais une mesure présentée en tableau.',
   objectifs: 'les objectifs du bloc « Bilan précédent », repris et statués : atteints, maintenus, révisés. Plus les nouveaux objectifs énoncés dans les notes. Rien dans le bilan précédent ni dans les notes → chaîne vide.',
   traitement: 'la suite du plan : ce qui est reconduit, ce qui change, les consignes données le jour du bilan — uniquement à partir des notes et du plan du bilan précédent ; sinon chaîne vide',
 };
@@ -58,7 +58,7 @@ const FINAL_GUIDE = {
   antecedents: FOLLOW_UP_ANTECEDENTS,
   examen: INITIAL_GUIDE.examen,
   limitations: 'uniquement les limitations d’activité et restrictions de participation résiduelles, telles que rapportées dans les notes ; aucune → chaîne vide',
-  diagnostic: 'synthèse du parcours et résultat obtenu au regard des objectifs du bilan précédent. Ce qui est récupéré, ce qui reste. Décris l’évolution en mots : ne chiffre jamais une mesure présentée en tableau.',
+  diagnostic: 'synthèse du parcours : ce qui explique le résultat obtenu et ce qui persiste comme déficience. Le statut des objectifs appartient à la section Objectifs. Décris l’évolution en mots : ne chiffre jamais une mesure présentée en tableau.',
   objectifs: 'statut final de chaque objectif du bloc « Bilan précédent » : atteint, partiellement atteint, non atteint. N\'énonce aucun objectif futur ; sinon chaîne vide',
   traitement: 'conseils de sortie : autonomie, entretien, reprise d’activité, critères de reconsultation — uniquement ce que les notes contiennent ; sinon chaîne vide',
 };
