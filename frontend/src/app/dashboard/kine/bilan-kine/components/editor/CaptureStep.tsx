@@ -28,7 +28,7 @@ export interface StepProps {
 
 const PLACEHOLDER = `Note tes observations en vrac...
 
-Ex : patient 52 ans, maçon, lombalgie chronique depuis 3 mois suite port de charge. ATCD : hernie discale L4-L5 opérée 2018. Douleur bas du dos irradiant fesse droite, EVA 5/10 repos 7/10 effort. Flexion lombaire limitée 40°, Lasègue négatif, paravertébraux contracturés...`;
+Ex : maçon, lombalgie chronique depuis 3 mois suite port de charge. ATCD : hernie discale L4-L5 opérée 2018. Douleur bas du dos irradiant fesse droite, EVA 5/10 repos 7/10 effort. Flexion lombaire limitée 40°, Lasègue négatif, paravertébraux contracturés...`;
 
 export interface CaptureStepProps extends StepProps {
   /** « Rédiger avec l'IA » : extraction + acceptation + rédaction, puis étape Document */
