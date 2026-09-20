@@ -1,12 +1,14 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import AppLayout from '@/components/AppLayout';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SubTabsList, SubTabsTrigger } from '@/components/ui/sub-tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { RefreshCw, ShieldCheck, UserPlus, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, Layers, Zap, ImagePlus, X, Pencil, Trash2, Sparkles, Dumbbell, Map as MapIcon, Mic } from 'lucide-react';
@@ -18,6 +20,7 @@ import ExercicesPublicsTab from './components/ExercicesPublicsTab';
 import RoadmapTab from './components/RoadmapTab';
 import DictationTermsTab from './components/DictationTermsTab';
 import StatsGlobalesTab, { type DashboardStats } from './components/StatsGlobalesTab';
+import AsrWorkerTab from './components/AsrWorkerTab';
 import { PLAN_COLORS } from './components/planColors';
 import { Button } from '@/components/ui/button';
 
@@ -58,8 +61,23 @@ interface SupportTicket {
   messages: TicketMessage[];
 }
 
-export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+function AdminDashboardPageContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'dashboard');
+  const [statsView, setStatsView] = useState(searchParams.get('vue') || 'metriques');
+
+  // L'onglet actif vit dans l'URL : rechargement et lien direct retrouvent la même vue
+  const syncUrl = (tab: string, vue: string) => {
+    const params = new URLSearchParams();
+    params.set('tab', tab);
+    if (tab === 'dashboard') params.set('vue', vue);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const handleTabChange = (tab: string) => { setActiveTab(tab); syncUrl(tab, statsView); };
+  const handleStatsViewChange = (vue: string) => { setStatsView(vue); syncUrl(activeTab, vue); };
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -325,7 +343,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList>
               <TabsTrigger value="dashboard">Statistiques</TabsTrigger>
               <TabsTrigger value="emails" className="gap-1.5">
@@ -354,10 +372,6 @@ export default function AdminDashboardPage() {
                 <Layers className="h-3.5 w-3.5" />
                 Templates bilans
               </TabsTrigger>
-              <TabsTrigger value="tokens" className="gap-1.5">
-                <Zap className="h-3.5 w-3.5" />
-                Tokens IA
-              </TabsTrigger>
               <TabsTrigger value="nouveautes" className="gap-1.5">
                 <Sparkles className="h-3.5 w-3.5" />
                 Nouveautés
@@ -376,8 +390,30 @@ export default function AdminDashboardPage() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="dashboard" className="space-y-6 mt-4">
-              <StatsGlobalesTab stats={stats} />
+            <TabsContent value="dashboard" className="mt-4">
+              <Tabs value={statsView} onValueChange={handleStatsViewChange}>
+                <SubTabsList>
+                  <SubTabsTrigger value="metriques">Métriques</SubTabsTrigger>
+                  <SubTabsTrigger value="worker">
+                    <Mic className="h-3.5 w-3.5" />
+                    Worker ASR
+                  </SubTabsTrigger>
+                  <SubTabsTrigger value="tokens">
+                    <Zap className="h-3.5 w-3.5" />
+                    Tokens IA
+                  </SubTabsTrigger>
+                </SubTabsList>
+
+                <TabsContent value="metriques" className="space-y-6 mt-6">
+                  <StatsGlobalesTab stats={stats} />
+                </TabsContent>
+                <TabsContent value="worker" className="mt-6">
+                  <AsrWorkerTab />
+                </TabsContent>
+                <TabsContent value="tokens" className="mt-6">
+                  <TokenUsageTab />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
 
             {/* Onglet Emails non vérifiés */}
@@ -696,10 +732,6 @@ export default function AdminDashboardPage() {
               <BilanTemplatesTab />
             </TabsContent>
 
-            <TabsContent value="tokens" className="space-y-4 mt-4">
-              <TokenUsageTab />
-            </TabsContent>
-
             <TabsContent value="nouveautes" className="space-y-4 mt-4">
               <NouveautesTab />
             </TabsContent>
@@ -719,5 +751,13 @@ export default function AdminDashboardPage() {
         </div>
       </AppLayout>
     </AuthGuard>
+  );
+}
+
+export default function AdminDashboardPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Chargement…</div>}>
+      <AdminDashboardPageContent />
+    </Suspense>
   );
 }
