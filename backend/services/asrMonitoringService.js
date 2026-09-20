@@ -56,7 +56,6 @@ const round = (v, digits) => Math.round(v * 10 ** digits) / 10 ** digits;
 function percentile(values, p) {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
-  if (sorted.length === 1) return round(sorted[0], 1);
   const rank = (p / 100) * (sorted.length - 1);
   const lo = Math.floor(rank);
   const hi = Math.ceil(rank);
@@ -110,6 +109,9 @@ async function getStats({ days } = {}) {
     }),
     // RECORDING est volontairement exclu : un onglet fermé laisse un job RECORDING pour toujours,
     // c'est un abandon utilisateur et non une panne — le compter rendrait l'alarme inutile.
+    // ⚠️ `updatedAt` n'est pas touché pendant la transcription (les écritures visent les segments,
+    // pas le job) : ce compteur signifie « en TRANSCRIBING depuis plus de 10 min », pas « sans
+    // progression depuis 10 min ».
     prisma.bilanJob.count({
       where: { status: { in: ['TRANSCRIBING'] }, updatedAt: { lt: new Date(Date.now() - SEGMENT_TIMEOUT_MS) } },
     }),
@@ -117,6 +119,7 @@ async function getStats({ days } = {}) {
       where: { status: { in: ['CORRECTING', 'COMPOSING'] }, updatedAt: { lt: new Date(Date.now() - TAIL_TIMEOUT_MS) } },
     }),
   ]);
+  if (rows.length === MAX_ROWS) logger.warn(`Monitoring ASR : lecture tronquée à ${MAX_ROWS} segments, agrégats partiels`);
 
   // --- usage et latency, jour par jour ---
   const empty = () => ({ segments: 0, segmentsDictation: 0, segmentsSession: 0, audioSeconds: 0, kines: new Set(), waitsDictation: [], waitsSession: [] });
@@ -125,7 +128,7 @@ async function getStats({ days } = {}) {
   const kineCounts = new Map();
   let totalAudio = 0;
   let totalProcessing = 0;
-  let processingKnown = 0;
+  let audioWithProcessing = 0;
   let retried = 0;
 
   for (const row of rows) {
@@ -146,7 +149,10 @@ async function getStats({ days } = {}) {
 
     if (row.job?.kineId != null) kineCounts.set(row.job.kineId, (kineCounts.get(row.job.kineId) || 0) + 1);
     totalAudio += row.audioSeconds || 0;
-    if (typeof row.processingSeconds === 'number') { totalProcessing += row.processingSeconds; processingKnown += 1; }
+    if (typeof row.processingSeconds === 'number') {
+      totalProcessing += row.processingSeconds;
+      audioWithProcessing += row.audioSeconds || 0;
+    }
     if ((row.attempts || 0) > 1) retried += 1;
   }
 
@@ -179,8 +185,10 @@ async function getStats({ days } = {}) {
     avgSegmentsPerActiveKine: activeKines ? round(rows.length / activeKines, 1) : 0,
     maxSegmentsPerKine: activeKines ? Math.max(...kineCounts.values()) : 0,
     retryRate: rows.length ? round(retried / rows.length, 3) : 0,
-    // null tant que la colonne n'est pas alimentée (segments antérieurs au déploiement)
-    rtf: processingKnown > 0 && totalAudio > 0 ? round(totalProcessing / totalAudio, 2) : null,
+    // null tant que la colonne n'est pas alimentée (segments antérieurs au déploiement) ; le
+    // dénominateur ne compte que l'audio des segments dont le temps de calcul est connu, sinon
+    // le ratio mélange deux populations et le RTF affiché est artificiellement bas
+    rtf: audioWithProcessing > 0 ? round(totalProcessing / audioWithProcessing, 2) : null,
   };
 
   const toFailures = (groups) => groups
