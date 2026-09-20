@@ -8,6 +8,16 @@ const HEALTH_TIMEOUT_MS = 3_000;
 
 const numOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
+const getSafeBreakerState = () => {
+  try {
+    return asrService.getBreakerState();
+  } catch (err) {
+    // Si le disjoncteur est illisible, renvoyer une valeur par défaut sûre (non ouvert)
+    logger.warn(`Monitoring ASR : impossible de lire l'etat du disjoncteur (${err?.name || 'Error'})`);
+    return { open: false, failures: 0, openUntil: null };
+  }
+};
+
 /**
  * État live du worker, sans passer par le cache 30 s de asrService (fait pour la dictée, pas pour
  * un écran d'admin). Ne lève jamais : un worker tombé doit s'afficher, pas faire planter la page.
@@ -19,7 +29,7 @@ async function getWorkerHealth() {
   const base = {
     configured, reachable: false, status: null, model: null,
     slots: null, busy: null, queued: null,
-    breaker: asrService.getBreakerState(),
+    breaker: getSafeBreakerState(),
   };
   if (!configured) return base;
   try {
