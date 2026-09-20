@@ -61,23 +61,48 @@ interface SupportTicket {
   messages: TicketMessage[];
 }
 
+const TABS = ['dashboard', 'emails', 'support', 'bilan-fields', 'bilan-templates',
+  'nouveautes', 'exercices-publics', 'roadmap', 'dictee'] as const;
+type TabKey = (typeof TABS)[number];
+
+const STATS_VIEWS = ['metriques', 'worker', 'tokens'] as const;
+type StatsViewKey = (typeof STATS_VIEWS)[number];
+
+function isTabKey(value: string | null): value is TabKey {
+  return value !== null && (TABS as readonly string[]).includes(value);
+}
+
+function isStatsViewKey(value: string | null): value is StatsViewKey {
+  return value !== null && (STATS_VIEWS as readonly string[]).includes(value);
+}
+
 function AdminDashboardPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'dashboard');
-  const [statsView, setStatsView] = useState(searchParams.get('vue') || 'metriques');
+  const requestedTab = searchParams.get('tab');
+  const requestedVue = searchParams.get('vue');
+  const [activeTab, setActiveTab] = useState<TabKey>(isTabKey(requestedTab) ? requestedTab : 'dashboard');
+  const [statsView, setStatsView] = useState<StatsViewKey>(isStatsViewKey(requestedVue) ? requestedVue : 'metriques');
 
   // L'onglet actif vit dans l'URL : rechargement et lien direct retrouvent la même vue
-  const syncUrl = (tab: string, vue: string) => {
+  const syncUrl = (tab: TabKey, vue: StatsViewKey) => {
     const params = new URLSearchParams();
     params.set('tab', tab);
     if (tab === 'dashboard') params.set('vue', vue);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
-  const handleTabChange = (tab: string) => { setActiveTab(tab); syncUrl(tab, statsView); };
-  const handleStatsViewChange = (vue: string) => { setStatsView(vue); syncUrl(activeTab, vue); };
+  const handleTabChange = (tab: string) => {
+    if (!isTabKey(tab)) return;
+    setActiveTab(tab);
+    syncUrl(tab, statsView);
+  };
+  const handleStatsViewChange = (vue: string) => {
+    if (!isStatsViewKey(vue)) return;
+    setStatsView(vue);
+    syncUrl(activeTab, vue);
+  };
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

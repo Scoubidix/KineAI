@@ -2,6 +2,7 @@
 
 // Navigation de niveau 2 : onglets soulignés, volontairement différents des pilules du niveau 1
 // (TabsList est déjà un segmented control — deux rangées identiques = anti-pattern « nested tabs »).
+// À utiliser à l'intérieur d'un <Tabs> de tabs.tsx, avec des <TabsContent> du même module.
 import * as React from "react"
 import * as TabsPrimitive from "@radix-ui/react-tabs"
 
