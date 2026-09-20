@@ -4,6 +4,7 @@ const router = express.Router();
 const { authenticate } = require('../middleware/authenticate');
 const { requireAdmin } = require('../middleware/authorization');
 const adminStatsService = require('../services/adminStatsService');
+const asrMonitoringService = require('../services/asrMonitoringService');
 const admin = require('../firebase/firebase');
 const prismaService = require('../services/prismaService');
 const logger = require('../utils/logger');
@@ -113,6 +114,36 @@ router.post('/verify-email/:uid', authenticate, requireAdmin, async (req, res) =
   } catch (error) {
     logger.error('Erreur validation manuelle email', { error: error.message });
     res.status(500).json({ success: false, error: 'Erreur lors de la validation', code: 'VERIFY_ERROR' });
+  }
+});
+
+/**
+ * GET /admin/dashboard/asr/health
+ * État live du worker ASR (proxy de son /healthz) + disjoncteur de l'instance qui répond.
+ * Appelée en polling par l'onglet admin : aucune requête DB.
+ */
+router.get('/asr/health', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const data = await asrMonitoringService.getWorkerHealth();
+    res.json({ success: true, data });
+  } catch (error) {
+    logger.error('Erreur état worker ASR', { error: error.message });
+    res.status(500).json({ success: false, error: "Erreur lors de la lecture de l'état du worker", code: 'ASR_HEALTH_ERROR' });
+  }
+});
+
+/**
+ * GET /admin/dashboard/asr/stats?days=7|30
+ * Usage, délai vécu, échecs et traitements bloqués, calculés à la volée depuis la base.
+ */
+router.get('/asr/stats', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const days = req.query.days === '30' ? 30 : 7;
+    const data = await asrMonitoringService.getStats({ days });
+    res.json({ success: true, data });
+  } catch (error) {
+    logger.error('Erreur stats worker ASR', { error: error.message });
+    res.status(500).json({ success: false, error: 'Erreur lors de la récupération des statistiques ASR', code: 'ASR_STATS_ERROR' });
   }
 });
 
