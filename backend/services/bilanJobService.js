@@ -173,7 +173,7 @@ async function transcribeQueued({ jobId, kind, index, buffer, mimeType }) {
       try {
         const r = await asrService.transcribeSegment({ buffer, mimeType, prompt, priority });
         logger.info(`Traitement dictée ${jobId} segment ${index} : ${r.audioSeconds}s audio, ${r.processingSeconds}s calcul, essai ${attempt}`);
-        written = await writeTerminal({ status: 'DONE', text: r.text, audioSeconds: r.audioSeconds, error: null });
+        written = await writeTerminal({ status: 'DONE', text: r.text, audioSeconds: r.audioSeconds, processingSeconds: r.processingSeconds, error: null });
         break;
       } catch (err) {
         const code = err instanceof DraftError ? err.code : 'INTERNAL_ERROR';
