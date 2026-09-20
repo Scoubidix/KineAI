@@ -3,6 +3,7 @@
 const logger = require('../utils/logger');
 const { DraftError } = require('./bilanDraftService');
 const { DICTATION_VOCABULARY } = require('../data/dictationVocabulary');
+const telegramService = require('./telegramService');
 
 const HEALTH_CACHE_MS = 30_000;
 const HEALTH_TIMEOUT_MS = 3_000;
@@ -21,19 +22,50 @@ const BREAKER_THRESHOLD = 3;
 const BREAKER_COOLDOWN_MS = 30_000;
 let breaker = { failures: 0, openUntil: 0 };
 const breakerOpen = () => Date.now() < breaker.openUntil;
+
+// Alertes de panne : on notifie à la bascule d'état, jamais par segment. État propre à cette
+// instance — avec plusieurs instances backend, chacune peut alerter une fois. Acceptable pour
+// un signal de panne.
+const MISCONFIGURED_ALERT_INTERVAL_MS = 60 * 60 * 1000;
+let alerted = { down: false, misconfiguredAt: 0 };
+
+/** Notifie sans jamais faire échouer une transcription (Telegram absent = silence). */
+function notifyIncident(message) {
+  // Appel synchrone (pas de .then différé) : l'envoi part immédiatement, seul l'échec est absorbé
+  try {
+    Promise.resolve(telegramService.sendNotification(message)).catch(() => {});
+  } catch {
+    // une alerte ne doit jamais faire échouer une transcription
+  }
+}
+
 function recordFailure() {
   breaker.failures += 1;
   if (breaker.failures >= BREAKER_THRESHOLD) {
     breaker.openUntil = Date.now() + BREAKER_COOLDOWN_MS;
     logger.warn(`ASR : disjoncteur ouvert ${BREAKER_COOLDOWN_MS / 1000} s après ${breaker.failures} panne(s) d'affilée`);
+    if (!alerted.down) {
+      alerted.down = true;
+      notifyIncident(`🔴 Worker ASR injoignable après ${breaker.failures} échecs d'affilée — la dictée et la séance sont en panne.`);
+    }
   }
 }
-function recordSuccess() { breaker = { failures: 0, openUntil: 0 }; }
+
+function recordSuccess() {
+  if (alerted.down) {
+    alerted.down = false;
+    notifyIncident('🟢 Worker ASR de nouveau joignable — la dictée est rétablie.');
+  }
+  breaker = { failures: 0, openUntil: 0 };
+}
+
+/** État du disjoncteur pour le monitoring admin. Lecture seule, propre à cette instance. */
+const getBreakerState = () => ({ open: breakerOpen(), failures: breaker.failures, openUntil: breaker.openUntil || null });
 
 const config = () => ({ url: (process.env.ASR_WORKER_URL || '').replace(/\/+$/, ''), token: process.env.ASR_WORKER_TOKEN || '' });
 const isConfigured = () => { const c = config(); return Boolean(c.url && c.token); };
 /** Oublie l'état mémorisé du worker (cache de santé et disjoncteur). */
-const resetHealthCache = () => { healthCache = { at: 0, ok: false }; breaker = { failures: 0, openUntil: 0 }; };
+const resetHealthCache = () => { healthCache = { at: 0, ok: false }; breaker = { failures: 0, openUntil: 0 }; alerted = { down: false, misconfiguredAt: 0 }; };
 
 // Vocabulaire d'abord, contexte ensuite : si l'ensemble dépasse 200 mots, c'est le vocabulaire qui est rogné.
 function buildPrompt(prevText) {
@@ -81,7 +113,15 @@ async function transcribeSegment({ buffer, mimeType, prompt, priority = 'interac
     throw new DraftError('ASR_BUSY', 503, 'Transcription saturée, réessaie dans un instant', { retryAfter });
   }
   if (res.status === 413 || res.status === 422) throw new DraftError('AUDIO_INVALID', 422, 'Segment audio invalide');
-  if (res.status === 401) { logger.error('ASR : jeton refusé par le worker (ASR_WORKER_TOKEN)'); throw new DraftError('ASR_MISCONFIGURED', 500, 'Transcription indisponible'); }
+  if (res.status === 401) {
+    logger.error('ASR : jeton refusé par le worker (ASR_WORKER_TOKEN)');
+    const now = Date.now();
+    if (now - alerted.misconfiguredAt >= MISCONFIGURED_ALERT_INTERVAL_MS) {
+      alerted.misconfiguredAt = now;
+      notifyIncident('🔴 Worker ASR : jeton refusé (ASR_WORKER_TOKEN) — la dictée est en panne.');
+    }
+    throw new DraftError('ASR_MISCONFIGURED', 500, 'Transcription indisponible');
+  }
   if (!res.ok) { logger.error(`ASR : réponse ${res.status}`); recordFailure(); throw unavailable(); }
   let body;
   try {
@@ -95,4 +135,4 @@ async function transcribeSegment({ buffer, mimeType, prompt, priority = 'interac
   return { text: String(body.text ?? ''), audioSeconds: Number(body.audio_seconds) || 0, processingSeconds: Number(body.processing_seconds) || 0 };
 }
 
-module.exports = { isConfigured, checkHealth, resetHealthCache, buildPrompt, transcribeSegment };
+module.exports = { isConfigured, checkHealth, resetHealthCache, buildPrompt, transcribeSegment, getBreakerState };
