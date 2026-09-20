@@ -58,8 +58,9 @@ const dayLabel = (iso: string) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
 const DICTATION_COLOR = '#0d9488'; // teal — Dictée
 const SESSION_COLOR = '#6366f1'; // indigo — Séance
 const FAILURE_COLOR = '#d97706'; // ambre — échecs
-// Trait de séparation entre segments empilés (2 px, couleur du fond de la carte).
-const STACK_GAP_COLOR = 'hsl(var(--background))';
+// Trait de séparation entre segments empilés (2 px, couleur du fond de la carte — les
+// graphiques sont sur bg-card, pas bg-background, les deux teintes diffèrent).
+const STACK_GAP_COLOR = 'hsl(var(--card))';
 
 function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -85,7 +86,7 @@ function HealthBanner({ health }: { health: WorkerHealth | null }) {
 
   const down = !health.reachable || health.status === 'error';
   const loading = health.status === 'loading';
-  const dot = down ? 'bg-red-500' : loading ? 'bg-amber-500' : 'bg-emerald-500';
+  const dot = down ? 'bg-red-500' : loading ? 'bg-amber-600' : 'bg-emerald-500';
   const label = down ? 'injoignable' : loading ? 'modèle en chargement' : 'en ligne';
 
   return (
@@ -116,21 +117,25 @@ function HealthBanner({ health }: { health: WorkerHealth | null }) {
 
 // Un des deux graphiques de délai (petits multiples) : p50 plein + p95 tireté, une seule
 // couleur (celle du registre concerné), légende car deux séries.
+// `domain` est partagé entre les deux instances (calculé par l'appelant) : deux petits
+// multiples doivent être comparables sans échelle Y indépendante, sinon on recrée
+// précisément l'erreur de lisibilité que le découpage en deux graphiques doit éviter.
 function LatencyChart({
-  title, data, color,
+  title, data, color, domain,
 }: {
   title: string;
   data: { label: string; p50: number | null; p95: number | null }[];
   color: string;
+  domain: [number, number | 'auto'];
 }) {
   return (
-    <div>
+    <div className="min-w-0">
       <h4 className="mb-2 text-sm font-medium text-foreground">{title}</h4>
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
           <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-          <YAxis tick={{ fontSize: 12 }} unit="s" />
+          <YAxis tick={{ fontSize: 12 }} unit="s" domain={domain} />
           <Tooltip />
           <Legend />
           <Line type="monotone" dataKey="p50" name="p50" stroke={color} strokeWidth={2} dot={false} connectNulls />
@@ -180,10 +185,19 @@ export default function AsrWorkerTab() {
         const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/admin/dashboard/asr/stats?days=${days}`);
         const body = await res.json();
         if (cancelled) return;
-        if (body.success) setStats(body.data);
-        else setError(body.error || 'Erreur de chargement');
+        if (body.success) {
+          setStats(body.data);
+        } else {
+          // Ne pas laisser les données de la fenêtre précédente affichées sous le
+          // nouveau libellé (ex. chiffres 7 j visibles sous le bouton « 30 jours »).
+          setStats(null);
+          setError(body.error || 'Erreur de chargement');
+        }
       } catch {
-        if (!cancelled) setError('Erreur de chargement');
+        if (!cancelled) {
+          setStats(null);
+          setError('Erreur de chargement');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -202,6 +216,13 @@ export default function AsrWorkerTab() {
     p50: l.session.p50,
     p95: l.session.p95,
   }));
+  // Domaine Y partagé entre les deux petits multiples de délai : sans ça, deux courbes
+  // d'allure identique pourraient représenter 8 s et 120 s sur des échelles indépendantes.
+  const latencyValues = [...dictationLatency, ...sessionLatency]
+    .flatMap((d) => [d.p50, d.p95])
+    .filter((v): v is number => v !== null);
+  const latencyMax = latencyValues.length ? Math.max(...latencyValues) : undefined;
+  const latencyDomain: [number, number | 'auto'] = [0, latencyMax ?? 'auto'];
   const stuckTotal = (stats?.stuck.transcribing ?? 0) + (stats?.stuck.tail ?? 0);
 
   return (
@@ -213,6 +234,7 @@ export default function AsrWorkerTab() {
           <button
             key={d}
             type="button"
+            aria-pressed={days === d}
             onClick={() => setDays(d)}
             className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
               days === d ? 'border-primary bg-primary/10 font-medium text-foreground' : 'border-border text-muted-foreground hover:text-foreground'
@@ -228,7 +250,7 @@ export default function AsrWorkerTab() {
           <Loader2 className="h-4 w-4 animate-spin" /> Chargement des statistiques…
         </div>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
 
       {stats && !loading && (
         <>
@@ -243,13 +265,13 @@ export default function AsrWorkerTab() {
           )}
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-            <Tile label="Segments" value={String(stats.totals.segments)} />
-            <Tile label="Minutes audio" value={String(stats.totals.audioMinutes)} />
-            <Tile label="Kinés actifs" value={String(stats.totals.activeKines)} />
+            <Tile label="Segments" value={stats.totals.segments.toLocaleString('fr-FR')} />
+            <Tile label="Minutes audio" value={stats.totals.audioMinutes.toLocaleString('fr-FR')} />
+            <Tile label="Kinés actifs" value={stats.totals.activeKines.toLocaleString('fr-FR')} />
             <Tile
               label="Segments / kiné"
-              value={String(stats.totals.avgSegmentsPerActiveKine)}
-              hint={`max ${stats.totals.maxSegmentsPerKine}`}
+              value={stats.totals.avgSegmentsPerActiveKine.toLocaleString('fr-FR')}
+              hint={`max ${stats.totals.maxSegmentsPerKine.toLocaleString('fr-FR')}`}
             />
             <Tile label="Taux de reprise" value={`${Math.round(stats.totals.retryRate * 100)} %`} />
             <Tile
@@ -268,7 +290,11 @@ export default function AsrWorkerTab() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                <Tooltip />
+                {/* itemStyle force la couleur du texte : par défaut recharts colore le texte
+                    de l'infobulle avec getMainColorOfGraphicItem, qui vaut `stroke` pour une
+                    Area — ici la couleur du fond utilisée pour l'écart de 2 px (cf. plus bas),
+                    donc un texte quasi invisible sans ce correctif. */}
+                <Tooltip itemStyle={{ color: 'hsl(var(--foreground))' }} />
                 {/* Payload explicite : recharts dérive sinon la couleur de légende de l'Area
                     depuis `stroke` (utilisé ici pour l'écart de 2 px, cf. commentaire ci-dessous),
                     ce qui afficherait des pastilles couleur du fond au lieu du teal/indigo. */}
@@ -314,8 +340,8 @@ export default function AsrWorkerTab() {
               Deux graphiques séparés (Dictée / Séance) : quatre séries dans un seul plot ne se distinguent pas.
             </p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <LatencyChart title="Dictée" data={dictationLatency} color={DICTATION_COLOR} />
-              <LatencyChart title="Séance" data={sessionLatency} color={SESSION_COLOR} />
+              <LatencyChart title="Dictée" data={dictationLatency} color={DICTATION_COLOR} domain={latencyDomain} />
+              <LatencyChart title="Séance" data={sessionLatency} color={SESSION_COLOR} domain={latencyDomain} />
             </div>
           </section>
 
@@ -325,20 +351,24 @@ export default function AsrWorkerTab() {
               <p className="text-sm text-muted-foreground">Aucun échec sur la période.</p>
             ) : (
               <>
-                <p className="mb-2 text-xs text-muted-foreground">Segments</p>
-                <ResponsiveContainer width="100%" height={Math.max(120, stats.failures.segments.length * 36)}>
-                  <BarChart data={stats.failures.segments} layout="vertical" margin={{ right: 24 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
-                    <YAxis type="category" dataKey="error" width={180} tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="count" name="Segments" fill={FAILURE_COLOR} radius={[0, 4, 4, 0]}>
-                      {/* Étiquette de valeur directement sur la barre : encodage secondaire
-                          en plus de l'infobulle, pour la même raison de séparation limite. */}
-                      <LabelList dataKey="count" position="right" className="fill-foreground" fontSize={12} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                {stats.failures.segments.length > 0 && (
+                  <>
+                    <p className="mb-2 text-xs text-muted-foreground">Segments</p>
+                    <ResponsiveContainer width="100%" height={Math.max(120, stats.failures.segments.length * 36)}>
+                      <BarChart data={stats.failures.segments} layout="vertical" margin={{ top: 5, right: 24, bottom: 5, left: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
+                        <YAxis type="category" dataKey="error" width={180} tick={{ fontSize: 11 }} />
+                        <Tooltip />
+                        <Bar dataKey="count" name="Segments" fill={FAILURE_COLOR} radius={[0, 4, 4, 0]}>
+                          {/* Étiquette de valeur directement sur la barre : encodage secondaire
+                              en plus de l'infobulle, pour la même raison de séparation limite. */}
+                          <LabelList dataKey="count" position="right" className="fill-foreground" fontSize={12} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </>
+                )}
                 {stats.failures.jobs.length > 0 && (
                   <>
                     <p className="mb-2 mt-4 text-xs text-muted-foreground">
