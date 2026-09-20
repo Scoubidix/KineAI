@@ -6,6 +6,7 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, UserCheck, ClipboardList, CreditCard, TrendingUp, TrendingDown, Minus, UserMinus, ArrowRightLeft, MessageSquare, Mail, FileText, FileSignature, Gift, Activity, Sparkles } from 'lucide-react';
+import { PLAN_COLORS } from './planColors';
 
 interface LastPayout {
   amount: number;
@@ -72,14 +73,6 @@ export interface DashboardStats {
   planChanges: PlanChange[];
   activity: ActivityStats;
 }
-
-const PLAN_COLORS: Record<string, string> = {
-  FREE: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
-  DECLIC: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  PRATIQUE: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  PIONNIER: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-  EXPERT: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300',
-};
 
 const PLAN_PRICES: Record<string, string> = {
   FREE: '0',

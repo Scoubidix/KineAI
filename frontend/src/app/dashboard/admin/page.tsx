@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 import React, { useState, useEffect, useRef } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { AuthGuard } from '@/components/AuthGuard';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +18,7 @@ import ExercicesPublicsTab from './components/ExercicesPublicsTab';
 import RoadmapTab from './components/RoadmapTab';
 import DictationTermsTab from './components/DictationTermsTab';
 import StatsGlobalesTab, { type DashboardStats } from './components/StatsGlobalesTab';
+import { PLAN_COLORS } from './components/planColors';
 import { Button } from '@/components/ui/button';
 
 interface UnverifiedKine {
@@ -56,14 +57,6 @@ interface SupportTicket {
   };
   messages: TicketMessage[];
 }
-
-const PLAN_COLORS: Record<string, string> = {
-  FREE: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
-  DECLIC: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  PRATIQUE: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  PIONNIER: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-  EXPERT: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300',
-};
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
