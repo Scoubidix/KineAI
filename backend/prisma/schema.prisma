@@ -125,6 +125,10 @@ model Kine {
   // ========== RELATION VISIOTRANSMISSION ==========
   visioSeances VisioSeance[]
   // ================================================
+
+  // ========== RELATION MONITORING ASR ==========
+  asrCalls AsrCall[]
+  // ==============================================
 }
 
 model Patient {
@@ -813,24 +817,44 @@ model BilanJob {
 }
 
 model BilanJobSegment {
-  id                Int                   @id @default(autoincrement())
-  jobId             Int
-  index             Int
-  status            BilanJobSegmentStatus @default(QUEUED)
-  text              String?               @db.Text // transcription brute ; effacée quand les notes sont écrites
-  audioSeconds      Float?
-  processingSeconds Float? // temps de calcul du worker ; sert au RTF du monitoring admin
-  transcribedAt     DateTime? // instant où le worker a rendu le texte ; sert au calcul du délai vécu par le kiné dans le monitoring admin
-  attempts          Int                   @default(0)
-  error             String?               @db.VarChar(40)
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+  id           Int                   @id @default(autoincrement())
+  jobId        Int
+  index        Int
+  status       BilanJobSegmentStatus @default(QUEUED)
+  text         String?               @db.Text // transcription brute ; effacée quand les notes sont écrites
+  audioSeconds Float?
+  attempts     Int                   @default(0)
+  error        String?               @db.VarChar(40)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
 
   job BilanJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@unique([jobId, index])
-  @@index([createdAt]) // agrégats journaliers du monitoring ASR
   @@map("bilan_job_segments")
+}
+
+// ==== Monitoring worker ASR (une ligne par appel, au goulot) ====
+
+enum AsrSource {
+  DICTATION_LIVE
+  SESSION
+}
+
+model AsrCall {
+  id                Int       @id @default(autoincrement())
+  kineId            Int
+  source            AsrSource
+  waitSeconds       Float // durée réelle de l'appel, chronométrée sur place
+  audioSeconds      Float?
+  processingSeconds Float?
+  error             String?   @db.VarChar(40) // null = succès
+  createdAt         DateTime  @default(now())
+
+  kine Kine @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@map("asr_calls")
 }
 
 // ==== Champs canoniques (gérés via /dashboard/admin) ====
