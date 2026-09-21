@@ -322,7 +322,7 @@ exports.transcribeDictation = async (req, res) => {
     if (!bilan) throw new draftService.DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
     if (!bilan.document) throw new draftService.DraftError('LEGACY_BILAN', 400, 'Les anciens bilans ne peuvent pas être dictés');
     const prompt = asrService.buildPrompt(String(prevText || '').slice(0, 600));
-    const r = await asrService.transcribeSegment({ buffer: req.file.buffer, mimeType: String(mimeType || req.file.mimetype || ''), prompt, priority: 'interactive' });
+    const r = await asrService.transcribeSegment({ buffer: req.file.buffer, mimeType: String(mimeType || req.file.mimetype || ''), prompt, priority: 'interactive', source: 'DICTATION_LIVE', kineId });
     logger.info(`Dictée bilan ${bilanId} prise ${sanitizeId(String(takeId))} segment ${idx} : ${r.audioSeconds}s audio, ${r.processingSeconds}s calcul`);
     res.json({ success: true, text: r.text, audioSeconds: r.audioSeconds, processingSeconds: r.processingSeconds });
   } catch (err) {

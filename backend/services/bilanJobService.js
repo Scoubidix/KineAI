@@ -103,7 +103,7 @@ async function receiveSegment({ kineId, bilanId, index, buffer, mimeType }) {
   if (heldBytes + buffer.length > maxHeldBytes()) throw new DraftError('ASR_BUSY', 503, 'Transcription saturée, réessaie dans un instant', { retryAfter: QUEUE_FULL_RETRY_S });
   await prisma.bilanJobSegment.upsert({ where: segmentKey(job.id, index), create: { jobId: job.id, index, status: 'QUEUED' }, update: { status: 'QUEUED', text: null, error: null } });
   hold(job.id, index, buffer.length);
-  queue.push(() => transcribeQueued({ jobId: job.id, kind: job.kind, index, buffer, mimeType }).finally(() => release(job.id, index)));
+  queue.push(() => transcribeQueued({ jobId: job.id, kind: job.kind, kineId, index, buffer, mimeType }).finally(() => release(job.id, index)));
   return { index };
 }
 
@@ -146,7 +146,7 @@ async function markInFlightLost() {
 }
 
 // Transcrit un segment reçu par cette instance ; le tampon est libéré à la sortie.
-async function transcribeQueued({ jobId, kind, index, buffer, mimeType }) {
+async function transcribeQueued({ jobId, kind, kineId, index, buffer, mimeType }) {
   const prisma = prismaService.getInstance();
   // Écriture finale conditionnée à la propriété : un segment déclaré perdu à tort se répare s'il
   // aboutit (QUEUED ou FAILED), mais un segment d'un traitement déjà passé en queue n'écrit rien —
@@ -165,15 +165,19 @@ async function transcribeQueued({ jobId, kind, index, buffer, mimeType }) {
     const prev = index > 0 ? await prisma.bilanJobSegment.findUnique({ where: segmentKey(jobId, index - 1), select: { status: true, text: true } }) : null;
     const prompt = asrService.buildPrompt(prev && prev.status === 'DONE' ? String(prev.text || '').slice(0, 600) : '');
     const priority = kind === 'SESSION' ? 'batch' : 'interactive';
+    // Le genre « DICTATION » côté job n'est plus créé (le front force SESSION), il ne reste que de
+    // rares jobs hérités : approximation assumée, ils appellent le worker en priorité 'interactive'
+    // comme la dictée en direct, donc classés DICTATION_LIVE plutôt que d'ajouter un 3e genre mourant.
+    const source = kind === 'SESSION' ? 'SESSION' : 'DICTATION_LIVE';
     let attempt = 0;
     for (;;) {
       attempt += 1;
       // Chaque tentative rafraîchit updatedAt : le segment n'est pas « perdu », il attend
       await prisma.bilanJobSegment.update({ where: segmentKey(jobId, index), data: { attempts: { increment: 1 } } });
       try {
-        const r = await asrService.transcribeSegment({ buffer, mimeType, prompt, priority });
+        const r = await asrService.transcribeSegment({ buffer, mimeType, prompt, priority, source, kineId });
         logger.info(`Traitement dictée ${jobId} segment ${index} : ${r.audioSeconds}s audio, ${r.processingSeconds}s calcul, essai ${attempt}`);
-        written = await writeTerminal({ status: 'DONE', text: r.text, audioSeconds: r.audioSeconds, processingSeconds: r.processingSeconds, transcribedAt: new Date(), error: null });
+        written = await writeTerminal({ status: 'DONE', text: r.text, audioSeconds: r.audioSeconds, error: null });
         break;
       } catch (err) {
         const code = err instanceof DraftError ? err.code : 'INTERNAL_ERROR';
