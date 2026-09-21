@@ -139,17 +139,19 @@ async function getStats({ days } = {}) {
     bucket.segments += 1;
     if (isSession) bucket.segmentsSession += 1; else bucket.segmentsDictation += 1;
     bucket.audioSeconds += row.audioSeconds || 0;
-    if (row.kineId != null) bucket.kines.add(row.kineId);
+    bucket.kines.add(row.kineId);
 
     // `waitSeconds` est chronométré sur l'appel réel, non nullable : un échec a fait attendre le
     // kiné tout autant qu'un succès, il entre donc aussi dans la latence perçue.
     if (isSession) bucket.waitsSession.push(row.waitSeconds); else bucket.waitsDictation.push(row.waitSeconds);
 
-    if (row.kineId != null) kineCounts.set(row.kineId, (kineCounts.get(row.kineId) || 0) + 1);
+    kineCounts.set(row.kineId, (kineCounts.get(row.kineId) || 0) + 1);
     totalAudio += row.audioSeconds || 0;
     // RTF : seules les lignes qui portent audio ET temps de calcul entrent au ratio — mélanger
     // l'audio d'une ligne non mesurée (échec, ou colonne pas encore alimentée) fausse le RTF.
-    if (typeof row.processingSeconds === 'number' && typeof row.audioSeconds === 'number') {
+    // `audioSeconds > 0` (pas un simple `typeof`) : asrService écrit `Number(body.audio_seconds) || 0`
+    // côté worker, un 0 y est donc possible et ne doit pas entrer seul au numérateur.
+    if (typeof row.processingSeconds === 'number' && row.audioSeconds > 0) {
       totalProcessing += row.processingSeconds;
       audioWithProcessing += row.audioSeconds;
     }
