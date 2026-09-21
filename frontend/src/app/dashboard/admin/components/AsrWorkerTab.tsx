@@ -43,7 +43,7 @@ interface AsrStats {
   totals: {
     segments: number; audioMinutes: number; activeKines: number;
     avgSegmentsPerActiveKine: number; maxSegmentsPerKine: number;
-    retryRate: number; rtf: number | null;
+    failureRate: number; rtf: number | null;
   };
   latency: LatencyDay[];
   failures: { segments: { error: string; count: number }[]; jobs: { error: string; count: number }[] };
@@ -273,7 +273,7 @@ export default function AsrWorkerTab() {
               value={stats.totals.avgSegmentsPerActiveKine.toLocaleString('fr-FR')}
               hint={`max ${stats.totals.maxSegmentsPerKine.toLocaleString('fr-FR')}`}
             />
-            <Tile label="Taux de reprise" value={`${Math.round(stats.totals.retryRate * 100)} %`} />
+            <Tile label="Taux d'échec" value={`${Math.round(stats.totals.failureRate * 100)} %`} />
             <Tile
               label="RTF"
               value={stats.totals.rtf === null ? '—' : String(stats.totals.rtf)}
@@ -300,7 +300,7 @@ export default function AsrWorkerTab() {
                     ce qui afficherait des pastilles couleur du fond au lieu du teal/indigo. */}
                 <Legend
                   payload={[
-                    { value: 'Dictée', type: 'square', color: DICTATION_COLOR },
+                    { value: 'Dictée (prise de notes)', type: 'square', color: DICTATION_COLOR },
                     { value: 'Séance', type: 'square', color: SESSION_COLOR },
                   ]}
                 />
@@ -308,7 +308,7 @@ export default function AsrWorkerTab() {
                     encodage secondaire, la paire teal/indigo étant à la limite de
                     séparation pour une forme de daltonisme. */}
                 <Area
-                  type="monotone" dataKey="segmentsDictation" name="Dictée" stackId="1"
+                  type="monotone" dataKey="segmentsDictation" name="Dictée (prise de notes)" stackId="1"
                   stroke={STACK_GAP_COLOR} strokeWidth={2} fill={DICTATION_COLOR} fillOpacity={0.35}
                 />
                 <Area
@@ -340,7 +340,7 @@ export default function AsrWorkerTab() {
               Deux graphiques séparés (Dictée / Séance) : quatre séries dans un seul plot ne se distinguent pas.
             </p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <LatencyChart title="Dictée" data={dictationLatency} color={DICTATION_COLOR} domain={latencyDomain} />
+              <LatencyChart title="Dictée (prise de notes)" data={dictationLatency} color={DICTATION_COLOR} domain={latencyDomain} />
               <LatencyChart title="Séance" data={sessionLatency} color={SESSION_COLOR} domain={latencyDomain} />
             </div>
           </section>
