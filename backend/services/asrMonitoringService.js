@@ -92,7 +92,7 @@ async function getStats({ days } = {}) {
       select: {
         status: true, error: true, attempts: true,
         audioSeconds: true, processingSeconds: true,
-        createdAt: true, updatedAt: true,
+        createdAt: true, updatedAt: true, transcribedAt: true,
         job: { select: { kind: true, kineId: true } },
       },
       take: MAX_ROWS,
@@ -142,8 +142,11 @@ async function getStats({ days } = {}) {
     bucket.audioSeconds += row.audioSeconds || 0;
     if (row.job?.kineId != null) bucket.kines.add(row.job.kineId);
 
-    if (row.status === 'DONE') {
-      const wait = (row.updatedAt.getTime() - row.createdAt.getTime()) / 1000;
+    // `transcribedAt` seul mesure l'attente vécue par le kiné : `updatedAt` est aussi retouché par
+    // le nettoyage du texte en fin de correction (bilanJobService), bien après la transcription.
+    // null = segment antérieur au déploiement de la colonne, exclu (ni percentile, ni count).
+    if (row.status === 'DONE' && row.transcribedAt) {
+      const wait = (row.transcribedAt.getTime() - row.createdAt.getTime()) / 1000;
       if (kind === 'SESSION') bucket.waitsSession.push(wait); else bucket.waitsDictation.push(wait);
     }
 

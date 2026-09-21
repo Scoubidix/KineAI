@@ -820,6 +820,7 @@ model BilanJobSegment {
   text              String?               @db.Text // transcription brute ; effacée quand les notes sont écrites
   audioSeconds      Float?
   processingSeconds Float? // temps de calcul du worker ; sert au RTF du monitoring admin
+  transcribedAt     DateTime? // instant où le worker a rendu le texte ; sert au calcul du délai vécu par le kiné dans le monitoring admin
   attempts          Int                   @default(0)
   error             String?               @db.VarChar(40)
   createdAt         DateTime              @default(now())

@@ -32,11 +32,7 @@ let alerted = { down: false, misconfiguredAt: 0 };
 /** Notifie sans jamais faire échouer une transcription (Telegram absent = silence). */
 function notifyIncident(message) {
   // Appel synchrone (pas de .then différé) : l'envoi part immédiatement, seul l'échec est absorbé
-  try {
-    Promise.resolve(telegramService.sendNotification(message)).catch(() => {});
-  } catch {
-    // une alerte ne doit jamais faire échouer une transcription
-  }
+  Promise.resolve(telegramService.sendNotification(message)).catch(() => {});
 }
 
 function recordFailure() {
