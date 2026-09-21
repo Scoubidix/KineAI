@@ -265,7 +265,11 @@ export default function AsrWorkerTab() {
           )}
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-            <Tile label="Segments" value={stats.totals.segments.toLocaleString('fr-FR')} />
+            <Tile
+              label="Segments"
+              value={stats.totals.segments.toLocaleString('fr-FR')}
+              hint="tentatives, reprises comprises"
+            />
             <Tile label="Minutes audio" value={stats.totals.audioMinutes.toLocaleString('fr-FR')} />
             <Tile label="Kinés actifs" value={stats.totals.activeKines.toLocaleString('fr-FR')} />
             <Tile
@@ -336,8 +340,12 @@ export default function AsrWorkerTab() {
           <section className="rounded-lg border border-border bg-card p-4">
             <h3 className="mb-1 text-sm font-medium text-foreground">Délai de transcription par segment</h3>
             <p className="mb-3 text-xs text-muted-foreground">
-              Mise en file → texte écrit, en secondes. C&apos;est l&apos;attente réellement subie par le kiné.
-              Deux graphiques séparés (Dictée / Séance) : quatre séries dans un seul plot ne se distinguent pas.
+              Durée de l&apos;appel au worker de transcription, en secondes (file d&apos;attente du worker
+              incluse ; file interne du backend et pauses entre reprises exclues). Pour la dictée en
+              prise de notes, l&apos;appel est synchrone : c&apos;est bien l&apos;attente subie par le kiné.
+              Pour la séance, traitée en arrière-plan, c&apos;est une valeur approximative — le kiné
+              n&apos;attend pas ce délai. Deux graphiques séparés — dictée (prise de notes) et séance —
+              car quatre séries dans un seul graphique ne se distinguent pas.
             </p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <LatencyChart title="Dictée (prise de notes)" data={dictationLatency} color={DICTATION_COLOR} domain={latencyDomain} />
