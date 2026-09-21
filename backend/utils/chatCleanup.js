@@ -3,6 +3,7 @@ const cron = require('node-cron');
 const prismaService = require('../services/prismaService');
 const notificationService = require('../services/notificationService');
 const bilanDraftService = require('../services/bilanDraftService');
+const asrMonitoringService = require('../services/asrMonitoringService');
 const logger = require('./logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('./logSanitizer');
 
@@ -189,6 +190,13 @@ const createProgramCompletedNotificationsTask = async () => {
 // Brouillons de bilan créés au clic puis jamais remplis : supprimés après le délai
 const purgeEmptyBilanDraftsTask = async () => {
   const count = await bilanDraftService.purgeEmptyDrafts();
+  return { purged: count };
+};
+
+// Purge des mesures de charge du worker ASR (asr_calls) au-delà de la fenêtre affichée par le
+// monitoring admin (30 j par défaut) — cf. asrMonitoringService.purgeOldCalls.
+const purgeOldAsrCallsTask = async () => {
+  const count = await asrMonitoringService.purgeOldCalls();
   return { purged: count };
 };
 
@@ -410,8 +418,22 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  logger.info('✅ PRODUCTION configurée - 7 tâches avec backup automatique + notifications');
-  logger.info('📅 Planning: 00h01+00h09 notifications, 00h10+00h18 archivage, mercredi 01h15+01h23 nettoyage programmes, 02h40 purge brouillons vides');
+  // PRODUCTION: Purge des mesures ASR (asr_calls) au-delà de 30j - 03h20, créneau libre
+  cron.schedule('20 3 * * *', async () => {
+    logger.info(`🗑️ [03h20] Purge des mesures ASR (asr_calls)`);
+
+    await executeWithTimeout(
+      'purge mesures ASR (03h20)',
+      purgeOldAsrCallsTask,
+      60000
+    );
+  }, {
+    timezone: "Europe/Paris",
+    scheduled: true
+  });
+
+  logger.info('✅ PRODUCTION configurée - 8 tâches avec backup automatique + notifications');
+  logger.info('📅 Planning: 00h01+00h09 notifications, 00h10+00h18 archivage, mercredi 01h15+01h23 nettoyage programmes, 02h40 purge brouillons vides, 03h20 purge mesures ASR');
   logger.info('🔒 Toutes les tâches utilisent le singleton prismaService');
 };
 

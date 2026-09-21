@@ -1,5 +1,6 @@
 // Lectures pour le monitoring admin du worker ASR : état live (proxy de /healthz) et agrégats
-// historiques calculés à la volée depuis bilan_job_segments / bilan_jobs. N'écrit jamais rien.
+// historiques calculés à la volée depuis asr_calls (charge du worker) et bilan_jobs (santé des
+// traitements de bilan). N'écrit jamais rien, sauf purgeOldCalls (purge périodique par le cron).
 const prismaService = require('./prismaService');
 const asrService = require('./asrService');
 const logger = require('../utils/logger');
@@ -49,6 +50,8 @@ const SEGMENT_TIMEOUT_MS = Number(process.env.JOB_SEGMENT_TIMEOUT_MS) || 10 * 60
 const TAIL_TIMEOUT_MS = Number(process.env.JOB_TAIL_TIMEOUT_MS) || 10 * 60 * 1000;
 // Garde-fou : les agrégats se font en mémoire, on borne la lecture
 const MAX_ROWS = 200_000;
+// Purge quotidienne (cron) : fenêtre affichée par le monitoring, rien au-delà n'est jamais lu
+const PURGE_DEFAULT_DAYS = 30;
 
 const round = (v, digits) => Math.round(v * 10 ** digits) / 10 ** digits;
 
@@ -74,9 +77,10 @@ function dayKeys(days, now) {
 }
 
 /**
- * Agrégats du worker sur les `days` derniers jours (7 ou 30), en heure de Paris.
- * Une seule lecture de segments sert usage, totals et latency ; failures et stuck sont des
- * agrégats SQL. Rien n'est écrit.
+ * Agrégats sur les `days` derniers jours (7 ou 30), en heure de Paris.
+ * `usage`/`totals`/`latency` viennent d'`asr_calls` (une ligne par tentative, succès ou échec :
+ * c'est la charge réelle du worker). `stuck` et `failures.jobs` restent sur `bilan_jobs` : c'est
+ * la santé des traitements de bilan, pas la charge du worker. Rien n'est écrit.
  */
 async function getStats({ days } = {}) {
   const window = days === 30 ? 30 : 7;
@@ -86,20 +90,15 @@ async function getStats({ days } = {}) {
   const from = parisMidnightUtc(startY, startM, startD);
   const prisma = prismaService.getInstance();
 
-  const [rows, segErrors, jobErrors, stuckTranscribing, stuckTail] = await Promise.all([
-    prisma.bilanJobSegment.findMany({
+  const [rows, callErrors, jobErrors, stuckTranscribing, stuckTail] = await Promise.all([
+    prisma.asrCall.findMany({
       where: { createdAt: { gte: from } },
-      select: {
-        status: true, error: true, attempts: true,
-        audioSeconds: true, processingSeconds: true,
-        createdAt: true, updatedAt: true, transcribedAt: true,
-        job: { select: { kind: true, kineId: true } },
-      },
+      select: { kineId: true, source: true, waitSeconds: true, audioSeconds: true, processingSeconds: true, error: true, createdAt: true },
       take: MAX_ROWS,
     }),
-    prisma.bilanJobSegment.groupBy({
+    prisma.asrCall.groupBy({
       by: ['error'],
-      where: { createdAt: { gte: from }, status: { in: ['FAILED', 'SKIPPED'] } },
+      where: { createdAt: { gte: from }, error: { not: null } },
       _count: { _all: true },
     }),
     prisma.bilanJob.groupBy({
@@ -119,7 +118,7 @@ async function getStats({ days } = {}) {
       where: { status: { in: ['CORRECTING', 'COMPOSING'] }, updatedAt: { lt: new Date(Date.now() - TAIL_TIMEOUT_MS) } },
     }),
   ]);
-  if (rows.length === MAX_ROWS) logger.warn(`Monitoring ASR : lecture tronquée à ${MAX_ROWS} segments, agrégats partiels`);
+  if (rows.length === MAX_ROWS) logger.warn(`Monitoring ASR : lecture tronquée à ${MAX_ROWS} appels, agrégats partiels`);
 
   // --- usage et latency, jour par jour ---
   const empty = () => ({ segments: 0, segmentsDictation: 0, segmentsSession: 0, audioSeconds: 0, kines: new Set(), waitsDictation: [], waitsSession: [] });
@@ -129,34 +128,32 @@ async function getStats({ days } = {}) {
   let totalAudio = 0;
   let totalProcessing = 0;
   let audioWithProcessing = 0;
-  let retried = 0;
+  let failed = 0;
 
   for (const row of rows) {
     const key = parisDayKey(row.createdAt);
     const bucket = byDay.get(key);
-    if (!bucket) continue; // segment hors fenêtre (bord de requête), ignoré
+    if (!bucket) continue; // ligne hors fenêtre (bord de requête), ignorée
 
-    const kind = row.job?.kind === 'SESSION' ? 'SESSION' : 'DICTATION';
+    const isSession = row.source === 'SESSION';
     bucket.segments += 1;
-    if (kind === 'SESSION') bucket.segmentsSession += 1; else bucket.segmentsDictation += 1;
+    if (isSession) bucket.segmentsSession += 1; else bucket.segmentsDictation += 1;
     bucket.audioSeconds += row.audioSeconds || 0;
-    if (row.job?.kineId != null) bucket.kines.add(row.job.kineId);
+    if (row.kineId != null) bucket.kines.add(row.kineId);
 
-    // `transcribedAt` seul mesure l'attente vécue par le kiné : `updatedAt` est aussi retouché par
-    // le nettoyage du texte en fin de correction (bilanJobService), bien après la transcription.
-    // null = segment antérieur au déploiement de la colonne, exclu (ni percentile, ni count).
-    if (row.status === 'DONE' && row.transcribedAt) {
-      const wait = (row.transcribedAt.getTime() - row.createdAt.getTime()) / 1000;
-      if (kind === 'SESSION') bucket.waitsSession.push(wait); else bucket.waitsDictation.push(wait);
-    }
+    // `waitSeconds` est chronométré sur l'appel réel, non nullable : un échec a fait attendre le
+    // kiné tout autant qu'un succès, il entre donc aussi dans la latence perçue.
+    if (isSession) bucket.waitsSession.push(row.waitSeconds); else bucket.waitsDictation.push(row.waitSeconds);
 
-    if (row.job?.kineId != null) kineCounts.set(row.job.kineId, (kineCounts.get(row.job.kineId) || 0) + 1);
+    if (row.kineId != null) kineCounts.set(row.kineId, (kineCounts.get(row.kineId) || 0) + 1);
     totalAudio += row.audioSeconds || 0;
-    if (typeof row.processingSeconds === 'number') {
+    // RTF : seules les lignes qui portent audio ET temps de calcul entrent au ratio — mélanger
+    // l'audio d'une ligne non mesurée (échec, ou colonne pas encore alimentée) fausse le RTF.
+    if (typeof row.processingSeconds === 'number' && typeof row.audioSeconds === 'number') {
       totalProcessing += row.processingSeconds;
-      audioWithProcessing += row.audioSeconds || 0;
+      audioWithProcessing += row.audioSeconds;
     }
-    if ((row.attempts || 0) > 1) retried += 1;
+    if (row.error) failed += 1;
   }
 
   const usage = keys.map((date) => {
@@ -187,10 +184,10 @@ async function getStats({ days } = {}) {
     activeKines,
     avgSegmentsPerActiveKine: activeKines ? round(rows.length / activeKines, 1) : 0,
     maxSegmentsPerKine: activeKines ? Math.max(...kineCounts.values()) : 0,
-    retryRate: rows.length ? round(retried / rows.length, 3) : 0,
-    // null tant que la colonne n'est pas alimentée (segments antérieurs au déploiement) ; le
-    // dénominateur ne compte que l'audio des segments dont le temps de calcul est connu, sinon
-    // le ratio mélange deux populations et le RTF affiché est artificiellement bas
+    failureRate: rows.length ? round(failed / rows.length, 3) : 0,
+    // null tant qu'aucune ligne ne porte les deux mesures ; le dénominateur ne compte que l'audio
+    // des lignes dont le temps de calcul est connu, sinon le ratio mélange deux populations et le
+    // RTF affiché est artificiellement bas
     rtf: audioWithProcessing > 0 ? round(totalProcessing / audioWithProcessing, 2) : null,
   };
 
@@ -204,9 +201,22 @@ async function getStats({ days } = {}) {
     usage,
     totals,
     latency,
-    failures: { segments: toFailures(segErrors), jobs: toFailures(jobErrors) },
+    failures: { segments: toFailures(callErrors), jobs: toFailures(jobErrors) },
     stuck: { transcribing: stuckTranscribing, tail: stuckTail },
   };
 }
 
-module.exports = { getWorkerHealth, getStats };
+/**
+ * Purge les lignes `asr_calls` antérieures à `olderThanDays` (30 par défaut — la fenêtre max
+ * affichée par le monitoring, cf. PURGE_DEFAULT_DAYS). Renvoie le nombre de lignes supprimées ;
+ * ne journalise que s'il est non nul, pour ne pas polluer les logs d'une purge quotidienne à vide.
+ */
+async function purgeOldCalls({ olderThanDays = PURGE_DEFAULT_DAYS } = {}) {
+  const prisma = prismaService.getInstance();
+  const before = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
+  const { count } = await prisma.asrCall.deleteMany({ where: { createdAt: { lt: before } } });
+  if (count > 0) logger.info(`Monitoring ASR : purge de ${count} ligne(s) asr_calls (> ${olderThanDays} j)`);
+  return count;
+}
+
+module.exports = { getWorkerHealth, getStats, purgeOldCalls };
