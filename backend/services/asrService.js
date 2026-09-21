@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 const { DraftError } = require('./bilanDraftService');
 const { DICTATION_VOCABULARY } = require('../data/dictationVocabulary');
 const telegramService = require('./telegramService');
+const prismaService = require('./prismaService');
 
 const HEALTH_CACHE_MS = 30_000;
 const HEALTH_TIMEOUT_MS = 3_000;
@@ -85,9 +86,18 @@ async function checkHealth() {
 const unavailable = () => new DraftError('ASR_UNAVAILABLE', 502, 'Transcription indisponible, réessaie dans un instant');
 
 /**
+ * Écrit une ligne `asr_calls` (une tentative = une ligne) sans jamais bloquer le chemin de
+ * réponse : l'appelant ne l'attend pas, et une panne d'écriture est absorbée (log `warn`).
+ */
+function recordCall({ source, kineId, waitSeconds, audioSeconds = null, processingSeconds = null, error = null }) {
+  prismaService.getInstance().asrCall.create({ data: { source, kineId, waitSeconds, audioSeconds, processingSeconds, error } })
+    .catch((err) => logger.warn(`ASR : échec écriture métrique asr_calls (${err && err.message})`));
+}
+
+/**
  * Transcrit un segment. @throws {DraftError} DICTATION_DISABLED | ASR_BUSY | AUDIO_INVALID | ASR_MISCONFIGURED | ASR_UNAVAILABLE
  */
-async function transcribeSegment({ buffer, mimeType, prompt, priority = 'interactive' }) {
+async function transcribeSegment({ buffer, mimeType, prompt, priority = 'interactive', source, kineId }) {
   if (!isConfigured()) throw new DraftError('DICTATION_DISABLED', 503, 'La dictée n\'est pas disponible pour le moment');
   if (breakerOpen()) throw unavailable();
   const { url, token } = config();
@@ -96,19 +106,27 @@ async function transcribeSegment({ buffer, mimeType, prompt, priority = 'interac
   form.append('language', 'fr');
   form.append('prompt', prompt || '');
   form.append('priority', priority);
+  // Chronométré ici, sur l'appel réel — jamais déduit d'un horodatage écrit ailleurs.
+  const startedAt = Date.now();
+  const record = (error, audioSeconds, processingSeconds) => recordCall({ source, kineId, waitSeconds: (Date.now() - startedAt) / 1000, audioSeconds, processingSeconds, error });
   let res;
   try {
     res = await fetch(`${url}/v1/transcribe`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   } catch (err) {
     logger.warn(`ASR injoignable (${err && err.name})`);
     recordFailure();
+    record('ASR_UNAVAILABLE');
     throw unavailable();
   }
   if (res.status === 503) {
     const retryAfter = Number(res.headers.get('retry-after')) || 5;
+    record('ASR_BUSY');
     throw new DraftError('ASR_BUSY', 503, 'Transcription saturée, réessaie dans un instant', { retryAfter });
   }
-  if (res.status === 413 || res.status === 422) throw new DraftError('AUDIO_INVALID', 422, 'Segment audio invalide');
+  if (res.status === 413 || res.status === 422) {
+    record('AUDIO_INVALID');
+    throw new DraftError('AUDIO_INVALID', 422, 'Segment audio invalide');
+  }
   if (res.status === 401) {
     logger.error('ASR : jeton refusé par le worker (ASR_WORKER_TOKEN)');
     const now = Date.now();
@@ -116,19 +134,29 @@ async function transcribeSegment({ buffer, mimeType, prompt, priority = 'interac
       alerted.misconfiguredAt = now;
       notifyIncident('🔴 Worker ASR : jeton refusé (ASR_WORKER_TOKEN) — la dictée est en panne.');
     }
+    record('ASR_MISCONFIGURED');
     throw new DraftError('ASR_MISCONFIGURED', 500, 'Transcription indisponible');
   }
-  if (!res.ok) { logger.error(`ASR : réponse ${res.status}`); recordFailure(); throw unavailable(); }
+  if (!res.ok) {
+    logger.error(`ASR : réponse ${res.status}`);
+    recordFailure();
+    record('ASR_UNAVAILABLE');
+    throw unavailable();
+  }
   let body;
   try {
     body = await res.json();
   } catch (err) {
     logger.error('ASR : réponse illisible');
     recordFailure();
+    record('ASR_UNAVAILABLE');
     throw unavailable();
   }
   recordSuccess();
-  return { text: String(body.text ?? ''), audioSeconds: Number(body.audio_seconds) || 0, processingSeconds: Number(body.processing_seconds) || 0 };
+  const audioSeconds = Number(body.audio_seconds) || 0;
+  const processingSeconds = Number(body.processing_seconds) || 0;
+  record(null, audioSeconds, processingSeconds);
+  return { text: String(body.text ?? ''), audioSeconds, processingSeconds };
 }
 
 module.exports = { isConfigured, checkHealth, resetHealthCache, buildPrompt, transcribeSegment, getBreakerState };
