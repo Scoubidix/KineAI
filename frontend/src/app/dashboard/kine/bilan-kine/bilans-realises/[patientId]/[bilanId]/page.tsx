@@ -22,7 +22,7 @@ import CompareWithPreviousModal from '../../../components/CompareWithPreviousMod
 import { usePreviousReference } from '../../../components/editor/usePreviousReference';
 import MeasuresPane, { useDensePane } from '../../../components/editor/MeasuresPane';
 import { useMinWidth } from '../../../components/editor/useMinWidth';
-import { BILAN_TYPE_COLORS, BILAN_TYPE_LABELS, emptyBilanDocument, type BilanRecord, type BilanSectionKey, type DocumentMeasurement } from '@/types/bilan';
+import { BILAN_TYPE_COLORS, BILAN_TYPE_LABELS, emptyBilanDocument, isProseOutdated, proseSignatures, type BilanRecord, type BilanSectionKey, type DocumentMeasurement } from '@/types/bilan';
 import { CARD, PageHeader, formatDateLong } from '../../../components/ListPage';
 import { BILANS_REALISES_HREF, parseId } from '../../../components/bilansRealises';
 
@@ -171,9 +171,12 @@ function LivingBilan({ initial, backHref }: { initial: BilanRecord; backHref: st
     autoSelect: false,
   });
 
+  // Écrire dans l'examen, c'est en reprendre la main : l'empreinte des mesures en prose est rebasée
   const setSection = (key: BilanSectionKey, text: string) => {
-    update({ document: { ...doc, sections: doc.sections.map((s) => (s.key === key ? { ...s, text } : s)) } });
+    const sections = doc.sections.map((s) => (s.key === key ? { ...s, text } : s));
+    update({ document: key === 'examen' ? { ...doc, sections, proseBasis: proseSignatures(doc.measurements) } : { ...doc, sections } });
   };
+  const rebaseProse = () => update({ document: { ...doc, proseBasis: proseSignatures(doc.measurements) } });
 
   const setMeasurements = (measurements: DocumentMeasurement[]) => update({ document: { ...doc, measurements } });
 
@@ -228,6 +231,8 @@ function LivingBilan({ initial, backHref }: { initial: BilanRecord; backHref: st
         doc={doc}
         onSectionChange={setSection}
         disabled={stale}
+        warnings={isProseOutdated(doc) ? { examen: 'measures_changed' } : {}}
+        onDismissWarning={rebaseProse}
       />
 
       </div>

@@ -284,7 +284,7 @@ exports.composeBilan = async (req, res) => {
   }
 };
 
-/** POST /api/bilans/:id/compose-from-notes — extraction + acceptation automatique + rédaction des 7 sections, une écriture */
+/** POST /api/bilans/:id/compose-from-notes — rédaction des 7 sections depuis les notes, une écriture (extraction débranchée, spec 2026-09-23) */
 exports.composeBilanFromNotes = async (req, res) => {
   try {
     const bilanId = parseBilanId(req, res);

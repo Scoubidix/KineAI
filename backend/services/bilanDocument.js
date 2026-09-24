@@ -37,6 +37,18 @@ function normalizeLabel(label) {
   return String(label ?? '').trim().toLowerCase();
 }
 
+// Empreinte des mesures « en prose » renseignées : ce que le texte de l'examen est censé reprendre
+// (spec 2026-09-23 §6). Posée quand l'examen est rédigé ; une différence avec l'empreinte courante
+// signale au kiné une mesure en prose que le texte ne reprend pas. Même identifiant que la détection
+// de doublons. Le front calcule la même empreinte (`frontend/src/types/bilan.ts`) : garder les deux
+// identiques.
+function proseSignatures(measurements) {
+  return (measurements || [])
+    .filter((m) => m.presentation === 'narrative' && m.value !== null && m.value !== undefined && !(typeof m.value === 'string' && m.value.trim() === ''))
+    .map((m) => `${m.kind === 'canonical' ? `c:${m.key}:${m.side ?? ''}` : `x:${normalizeLabel(m.label)}`}=${JSON.stringify(m.value)}`)
+    .sort();
+}
+
 // Vérifie une valeur canonique selon le type du champ. Retourne un message d'erreur ou null.
 function checkCanonicalValue(field, value) {
   if (value === null) return null; // ajoutée mais non saisie
@@ -146,6 +158,11 @@ function buildDocumentSchema(fieldsByKey) {
     comparison: z
       .object({ previousBilanIds: z.array(z.number().int().positive()).max(10) })
       .optional(),
+    // Empreinte des mesures en prose à la dernière écriture de l'examen (cf. proseSignatures).
+    // Déclarée ici sans quoi Zod la retirerait à chaque autosave.
+    // Borne large : JSON.stringify peut porter un caractère de la valeur à 6 (\uXXXX), et une entrée
+    // refusée bloquerait tous les autosaves du bilan.
+    proseBasis: z.array(z.string().max(6 * TEXT_VALUE_MAX + 300)).max(MEASUREMENTS_MAX).optional(),
   });
 }
 
@@ -181,6 +198,7 @@ module.exports = {
   ORIGINS,
   emptyDocument,
   normalizeLabel,
+  proseSignatures,
   buildDocumentSchema,
   validateDocument,
   isDocumentEmpty,

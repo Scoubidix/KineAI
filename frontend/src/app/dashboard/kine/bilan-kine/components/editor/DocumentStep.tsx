@@ -12,7 +12,7 @@ import { DRAWER_ACTIONS_ID } from './MeasuresDrawer';
 import PatientCombobox from '../PatientCombobox';
 import { attachPatient, finalizeBilan, ApiError } from '@/utils/bilanApi';
 import { fetchBilanRender, downloadBilanPdf, buildBilanClipboard, writeBilanToClipboard, type BilanClipboard } from '@/utils/bilanExport';
-import { emptyBilanDocument, BILAN_TYPE_LABELS, type AiBusy, type BilanPatch, type BilanRecord, type BilanSectionKey, type BilanType, type PatientSummary, type SectionWarnings } from '@/types/bilan';
+import { emptyBilanDocument, proseSignatures, BILAN_TYPE_LABELS, type AiBusy, type BilanPatch, type BilanRecord, type BilanSectionKey, type BilanType, type PatientSummary, type SectionWarnings } from '@/types/bilan';
 
 // flush() renvoie Promise<boolean> (cf. useBilanAutosave) : true si tout est persisté
 export interface DocumentStepProps {
@@ -55,8 +55,16 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
 
   const hasNotes = (record.rawNotes ?? '').trim().length > 0;
 
+  // Écrire dans l'examen, c'est en reprendre la main : l'empreinte des mesures en prose est rebasée
   const setSection = (key: BilanSectionKey, text: string) => {
-    update({ document: { ...doc, sections: doc.sections.map((s) => (s.key === key ? { ...s, text } : s)) } });
+    const sections = doc.sections.map((s) => (s.key === key ? { ...s, text } : s));
+    update({ document: key === 'examen' ? { ...doc, sections, proseBasis: proseSignatures(doc.measurements) } : { ...doc, sections } });
+    onSectionEdited(key);
+  };
+  // Seul l'avertissement « mesures modifiées » rebase l'empreinte : fermer un avertissement de rédaction
+  // (chiffre à vérifier…) qui passait devant ne doit pas effacer le signal d'une mesure en prose.
+  const dismissWarning = (key: BilanSectionKey) => {
+    if (key === 'examen' && warnings.examen === 'measures_changed') update({ document: { ...doc, proseBasis: proseSignatures(doc.measurements) } });
     onSectionEdited(key);
   };
 
@@ -186,7 +194,7 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
   // paragraphes des sections éditables en place
   const sheet = (
     <DocumentSheet bilanId={record.id} refreshKey={record.updatedAt} evolution={evolution} doc={doc} onSectionChange={setSection} disabled={disabled}
-      canRegenerate={hasNotes} onRegenerate={(key) => { void onCompose([key]); }} aiBusy={aiBusy} warnings={warnings} onDismissWarning={onSectionEdited} />
+      canRegenerate={hasNotes} onRegenerate={(key) => { void onCompose([key]); }} aiBusy={aiBusy} warnings={warnings} onDismissWarning={dismissWarning} />
   );
 
   // Enregistré : plus de bouton, l'état est déjà dit. Un bouton désactivé laissait croire

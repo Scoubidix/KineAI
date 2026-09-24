@@ -8,7 +8,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useBilanAutosave } from '@/hooks/useBilanAutosave';
 import { getBilan, getJob, abandonJob, attachPatient, composeBilan, composeBilanFromNotes, ApiError, StaleDraftError } from '@/utils/bilanApi';
-import { emptyBilanDocument, type AiBusy, type BilanJobKind, type BilanJobResult, type BilanJobView, type BilanRecord, type BilanSectionKey, type DictationChange, type ExtractionCandidate, type PatientSummary, type BilanType, type SectionWarnings } from '@/types/bilan';
+import { emptyBilanDocument, isProseOutdated, type AiBusy, type BilanJobKind, type BilanJobResult, type BilanJobView, type BilanRecord, type BilanSectionKey, type DictationChange, type ExtractionCandidate, type PatientSummary, type BilanType, type SectionWarnings } from '@/types/bilan';
 import BilanEditorAlerts from '../components/editor/BilanEditorAlerts';
 import BilanSettingsLine from '../components/editor/BilanSettingsLine';
 import CaptureStep from '../components/editor/CaptureStep';
@@ -34,10 +34,10 @@ export interface InitialAi {
 }
 
 const toInitialAi = (r: BilanJobResult): InitialAi => ({
-  candidates: r.pending,
+  candidates: [], // extraction débranchée (spec 2026-09-23) : ni suggestions, ni tiroir forcé ouvert
   rejected: r.rejected,
   quotes: new Map(r.accepted.map((a) => [a.id, a.quote])),
-  lastRun: { extracted: r.accepted.length + r.pending.length, pending: r.pending.length },
+  lastRun: null, // plus de bandeau « mesures extraites »
   warnings: r.warnings,
   corrections: r.corrections ?? [],
 });
@@ -51,7 +51,9 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
   const locked = saveState === 'stale';
 
   // État IA, non persisté (spec §9.2) : candidats d'extraction, appel en cours, avertissements de rédaction
-  const [candidates, setCandidates] = useState<ExtractionCandidate[] | null>(initialAi?.candidates ?? null);
+  // Suggestions d'extraction : plus alimentées (extraction débranchée, spec 2026-09-23). `null` et non
+  // `[]` : une liste vide afficherait le panneau « 0 suggestion ». Câblage gardé pour le rebranchement.
+  const [candidates, setCandidates] = useState<ExtractionCandidate[] | null>(null);
   const [rejectedCount, setRejectedCount] = useState(initialAi?.rejected ?? 0);
   const [aiBusy, setAiBusy] = useState<AiBusy>(null);
   const [warnings, setWarnings] = useState<SectionWarnings>(initialAi?.warnings ?? {});
@@ -101,30 +103,10 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
   const [quotes, setQuotes] = useState<Map<string, string>>(initialAi?.quotes ?? new Map());
   // Bandeau de la page Document : résultat de la dernière rédaction (session)
   const [lastRun, setLastRun] = useState<{ extracted: number; pending: number } | null>(initialAi?.lastRun ?? null);
-  // Empreinte des mesures à la dernière rédaction : si elles changent, Examen et Diagnostic sont signalées
-  // (rédaction faite côté serveur : l'empreinte de départ est celle du bilan relu)
-  const composedMeasurementsRef = useRef<string | null>(initialAi ? JSON.stringify(initial.document?.measurements ?? []) : null);
   // Type du bilan au moment de la dernière rédaction. Le changer après coup ne casse rien (les
   // sections sont les mêmes pour les trois types), mais le texte a été écrit sous un autre angle :
-  // on le signale, on ne réécrit rien. État de session, comme l'avertissement « mesures modifiées ».
+  // on le signale, on ne réécrit rien. État de session.
   const [composedType, setComposedType] = useState<BilanType | null>(initialAi ? initial.type : null);
-  const fingerprint = (r: BilanRecord) => JSON.stringify(r.document?.measurements ?? []);
-  useEffect(() => {
-    const ref = composedMeasurementsRef.current;
-    if (ref === null) return;
-    const current = fingerprint(record);
-    if (current === ref) return;
-    composedMeasurementsRef.current = current; // un seul signalement par modification
-    const sections = record.document?.sections ?? [];
-    setWarnings((prev) => {
-      const next: SectionWarnings = { ...prev };
-      for (const k of ['examen', 'diagnostic'] as const) {
-        const text = sections.find((s) => s.key === k)?.text ?? '';
-        if (text.trim() !== '' && !next[k]) next[k] = 'measures_changed';
-      }
-      return next;
-    });
-  }, [record]);
 
   const handleComposeFromNotes = async () => {
     if (aiLockRef.current) return;
@@ -135,13 +117,9 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
       const r = await composeBilanFromNotes(record.id);
       replaceRecord(r.bilan);
       setWarnings(r.warnings);
-      setCandidates(r.pending);
       setRejectedCount(r.rejected);
       setQuotes(new Map(r.accepted.map((a) => [a.id, a.quote])));
-      setLastRun({ extracted: r.accepted.length + r.pending.length, pending: r.pending.length });
-      composedMeasurementsRef.current = fingerprint(r.bilan);
       setComposedType(r.bilan.type);
-      revealDrawer();
       await goTo('document');
     } catch (e) {
       // Rédaction en échec après l'écriture des mesures : rien n'est perdu, on montre le tableau
@@ -176,11 +154,9 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
     try {
       const r = await composeBilan(record.id, sections);
       replaceRecord(r.bilan);
-      composedMeasurementsRef.current = fingerprint(r.bilan);
       // Une reprise ciblée (une seule section) ne rédige pas les 6 autres : l'avertissement
       // sur le type reste vrai pour elles, on ne le lève que sur une rédaction complète.
       if (!sections) setComposedType(r.bilan.type);
-      revealDrawer();
       setWarnings((prev) => {
         if (!sections) return r.warnings;
         const next: SectionWarnings = { ...prev };
@@ -226,6 +202,10 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
     router.push('/dashboard/kine/bilan-kine');
   };
 
+  // Mesure en prose ajoutée ou modifiée depuis la rédaction de l'examen : dérivé du document, donc
+  // tient au rechargement (spec 2026-09-23 §6). Un avertissement de rédaction déjà posé passe devant.
+  const shownWarnings: SectionWarnings = !warnings.examen && record.document && isProseOutdated(record.document) ? { ...warnings, examen: 'measures_changed' } : warnings;
+
   return (
     <TooltipProvider>
       <div className="flex flex-col min-h-full">
@@ -250,7 +230,7 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
         <div className="flex-1 min-h-0 flex">
           <div className="flex-1 min-w-0 pb-12 lg:pb-0">
             {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('document')} onCompose={() => { void handleComposeFromNotes(); }} composing={aiBusy === 'compose_from_notes'} dictation={dictation} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} />}
-            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={warnings} onSectionEdited={clearWarning} lastRun={lastRun} onVerify={openSuggestions} onDismissRun={() => setLastRun(null)} wide={wide} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} fromSession={fromSession} composedType={composedType} />}
+            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={shownWarnings} onSectionEdited={clearWarning} lastRun={lastRun} onVerify={openSuggestions} onDismissRun={() => setLastRun(null)} wide={wide} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} fromSession={fromSession} composedType={composedType} />}
           </div>
           <MeasuresDrawer record={record} update={update} disabled={locked || aiBusy !== null} candidates={candidates} rejectedCount={rejectedCount} onCandidatesChange={setCandidates} aiBusy={aiBusy} open={drawerOpen} onOpenChange={setDrawer} wide={wide} quotes={quotes} />
         </div>

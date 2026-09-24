@@ -46,6 +46,8 @@ export interface BilanDocument {
   sections: BilanSection[];
   measurements: DocumentMeasurement[];
   comparison?: { previousBilanIds: number[] };
+  /** Empreinte des mesures en prose à la dernière écriture de l'examen (spec 2026-09-23 §6) */
+  proseBasis?: string[];
 }
 
 export const emptyBilanDocument = (): BilanDocument => ({
@@ -53,6 +55,20 @@ export const emptyBilanDocument = (): BilanDocument => ({
   sections: BILAN_SECTION_KEYS.map((key) => ({ key, text: '' })),
   measurements: [],
 });
+
+/** Empreinte des mesures en prose renseignées. Même algorithme que `proseSignatures` côté serveur (`backend/services/bilanDocument.js`) : garder les deux identiques. */
+export const proseSignatures = (measurements: DocumentMeasurement[]): string[] =>
+  measurements
+    .filter((m) => m.presentation === 'narrative' && m.value !== null && m.value !== undefined && !(typeof m.value === 'string' && m.value.trim() === ''))
+    .map((m) => `${m.kind === 'canonical' ? `c:${m.key}:${m.side ?? ''}` : `x:${m.label.trim().toLowerCase()}`}=${JSON.stringify(m.value)}`)
+    .sort();
+
+/** Vrai si une mesure en prose a été ajoutée ou modifiée depuis la dernière écriture d'un examen non vide. Sans empreinte (bilan rédigé avant 2026-09-23) : faux. */
+export const isProseOutdated = (doc: BilanDocument): boolean => {
+  if (!doc.proseBasis) return false;
+  if ((doc.sections.find((s) => s.key === 'examen')?.text ?? '').trim() === '') return false;
+  return proseSignatures(doc.measurements).join('\n') !== doc.proseBasis.join('\n');
+};
 
 // ==================== RESSOURCE /api/bilans (plan 2) ====================
 

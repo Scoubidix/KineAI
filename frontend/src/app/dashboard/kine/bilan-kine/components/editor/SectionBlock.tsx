@@ -26,7 +26,7 @@ interface SectionBlockProps {
 const WARNING_TEXT: Record<SectionWarning, string> = {
   unverified_number: 'Chiffre à vérifier : un nombre de ce texte n’apparaît ni dans tes notes ni dans tes mesures.',
   table_duplicate: 'Déjà dans le tableau : ce texte reprend une valeur de l’examen clinique. Reformule ou régénère.',
-  measures_changed: 'Mesures modifiées depuis la rédaction. Régénère cette section si besoin.',
+  measures_changed: 'Mesures modifiées depuis l’écriture de cette section : le texte ne les reprend pas encore.',
 };
 
 // Une section de la page : le titre du PDF, puis le paragraphe éditable, dans la mise en page
