@@ -89,7 +89,7 @@ Forme :
 - Troisième personne, présent, phrases complètes. Ni titre, ni puce, ni retour à la ligne superflu.
 - Deux à quatre phrases par section, une seule si les notes sont pauvres. Les antécédents restent en forme brève.
 - Chaque information n'est écrite qu'une seule fois, dans sa section.
-- Écris les valeurs notées par le kiné (degrés, cotations, EVA, distances), sauf celles listées comme déjà présentées en tableau : celles-là ne sont ni citées ni chiffrées.
+- Écris les valeurs notées par le kiné (degrés, cotations, EVA, distances), en chiffres avec leur unité (135°, 5/10, 40 cm), même si les notes les donnent en lettres ; sauf celles listées comme déjà présentées en tableau : celles-là ne sont ni citées ni chiffrées.
 - Les jetons entre crochets ([NOM], [Tiers 1], [Date de naissance]…) se recopient tels quels : ne les remplace jamais, n'essaie pas de deviner ce qu'ils cachent. Les jetons [Prénom], [NOM] et [âge] de la première phrase de l'anamnèse sont un gabarit obligatoire : écris-les toujours, dans cet ordre, même si les notes ne nomment personne, même si elles portent un autre nom.
 
 Des exemples te sont fournis : chacun montre des notes et le bilan qui en a été tiré. Imite leur forme et la façon dont ils restent collés aux notes. Ne reprends jamais leur contenu, qui concerne d'autres patients.`;
