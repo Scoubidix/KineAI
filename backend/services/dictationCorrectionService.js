@@ -337,7 +337,7 @@ async function correct({ text, mode, catalog, pseudo }) {
       if (usage) logger.info(`Correction dictée : ${usage.prompt_tokens} jeton(s) d'entrée, ${usage.completion_tokens} de sortie`);
       parsed = parseCorrection(content);
     } catch (err) {
-      logger.warn(`Correction dictée : essai ${attempt} en échec (${safeErrorLabel(err)})`);
+      logger.warn(`Correction dictée (${mode}) : essai ${attempt} en échec (${safeErrorLabel(err)}, ${tokens(known.text).length} mots envoyés)`);
     }
   }
   // Le texte brut reste rendu au kiné si le modèle échoue — mais les correspondances validées,
