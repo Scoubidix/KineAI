@@ -31,18 +31,19 @@ const csp = [
     : "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com",
   // Styles : 'unsafe-inline' requis par React inline styles + Tailwind
   "style-src 'self' 'unsafe-inline'",
-  // Connexions API : backend + Firebase Auth + GCS + GA4
-  `connect-src 'self' ${apiOrigin} ${wsOrigin} *.googleapis.com *.firebaseapp.com storage.googleapis.com https://www.google-analytics.com https://*.analytics.google.com https://*.google-analytics.com`,
+  // Connexions API : backend + Firebase Auth + GCS + GA4 + vignettes YouTube (le service worker
+  // intercepte les images cross-origin et les refait en fetch(), soumis à connect-src)
+  `connect-src 'self' ${apiOrigin} ${wsOrigin} *.googleapis.com *.firebaseapp.com storage.googleapis.com https://www.google-analytics.com https://*.analytics.google.com https://*.google-analytics.com https://i.ytimg.com`,
   "worker-src 'self'",
-  // Images : GCS (posters + GIFs legacy) + picsum (placeholder) + data: (SVG inline) + GA4 (pixels)
-  "img-src 'self' data: blob: picsum.photos storage.googleapis.com www.google.com https://www.google-analytics.com",
+  // Images : GCS (posters + GIFs legacy) + picsum (placeholder) + data: (SVG inline) + GA4 (pixels) + vignettes YouTube (fiches tests)
+  "img-src 'self' data: blob: picsum.photos storage.googleapis.com www.google.com https://www.google-analytics.com https://i.ytimg.com",
   // Médias : les vidéos de démonstration sont servies par URL signée GCS. Sans
   // cette directive, <video> retombe sur default-src 'self' et est bloquée.
   "media-src 'self' blob: storage.googleapis.com",
   // Fonts : next/font auto-heberge au build, gstatic en fallback
   "font-src 'self' fonts.gstatic.com",
-  // Frames : iframe autorise uniquement vers la meme origine + blob: (preview PDF contrats)
-  "frame-src 'self' blob:",
+  // Frames : meme origine + blob: (preview PDF contrats) + lecteur YouTube confidentialite renforcee (fiches tests, charge au clic)
+  "frame-src 'self' blob: https://www.youtube-nocookie.com",
   // Bloque les plugins (Flash, Java, etc.)
   "object-src 'none'",
   // Empeche le changement de base URL

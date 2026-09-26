@@ -5,6 +5,7 @@ import { Plus, Search, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CanonicalField } from '@/types/bilan';
+import TestGuideButton from '@/components/bilan/TestGuideButton';
 
 interface InlineMeasureSearchProps {
   fields: CanonicalField[];
@@ -86,6 +87,15 @@ export default function InlineMeasureSearch({
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Fiche ⓘ ouverte depuis un résultat : elle est portée hors du conteneur, donc un clic dedans
+  // (ou sur le fond pour la fermer) passerait pour un clic extérieur et viderait la recherche,
+  // démontant la fiche avec. La remise à false est différée : Radix ferme la fiche au pointerdown,
+  // le mousedown qui suit dans la même séquence doit encore être ignoré.
+  const guideOpenRef = useRef(false);
+  const handleGuideOpenChange = (open: boolean) => {
+    if (open) guideOpenRef.current = true;
+    else setTimeout(() => { guideOpenRef.current = false; }, 0);
+  };
 
   const q = useMemo(() => normalize(search), [search]);
 
@@ -127,6 +137,7 @@ export default function InlineMeasureSearch({
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: MouseEvent) => {
+      if (guideOpenRef.current) return;
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
         setSearch('');
@@ -248,18 +259,32 @@ export default function InlineMeasureSearch({
           {results.map((f, idx) => {
             const isHighlighted = idx === highlightedIndex;
             return (
-              <button
+              // Bouton « ajouter » étiré sur toute la ligne (pattern stretched link) : le ⓘ peut ainsi
+              // se placer juste après le libellé sans être imbriqué dans un autre bouton (HTML interdit).
+              // Le contenu laisse passer les clics vers le bouton, sauf le ⓘ.
+              <div
                 key={f.id}
-                type="button"
                 onMouseEnter={() => setHighlightedIndex(idx)}
-                onClick={() => addCanonical(f)}
-                disabled={disabled}
-                className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${
+                className={`relative flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors ${
                   isHighlighted ? 'bg-[#3899aa]/15' : 'hover:bg-[#3899aa]/10'
                 }`}
               >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{f.label}</p>
+                <button
+                  type="button"
+                  onClick={() => addCanonical(f)}
+                  disabled={disabled}
+                  aria-label={`Ajouter ${f.label}`}
+                  className="absolute inset-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <div className="pointer-events-none relative flex-1 min-w-0">
+                  <div className="flex items-center gap-1">
+                    <p className="text-sm font-medium truncate">{f.label}</p>
+                    {f.hasGuide && (
+                      <span className="pointer-events-auto -my-1 shrink-0">
+                        <TestGuideButton fieldKey={f.key} label={f.label} onOpenChange={handleGuideOpenChange} />
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-muted-foreground truncate">
                     {f.category}
                     {f.type === 'NUMERIC' && f.unit ? ` · ${f.unit}` : ''}
@@ -268,8 +293,7 @@ export default function InlineMeasureSearch({
                     {f.type === 'ENUM' && f.options ? ` · ${f.options.join(' / ')}` : ''}
                   </p>
                 </div>
-                <Plus className="w-3.5 h-3.5 text-[#3899aa] shrink-0" />
-              </button>
+              </div>
             );
           })}
 
@@ -291,7 +315,6 @@ export default function InlineMeasureSearch({
                   Ajouter «&nbsp;<strong>{search.trim()}</strong>&nbsp;» en mesure libre
                 </p>
               </div>
-              <Plus className="w-3.5 h-3.5 text-[#3899aa] shrink-0" />
             </button>
           )}
 

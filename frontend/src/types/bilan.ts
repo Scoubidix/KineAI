@@ -206,6 +206,36 @@ export interface CanonicalField {
   lateralized: boolean;
   presentation: 'TABLE' | 'NARRATIVE';
   description: string | null;
+  /** Une fiche pratique avec description existe (bouton ⓘ). Absent des réponses admin. */
+  hasGuide?: boolean;
+}
+
+/** Fiche pratique d'un test, lue par le kiné (GET /api/bilan-guides/:key) */
+export interface TestGuide {
+  fieldKey: string;
+  label: string;
+  category: string;
+  content: string;
+  youtubeId: string | null;
+  youtubeStart: number | null;
+}
+
+/** Fiche vue par l'admin */
+export interface AdminBilanGuide {
+  content: string;
+  youtubeId: string | null;
+  youtubeStart: number | null;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+/** Ligne de l'onglet admin « Fiches tests » : un test actif du catalogue et sa fiche éventuelle */
+export interface AdminBilanGuideRow {
+  fieldKey: string;
+  label: string;
+  category: string;
+  order: number;
+  guide: AdminBilanGuide | null;
 }
 
 // ⚠️ Hérité : sert uniquement à lire structuredData des bilans antérieurs à la V1. Les nouveaux bilans utilisent BilanDocument.

@@ -894,6 +894,23 @@ model BilanCanonicalField {
   @@map("bilan_canonical_fields")
 }
 
+// ==== Fiches pratiques des tests du bilan (rédigées en admin, lues par le kiné) ====
+// Liées au catalogue par la clé stable, SANS clé étrangère : runBilanSeed efface et recrée
+// bilan_canonical_fields à chaque montée de version (les id changent, la key jamais).
+// Une fiche dont le test disparaît reste en base, invisible ; elle revient avec la clé.
+model BilanTestGuide {
+  id           Int      @id @default(autoincrement())
+  fieldKey     String   @unique @db.VarChar(80) // = BilanCanonicalField.key
+  content      String   @default("") // Markdown, ≤ 5000 caractères (Zod) ; vide = pas de bouton ⓘ
+  youtubeId    String?  @db.VarChar(11)
+  youtubeStart Int? // seconde de départ de la vidéo
+  updatedBy    String?  @db.VarChar(255) // email de l'admin, dernière modification
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("bilan_test_guides")
+}
+
 // ==== Templates de bilan (publics gérés par admin, privés par kiné) ====
 // Un template = liste ordonnée d'items à pré-remplir dans structuredData
 // (pas de valeurs, uniquement la composition).

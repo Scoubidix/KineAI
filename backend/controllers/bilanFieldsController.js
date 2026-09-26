@@ -2,6 +2,7 @@ const prismaService = require('../services/prismaService');
 const logger = require('../utils/logger');
 const { sanitizeId } = require('../utils/logSanitizer');
 const { invalidateCatalogCache } = require('../services/bilanRenderService');
+const bilanGuideService = require('../services/bilanGuideService');
 
 const VALID_TYPES = ['NUMERIC', 'BOOLEAN', 'TEXT', 'ENUM'];
 
@@ -13,11 +14,15 @@ const VALID_TYPES = ['NUMERIC', 'BOOLEAN', 'TEXT', 'ENUM'];
 exports.getActiveFields = async (req, res) => {
   try {
     const prisma = prismaService.getInstance();
-    const fields = await prisma.bilanCanonicalField.findMany({
-      where: { isActive: true },
-      orderBy: [{ category: 'asc' }, { order: 'asc' }, { id: 'asc' }],
-    });
-    res.json({ success: true, fields });
+    const [fields, guideKeys] = await Promise.all([
+      prisma.bilanCanonicalField.findMany({
+        where: { isActive: true },
+        orderBy: [{ category: 'asc' }, { order: 'asc' }, { id: 'asc' }],
+      }),
+      bilanGuideService.listGuideKeys(),
+    ]);
+    // hasGuide pilote le bouton ⓘ : le texte de la fiche n'est chargé qu'à l'ouverture
+    res.json({ success: true, fields: fields.map((f) => ({ ...f, hasGuide: guideKeys.has(f.key) })) });
   } catch (err) {
     logger.error('Erreur récupération champs canoniques :', err);
     res.status(500).json({ success: false, error: 'Erreur récupération champs', code: 'INTERNAL_ERROR' });

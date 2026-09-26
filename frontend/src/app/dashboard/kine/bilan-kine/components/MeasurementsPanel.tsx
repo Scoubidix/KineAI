@@ -28,6 +28,7 @@ import {
 import InlineMeasureSearch from './InlineMeasureSearch';
 import ApplyTemplateModal from './ApplyTemplateModal';
 import SideSelector from './SideSelector';
+import TestGuideButton from '@/components/bilan/TestGuideButton';
 import { measurementIdentity } from './editor/suggestions';
 
 interface MeasurementsPanelProps {
@@ -452,6 +453,9 @@ export default function MeasurementsPanel({
     }
 
     const field = row.field;
+    const guideButton = m.kind === 'canonical' && field?.hasGuide
+      ? <TestGuideButton fieldKey={field.key} label={field.label} />
+      : null;
     const sideSelector = m.kind === 'canonical' && field?.lateralized
       ? <SideSelector value={m.side} onChange={(s) => handleSideAt(row.index, s)} disabled={disabled} />
       : null;
@@ -480,6 +484,7 @@ export default function MeasurementsPanel({
         <div key={`row-${row.index}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
           <div className="flex items-start gap-2">
             <span className={`${labelClass} flex-1 min-w-0`} title={labelTitle}>{label}</span>
+            {guideButton}
             {renderQuote(m)}
             {removeButton}
           </div>
@@ -494,7 +499,10 @@ export default function MeasurementsPanel({
 
     return (
       <div key={`row-${row.index}`} className="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-muted/40">
-        <span className={`${labelClass} w-36 sm:w-56 shrink-0`} title={labelTitle}>{label}</span>
+        <span className="flex w-36 shrink-0 items-start gap-1 sm:w-56">
+          <span className={`${labelClass} min-w-0`} title={labelTitle}>{label}</span>
+          {guideButton}
+        </span>
         {sideSelector}
         {input}
         {previous}

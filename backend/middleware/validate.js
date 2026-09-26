@@ -257,6 +257,15 @@ const roadmapIdeeStatutSchema = z.object({
   statut: z.enum(ROADMAP_IDEE_STATUTS),
 });
 
+// ========== FICHES TESTS BILAN ==========
+
+// Fiche pratique d'un test (PUT /api/admin/bilan-guides/:key) : Markdown libre, lien YouTube facultatif.
+// Le lien est vérifié par le service (parseYouTubeUrl) ; vide ou null = pas de vidéo.
+const bilanGuideSchema = z.object({
+  content: z.string().trim().max(5000),
+  videoUrl: z.string().trim().max(500).nullish().transform((v) => v || null),
+});
+
 // Signalement d'un terme mal transcrit : bornes de la spec (80 caractères, 4 mots côté service)
 const dictationTermSchema = z.object({
   heard: z.string().min(1).max(80),
@@ -303,6 +312,7 @@ module.exports = {
   roadmapIdeeSchema,
   roadmapItemSchema,
   roadmapIdeeStatutSchema,
+  bilanGuideSchema,
   dictationTermSchema,
   dictationTermStatutSchema,
   dictationTermEditSchema,

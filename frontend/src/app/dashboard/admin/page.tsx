@@ -11,9 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SubTabsList, SubTabsTrigger } from '@/components/ui/sub-tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { RefreshCw, ShieldCheck, UserPlus, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, Layers, Zap, ImagePlus, X, Pencil, Trash2, Sparkles, Dumbbell, Map as MapIcon, Mic } from 'lucide-react';
+import { RefreshCw, ShieldCheck, UserPlus, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, Layers, Zap, ImagePlus, X, Pencil, Trash2, Sparkles, Dumbbell, Map as MapIcon, Mic, BookOpen } from 'lucide-react';
 import BilanFieldsTab from './components/BilanFieldsTab';
 import BilanTemplatesTab from './components/BilanTemplatesTab';
+import BilanGuidesTab from './components/BilanGuidesTab';
 import TokenUsageTab from './components/TokenUsageTab';
 import NouveautesTab from './components/NouveautesTab';
 import ExercicesPublicsTab from './components/ExercicesPublicsTab';
@@ -61,7 +62,7 @@ interface SupportTicket {
   messages: TicketMessage[];
 }
 
-const TABS = ['dashboard', 'emails', 'support', 'bilan-fields', 'bilan-templates',
+const TABS = ['dashboard', 'emails', 'support', 'bilans',
   'nouveautes', 'exercices-publics', 'roadmap', 'dictee'] as const;
 type TabKey = (typeof TABS)[number];
 
@@ -76,32 +77,55 @@ function isStatsViewKey(value: string | null): value is StatsViewKey {
   return value !== null && (STATS_VIEWS as readonly string[]).includes(value);
 }
 
+const BILAN_VIEWS = ['champs', 'templates', 'fiches'] as const;
+type BilanViewKey = (typeof BILAN_VIEWS)[number];
+
+function isBilanViewKey(value: string | null): value is BilanViewKey {
+  return value !== null && (BILAN_VIEWS as readonly string[]).includes(value);
+}
+
+// Anciens onglets devenus sous-onglets de « Bilans » : les liens existants restent valides
+const LEGACY_BILAN_TABS: Record<string, BilanViewKey> = { 'bilan-fields': 'champs', 'bilan-templates': 'templates' };
+
 function AdminDashboardPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get('tab');
   const requestedVue = searchParams.get('vue');
-  const [activeTab, setActiveTab] = useState<TabKey>(isTabKey(requestedTab) ? requestedTab : 'dashboard');
+  const legacyBilanView = requestedTab ? LEGACY_BILAN_TABS[requestedTab] : undefined;
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    legacyBilanView ? 'bilans' : isTabKey(requestedTab) ? requestedTab : 'dashboard'
+  );
   const [statsView, setStatsView] = useState<StatsViewKey>(isStatsViewKey(requestedVue) ? requestedVue : 'metriques');
+  const [bilanView, setBilanView] = useState<BilanViewKey>(
+    legacyBilanView ?? (isBilanViewKey(requestedVue) ? requestedVue : 'champs')
+  );
 
-  // L'onglet actif vit dans l'URL : rechargement et lien direct retrouvent la même vue
-  const syncUrl = (tab: TabKey, vue: StatsViewKey) => {
+  // L'onglet actif vit dans l'URL : rechargement et lien direct retrouvent la même vue.
+  // « vue » porte le sous-onglet des onglets qui en ont (Statistiques, Bilans).
+  const syncUrl = (tab: TabKey, vue: string | null) => {
     const params = new URLSearchParams();
     params.set('tab', tab);
-    if (tab === 'dashboard') params.set('vue', vue);
+    if (vue) params.set('vue', vue);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
+  const vueOf = (tab: TabKey): string | null => (tab === 'dashboard' ? statsView : tab === 'bilans' ? bilanView : null);
 
   const handleTabChange = (tab: string) => {
     if (!isTabKey(tab)) return;
     setActiveTab(tab);
-    syncUrl(tab, statsView);
+    syncUrl(tab, vueOf(tab));
   };
   const handleStatsViewChange = (vue: string) => {
     if (!isStatsViewKey(vue)) return;
     setStatsView(vue);
-    syncUrl(activeTab, vue);
+    syncUrl('dashboard', vue);
+  };
+  const handleBilanViewChange = (vue: string) => {
+    if (!isBilanViewKey(vue)) return;
+    setBilanView(vue);
+    syncUrl('bilans', vue);
   };
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -389,13 +413,9 @@ function AdminDashboardPageContent() {
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="bilan-fields" className="gap-1.5">
+              <TabsTrigger value="bilans" className="gap-1.5">
                 <FileText className="h-3.5 w-3.5" />
-                Champs bilans
-              </TabsTrigger>
-              <TabsTrigger value="bilan-templates" className="gap-1.5">
-                <Layers className="h-3.5 w-3.5" />
-                Templates bilans
+                Bilans
               </TabsTrigger>
               <TabsTrigger value="nouveautes" className="gap-1.5">
                 <Sparkles className="h-3.5 w-3.5" />
@@ -749,12 +769,33 @@ function AdminDashboardPageContent() {
               )}
             </TabsContent>
 
-            <TabsContent value="bilan-fields" className="space-y-4 mt-4">
-              <BilanFieldsTab />
-            </TabsContent>
+            <TabsContent value="bilans" className="mt-4">
+              <Tabs value={bilanView} onValueChange={handleBilanViewChange}>
+                <SubTabsList>
+                  <SubTabsTrigger value="champs">
+                    <FileText className="h-3.5 w-3.5" />
+                    Champs
+                  </SubTabsTrigger>
+                  <SubTabsTrigger value="templates">
+                    <Layers className="h-3.5 w-3.5" />
+                    Templates
+                  </SubTabsTrigger>
+                  <SubTabsTrigger value="fiches">
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Fiches tests
+                  </SubTabsTrigger>
+                </SubTabsList>
 
-            <TabsContent value="bilan-templates" className="space-y-4 mt-4">
-              <BilanTemplatesTab />
+                <TabsContent value="champs" className="space-y-4 mt-6">
+                  <BilanFieldsTab />
+                </TabsContent>
+                <TabsContent value="templates" className="space-y-4 mt-6">
+                  <BilanTemplatesTab />
+                </TabsContent>
+                <TabsContent value="fiches" className="space-y-4 mt-6">
+                  <BilanGuidesTab />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
 
             <TabsContent value="nouveautes" className="space-y-4 mt-4">

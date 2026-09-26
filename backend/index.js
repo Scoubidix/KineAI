@@ -102,6 +102,7 @@ const supportRoutes = require('./routes/support');
 const bilansRoutes = require('./routes/bilans');
 const bilansGlobalRoutes = require('./routes/bilansGlobal');
 const bilanFieldsRoutes = require('./routes/bilanFields');
+const bilanGuidesRoutes = require('./routes/bilanGuides');
 const bilanTemplatesRoutes = require('./routes/bilanTemplates');
 
 // ⚖️ LEGAL : Import des routes acceptations legales
@@ -608,6 +609,7 @@ app.use('/patients', patientsRoutes);       // Rate limiting dans le routeur APR
 app.use('/api/patients', bilansRoutes);     // Rate limiting dans le routeur APRÈS authenticate
 app.use('/api/bilans', bilansGlobalRoutes);                   // ✅ Routes globales bilans (GET uniquement)
 app.use('/api', bilanFieldsRoutes);                           // ✅ Champs canoniques bilan : GET libre, CRUD admin
+app.use('/api', bilanGuidesRoutes);                           // ✅ Fiches pratiques des tests : GET kiné, liste/édition admin
 app.use('/api', bilanTemplatesRoutes);                        // ✅ Templates bilan : GET libre, CRUD privé kiné, CRUD admin pour publics
 
 // Programmes : rate limiting appliqué dans le routeur APRÈS authenticate
