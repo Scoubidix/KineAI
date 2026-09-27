@@ -8,12 +8,11 @@ const logger = require('../utils/logger');
 const { logMasked } = require('../utils/pseudonymDebug');
 const llmService = require('./llmService');
 const { getCatalog } = require('./bilanRenderService');
-const { normalizeLabel, MEASUREMENTS_MAX } = require('./bilanDocument');
+const { normalizeLabel, MEASUREMENTS_MAX, QUOTE_MAX } = require('./bilanDocument');
 const { DraftError, loadIdentity } = require('./bilanDraftService');
 const { createPseudonymizer } = require('./pseudonymService');
 const { normalizeText, proofText, nameForms, evidenceReasons } = require('./bilanEvidence');
 
-const QUOTE_MAX = 300;
 const CANDIDATES_MAX = 100;
 const LABEL_MAX = 200;
 const TEXT_MAX = 500;

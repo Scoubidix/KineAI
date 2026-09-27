@@ -1,6 +1,7 @@
 // Schéma du document de bilan V1 (source de vérité stockée dans BilanKine.document).
 // Modèle inspiré de FHIR Composition (sections narratives) + Observation (mesures codées).
 const { z } = require('zod');
+const { REASONS } = require('./bilanEvidence');
 
 const SCHEMA_VERSION = 1;
 
@@ -23,6 +24,8 @@ const ORIGINS = ['manual', 'extracted', 'previous'];
 const SECTION_TEXT_MAX = 5000;
 const MEASUREMENTS_MAX = 200;
 const TEXT_VALUE_MAX = 500;
+const QUOTE_MAX = 300;
+const PENDING_MAX = 200;
 
 function emptyDocument() {
   return {
@@ -86,6 +89,7 @@ function buildDocumentSchema(fieldsByKey) {
     side: z.enum(SIDES).optional(),
     presentation: z.enum(PRESENTATIONS),
     origin: z.enum(ORIGINS),
+    quote: z.string().max(QUOTE_MAX).optional(),
   });
 
   const customSchema = z.object({
@@ -94,6 +98,27 @@ function buildDocumentSchema(fieldsByKey) {
     value: z.string().max(TEXT_VALUE_MAX),
     presentation: z.enum(PRESENTATIONS),
     origin: z.enum(ORIGINS),
+    quote: z.string().max(QUOTE_MAX).optional(),
+  });
+
+  const valueSchema = z.union([z.number(), z.boolean(), z.string().max(TEXT_VALUE_MAX), z.null()]);
+  // Ligne à vérifier (spec 2026-09-26 §5) : bornes alignées sur ce que l'extraction peut produire,
+  // sans quoi une ligne refusée bloquerait tous les autosaves du bilan
+  const pendingSchema = z.object({
+    id: z.string().max(300),
+    kind: z.enum(['canonical', 'custom']),
+    key: z.string().max(80).optional(),
+    label: z.string().max(200),
+    fieldType: z.enum(['NUMERIC', 'BOOLEAN', 'ENUM', 'TEXT']),
+    unit: z.string().max(20).nullable(),
+    lateralized: z.boolean(),
+    value: valueSchema,
+    side: z.enum(SIDES).nullable(),
+    presentation: z.enum(PRESENTATIONS),
+    quote: z.string().max(QUOTE_MAX),
+    confidence: z.number().min(0).max(1),
+    reasons: z.array(z.enum(REASONS)).min(1).max(REASONS.length),
+    existingValue: valueSchema.optional(),
   });
 
   return z.object({
@@ -163,6 +188,15 @@ function buildDocumentSchema(fieldsByKey) {
     // Borne large : JSON.stringify peut porter un caractère de la valeur à 6 (\uXXXX), et une entrée
     // refusée bloquerait tous les autosaves du bilan.
     proseBasis: z.array(z.string().max(6 * TEXT_VALUE_MAX + 300)).max(MEASUREMENTS_MAX).optional(),
+    // Vérification des mesures (spec 2026-09-26 §5) : empreinte des notes analysées, lignes à
+    // vérifier non tranchées, lignes retirées par le kiné. Déclarée ici sans quoi Zod la retirerait
+    // à chaque autosave.
+    review: z.object({
+      notesHash: z.string().regex(/^[0-9a-f]{64}$/),
+      extractedAt: z.string().max(40),
+      pending: z.array(pendingSchema).max(PENDING_MAX),
+      dismissed: z.array(z.object({ id: z.string().max(300), quote: z.string().max(QUOTE_MAX) })).max(MEASUREMENTS_MAX),
+    }).optional(),
   });
 }
 
@@ -197,6 +231,7 @@ module.exports = {
   PRESENTATIONS,
   ORIGINS,
   MEASUREMENTS_MAX,
+  QUOTE_MAX,
   emptyDocument,
   normalizeLabel,
   proseSignatures,
