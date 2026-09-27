@@ -11,7 +11,7 @@ const { getCatalog } = require('./bilanRenderService');
 const { normalizeLabel, validateDocument, MEASUREMENTS_MAX, QUOTE_MAX } = require('./bilanDocument');
 const { DraftError, PATIENT_SELECT, loadIdentity, loadNotesSource } = require('./bilanDraftService');
 const { createPseudonymizer } = require('./pseudonymService');
-const { normalizeText, proofText, nameForms, evidenceReasons, selfCorrectedAfter, quoteContext } = require('./bilanEvidence');
+const { normalizeText, proofText, nameForms, evidenceReasons, selfCorrectedAfter } = require('./bilanEvidence');
 
 const CANDIDATES_MAX = 100;
 const LABEL_MAX = 200;
@@ -281,9 +281,7 @@ function normalize({ candidates, notes, catalog, document }) {
         if (value === undefined) { rejected += 1; continue; }
         const side = field.lateralized && (raw.side === 'D' || raw.side === 'G') ? raw.side : null; // règle 6
         // Spec 2026-09-26 §2 : nom, valeur et côté confrontés à la citation
-        // Levier 2 : le nom peut se compléter et le côté se lire dans la phrase de la citation
-        const context = quoteContext(notesProof, quote);
-        const reasons = evidenceReasons({ quote, forms: formsOf(field), fieldType: field.type, value, side, lateralized: !!field.lateralized, confidence: raw.confidence, context });
+        const reasons = evidenceReasons({ quote, forms: formsOf(field), fieldType: field.type, value, side, lateralized: !!field.lateralized, confidence: raw.confidence });
         if (outOfRange) reasons.push('out_of_range');
         c = {
           kind: 'canonical', key: field.key, label: field.label, fieldType: field.type, unit: field.unit ?? null, lateralized: !!field.lateralized,

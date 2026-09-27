@@ -142,107 +142,13 @@ const POS_RE = /(?<![a-z0-9])(?:positif|positive|positifs|positives|pos|present|
 const DOUBT_RE = /\?|(?<![a-z0-9])(?:douteux|douteuse|equivoque)(?![a-z0-9])/;
 // Puce en tête de proposition (« - Hawkins D ») : de la mise en forme, pas une négation
 const BULLET_RE = /^\s*[-−]\s*(?=[a-z])/;
-// requireMarker : nom ou côté pris dans la phrase (levier 2) → le positif par défaut ne vaut plus,
-// un marqueur explicite est exigé
-function booleanReason(text, at, proposed, requireMarker = false) {
+function booleanReason(text, at, proposed) {
   const { start, end } = clauseAround(text, at);
   const clause = text.slice(start, end).replace(BULLET_RE, '');
   if (DOUBT_RE.test(clause)) return 'result_uncertain';
   const neg = NEG_RE.test(clause);
-  const pos = POS_RE.test(clause);
-  if (neg && pos) return 'result_uncertain';
-  if (requireMarker && !neg && !pos) return 'result_uncertain';
+  if (neg && POS_RE.test(clause)) return 'result_uncertain';
   return proposed === !neg ? null : 'result_contradicted';
-}
-
-// --- Levier 2 (arbitrage du 27 sept.) : nom et côté lus dans la phrase de la citation ---
-
-// Phrase de la citation dans les notes : bornée par « . » suivi d'un espace, « ; » (le saut de
-// ligne en est devenu un), « ! », « ? » — pas la virgule — et à 100 caractères de part et d'autre
-// (les transcriptions n'ont pas de ponctuation)
-const WINDOW_SPAN = 100;
-const SENTENCE_END_RE = /\.(?=\s|$)|[;!?]/g;
-const isWordChar = (c) => /[a-z0-9]/.test(c || '');
-
-/**
- * Fenêtre de la citation dans les notes, en texte de preuve. null si la citation est introuvable
- * ou présente plusieurs fois (quelle phrase lire ? on ne devine pas).
- * @param {string} notesProof notes passées par proofText
- * @returns {{ text: string, start: number } | null} start = position de la citation dans text
- */
-function quoteContext(notesProof, quote) {
-  const q = proofText(quote);
-  if (!q) return null;
-  const at = notesProof.indexOf(q);
-  if (at === -1 || notesProof.indexOf(q, at + 1) !== -1) return null;
-  const qEnd = at + q.length;
-  let start = Math.max(0, at - WINDOW_SPAN);
-  let end = Math.min(notesProof.length, qEnd + WINDOW_SPAN);
-  for (const m of notesProof.matchAll(SENTENCE_END_RE)) {
-    if (m.index < at) start = Math.max(start, m.index + 1);
-    else if (m.index >= qEnd) { end = Math.min(end, m.index); break; }
-  }
-  // Borne tombée au milieu d'un mot : le fragment est retiré
-  while (start < at && isWordChar(notesProof[start - 1]) && isWordChar(notesProof[start])) start += 1;
-  while (end > qEnd && isWordChar(notesProof[end]) && isWordChar(notesProof[end - 1])) end -= 1;
-  const lead = notesProof.slice(start, at).match(/^\s*/)[0].length;
-  return { text: notesProof.slice(start + lead, end).trimEnd(), start: at - start - lead };
-}
-
-// Valeur écrite : chiffres ou mot-nombre (« un / une », surtout des déterminants, n'en sont pas)
-const VALUE_WORD_RE = new RegExp(NUMBER_WORD_RE.source.replace('un|une|', ''));
-const hasValue = (s) => /\d/.test(s) || VALUE_WORD_RE.test(s);
-const lastEnd = (s, token) => {
-  let end = -1;
-  const re = new RegExp(wordRe(token).source, 'g');
-  let m;
-  while ((m = re.exec(s)) !== null) end = m.index + m[0].length;
-  return end;
-};
-
-/**
- * Nom complété par la phrase : un mot d'une forme dans la proposition d'ancrage (bornée à la
- * citation), tous les autres écrits AVANT elle dans la fenêtre, jamais après. Garde : aucune
- * autre valeur entre ces mots et l'ancrage (« Genou D : flexion 95°, hanche : flexion 100° » ne
- * complète pas la flexion de genou pour 100°), sauf liste qui reprend le nom par sa valeur
- * (« EVA 4 repos, 7 effort » : l'ancrage commence par la valeur, les mots sont dans la
- * proposition juste avant).
- */
-function nameByWindow(win, off, text, forms, clause) {
-  const anchor = text.slice(clause.start, clause.end);
-  const before = win.slice(0, off + clause.start);
-  const continuation = new RegExp(`^\\s*(?:\\d|${VALUE_WORD_RE.source})`).test(anchor);
-  for (const f of forms) {
-    const tokens = f.split(' ').filter((t) => !STOPWORDS.has(t));
-    if (tokens.length < 2) continue;
-    const rest = tokens.filter((t) => !wordRe(t).test(anchor));
-    if (!rest.length || rest.length === tokens.length) continue;
-    const ends = rest.map((t) => lastEnd(before, t));
-    if (ends.some((e) => e < 0)) continue;
-    const gap = before.slice(Math.min(...ends));
-    if (!hasValue(gap)) return true;
-    if (continuation && !clauses(gap.replace(/[;,.]\s*$/, '')).slice(1).length) return true;
-  }
-  return false;
-}
-
-// Côté pris dans la phrase quand la citation n'en porte aucun : marqueur qui suit immédiatement
-// la citation (espaces, « à »), ou en-tête « X D : » avant elle sans autre valeur entre les deux.
-// Les deux présents et différents → aucun.
-const SIDE_AFTER_RE = new RegExp(`^\\s*(?:a\\s+)?${SIDE_RE.source}`);
-const sideOf = (m) => (m[1] ? 'DG' : m[2] ? 'D' : 'G');
-function windowSide(win, off, len) {
-  const after = SIDE_AFTER_RE.exec(win.slice(off + len));
-  const before = win.slice(0, off);
-  let heading = null;
-  const re = new RegExp(SIDE_RE.source, 'g');
-  let m;
-  while ((m = re.exec(before)) !== null) {
-    const rest = before.slice(m.index + m[0].length);
-    if (/^\s*:/.test(rest) && !hasValue(rest)) heading = sideOf(m);
-  }
-  const found = [after && sideOf(after), heading].filter(Boolean);
-  return found.length && found.every((s) => s === found[0]) ? found[0] : null;
 }
 
 // Option d'un champ à choix : telle quelle, ou (options en mots « Propre / fermée ») un de ses mots
@@ -256,40 +162,23 @@ function enumProven(text, option) {
 
 /**
  * Raisons pour lesquelles un candidat ne peut pas être rempli d'office. Liste vide = prouvé.
- * `context` (quoteContext) : la phrase des notes autour de la citation. Le nom peut s'y compléter
- * et le côté s'y lire ; la valeur et le résultat se lisent toujours dans la citation.
- * @param {{ quote: string, forms: string[], fieldType: 'NUMERIC'|'BOOLEAN'|'ENUM'|'TEXT', value: any, side: 'D'|'G'|null, lateralized: boolean, confidence: number, context?: { text: string, start: number } | null }} c
+ * @param {{ quote: string, forms: string[], fieldType: 'NUMERIC'|'BOOLEAN'|'ENUM'|'TEXT', value: any, side: 'D'|'G'|null, lateralized: boolean, confidence: number }} c
  * @returns {string[]} sous-ensemble ordonné de REASONS
  */
-function evidenceReasons({ quote, forms, fieldType, value, side, lateralized, confidence, context }) {
+function evidenceReasons({ quote, forms, fieldType, value, side, lateralized, confidence }) {
   const text = proofText(quote);
   const reasons = [];
   const name = findName(text, forms);
-  // Sans contexte, la « phrase » est la citation elle-même (citation sur deux propositions)
-  const win = context ? context.text : text;
-  const off = context ? context.start : 0;
-  const values = fieldType === 'NUMERIC' && typeof value === 'number' ? numberPositions(text, value) : [];
-  // Proposition d'ancrage d'un nom complété : celle de la valeur pour un chiffré, sinon la
-  // première proposition de la citation qui porte un mot du nom
-  let anchor = null;
-  if (!name) {
-    const candidates = fieldType === 'NUMERIC' ? values.map((p) => ({ ...clauseAround(text, p), at: p })) : clauses(text);
-    anchor = candidates.find((c) => nameByWindow(win, off, text, forms, c)) || null;
-  }
-  if (!name && !anchor) reasons.push('name_absent');
-  // Citation sans aucun côté écrit : la phrase peut le porter (levier 2)
-  const sideFromWindow = lateralized && !!context && !sideMarkers(text).length;
+  if (!name) reasons.push('name_absent');
   // Un chiffré peut porter sa valeur des deux côtés (« D 140°, G 140° ») : une occurrence écrite
   // du côté proposé suffit
   let sideAnchors = [name ? name.end : 0];
   if (fieldType === 'NUMERIC') {
-    const at = anchor ? [anchor.at] : typeof value === 'number' ? numberAnchors(text, value, name) : [];
+    const at = typeof value === 'number' ? numberAnchors(text, value, name) : [];
     if (!at.length) reasons.push('value_absent');
     else sideAnchors = at;
   } else if (fieldType === 'BOOLEAN') {
-    // Nom complété ou côté lu hors de la citation : elle est incomplète, le positif par défaut
-    // ne vaut plus (« Hawkins » cité dans « Hawkins D - »)
-    const r = anchor ? booleanReason(text, anchor.start, value === true, true) : booleanReason(text, name ? name.start : 0, value === true, sideFromWindow);
+    const r = booleanReason(text, name ? name.start : 0, value === true);
     if (r) reasons.push(r);
   } else if (fieldType === 'ENUM') {
     if (!enumProven(text, String(value ?? ''))) reasons.push('value_absent');
@@ -298,9 +187,7 @@ function evidenceReasons({ quote, forms, fieldType, value, side, lateralized, co
     if (!v || !text.includes(v)) reasons.push('value_absent');
   }
   if (lateralized) {
-    const found = sideFromWindow
-      ? [windowSide(win, off, text.length)].filter(Boolean)
-      : sideAnchors.map((a) => sideAt(text, a)).filter((f) => f !== null);
+    const found = sideAnchors.map((a) => sideAt(text, a)).filter((f) => f !== null);
     if (!found.length || side === null) reasons.push('side_absent');
     else if (!found.some((f) => f === 'DG' || f === side)) reasons.push('side_contradicted');
   }
@@ -329,4 +216,4 @@ function selfCorrectedAfter(notesProof, quote) {
   return false;
 }
 
-module.exports = { REASONS, LOW_CONFIDENCE, normalizeText, proofText, nameForms, findName, evidenceReasons, selfCorrectedAfter, quoteContext };
+module.exports = { REASONS, LOW_CONFIDENCE, normalizeText, proofText, nameForms, findName, evidenceReasons, selfCorrectedAfter };
