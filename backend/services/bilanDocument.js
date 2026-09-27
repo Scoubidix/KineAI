@@ -196,6 +196,7 @@ module.exports = {
   SIDES,
   PRESENTATIONS,
   ORIGINS,
+  MEASUREMENTS_MAX,
   emptyDocument,
   normalizeLabel,
   proseSignatures,

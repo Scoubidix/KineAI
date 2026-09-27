@@ -2,14 +2,16 @@
 // Le modèle propose des candidats CITÉS ; ce service les normalise de façon déterministe.
 // Rien n'est écrit dans le document : le kiné valide à l'étape Vérification.
 const { z } = require('zod');
+const crypto = require('crypto');
 const prismaService = require('./prismaService');
 const logger = require('../utils/logger');
 const { logMasked } = require('../utils/pseudonymDebug');
 const llmService = require('./llmService');
 const { getCatalog } = require('./bilanRenderService');
-const { normalizeLabel } = require('./bilanDocument');
+const { normalizeLabel, MEASUREMENTS_MAX } = require('./bilanDocument');
 const { DraftError, loadIdentity } = require('./bilanDraftService');
 const { createPseudonymizer } = require('./pseudonymService');
+const { normalizeText, proofText, nameForms, evidenceReasons } = require('./bilanEvidence');
 
 const QUOTE_MAX = 300;
 const CANDIDATES_MAX = 100;
@@ -20,11 +22,6 @@ const TEXT_MAX = 500;
 // et structurer du texte libre en cases texte est la première source d'erreurs de classement.
 const EXTRACTION_EXCLUDED_CATEGORIES = ['Anamnèse'];
 const isExtractable = (f) => f.isActive !== false && !EXTRACTION_EXCLUDED_CATEGORIES.includes(f.category);
-
-// Texte comparable : sans diacritiques, minuscules, espaces normalisés
-function normalizeText(s) {
-  return String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
-}
 
 // Statut d'assertion « non évalué » (famille NegEx/ConText) : une citation qui dit qu'un test n'a
 // pas été fait ne porte aucune valeur, quel que soit le champ.
@@ -94,6 +91,10 @@ Règles absolues :
 - Chaque champ porte une "category" (région ou domaine). Quand plusieurs champs ont des libellés proches (rotation externe de hanche / RE1 d'épaule), choisis d'après la région dont parle le contexte immédiat ; en cas de doute, confiance 0.5. Lis la "description" quand elle existe : elle fixe la convention (signe, unité, périmètre).
 - Ignore tout ce qui n'est ni un test ni une mesure du catalogue. L'anamnèse (profession, antécédents, traitements, examens, objectifs) n'est pas à extraire : elle est rédigée à part.`;
 
+// Séance enregistrée (spec 2026-09-26 §4.2) : le texte est un dialogue, une intention ou une
+// hypothèse dite à voix haute y a l'air d'un résultat
+const EXTRACTION_DIALOGUE_RULE = 'Les notes sont la transcription d’un dialogue entre le kinésithérapeute et son patient. Ne retiens que les résultats que le kiné constate ou mesure pendant la séance : une intention (« on va tester… »), une hypothèse, une question ou un souvenir du patient n’est pas un résultat.';
+
 // Schéma strict (OpenAI) : tous les champs requis, nullables quand optionnels
 const EXTRACTION_JSON_SCHEMA = {
   name: 'bilan_extraction',
@@ -148,9 +149,10 @@ function parseExtractionOutput(content) {
   return result.data;
 }
 
-function buildExtractionMessages({ rawNotes, motif, compactCatalog }) {
+function buildExtractionMessages({ rawNotes, motif, compactCatalog, source = 'notes' }) {
+  const system = source === 'dialogue' ? `${SYSTEM_PROMPT}\n- ${EXTRACTION_DIALOGUE_RULE}` : SYSTEM_PROMPT;
   return [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: system },
     { role: 'user', content: `Catalogue (JSON) :\n${JSON.stringify(compactCatalog)}\n\nMotif : ${motif || '(aucun)'}\n\nNotes :\n"""\n${rawNotes}\n"""` },
   ];
 }
@@ -231,6 +233,11 @@ function normalize({ candidates, notes, catalog, document }) {
   const notesNorm = normalizeText(notes);
   const existing = new Map((document?.measurements || []).map((m) => [identityOf(m), m]));
   const kept = new Map();
+  const formsCache = new Map();
+  const formsOf = (field) => {
+    if (!formsCache.has(field.key)) formsCache.set(field.key, nameForms(field));
+    return formsCache.get(field.key);
+  };
   let rejected = 0;
 
   for (const raw of candidates.flatMap(expandBilateral)) {
@@ -248,17 +255,21 @@ function normalize({ candidates, notes, catalog, document }) {
     let c;
     if (field) {
       let value;
-      let warning;
+      let outOfRange = false;
       switch (field.type) {
         case 'NUMERIC': { // règle 3
           value = toNumber(raw.value);
           // Règle 3b : la citation doit prouver le nombre, sinon on garde l'information en texte
           if (value === undefined || !quoteSupportsNumber(quote, value)) {
-            c = { kind: 'custom', label: field.label, fieldType: 'TEXT', unit: null, lateralized: false, value: quote.slice(0, TEXT_MAX), side: null, presentation: 'narrative', quote, confidence: raw.confidence };
+            const text = quote.slice(0, TEXT_MAX);
+            c = {
+              kind: 'custom', label: field.label, fieldType: 'TEXT', unit: null, lateralized: false, value: text, side: null, presentation: 'narrative', quote, confidence: raw.confidence,
+              reasons: evidenceReasons({ quote, forms: formsOf(field), fieldType: 'TEXT', value: text, side: null, lateralized: false, confidence: raw.confidence }),
+            };
             value = undefined;
             break;
           }
-          if ((field.rangeMin != null && value < field.rangeMin) || (field.rangeMax != null && value > field.rangeMax)) warning = 'out_of_range';
+          outOfRange = (field.rangeMin != null && value < field.rangeMin) || (field.rangeMax != null && value > field.rangeMax);
           break;
         }
         case 'BOOLEAN': value = toBoolean(raw.value); break; // règle 5
@@ -268,13 +279,15 @@ function normalize({ candidates, notes, catalog, document }) {
       }
       if (!c) {
         if (value === undefined) { rejected += 1; continue; }
+        const side = field.lateralized && (raw.side === 'D' || raw.side === 'G') ? raw.side : null; // règle 6
+        // Spec 2026-09-26 §2 : nom, valeur et côté confrontés à la citation
+        const reasons = evidenceReasons({ quote, forms: formsOf(field), fieldType: field.type, value, side, lateralized: !!field.lateralized, confidence: raw.confidence });
+        if (outOfRange) reasons.push('out_of_range');
         c = {
           kind: 'canonical', key: field.key, label: field.label, fieldType: field.type, unit: field.unit ?? null, lateralized: !!field.lateralized,
-          value,
-          side: field.lateralized && (raw.side === 'D' || raw.side === 'G') ? raw.side : null, // règle 6
+          value, side,
           presentation: field.presentation === 'NARRATIVE' ? 'narrative' : 'table',
-          quote, confidence: raw.confidence,
-          ...(warning ? { warning } : {}),
+          quote, confidence: raw.confidence, reasons,
         };
       }
     } else {
@@ -282,13 +295,16 @@ function normalize({ candidates, notes, catalog, document }) {
       const label = String(raw.label || humanizeKey(raw.key)).trim();
       const value = toText(raw.value);
       if (!label || label.length > LABEL_MAX || value === undefined) { rejected += 1; continue; }
-      c = { kind: 'custom', label, fieldType: 'TEXT', unit: null, lateralized: false, value, side: null, presentation: 'table', quote, confidence: raw.confidence };
+      c = {
+        kind: 'custom', label, fieldType: 'TEXT', unit: null, lateralized: false, value, side: null, presentation: 'table', quote, confidence: raw.confidence,
+        reasons: evidenceReasons({ quote, forms: nameForms({ key: '', label, aliases: [] }), fieldType: 'TEXT', value, side: null, lateralized: false, confidence: raw.confidence }),
+      };
     }
 
-    // Règle 7 : doublons → confiance la plus haute
+    // Règle 7 : doublons → la version la mieux prouvée, puis la plus confiante
     const id = identityOf(c);
     const prev = kept.get(id);
-    if (prev && prev.confidence >= c.confidence) continue;
+    if (prev && (prev.reasons.length < c.reasons.length || (prev.reasons.length === c.reasons.length && prev.confidence >= c.confidence))) continue;
     kept.set(id, { ...c, id });
   }
 
@@ -298,39 +314,50 @@ function normalize({ candidates, notes, catalog, document }) {
     const cur = existing.get(c.id);
     if (cur && isFilled(cur.value)) {
       if (sameValue(cur.value, c.value)) continue; // déjà saisi
-      out.push({ ...c, status: 'conflict', existingValue: cur.value });
+      out.push({ ...c, reasons: [...c.reasons, 'conflict'], existingValue: cur.value });
     } else {
-      out.push({ ...c, status: 'new' });
+      out.push(c);
     }
   }
   return { candidates: out, rejected };
 }
 
 /**
- * Acceptation automatique (spec flux deux étapes §5.2 étape 3). Pure : ne mute pas `document`.
- * Un candidat `new` sans avertissement entre au document : il remplit la ligne vide de même
- * identité (présentation de la ligne conservée) ou s'ajoute en fin de liste. `conflict` et
- * `out_of_range` restent en suspens, pour le tiroir du front.
- * @returns {{ document: object, accepted: {id: string, quote: string}[], pending: object[] }}
+ * Empreinte des notes analysées : notes inchangées → pas de nouvelle analyse (spec 2026-09-26 §5).
+ * Le motif n'y entre pas : la rédaction en déduit un, qui relancerait sinon une extraction inutile.
  */
-function applyCandidates(document, candidates) {
+function notesHash(rawNotes) {
+  return crypto.createHash('sha256').update(String(rawNotes ?? '').trim()).digest('hex');
+}
+
+/**
+ * Écrit les candidats prouvés dans le tableau et garde les autres pour l'étape Mesures (spec
+ * 2026-09-26 §4.3). Les sections ne sont jamais touchées : rien n'atteint la prose avant que le
+ * kiné ait relu le tableau. Une ligne retirée par le kiné (même identité, même citation) n'est ni
+ * réécrite ni reproposée. Pure : ne mute pas `document`.
+ * @returns {{ document: object, filled: number, pending: number }}
+ */
+function applyExtraction(document, candidates, { notesHash: hash, extractedAt }) {
+  const dismissed = document.review?.dismissed || [];
+  const dismissedKeys = new Set(dismissed.map((d) => `${d.id}|${proofText(d.quote)}`));
   const measurements = [...(document.measurements || [])];
-  const accepted = [];
   const pending = [];
+  let filled = 0;
   for (const c of candidates) {
-    if (c.status !== 'new' || c.warning) { pending.push(c); continue; }
+    if (dismissedKeys.has(`${c.id}|${proofText(c.quote)}`)) continue;
+    if (c.reasons.length > 0) { pending.push(c); continue; }
     const idx = measurements.findIndex((m) => identityOf(m) === c.id);
-    if (idx === -1) {
-      measurements.push(c.kind === 'canonical'
-        ? { kind: 'canonical', key: c.key, value: c.value, ...(c.side ? { side: c.side } : {}), presentation: c.presentation, origin: 'extracted' }
-        : { kind: 'custom', label: c.label, value: String(c.value), presentation: c.presentation, origin: 'extracted' });
-    } else {
-      const row = measurements[idx];
-      measurements[idx] = { ...row, value: row.kind === 'custom' ? String(c.value) : c.value, origin: 'extracted' };
-    }
-    accepted.push({ id: c.id, quote: c.quote });
+    // Tableau plein (le schéma borne à 200 lignes) : la ligne n'est pas écrite plutôt que de
+    // bloquer tous les autosaves du bilan
+    if (idx === -1 && measurements.length >= MEASUREMENTS_MAX) continue;
+    const row = c.kind === 'canonical'
+      ? { kind: 'canonical', key: c.key, value: c.value, ...(c.side ? { side: c.side } : {}), presentation: c.presentation, origin: 'extracted', quote: c.quote }
+      : { kind: 'custom', label: c.label, value: String(c.value), presentation: c.presentation, origin: 'extracted', quote: c.quote };
+    if (idx === -1) measurements.push(row);
+    else measurements[idx] = { ...measurements[idx], value: row.value, origin: 'extracted', quote: c.quote };
+    filled += 1;
   }
-  return { document: { ...document, measurements }, accepted, pending };
+  return { document: { ...document, measurements, review: { notesHash: hash, extractedAt, pending, dismissed } }, filled, pending: pending.length };
 }
 
 // Un JSON malformé peut contenir un extrait des notes (données de santé) dans le message
@@ -347,11 +374,11 @@ async function callExtraction(messages) {
  * Pipeline complet sans accès base : prompt, appel modèle (un retry), normalisation.
  * Utilisé par extractForBilan et par le jeu d'évaluation (backend/eval/extraction).
  */
-async function extractFromText({ rawNotes, motif, catalog, document, logContext = 'texte', pseudo }) {
+async function extractFromText({ rawNotes, motif, catalog, document, logContext = 'texte', pseudo, source = 'notes' }) {
   const notes = pseudo ? pseudo.mask(rawNotes) : rawNotes;
   const m = pseudo ? pseudo.mask(motif || '') : motif;
   logMasked(`extraction (${logContext})`, `Motif : ${m || '(aucun)'}\n${notes}`, pseudo);
-  const messages = buildExtractionMessages({ rawNotes: notes, motif: m, compactCatalog: buildCompactCatalog(catalog) });
+  const messages = buildExtractionMessages({ rawNotes: notes, motif: m, compactCatalog: buildCompactCatalog(catalog), source });
   let output;
   try {
     output = await callExtraction(messages);
@@ -397,11 +424,13 @@ module.exports = {
   parseExtractionOutput,
   parseJsonOutput,
   normalize,
-  applyCandidates,
+  applyExtraction,
+  notesHash,
   extractFromText,
   extractForBilan,
   EXTRACTION_JSON_SCHEMA,
   EXTRACTION_EXCLUDED_CATEGORIES,
+  EXTRACTION_DIALOGUE_RULE,
   isNotAssessed,
   quoteSupportsNumber,
   identityOf,
