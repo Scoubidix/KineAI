@@ -61,8 +61,7 @@
       "test_yergason:G=false",
       "eva_nuit=6",
       "douleur_nocturne=true",
-      "rotation_interne_main_dos:G=~l1",
-      "irradiations=~irradiation"
+      "rotation_interne_main_dos:G=~l1"
     ],
     "forbid": [
       "profession_activites"
@@ -92,9 +91,7 @@
       "inclinaison_cervicale_gauche=40",
       "endurance_flechisseurs_profonds=18",
       "paresthesies=true",
-      "troubles_sphincteriens=false",
-      "irradiations=~pouce",
-      "reflexes_osteotendineux=~bicipital"
+      "troubles_sphincteriens=false"
     ],
     "forbid": [],
     "forbidValues": [],
@@ -140,9 +137,7 @@
       "tinetti_score=19",
       "test_6_minutes_marche=240",
       "appui_monopodal_secondes:D=4",
-      "appui_monopodal_secondes:G=3",
-      "montee_descente_escaliers=~marche par marche",
-      "aides_techniques=~deambulateur"
+      "appui_monopodal_secondes:G=3"
     ],
     "forbid": [
       "date_lesion_chirurgie"
