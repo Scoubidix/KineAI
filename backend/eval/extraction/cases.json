@@ -391,5 +391,41 @@
     "customContains": [],
     "identity": { "firstName": "Paul", "lastName": "Renaud", "birthDate": "1965-01-30" },
     "mustNotReachModel": []
+  },
+  {
+    "id": "trap-05",
+    "title": "piège : même valeur répétée, deux côtés",
+    "motif": null,
+    "notes": "Épaule. Flexion épaule G 90°, abduction épaule D 90°. RE1 D 40°, G 40°.",
+    "expect": ["flexion_epaule:G=90", "abduction_epaule:D=90", "rotation_externe_1:D=40", "rotation_externe_1:G=40"],
+    "forbid": [],
+    "forbidValues": [],
+    "customContains": [],
+    "identity": { "firstName": "Nadia", "lastName": "Lemoine", "birthDate": "1983-05-19" },
+    "mustNotReachModel": []
+  },
+  {
+    "id": "trap-06",
+    "title": "piège : saut de ligne entre deux propositions",
+    "motif": null,
+    "notes": "Pas de douleur nocturne\nBoiterie à la marche\nPas de signe de la sonnette",
+    "expect": ["douleur_nocturne=false", "boiterie=true", "signe_de_la_sonnette=false"],
+    "forbid": [],
+    "forbidValues": [],
+    "customContains": [],
+    "identity": { "firstName": "Julien", "lastName": "Carrel", "birthDate": "1975-02-07" },
+    "mustNotReachModel": []
+  },
+  {
+    "id": "trap-07",
+    "title": "piège : côté écrit après la valeur (souvent omis par le modèle)",
+    "motif": null,
+    "notes": "Flexion d'épaule 140° côté droit. Hawkins négatif à droite.",
+    "expect": ["flexion_epaule:D=140", "test_hawkins_kennedy:D=false"],
+    "forbid": [],
+    "forbidValues": [],
+    "customContains": [],
+    "identity": { "firstName": "Agathe", "lastName": "Morel", "birthDate": "1990-10-03" },
+    "mustNotReachModel": []
   }
 ]

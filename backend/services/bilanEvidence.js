@@ -11,10 +11,12 @@ function normalizeText(s) {
   return String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-// Texte des preuves : l'élision tombe (« d'épaule » n'est pas un côté droit), parenthèses et
-// apostrophes deviennent des espaces. Les tirets restent : « - » est un résultat négatif.
+// Texte des preuves : un saut de ligne sépare deux propositions (spec §2.2), il devient « ; »
+// avant que normalizeText n'écrase les espaces. L'élision tombe (« d'épaule » n'est pas un côté
+// droit), parenthèses et apostrophes deviennent des espaces. Les tirets restent : « - » est un
+// résultat négatif.
 function proofText(s) {
-  return normalizeText(s).replace(/(?<![a-z0-9])(?:qu|[dljnmst])['’]/g, '').replace(/[()'’]/g, ' ').replace(/\s+/g, ' ').trim();
+  return normalizeText(String(s ?? '').trim().replace(/\s*[\r\n]+\s*/g, ' ; ')).replace(/(?<![a-z0-9])(?:qu|[dljnmst])['’]/g, '').replace(/[()'’]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -76,18 +78,18 @@ function findName(text, forms) {
   return best;
 }
 
-// Position de la valeur chiffrée : ses chiffres, ou à défaut (dictée sans chiffre) un mot-nombre
+// Positions de la valeur chiffrée : ses chiffres, ou à défaut (dictée sans chiffre) un mot-nombre
 const NUMBER_WORD_RE = /(?<![a-z0-9])(?:zero|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante|soixante|cent|cents|mille)(?![a-z0-9])/;
-function numberAnchor(text, value) {
+function numberPositions(text, value) {
   const t = text.replace(/,/g, '.');
   const abs = Math.abs(value);
   for (const f of new Set([String(abs), abs.toFixed(1), String(Math.trunc(abs))])) {
-    const m = new RegExp(`(?<![\\d.])${escapeRe(f)}(?![\\d])`).exec(t);
-    if (m) return m.index;
+    const found = [...t.matchAll(new RegExp(`(?<![\\d.])${escapeRe(f)}(?![\\d])`, 'g'))].map((m) => m.index);
+    if (found.length) return found;
   }
-  if (/\d/.test(t)) return null;
+  if (/\d/.test(t)) return [];
   const w = NUMBER_WORD_RE.exec(t);
-  return w ? w.index : null;
+  return w ? [w.index] : [];
 }
 
 const SIDE_RE = /(?<![a-z0-9])(?:(des deux cotes|deux cotes|ddc|bilateral|bilaterale|bilaterales|bilateraux|d et g|g et d|d\/g|g\/d)|(droite|droites|droit|droits|dte|dt|d)|(gauche|gauches|gche|g))(?![a-z0-9])/g;
@@ -98,6 +100,30 @@ function sideMarkers(text) {
   while ((m = re.exec(text)) !== null) out.push({ index: m.index, side: m[1] ? 'DG' : m[2] ? 'D' : 'G' });
   return out;
 }
+// Portée du nom : de lui à la fin de sa proposition, prolongée des propositions qui commencent
+// par un côté (« Flexion D 140°, G 140° ») ; elle s'arrête au nom suivant (« …, abduction D 90° »)
+const SIDE_START_RE = new RegExp(`^(?:a )?${SIDE_RE.source}`);
+function nameScopeEnd(text, name) {
+  const cs = clauses(text);
+  let i = cs.findIndex((c) => name.start >= c.start && name.start <= c.end);
+  while (i + 1 < cs.length && SIDE_START_RE.test(text.slice(cs[i + 1].start, cs[i + 1].end).trim())) i += 1;
+  return cs[i].end;
+}
+
+/**
+ * Occurrences de la valeur rattachées au nom : celles de sa portée ; à défaut la première après
+ * le nom, puis la première de la citation (valeur écrite avant le nom).
+ */
+function numberAnchors(text, value, name) {
+  const all = numberPositions(text, value);
+  if (!name) return all.slice(0, 1);
+  const after = all.filter((p) => p >= name.start);
+  const end = nameScopeEnd(text, name);
+  const scoped = after.filter((p) => p < end);
+  if (scoped.length) return scoped;
+  return (after.length ? after : all).slice(0, 1);
+}
+
 // Côté écrit pour la valeur : le marqueur le plus proche avant elle dans sa proposition, sinon le
 // premier après elle dans la même proposition
 function sideAt(text, anchor) {
@@ -114,9 +140,11 @@ function sideAt(text, anchor) {
 const NEG_RE = /(?<![a-z0-9])(?:negatif|negative|negatifs|negatives|neg|absent|absente|absents|absentes|absence|aucun|aucune|non|pas|sans)(?![a-z0-9])|(?:^|[\s:=/])[-−](?=$|[\s),;.:/])|(?<=[a-z0-9])[-−](?=$|[\s),;.:/])/;
 const POS_RE = /(?<![a-z0-9])(?:positif|positive|positifs|positives|pos|present|presente|presents|presentes)(?![a-z0-9])|\+/;
 const DOUBT_RE = /\?|(?<![a-z0-9])(?:douteux|douteuse|equivoque)(?![a-z0-9])/;
+// Puce en tête de proposition (« - Hawkins D ») : de la mise en forme, pas une négation
+const BULLET_RE = /^\s*[-−]\s*(?=[a-z])/;
 function booleanReason(text, at, proposed) {
   const { start, end } = clauseAround(text, at);
-  const clause = text.slice(start, end);
+  const clause = text.slice(start, end).replace(BULLET_RE, '');
   if (DOUBT_RE.test(clause)) return 'result_uncertain';
   const neg = NEG_RE.test(clause);
   if (neg && POS_RE.test(clause)) return 'result_uncertain';
@@ -142,11 +170,13 @@ function evidenceReasons({ quote, forms, fieldType, value, side, lateralized, co
   const reasons = [];
   const name = findName(text, forms);
   if (!name) reasons.push('name_absent');
-  let sideAnchor = name ? name.end : 0;
+  // Un chiffré peut porter sa valeur des deux côtés (« D 140°, G 140° ») : une occurrence écrite
+  // du côté proposé suffit
+  let sideAnchors = [name ? name.end : 0];
   if (fieldType === 'NUMERIC') {
-    const at = typeof value === 'number' ? numberAnchor(text, value) : null;
-    if (at === null) reasons.push('value_absent');
-    else sideAnchor = at;
+    const at = typeof value === 'number' ? numberAnchors(text, value, name) : [];
+    if (!at.length) reasons.push('value_absent');
+    else sideAnchors = at;
   } else if (fieldType === 'BOOLEAN') {
     const r = booleanReason(text, name ? name.start : 0, value === true);
     if (r) reasons.push(r);
@@ -157,9 +187,9 @@ function evidenceReasons({ quote, forms, fieldType, value, side, lateralized, co
     if (!v || !text.includes(v)) reasons.push('value_absent');
   }
   if (lateralized) {
-    const found = sideAt(text, sideAnchor);
-    if (found === null || side === null) reasons.push('side_absent');
-    else if (found !== 'DG' && found !== side) reasons.push('side_contradicted');
+    const found = sideAnchors.map((a) => sideAt(text, a)).filter((f) => f !== null);
+    if (!found.length || side === null) reasons.push('side_absent');
+    else if (!found.some((f) => f === 'DG' || f === side)) reasons.push('side_contradicted');
   }
   if (typeof confidence === 'number' && confidence < LOW_CONFIDENCE) reasons.push('low_confidence');
   return reasons;
