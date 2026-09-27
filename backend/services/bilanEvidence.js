@@ -195,4 +195,25 @@ function evidenceReasons({ quote, forms, fieldType, value, side, lateralized, co
   return reasons;
 }
 
-module.exports = { REASONS, LOW_CONFIDENCE, normalizeText, proofText, nameForms, findName, evidenceReasons };
+// Auto-correction dite à voix haute (« euh non pardon je m'embrouille ») : ce qui la précède a
+// peut-être été démenti. Formes du texte de preuve (sans accent, élision tombée : « je m'embrouille »
+// → « je embrouille »). « non », « pardon », « plutôt », « correction » seuls sont trop fréquents.
+const SELF_CORRECTION_RE = /(?<![a-z0-9])(?:non pardon|euh non|pardon non|je me suis trompee?|je me trompe|je m? ?embrouille|c est l? ?inverse|je rectifie|rectification)(?![a-z0-9])/;
+const SELF_CORRECTION_SPAN = 300;
+
+/**
+ * Une marque d'auto-correction suit-elle la citation dans les notes (300 caractères) ? Toute
+ * occurrence de la citation compte : doute en plus, jamais de preuve en plus.
+ * @param {string} notesProof notes passées par proofText
+ */
+function selfCorrectedAfter(notesProof, quote) {
+  const q = proofText(quote);
+  if (!q) return false;
+  for (let i = notesProof.indexOf(q); i !== -1; i = notesProof.indexOf(q, i + 1)) {
+    const end = i + q.length;
+    if (SELF_CORRECTION_RE.test(notesProof.slice(end, end + SELF_CORRECTION_SPAN))) return true;
+  }
+  return false;
+}
+
+module.exports = { REASONS, LOW_CONFIDENCE, normalizeText, proofText, nameForms, findName, evidenceReasons, selfCorrectedAfter };

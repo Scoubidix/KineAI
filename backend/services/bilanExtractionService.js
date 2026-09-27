@@ -11,7 +11,7 @@ const { getCatalog } = require('./bilanRenderService');
 const { normalizeLabel, validateDocument, MEASUREMENTS_MAX, QUOTE_MAX } = require('./bilanDocument');
 const { DraftError, PATIENT_SELECT, loadIdentity, loadNotesSource } = require('./bilanDraftService');
 const { createPseudonymizer } = require('./pseudonymService');
-const { normalizeText, proofText, nameForms, evidenceReasons } = require('./bilanEvidence');
+const { normalizeText, proofText, nameForms, evidenceReasons, selfCorrectedAfter } = require('./bilanEvidence');
 
 const CANDIDATES_MAX = 100;
 const LABEL_MAX = 200;
@@ -78,7 +78,7 @@ function buildCompactCatalog(catalog) {
 const SYSTEM_PROMPT = `Tu es un assistant d'extraction pour kinésithérapeutes. On te donne les notes brutes d'un bilan et un catalogue de champs (tests et mesures). Tu renvoies uniquement un objet JSON {"candidates":[...]}.
 Règles absolues :
 - Ne retiens que ce qui est ÉCRIT EXPLICITEMENT dans les notes. N'infère jamais une valeur, ne complète jamais un test non renseigné.
-- Pour chaque candidat, "quote" est l'extrait EXACT des notes (copié tel quel, 3 à 80 caractères) qui contient la valeur.
+- Pour chaque candidat, "quote" est l'extrait EXACT des notes, copié tel quel, qui contient le nom du test ou de la mesure tel qu'il est écrit dans les notes, le côté s'il est écrit, et la valeur — 120 caractères maximum ; s'ils sont éloignés, l'extrait le plus court qui les contient tous.
 - "side" vaut "D" ou "G" uniquement si le côté est écrit (droite, gauche, D, G, dt, gche…), "DG" si les deux côtés sont explicitement mentionnés (« des deux côtés », « bilatéral », « D et G », « ddc »), sinon null.
 - Un test dit « non testé », « non réalisé », « à tester », « NT » n'a pas de valeur : ne le propose pas.
 - Une valeur numérique doit être écrite dans la citation (chiffres ou nombre en lettres). « impossible », « non tenu », « incapable » ne valent pas 0 : propose alors un "custom" avec le texte.
@@ -230,6 +230,7 @@ function normalize({ candidates, notes, catalog, document }) {
   const fieldsByKey = new Map(activeFields.map((f) => [f.key, f]));
   const fieldIndex = buildFieldIndex(activeFields);
   const notesNorm = normalizeText(notes);
+  const notesProof = proofText(notes);
   const existing = new Map((document?.measurements || []).map((m) => [identityOf(m), m]));
   const kept = new Map();
   const formsCache = new Map();
@@ -299,6 +300,9 @@ function normalize({ candidates, notes, catalog, document }) {
         reasons: evidenceReasons({ quote, forms: nameForms({ key: '', label, aliases: [] }), fieldType: 'TEXT', value, side: null, lateralized: false, confidence: raw.confidence }),
       };
     }
+
+    // Auto-correction juste après la citation (« euh non pardon… ») : ce qu'elle affirme est peut-être démenti
+    if (selfCorrectedAfter(notesProof, quote) && !c.reasons.includes('result_uncertain')) c.reasons.push('result_uncertain');
 
     // Règle 7 : doublons → la version la mieux prouvée, puis la plus confiante
     const id = identityOf(c);
