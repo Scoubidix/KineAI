@@ -8,7 +8,7 @@ const logger = require('../utils/logger');
 const { logMasked } = require('../utils/pseudonymDebug');
 const llmService = require('./llmService');
 const { getCatalog } = require('./bilanRenderService');
-const { normalizeLabel, MEASUREMENTS_MAX, QUOTE_MAX } = require('./bilanDocument');
+const { normalizeLabel, validateDocument, MEASUREMENTS_MAX, QUOTE_MAX } = require('./bilanDocument');
 const { DraftError, PATIENT_SELECT, loadIdentity, loadNotesSource } = require('./bilanDraftService');
 const { createPseudonymizer } = require('./pseudonymService');
 const { normalizeText, proofText, nameForms, evidenceReasons } = require('./bilanEvidence');
@@ -369,6 +369,9 @@ async function callExtraction(messages) {
   return parseExtractionOutput(content);
 }
 
+// Bornes du schéma du document (bilanDocument.js) pour une ligne remplie ou à vérifier
+const withinBounds = (c) => c.quote.length <= QUOTE_MAX && c.label.length <= LABEL_MAX && !(typeof c.value === 'string' && c.value.length > TEXT_MAX);
+
 /**
  * Pipeline complet sans accès base : prompt, appel modèle (un retry), normalisation.
  * Utilisé par extractForBilan et par le jeu d'évaluation (backend/eval/extraction).
@@ -391,7 +394,12 @@ async function extractFromText({ rawNotes, motif, catalog, document, logContext 
     }
   }
   const { candidates, rejected } = normalize({ candidates: output.candidates, notes, catalog, document });
-  return { candidates: pseudo ? pseudo.unmaskDeep(candidates) : candidates, rejected };
+  if (!pseudo) return { candidates, rejected };
+  // Les bornes ont été vérifiées sur le texte masqué ; réhydraté (« [NOM] » → le vrai nom), il
+  // s'allonge. Un candidat hors bornes ferait refuser le document et bloquerait tous les autosaves.
+  const unmasked = pseudo.unmaskDeep(candidates);
+  const kept = unmasked.filter(withinBounds);
+  return { candidates: kept, rejected: rejected + unmasked.length - kept.length };
 }
 
 /**
@@ -426,6 +434,12 @@ async function extractForBilan({ kineId, bilanId }) {
   const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId), at: bilan.createdAt });
   const { candidates, rejected } = await extractFromText({ rawNotes: notes, motif: bilan.motif, catalog, document: bilan.document, logContext: `bilan ${bilanId}`, pseudo, source });
   const applied = applyExtraction(bilan.document, candidates, { notesHash: hash, extractedAt: new Date().toISOString() });
+  // Garde : un document que le schéma refuse bloquerait tous les autosaves du bilan, rien n'est écrit
+  const check = validateDocument(applied.document, catalog);
+  if (!check.success) {
+    logger.error(`Extraction bilan ${bilanId} : document refusé par le schéma (${check.errors.length} erreur(s)), rien d’écrit`);
+    throw new DraftError('EXTRACTION_FAILED', 502, 'L’analyse des notes a échoué, réessaie dans un instant');
+  }
 
   let updated;
   try {
