@@ -7,7 +7,6 @@ const logger = require('../utils/logger');
 const asrService = require('./asrService');
 const dictationCorrectionService = require('./dictationCorrectionService');
 const { createPseudonymizer } = require('./pseudonymService');
-const composeService = require('./bilanComposeService');
 const { getCatalog } = require('./bilanRenderService');
 const { DraftError } = require('./bilanDraftService');
 const rules = require('./bilanJobRules');
@@ -282,9 +281,10 @@ async function evaluate(jobId) {
 }
 
 /**
- * Queue du traitement à partir de `stage` (CORRECTING ou COMPOSING). Toute erreur → FAILED avec le
- * code DraftError (INTERNAL_ERROR sinon) ; jamais de texte dans les logs. Chaque écriture est
- * conditionnée au statut attendu : une queue qui a perdu la main se retire sans rien toucher.
+ * Queue du traitement à partir de `stage` : CORRECTING écrit les notes ; COMPOSING n'existe plus
+ * que pour les traitements d'avant le 2026-09-26. Toute erreur → FAILED avec le code DraftError
+ * (INTERNAL_ERROR sinon) ; jamais de texte dans les logs. Chaque écriture est conditionnée au
+ * statut attendu : une queue qui a perdu la main se retire sans rien toucher.
  */
 async function runTail(jobId, stage) {
   runningTails.add(jobId);
@@ -299,52 +299,43 @@ async function runTailInner(jobId, stage) {
   const prisma = prismaService.getInstance();
   const job = await prisma.bilanJob.findUnique({ where: { id: jobId }, include: JOB_INCLUDE });
   if (!job) return;
-  // Vaut aussi pour une reprise en COMPOSING : les notes d'une séance sont le dialogue corrigé
-  const source = job.kind === 'SESSION' ? 'dialogue' : 'notes';
-  // Remplacements appliqués par le correcteur, rendus au client dans le résultat. Vide sur une
-  // reprise en COMPOSING : la correction a déjà eu lieu, ses opérations ne sont plus connues.
-  let corrections = [];
   try {
-    if (stage === 'CORRECTING') {
-      // Un bilan enregistré pendant le traitement ne doit pas être modifié
-      if (job.bilan.status === 'ENREGISTRE') throw new DraftError('ALREADY_FINALIZED', 409, 'Ce bilan est déjà enregistré');
-      const raw = rules.assembleSegments(job.segments);
-      if (!raw) throw new DraftError('NOTES_REQUIRED', 400, 'Rien n’a été entendu');
-      const catalog = await getCatalog();
-      const pseudo = createPseudonymizer({ patient: job.bilan.patient, kine: job.kine });
-      const { text, applied, ignored, motif, changes } = await dictationCorrectionService.correct({ text: raw, mode: job.kind === 'SESSION' ? 'session' : 'dictation', catalog, pseudo });
-      corrections = changes || [];
-      if (source === 'dialogue') logger.info(`Traitement dictée ${jobId} : séance, rédaction depuis le dialogue`);
-      // La transition sert de verrou : une queue qui a perdu la main n'ajoute pas les notes une 2e fois.
-      // Les trois écritures (statut, notes, segments) réussissent ou échouent ensemble.
-      await prisma.$transaction(async (tx) => {
-        const r = await tx.bilanJob.updateMany({ where: { id: jobId, status: 'CORRECTING' }, data: { status: 'COMPOSING' } });
-        if (r.count !== 1) throw new TailLost();
-        // La correction prend du temps : le kiné a pu taper entre-temps, on relit les notes
-        // dans la transaction plutôt que de repartir de celles lues au début de la queue
-        const fresh = await tx.bilanKine.findUnique({ where: { id: job.bilanId }, select: { rawNotes: true } });
-        await tx.bilanKine.update({ where: { id: job.bilanId }, data: { rawNotes: rules.appendNotes(fresh?.rawNotes, text) } });
-        // Le texte vit désormais dans les notes : les copies par segment n'ont plus de raison d'être
-        await tx.bilanJobSegment.updateMany({ where: { jobId }, data: { text: null } });
-        // Motif déduit de la dictée : étiquette de liste et contexte du rédacteur. Jamais par-dessus
-        // celui du kiné — un updateMany qui ne matche rien ne fait simplement rien.
-        if (motif) {
-          await tx.bilanKine.updateMany({ where: { id: job.bilanId, OR: [{ motif: null }, { motif: '' }] }, data: { motif } });
-        }
-      });
-      logger.info(`Traitement dictée ${jobId} : notes écrites (${applied} correction(s), ${ignored} ignorée(s))`);
-    }
-    const r = await composeService.composeFromNotesForBilan({ kineId: job.kineId, bilanId: job.bilanId, uid: job.kine.uid, source });
-    // Ce que le front recevait d'un « Rédiger avec l'IA » direct, gardé pour rouvrir le tiroir « à vérifier »
-    // `corrections` voyage avec le résultat : en séance le kiné ne repasse pas par les notes avant
-    // la rédaction, c'est le seul moyen de savoir plus tard quels termes viennent du correcteur.
-    const result = { accepted: (r.accepted || []).map((a) => ({ id: a.id, quote: a.quote })), pending: r.pending || [], rejected: r.rejected || 0, warnings: r.warnings || {}, corrections };
-    const finished = await prisma.bilanJob.updateMany({ where: { id: jobId, status: 'COMPOSING' }, data: { status: 'DONE', error: null, errorDetail: null, result, finishedAt: new Date() } });
-    if (finished.count !== 1) {
-      logger.warn(`Traitement dictée ${jobId} : une autre queue a repris ce traitement, résultat non écrit`);
+    if (stage === 'COMPOSING') {
+      // Traitement lancé avant le 2026-09-26 : les notes sont déjà écrites, et la rédaction part
+      // désormais d'un clic du kiné après l'étape Mesures. Il n'y a plus rien à faire ici.
+      await prisma.bilanJob.updateMany({ where: { id: jobId, status: 'COMPOSING' }, data: { status: 'DONE', error: null, errorDetail: null, result: { corrections: [] }, finishedAt: new Date() } });
+      logger.info(`Traitement dictée ${jobId} : reprise après rédaction retirée, notes déjà écrites`);
       return;
     }
-    logger.info(`Traitement dictée ${jobId} : bilan ${job.bilanId} rédigé`);
+    // Un bilan enregistré pendant le traitement ne doit pas être modifié
+    if (job.bilan.status === 'ENREGISTRE') throw new DraftError('ALREADY_FINALIZED', 409, 'Ce bilan est déjà enregistré');
+    const raw = rules.assembleSegments(job.segments);
+    if (!raw) throw new DraftError('NOTES_REQUIRED', 400, 'Rien n’a été entendu');
+    const catalog = await getCatalog();
+    const pseudo = createPseudonymizer({ patient: job.bilan.patient, kine: job.kine });
+    const { text, applied, ignored, motif, changes } = await dictationCorrectionService.correct({ text: raw, mode: job.kind === 'SESSION' ? 'session' : 'dictation', catalog, pseudo });
+    // `corrections` voyage avec le résultat : le kiné peut signaler un terme corrigé, il faut savoir
+    // qu'il porte sur la sortie du correcteur et non sur celle de Whisper
+    const corrections = changes || [];
+    // La transition sert de verrou : une queue qui a perdu la main n'ajoute pas les notes une 2e fois.
+    // Statut, notes et segments réussissent ou échouent ensemble ; le traitement se termine ici, la
+    // rédaction part de l'étape Mesures (spec 2026-09-26 §4.1).
+    await prisma.$transaction(async (tx) => {
+      const r = await tx.bilanJob.updateMany({ where: { id: jobId, status: 'CORRECTING' }, data: { status: 'DONE', error: null, errorDetail: null, result: { corrections }, finishedAt: new Date() } });
+      if (r.count !== 1) throw new TailLost();
+      // La correction prend du temps : le kiné a pu taper entre-temps, on relit les notes
+      // dans la transaction plutôt que de repartir de celles lues au début de la queue
+      const fresh = await tx.bilanKine.findUnique({ where: { id: job.bilanId }, select: { rawNotes: true } });
+      await tx.bilanKine.update({ where: { id: job.bilanId }, data: { rawNotes: rules.appendNotes(fresh?.rawNotes, text) } });
+      // Le texte vit désormais dans les notes : les copies par segment n'ont plus de raison d'être
+      await tx.bilanJobSegment.updateMany({ where: { jobId }, data: { text: null } });
+      // Motif déduit de la dictée : étiquette de liste et contexte du rédacteur. Jamais par-dessus
+      // celui du kiné — un updateMany qui ne matche rien ne fait simplement rien.
+      if (motif) {
+        await tx.bilanKine.updateMany({ where: { id: job.bilanId, OR: [{ motif: null }, { motif: '' }] }, data: { motif } });
+      }
+    });
+    logger.info(`Traitement dictée ${jobId} : notes écrites (${applied} correction(s), ${ignored} ignorée(s))`);
   } catch (err) {
     if (err instanceof TailLost) {
       logger.warn(`Traitement dictée ${jobId} : une autre queue a repris ce traitement, notes non écrites`);
