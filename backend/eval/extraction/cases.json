@@ -342,5 +342,54 @@
     "customContains": [],
     "identity": { "firstName": "Léa", "lastName": "Fontaine", "birthDate": "1996-08-08" },
     "mustNotReachModel": []
+  },
+  {
+    "id": "trap-01",
+    "title": "piège : test déduit d'un conflit",
+    "motif": null,
+    "notes": "Douleur épaule D depuis 2 mois. Suspicion de conflit sous-acromial. Jobe D +. RE1 D 40°, G 70°.",
+    "expect": ["test_jobe:D=true", "rotation_externe_1:D=40", "rotation_externe_1:G=70"],
+    "forbid": ["test_hawkins_kennedy", "test_yocum", "test_neer"],
+    "forbidValues": [],
+    "customContains": [],
+    "identity": { "firstName": "Claire", "lastName": "Dumont", "birthDate": "1971-03-02" },
+    "mustNotReachModel": []
+  },
+  {
+    "id": "trap-02",
+    "title": "piège : côtés croisés",
+    "motif": null,
+    "notes": "Genou. Flexion genou G 120°, D 90°. Lasègue positif à gauche, négatif à droite.",
+    "expect": ["flexion_genou:G=120", "flexion_genou:D=90", "test_laseuge:G=true", "test_laseuge:D=false"],
+    "forbid": [],
+    "forbidValues": [],
+    "customContains": [],
+    "identity": { "firstName": "Marc", "lastName": "Olivier", "birthDate": "1980-11-20" },
+    "mustNotReachModel": []
+  },
+  {
+    "id": "trap-03",
+    "title": "piège : négations et résultats douteux",
+    "motif": null,
+    "notes": "Boiterie à la marche. Pas de signe de la sonnette. Neer D ? Hawkins D -.",
+    "expect": ["boiterie=true", "signe_de_la_sonnette=false", "test_hawkins_kennedy:D=false"],
+    "forbid": [],
+    "forbidValues": [],
+    "customContains": [],
+    "identity": { "firstName": "Inès", "lastName": "Garnier", "birthDate": "1992-06-14" },
+    "mustNotReachModel": []
+  },
+  {
+    "id": "trap-04",
+    "title": "piège : séance, intention dite à voix haute",
+    "motif": null,
+    "source": "dialogue",
+    "notes": "Alors on va regarder votre épaule droite. Levez le bras. Ça tire ? Oui, là. On va tester le Hawkins la prochaine fois. Rotation externe à droite quarante degrés.",
+    "expect": ["rotation_externe_1:D=40"],
+    "forbid": ["test_hawkins_kennedy"],
+    "forbidValues": [],
+    "customContains": [],
+    "identity": { "firstName": "Paul", "lastName": "Renaud", "birthDate": "1965-01-30" },
+    "mustNotReachModel": []
   }
 ]

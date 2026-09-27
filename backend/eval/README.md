@@ -401,3 +401,33 @@ l'inventaire des Limitations fonctionnelles, interdire explicitement les valeurs
 (EVA) dans l'anamnèse, et vérifier que le diagnostic ne recopie pas les valeurs de testing déjà dans
 le tableau. Log complet et dump conservés hors dépôt (gitignorés) pour relecture :
 `.superpowers/sdd/2026-09-13-sections-frontieres/task-2-report.md`.
+
+## Vérification des mesures (2026-09-26)
+
+Depuis le passage du tableau par une étape de vérification (spec
+`docs/superpowers/specs/2026-09-26-verification-mesures-design.md` §6.1-6.2), les trois harnais
+(`eval:extraction`, `eval:dictation`, `eval:session`) classent chaque ligne candidate en **remplie**
+(`reasons` vide, insérée d'office) ou **à vérifier** (`reasons` non vide, montrée au kiné avec ses
+preuves) plutôt que de compter un simple rappel :
+
+- **rappel** : inchangé, proportion des mesures attendues (`expect`) extraites avec la bonne valeur.
+- **remplie(s) fausse(s)** : une ligne insérée d'office (`reasons: []`) qui est absente de `expect`
+  ou dont la valeur diffère — le vrai risque du mode « remplie », puisque le kiné ne la relit pas
+  par défaut. **Seuil bloquant à 0** : `summarize` sort en code 1 dès qu'il y en a une, sur
+  n'importe quel cas.
+- **juste(s) à vérifier** (friction) : une ligne attendue, correctement extraite, mais classée « à
+  vérifier » — pas une erreur, mais un clic de relecture en plus pour le kiné. Affichée en moyenne
+  (`friction`), sans seuil pour l'instant : le seuil sera fixé après le premier passage de référence
+  (tâche 11).
+- un interdit proposé « à vérifier » n'est plus une faute (le kiné le voit et peut l'écarter) : seul
+  un interdit **rempli** compte dans `forbidden`/`forbiddenValues`.
+
+Quatre cas pièges ajoutés à `extraction/cases.json` (`trap-01` à `trap-04`) : un test à ne pas
+déduire d'un simple contexte clinique, des côtés croisés dans la même phrase, une négation/un
+résultat douteux à distinguer, et une intention dite à voix haute pendant une séance (`source:
+"dialogue"`) qui ne doit pas devenir une mesure.
+
+`eval:session` ne rédige plus depuis des mesures « acceptées » par une auto-acceptation : la
+rédaction part désormais du **tableau attendu du cas** (`expectedDocument`, construit depuis
+`expect`), qui simule un kiné ayant validé chaque ligne juste — comme en production, où la rédaction
+part du tableau validé par le kiné, jamais d'une écriture directe de l'extracteur.

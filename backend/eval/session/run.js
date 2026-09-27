@@ -14,11 +14,10 @@ require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 const { loadSeedFile } = require('../../services/bilanSeedService');
 const { correct } = require('../../services/dictationCorrectionService');
 const { composeSections } = require('../../services/bilanComposeService');
-const { applyCandidates } = require('../../services/bilanExtractionService');
 const { SECTION_KEYS, SECTION_TITLES } = require('../../services/bilanDocument');
 const { createPseudonymizer, fold } = require('../../services/pseudonymService');
 const llmService = require('../../services/llmService');
-const { runCase, printResult, summarize, installLeakGuard, identityOf, formatStats, leakLine } = require('../extraction/lib');
+const { runCase, printResult, summarize, installLeakGuard, identityOf, formatStats, leakLine, parseExpect } = require('../extraction/lib');
 const { buildPreviousContext } = require('../../services/bilanPreviousContext');
 const cases = require('./cases.json');
 // Kiné synthétique des harnais (jamais un vrai kiné) : masqué comme le patient, jamais envoyé au modèle.
@@ -33,6 +32,19 @@ const dumpDir = arg('--dump');
 const ROOT = path.join(__dirname, '..', '..', '..');
 const THRESHOLDS = { sectionsRecall: 0.8, extractionRecall: 0.85 };
 const EMPTY_DOC = { schemaVersion: 1, sections: [], measurements: [] };
+
+// Comme en production depuis le 2026-09-26 : la rédaction part du tableau validé par le kiné. Le
+// harnais simule un kiné qui a tout validé juste : le tableau attendu du cas.
+function expectedDocument(kase, catalog) {
+  const byKey = new Map(catalog.map((f) => [f.key, f]));
+  const measurements = [];
+  for (const e of (kase.expect || []).map(parseExpect)) {
+    const f = byKey.get(e.key);
+    if (!f || (typeof e.value === 'string' && e.value.startsWith('~'))) continue;
+    measurements.push({ kind: 'canonical', key: e.key, value: e.value, ...(e.side ? { side: e.side } : {}), presentation: f.presentation === 'NARRATIVE' ? 'narrative' : 'table', origin: 'manual' });
+  }
+  return { ...EMPTY_DOC, measurements };
+}
 
 function dump(id, sections, warnings) {
   if (!dumpDir) return;
@@ -89,10 +101,9 @@ function dump(id, sections, warnings) {
         const c = await correct({ text: transcript, mode: 'session', catalog, pseudo });
         const expected = kase.expectSections || [];
         out.write(`\n   dialogue ${words} mots · correction ${c.applied}/${c.ignored}\n   extraction … `);
-        const x = await runCase({ ...kase, notes: c.text, pseudo }, catalog);
+        const x = await runCase({ ...kase, notes: c.text, pseudo, source: 'dialogue' }, catalog);
         printResult(x, out.log);
-        // Comme en production : les mesures acceptées entrent au document avant la rédaction (tableau exclu de la prose)
-        const { document, accepted } = applyCandidates(EMPTY_DOC, x.candidates);
+        const document = expectedDocument(kase, catalog);
         const t0 = Date.now();
         // Contexte du bilan précédent, comme en production (le cas porte sa référence en dur)
         const previous = buildPreviousContext({ previous: kase.previousBilan || null, currentMeasurements: document.measurements, catalog, patient: kase.identity, at: new Date() });
@@ -104,7 +115,7 @@ function dump(id, sections, warnings) {
         const found = expected.filter((k) => got.includes(k));
         const unexpected = got.filter((k) => !expected.includes(k));
         sectionStats.expected += expected.length; sectionStats.found += found.length; sectionStats.unexpected += unexpected.length;
-        out.log(`   rédaction ${got.length}/7 sections en ${((Date.now() - t0) / 1000).toFixed(1)} s (${Object.values(sections).join(' ').split(/\s+/).filter(Boolean).length} mots, ${accepted.length} mesure(s) en tableau) · attendues ${found.length}/${expected.length}${unexpected.length ? ` · inattendues ${unexpected.join(', ')}` : ''}${warned.length ? ` · avertissements ${warned.map((k) => `${k}=${composed.warnings[k]}`).join(', ')}` : ''}`);
+        out.log(`   rédaction ${got.length}/7 sections en ${((Date.now() - t0) / 1000).toFixed(1)} s (${Object.values(sections).join(' ').split(/\s+/).filter(Boolean).length} mots, ${document.measurements.length} mesure(s) en tableau attendu) · attendues ${found.length}/${expected.length}${unexpected.length ? ` · inattendues ${unexpected.join(', ')}` : ''}${warned.length ? ` · avertissements ${warned.map((k) => `${k}=${composed.warnings[k]}`).join(', ')}` : ''}`);
         dump(kase.id, sections, composed.warnings);
         delete x.candidates;
         x.sections = { expected, found, unexpected, warnings: composed.warnings };

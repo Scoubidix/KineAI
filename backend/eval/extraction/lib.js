@@ -17,33 +17,47 @@ const sameValue = (got, exp) => {
   return got === exp;
 };
 
+const idOf = (x) => `${x.key}${x.side ? ':' + x.side : ''}`;
+
 async function runCase(c, catalog) {
-  const { candidates, rejected } = await extractFromText({ rawNotes: c.notes, motif: c.motif ?? null, catalog, document: { schemaVersion: 1, sections: [], measurements: [] }, logContext: c.id, pseudo: c.pseudo });
+  const { candidates, rejected } = await extractFromText({ rawNotes: c.notes, motif: c.motif ?? null, catalog, document: { schemaVersion: 1, sections: [], measurements: [] }, logContext: c.id, pseudo: c.pseudo, source: c.source || 'notes' });
   const canon = candidates.filter((x) => x.kind === 'canonical');
   const custom = candidates.filter((x) => x.kind === 'custom');
+  const expected = new Map((c.expect || []).map(parseExpect).map((e) => [`${e.key}${e.side ? ':' + e.side : ''}`, e]));
   const missing = [];
   const wrong = [];
-  for (const e of (c.expect || []).map(parseExpect)) {
-    const hit = canon.find((x) => x.key === e.key && (x.side ?? null) === e.side);
-    if (!hit) missing.push(`${e.key}${e.side ? ':' + e.side : ''}`);
-    else if (!sameValue(hit.value, e.value)) wrong.push(`${e.key}${e.side ? ':' + e.side : ''} attendu ${JSON.stringify(e.value)} obtenu ${JSON.stringify(hit.value)}`);
+  const toVerify = [];
+  for (const [id, e] of expected) {
+    // Un côté manquant laisse la ligne sans côté, à vérifier : elle n'est pas perdue
+    const hit = canon.find((x) => idOf(x) === id) || (e.side ? canon.find((x) => x.key === e.key && x.side === null && x.reasons.includes('side_absent')) : undefined);
+    if (!hit) missing.push(id);
+    else if (!sameValue(hit.value, e.value)) wrong.push(`${id} attendu ${JSON.stringify(e.value)} obtenu ${JSON.stringify(hit.value)}${hit.reasons.length ? ' (à vérifier)' : ' (REMPLIE)'}`);
+    else if (hit.reasons.length > 0) toVerify.push(`${id} (${hit.reasons.join(', ')})`);
   }
-  const forbidden = (c.forbid || []).filter((k) => canon.some((x) => x.key === k));
-  const forbiddenValues = (c.forbidValues || []).filter((v) => canon.some((x) => x.fieldType === 'NUMERIC' && x.value === v));
+  // Fiabilité (spec 2026-09-26 §6.1) : une ligne remplie d'office doit être attendue ET juste
+  const falseFilled = canon
+    .filter((x) => x.reasons.length === 0)
+    .filter((x) => { const e = expected.get(idOf(x)); return !e || !sameValue(x.value, e.value); })
+    .map((x) => `${idOf(x)}=${JSON.stringify(x.value)}`);
+  // Un test interdit proposé « à vérifier » est montré au kiné : seul un interdit rempli est une faute
+  const forbidden = (c.forbid || []).filter((k) => canon.some((x) => x.key === k && x.reasons.length === 0));
+  const forbiddenValues = (c.forbidValues || []).filter((v) => canon.some((x) => x.fieldType === 'NUMERIC' && x.value === v && x.reasons.length === 0));
   const customMissing = (c.customContains || []).filter((s) => !custom.some((x) => normalizeText(x.label + ' ' + x.value).includes(normalizeText(s))));
-  const expectedKeys = new Set((c.expect || []).map((s) => s.split('=')[0]));
-  const extras = canon.filter((x) => !expectedKeys.has(`${x.key}${x.side ? ':' + x.side : ''}`)).map((x) => `${x.key}${x.side ? ':' + x.side : ''}=${JSON.stringify(x.value)}`);
-  const total = (c.expect || []).length;
+  const extras = canon.filter((x) => !expected.has(idOf(x))).map((x) => `${idOf(x)}=${JSON.stringify(x.value)}${x.reasons.length ? ` [à vérifier : ${x.reasons.join(', ')}]` : ' [REMPLIE]'}`);
+  const total = expected.size;
   const recall = total ? (total - missing.length - wrong.length) / total : 1;
-  return { id: c.id, title: c.title, recall, missing, wrong, forbidden, forbiddenValues, customMissing, extras, rejected, custom: custom.map((x) => `${x.label} = ${x.value}`), candidates };
+  const friction = total ? toVerify.length / total : 0;
+  return { id: c.id, title: c.title, recall, friction, falseFilled, toVerify, missing, wrong, forbidden, forbiddenValues, customMissing, extras, rejected, custom: custom.map((x) => `${x.label} = ${x.value}${x.reasons.length ? ` [à vérifier : ${x.reasons.join(', ')}]` : ''}`), candidates };
 }
 
 // `log` : sortie ligne à ligne (console.log par défaut ; un tampon quand les cas tournent en parallèle)
 function printResult(r, log = console.log) {
   const errors = r.forbidden.length + r.forbiddenValues.length + r.customMissing.length;
-  log(`rappel ${(r.recall * 100).toFixed(0)} %${errors ? ` · ${errors} interdit(s)` : ''} · ${r.extras.length} extra(s) · ${r.rejected} écarté(s)`);
+  log(`rappel ${(r.recall * 100).toFixed(0)} % · ${r.falseFilled.length} remplie(s) fausse(s) · ${r.toVerify.length} juste(s) à vérifier${errors ? ` · ${errors} interdit(s)` : ''} · ${r.extras.length} extra(s) · ${r.rejected} écarté(s)`);
+  for (const f of r.falseFilled) log(`   FAUSSE     ${f}`);
   for (const m of r.missing) log(`   manquant   ${m}`);
   for (const w of r.wrong) log(`   valeur     ${w}`);
+  for (const v of r.toVerify) log(`   à vérifier ${v}`);
   for (const f of r.forbidden) log(`   INTERDIT   ${f}`);
   for (const v of r.forbiddenValues) log(`   INTERDIT   valeur ${v}`);
   for (const s of r.customMissing) log(`   custom absent : ${s}`);
@@ -51,13 +65,17 @@ function printResult(r, log = console.log) {
   for (const x of r.custom) log(`   libre      ${x}`);
 }
 
-/** Rappel moyen et total d'interdits ; code de sortie 1 si un interdit, une erreur ou aucun cas. */
+/**
+ * Rappel et friction moyens, lignes remplies fausses et interdits au total. Code de sortie 1 si une
+ * ligne remplie est fausse (seuil 0, bloquant), un interdit, une erreur ou aucun cas.
+ */
 function summarize(results) {
   const ok = results.filter((r) => !r.error);
-  const avg = ok.length ? ok.reduce((s, r) => s + r.recall, 0) / ok.length : 0;
+  const avg = (k) => (ok.length ? ok.reduce((s, r) => s + r[k], 0) / ok.length : 0);
+  const falseFilled = ok.reduce((s, r) => s + r.falseFilled.length, 0);
   const errors = ok.reduce((s, r) => s + r.forbidden.length + r.forbiddenValues.length + r.customMissing.length, 0);
-  console.log(`\nRappel moyen ${(avg * 100).toFixed(1)} % sur ${ok.length} cas · ${errors} interdit(s) au total`);
-  return errors > 0 || results.length === 0 || results.some((r) => r.error) ? 1 : 0;
+  console.log(`\nRappel moyen ${(avg('recall') * 100).toFixed(1)} % sur ${ok.length} cas · ${falseFilled} ligne(s) remplie(s) fausse(s) (seuil 0) · friction ${(avg('friction') * 100).toFixed(1)} % de lignes justes à vérifier · ${errors} interdit(s) au total`);
+  return falseFilled > 0 || errors > 0 || results.length === 0 || results.some((r) => r.error) ? 1 : 0;
 }
 
 // ---- Garde anti-fuite (pseudonymisation, spec 2026-09-12 §9) : repère si une forme interdite —
