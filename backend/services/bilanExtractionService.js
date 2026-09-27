@@ -11,7 +11,7 @@ const { getCatalog } = require('./bilanRenderService');
 const { normalizeLabel, validateDocument, MEASUREMENTS_MAX, QUOTE_MAX } = require('./bilanDocument');
 const { DraftError, PATIENT_SELECT, loadIdentity, loadNotesSource } = require('./bilanDraftService');
 const { createPseudonymizer } = require('./pseudonymService');
-const { normalizeText, proofText, nameForms, evidenceReasons, selfCorrectedAfter } = require('./bilanEvidence');
+const { normalizeText, proofText, nameForms, evidenceReasons, selfCorrected, spokenNumbers } = require('./bilanEvidence');
 
 const CANDIDATES_MAX = 100;
 const LABEL_MAX = 200;
@@ -29,11 +29,9 @@ function isNotAssessed(quote) {
   return NOT_ASSESSED_RE.test(normalizeText(quote));
 }
 
-// Preuve d'une valeur numérique dans la citation : ses chiffres (13.5 / 13,5 / 13), ou un mot-nombre
-// français (transcriptions : « quarante-deux », « treize et demi »). Liste réduite aux mots-nombres
-// sans ambiguïté : « un/une/demi/virgule » servent aussi de déterminants ou de liaisons courantes
-// et ne prouvent rien à eux seuls (« une douleur », « une seconde »).
-const NUMBER_WORD_RE = /\b(?:zero|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante|soixante|cent|cents|mille)\b/;
+// Preuve d'une valeur numérique dans la citation : ses chiffres (13.5 / 13,5 / 13), ou la même
+// valeur dite en lettres (transcriptions : « quarante-deux », « treize et demi ») — un mot-nombre
+// ne prouve que sa propre valeur. « un/une » servent aussi de déterminants (« une douleur »).
 function quoteSupportsNumber(quote, value) {
   const q = normalizeText(quote).replace(/,/g, '.');
   const abs = Math.abs(value);
@@ -49,7 +47,7 @@ function quoteSupportsNumber(quote, value) {
   // « un / une » : déterminants la plupart du temps, mais seule preuve possible de la valeur 1
   // dans une dictée (« eva un au repos ») : acceptés uniquement pour cette valeur.
   if (abs === 1 && /\b(?:un|une)\b/.test(q)) return true;
-  return NUMBER_WORD_RE.test(q);
+  return spokenNumbers(q).some((n) => n.value === abs);
 }
 
 // « DG » (bilatéral, des deux côtés, ddc) → deux candidats identiques D et G
@@ -301,8 +299,8 @@ function normalize({ candidates, notes, catalog, document }) {
       };
     }
 
-    // Auto-correction juste après la citation (« euh non pardon… ») : ce qu'elle affirme est peut-être démenti
-    if (selfCorrectedAfter(notesProof, quote) && !c.reasons.includes('result_uncertain')) c.reasons.push('result_uncertain');
+    // Auto-correction dans la citation ou juste après (« euh non pardon… ») : ce qu'elle affirme est peut-être démenti
+    if (selfCorrected(notesProof, quote) && !c.reasons.includes('result_uncertain')) c.reasons.push('result_uncertain');
 
     // Règle 7 : doublons → la version la mieux prouvée, puis la plus confiante
     const id = identityOf(c);

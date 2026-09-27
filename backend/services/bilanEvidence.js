@@ -1,6 +1,7 @@
 // Preuves déterministes d'un candidat d'extraction (spec 2026-09-26 §2) : le nom, la valeur et le
 // côté proposés par le modèle doivent se lire dans la citation. Une preuve qui échoue n'écarte
 // rien : elle envoie la ligne « à vérifier ». Pur : aucune I/O.
+const { wordsToDigits } = require('../utils/frenchNumbers');
 
 const REASONS = ['name_absent', 'value_absent', 'result_contradicted', 'result_uncertain', 'side_absent', 'side_contradicted', 'conflict', 'out_of_range', 'low_confidence'];
 // Confiance déclarée par le modèle : non calibrée, simple signal secondaire (spec §2.4)
@@ -57,7 +58,10 @@ function clauses(text) {
 }
 const clauseAround = (text, pos) => clauses(text).find((c) => pos >= c.start && pos <= c.end) || { start: 0, end: text.length };
 
-/** Première occurrence d'une forme du nom : d'un seul tenant, ou ses mots dans une même proposition. */
+/**
+ * Première occurrence d'une forme du nom : d'un seul tenant, ou ses mots dans une même proposition
+ * (`parts` : la position de chacun de ces mots dispersés).
+ */
 function findName(text, forms) {
   let best = null;
   const keep = (r) => { if (!best || r.start < best.start) best = r; };
@@ -70,7 +74,8 @@ function findName(text, forms) {
       const part = text.slice(c.start, c.end);
       const hits = tokens.map((t) => wordRe(t).exec(part));
       if (hits.every(Boolean)) {
-        keep({ start: c.start + Math.min(...hits.map((h) => h.index)), end: c.start + Math.max(...hits.map((h) => h.index + h[0].length)) });
+        const parts = hits.map((h) => ({ start: c.start + h.index, end: c.start + h.index + h[0].length }));
+        keep({ start: Math.min(...parts.map((p) => p.start)), end: Math.max(...parts.map((p) => p.end)), parts });
         break;
       }
     }
@@ -78,8 +83,32 @@ function findName(text, forms) {
   return best;
 }
 
-// Positions de la valeur chiffrée : ses chiffres, ou à défaut (dictée sans chiffre) un mot-nombre
-const NUMBER_WORD_RE = /(?<![a-z0-9])(?:zero|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante|soixante|cent|cents|mille)(?![a-z0-9])/;
+// Nombres dits en lettres (dictée) : chaque groupe de mots-nombres est lu par frenchNumbers et ne
+// prouve que SA valeur (« quatre » ne prouve pas 7). « et demi » suit le nombre, au plus un mot
+// (l'unité) entre les deux ; « virgule » est lu par wordsToDigits.
+const NUMBER_WORDS = 'zero|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|vingts|trente|quarante|cinquante|soixante|cent|cents|mille';
+const SPOKEN_RUN_RE = new RegExp(`(?<![a-z0-9])(?:${NUMBER_WORDS})(?:[\\s-]+(?:${NUMBER_WORDS}|et|virgule))*(?![a-z0-9])`, 'g');
+const HALF_RE = /^(?:\s+[a-z°]+)?\s+et\s+demie?(?![a-z0-9])/;
+/**
+ * Nombres en lettres d'un texte normalisé (sans accent, minuscules). « un / une » seuls n'y sont
+ * pas : déterminants la plupart du temps, l'appelant les traite pour la seule valeur 1.
+ * @returns {{ index: number, value: number }[]}
+ */
+function spokenNumbers(text) {
+  const out = [];
+  for (const m of String(text ?? '').matchAll(SPOKEN_RUN_RE)) {
+    const run = m[0].replace(/(?:[\s-]+(?:et|virgule))+$/, '');
+    const values = (wordsToDigits(run).match(/\d+(?:\.\d+)?/g) || []).map(Number);
+    if (!values.length) continue;
+    if (HALF_RE.test(m.input.slice(m.index + run.length))) values[values.length - 1] += 0.5;
+    for (const value of values) out.push({ index: m.index, value });
+  }
+  return out;
+}
+const UN_RE = /(?<![a-z0-9])(?:un|une)(?![a-z0-9])/;
+
+// Positions de la valeur chiffrée : ses chiffres, ou à défaut (dictée sans chiffre) sa valeur dite
+// en lettres
 function numberPositions(text, value) {
   const t = text.replace(/,/g, '.');
   const abs = Math.abs(value);
@@ -88,8 +117,23 @@ function numberPositions(text, value) {
     if (found.length) return found;
   }
   if (/\d/.test(t)) return [];
-  const w = NUMBER_WORD_RE.exec(t);
-  return w ? [w.index] : [];
+  const spoken = spokenNumbers(text).filter((n) => n.value === abs).map((n) => n.index);
+  if (spoken.length) return spoken;
+  const un = abs === 1 ? UN_RE.exec(text) : null;
+  return un ? [un.index] : [];
+}
+
+// Nom dispersé (« EVA 4 repos ») : entre ses mots et la valeur, aucun autre nombre que la valeur
+// (« EVA 4 au repos 7 effort » ne prouve pas eva_effort=4). Dénominateur « /10 » et chiffres des
+// mots du nom exceptés.
+function onlyValueBetween(text, name, at, abs) {
+  const start = Math.min(name.start, at);
+  const end = Math.max(name.end, at + 1);
+  const inName = (i) => name.parts.some((p) => i >= p.start && i < p.end);
+  const digits = [...text.matchAll(/(?<![\d.,/])\d+(?:[.,]\d+)?/g)].map((m) => ({ index: m.index, value: parseFloat(m[0].replace(',', '.')) }));
+  return [...digits, ...spokenNumbers(text)]
+    .filter((n) => n.index >= start && n.index < end && !inName(n.index))
+    .every((n) => n.value === abs);
 }
 
 const SIDE_RE = /(?<![a-z0-9])(?:(des deux cotes|deux cotes|ddc|bilateral|bilaterale|bilaterales|bilateraux|d et g|g et d|d\/g|g\/d)|(droite|droites|droit|droits|dte|dt|d)|(gauche|gauches|gche|g))(?![a-z0-9])/g;
@@ -168,13 +212,18 @@ function enumProven(text, option) {
 function evidenceReasons({ quote, forms, fieldType, value, side, lateralized, confidence }) {
   const text = proofText(quote);
   const reasons = [];
-  const name = findName(text, forms);
+  let name = findName(text, forms);
+  let at = fieldType === 'NUMERIC' && typeof value === 'number' ? numberAnchors(text, value, name) : [];
+  if (name && name.parts && at.length) {
+    const clean = at.filter((a) => onlyValueBetween(text, name, a, Math.abs(value)));
+    if (clean.length) at = clean;
+    else { name = null; at = numberAnchors(text, value, null); }
+  }
   if (!name) reasons.push('name_absent');
   // Un chiffré peut porter sa valeur des deux côtés (« D 140°, G 140° ») : une occurrence écrite
   // du côté proposé suffit
   let sideAnchors = [name ? name.end : 0];
   if (fieldType === 'NUMERIC') {
-    const at = typeof value === 'number' ? numberAnchors(text, value, name) : [];
     if (!at.length) reasons.push('value_absent');
     else sideAnchors = at;
   } else if (fieldType === 'BOOLEAN') {
@@ -197,18 +246,21 @@ function evidenceReasons({ quote, forms, fieldType, value, side, lateralized, co
 
 // Auto-correction dite à voix haute (« euh non pardon je m'embrouille ») : ce qui la précède a
 // peut-être été démenti. Formes du texte de preuve (sans accent, élision tombée : « je m'embrouille »
-// → « je embrouille »). « non », « pardon », « plutôt », « correction » seuls sont trop fréquents.
-const SELF_CORRECTION_RE = /(?<![a-z0-9])(?:non pardon|euh non|pardon non|je me suis trompee?|je me trompe|je m? ?embrouille|c est l? ?inverse|je rectifie|rectification)(?![a-z0-9])/;
+// → « je embrouille », « je m'suis trompé » → « je suis trompe »). « non », « pardon », « plutôt »,
+// « correction » seuls sont trop fréquents ; « rectification » aussi (« rectification de la
+// lordose » est un compte rendu de radiologie).
+const SELF_CORRECTION_RE = /(?<![a-z0-9])(?:non pardon|euh non|pardon non|enfin non|je veux dire|je (?:me )?suis trompee?|je (?:me )?trompe|je m? ?embrouille|c est l? ?inverse|je rectifie)(?![a-z0-9])/;
 const SELF_CORRECTION_SPAN = 300;
 
 /**
- * Une marque d'auto-correction suit-elle la citation dans les notes (300 caractères) ? Toute
- * occurrence de la citation compte : doute en plus, jamais de preuve en plus.
+ * Une marque d'auto-correction est-elle dans la citation, ou la suit-elle dans les notes (300
+ * caractères) ? Toute occurrence de la citation compte : doute en plus, jamais de preuve en plus.
  * @param {string} notesProof notes passées par proofText
  */
-function selfCorrectedAfter(notesProof, quote) {
+function selfCorrected(notesProof, quote) {
   const q = proofText(quote);
   if (!q) return false;
+  if (SELF_CORRECTION_RE.test(q)) return true;
   for (let i = notesProof.indexOf(q); i !== -1; i = notesProof.indexOf(q, i + 1)) {
     const end = i + q.length;
     if (SELF_CORRECTION_RE.test(notesProof.slice(end, end + SELF_CORRECTION_SPAN))) return true;
@@ -216,4 +268,4 @@ function selfCorrectedAfter(notesProof, quote) {
   return false;
 }
 
-module.exports = { REASONS, LOW_CONFIDENCE, normalizeText, proofText, nameForms, findName, evidenceReasons, selfCorrectedAfter };
+module.exports = { REASONS, LOW_CONFIDENCE, normalizeText, proofText, nameForms, findName, evidenceReasons, selfCorrected, spokenNumbers };
