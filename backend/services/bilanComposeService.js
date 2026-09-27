@@ -9,7 +9,7 @@ const llmService = require('./llmService');
 const activityService = require('./activityService');
 const { getCatalog } = require('./bilanRenderService');
 const { SECTION_KEYS, SECTION_TITLES, proseSignatures } = require('./bilanDocument');
-const { DraftError, PATIENT_SELECT, loadIdentity } = require('./bilanDraftService');
+const { DraftError, PATIENT_SELECT, loadIdentity, loadNotesSource } = require('./bilanDraftService');
 const { createPseudonymizer } = require('./pseudonymService');
 const { BILAN_TYPE_LABELS } = require('./bilanRenderer/format');
 const { wordsToDigits, wordValues, ordinalValues } = require('../utils/frenchNumbers');
@@ -400,6 +400,7 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
   const prisma = prismaService.getInstance();
   const where = { id: bilanId, kineId, isActive: true };
   const { bilan, notes } = await loadBilanForCompose(prisma, where);
+  const source = await loadNotesSource(prisma, bilanId);
 
   // Ordre canonique, doublons ignorés, clés inconnues ignorées (déjà filtrées par Zod en route)
   const keys = Array.isArray(sections) && sections.length ? SECTION_KEYS.filter((k) => sections.includes(k)) : SECTION_KEYS;
@@ -410,7 +411,7 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
   const effectiveMotif = bilan.motif || inheritedMotif;
   // Un motif ne se déduit que d'une rédaction complète : sur une section reprise seule, la question n'a pas de sens
   const withMotif = !effectiveMotif && keys.length === SECTION_KEYS.length;
-  const { texts, warnings, motif: composedMotif } = await composeSections({ bilanId, type: bilan.type, motif: effectiveMotif, notes, document: bilan.document, catalog, keys, pseudo, withMotif, previous });
+  const { texts, warnings, motif: composedMotif } = await composeSections({ bilanId, type: bilan.type, motif: effectiveMotif, notes, document: bilan.document, catalog, keys, source, pseudo, withMotif, previous });
 
   // L'appel IA a duré plusieurs secondes : on relit la version la plus fraîche et on ne
   // remplace que les sections demandées, en check-and-set sur updatedAt (comme l'autosave).
@@ -430,28 +431,29 @@ async function composeForBilan({ kineId, bilanId, sections, uid }) {
 }
 
 /**
- * « Rédiger avec l'IA » en un appel : rédaction des 7 sections depuis les notes, une seule écriture.
- * L'extraction est débranchée (spec 2026-09-23) : les mesures du document sont celles que le kiné a
- * saisies, rien n'y est ajouté. L'enveloppe `accepted / pending / rejected` est conservée, vide, pour
- * le front et `BilanJob.result`. Check-and-set sur l'updatedAt lu au départ : le front a flushé et
- * verrouille l'édition pendant l'appel ; toute autre modification (autre appareil) → STALE_DRAFT.
+ * « Rédiger le bilan » depuis l'étape Mesures (spec 2026-09-26) : les 7 sections, sur le tableau
+ * validé par le kiné, en une écriture. Les lignes à vérifier non tranchées ne sont pas reprises
+ * (§3.3) : elles quittent la vérification, l'empreinte et les lignes retirées restent. Check-and-set
+ * sur l'updatedAt lu au départ : le front a flushé et verrouille l'édition pendant l'appel.
  * @throws {DraftError} BILAN_NOT_FOUND | LEGACY_BILAN | NOTES_REQUIRED | COMPOSE_FAILED | STALE_DRAFT
  */
-async function composeFromNotesForBilan({ kineId, bilanId, uid, source = 'notes' }) {
+async function composeFromNotesForBilan({ kineId, bilanId, uid }) {
   const prisma = prismaService.getInstance();
   const where = { id: bilanId, kineId, isActive: true };
   const { bilan, notes } = await loadBilanForCompose(prisma, where);
   const catalog = await getCatalog();
-  if (!SOURCES.includes(source)) throw new Error(`source de rédaction inconnue : ${source}`);
+  const source = await loadNotesSource(prisma, bilanId);
 
   const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId), at: bilan.createdAt });
   const { block: previous, motif: inheritedMotif } = await loadPreviousBlock({ prisma, kineId, bilan, catalog });
   // Un bilan de suivi prolonge le motif du bilan qu'il suit : inutile de le faire deviner au modèle.
   const effectiveMotif = bilan.motif || inheritedMotif;
   const composed = await composeSections({ bilanId, type: bilan.type, motif: effectiveMotif, notes, document: bilan.document, catalog, keys: SECTION_KEYS, source, pseudo, withMotif: !effectiveMotif, previous });
-  const updated = await writeDocument({ prisma, where, updatedAt: bilan.updatedAt, status: bilan.status, uid, document: applySections(bilan.document, composed.texts), generated: true, motif: bilan.motif ? undefined : (inheritedMotif || composed.motif) });
-  logger.info(`Rédaction depuis les notes bilan ${bilanId} : ${Object.keys(composed.warnings).length} avertissement(s)`);
-  return { bilan: updated, warnings: composed.warnings, accepted: [], pending: [], rejected: 0 };
+  const written = applySections(bilan.document, composed.texts);
+  const document = written.review ? { ...written, review: { ...written.review, pending: [] } } : written;
+  const updated = await writeDocument({ prisma, where, updatedAt: bilan.updatedAt, status: bilan.status, uid, document, generated: true, motif: bilan.motif ? undefined : (inheritedMotif || composed.motif) });
+  logger.info(`Rédaction depuis les notes bilan ${bilanId} (${source}) : ${Object.keys(composed.warnings).length} avertissement(s)`);
+  return { bilan: updated, warnings: composed.warnings };
 }
 
 module.exports = {

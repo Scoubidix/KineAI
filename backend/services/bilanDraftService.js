@@ -252,12 +252,23 @@ async function removeBilan({ kineId, bilanId }) {
   return { deleted: 'soft' };
 }
 
+/**
+ * Origine des notes d'un bilan (spec 2026-09-26 §4.2) : « dialogue » si la dernière prise
+ * enregistrée est une séance terminée. Un bilan n'a qu'un traitement : une dictée relancée après
+ * une séance le remplace, et les notes redeviennent des notes.
+ */
+async function loadNotesSource(prisma, bilanId) {
+  const job = await prisma.bilanJob.findUnique({ where: { bilanId }, select: { kind: true, status: true } });
+  return job && job.kind === 'SESSION' && job.status === 'DONE' ? 'dialogue' : 'notes';
+}
+
 module.exports = {
   DraftError,
   PATIENT_SELECT,
   BILAN_TYPES,
   DRAFT_STATUSES,
   loadIdentity,
+  loadNotesSource,
   createDraft,
   listMyBilans,
   getForEditor,

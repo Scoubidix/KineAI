@@ -256,15 +256,15 @@ exports.deleteBilan = async (req, res) => {
   }
 };
 
-/** POST /api/bilans/:id/extract — candidats mesures depuis les notes (rien n'est écrit) */
+/** POST /api/bilans/:id/extract — écrit les lignes prouvées du tableau et la vérification (jamais les sections) */
 exports.extractBilan = async (req, res) => {
   try {
     const bilanId = parseBilanId(req, res);
     if (bilanId === null) return;
     const kineId = await getKineId(req, res);
     if (!kineId) return;
-    const { candidates, rejected } = await extractionService.extractForBilan({ kineId, bilanId });
-    res.json({ success: true, candidates, rejected });
+    const { bilan, cached, filled, pending, rejected } = await extractionService.extractForBilan({ kineId, bilanId });
+    res.json({ success: true, bilan, cached, filled, pending, rejected });
   } catch (err) {
     sendDraftError(res, err, 'analyse des notes');
   }
@@ -284,15 +284,15 @@ exports.composeBilan = async (req, res) => {
   }
 };
 
-/** POST /api/bilans/:id/compose-from-notes — rédaction des 7 sections depuis les notes, une écriture (extraction débranchée, spec 2026-09-23) */
+/** POST /api/bilans/:id/compose-from-notes — rédaction des 7 sections sur le tableau validé à l'étape Mesures (spec 2026-09-26) */
 exports.composeBilanFromNotes = async (req, res) => {
   try {
     const bilanId = parseBilanId(req, res);
     if (bilanId === null) return;
     const kineId = await getKineId(req, res);
     if (!kineId) return;
-    const { bilan, warnings, accepted, pending, rejected } = await composeService.composeFromNotesForBilan({ kineId, bilanId, uid: req.uid });
-    res.json({ success: true, bilan, warnings, accepted, pending, rejected });
+    const { bilan, warnings } = await composeService.composeFromNotesForBilan({ kineId, bilanId, uid: req.uid });
+    res.json({ success: true, bilan, warnings });
   } catch (err) {
     sendDraftError(res, err, 'rédaction depuis les notes');
   }

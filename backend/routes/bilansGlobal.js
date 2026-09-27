@@ -58,11 +58,12 @@ router.post('/:id/attach', authenticate, crudWriteLimiter, validate(attachPatien
 router.post('/:id/finalize', authenticate, crudWriteLimiter, bilansGlobalController.finalizeBilan);
 router.delete('/:id', authenticate, crudWriteLimiter, bilansGlobalController.deleteBilan);
 
-// IA (spec §6) : plan Pratique+ et limiteur IA (5/min). L'extraction n'écrit rien ;
-// la rédaction écrit les sections demandées en check-and-set (409 STALE_DRAFT).
+// IA (spec §6) : plan Pratique+ et limiteur IA (5/min). L'extraction écrit le tableau et la
+// vérification, jamais les sections (spec 2026-09-26) ; la rédaction écrit les sections demandées
+// en check-and-set (409 STALE_DRAFT).
 router.post('/:id/extract', authenticate, gptLimiter, requireBilanEditor, bilansGlobalController.extractBilan);
 router.post('/:id/compose', authenticate, gptLimiter, requireBilanEditor, validate(composeSchema), bilansGlobalController.composeBilan);
-// « Rédiger avec l'IA » en un appel : extraction, acceptation automatique, rédaction (spec flux deux étapes §5)
+// Rédaction des 7 sections sur le tableau validé à l'étape Mesures (spec 2026-09-26)
 router.post('/:id/compose-from-notes', authenticate, gptLimiter, requireBilanEditor, bilansGlobalController.composeBilanFromNotes);
 // Un segment de dictée → texte, rien n'est écrit ; l'autosave du front porte le texte dans rawNotes.
 router.post('/:id/dictation', authenticate, dictationLimiter, requireBilanEditor, dictationAudio, bilansGlobalController.transcribeDictation);

@@ -9,7 +9,7 @@ const { logMasked } = require('../utils/pseudonymDebug');
 const llmService = require('./llmService');
 const { getCatalog } = require('./bilanRenderService');
 const { normalizeLabel, MEASUREMENTS_MAX, QUOTE_MAX } = require('./bilanDocument');
-const { DraftError, loadIdentity } = require('./bilanDraftService');
+const { DraftError, PATIENT_SELECT, loadIdentity, loadNotesSource } = require('./bilanDraftService');
 const { createPseudonymizer } = require('./pseudonymService');
 const { normalizeText, proofText, nameForms, evidenceReasons } = require('./bilanEvidence');
 
@@ -395,25 +395,47 @@ async function extractFromText({ rawNotes, motif, catalog, document, logContext 
 }
 
 /**
- * Analyse les notes d'un bilan du kiné. Ne modifie pas le bilan.
- * @throws {DraftError} BILAN_NOT_FOUND | LEGACY_BILAN | NOTES_REQUIRED | EXTRACTION_FAILED
+ * « Rédiger le bilan » depuis les notes, première moitié (spec 2026-09-26 §4.3) : analyse, preuves,
+ * écriture des lignes prouvées dans le tableau et de la vérification dans le document. Les
+ * sections ne sont jamais écrites ici. Notes inchangées depuis la dernière analyse : rien
+ * n'est rappelé, le kiné retrouve sa vérification. Check-and-set sur l'updatedAt lu au départ : le
+ * front a flushé et verrouille l'édition pendant l'appel.
+ * @throws {DraftError} BILAN_NOT_FOUND | LEGACY_BILAN | NOTES_REQUIRED | EXTRACTION_FAILED | STALE_DRAFT
  */
 async function extractForBilan({ kineId, bilanId }) {
   const prisma = prismaService.getInstance();
+  const where = { id: bilanId, kineId, isActive: true };
   const bilan = await prisma.bilanKine.findFirst({
-    where: { id: bilanId, kineId, isActive: true },
-    select: { id: true, rawNotes: true, motif: true, document: true, createdAt: true, patient: { select: { firstName: true, lastName: true, birthDate: true } } },
+    where,
+    select: { id: true, rawNotes: true, motif: true, document: true, updatedAt: true, createdAt: true, patient: { select: { firstName: true, lastName: true, birthDate: true } } },
   });
   if (!bilan) throw new DraftError('BILAN_NOT_FOUND', 404, 'Bilan non trouvé ou accès refusé');
   if (!bilan.document) throw new DraftError('LEGACY_BILAN', 400, 'Les anciens bilans ne peuvent pas être analysés');
   const notes = (bilan.rawNotes || '').trim();
   if (!notes) throw new DraftError('NOTES_REQUIRED', 400, 'Saisis des notes avant de lancer l’analyse');
 
+  const hash = notesHash(notes);
+  const previous = bilan.document.review;
+  if (previous && previous.notesHash === hash) {
+    logger.info(`Extraction bilan ${bilanId} : notes inchangées, vérification reprise`);
+    return { bilan: null, cached: true, filled: 0, pending: previous.pending.length, rejected: 0 };
+  }
+
   const catalog = await getCatalog();
+  const source = await loadNotesSource(prisma, bilanId);
   const pseudo = createPseudonymizer({ patient: bilan.patient, kine: await loadIdentity(prisma, kineId), at: bilan.createdAt });
-  const result = await extractFromText({ rawNotes: notes, motif: bilan.motif, catalog, document: bilan.document, logContext: `bilan ${bilanId}`, pseudo });
-  logger.info(`Extraction bilan ${bilanId} : ${result.candidates.length} candidat(s), ${result.rejected} rejeté(s)`);
-  return result;
+  const { candidates, rejected } = await extractFromText({ rawNotes: notes, motif: bilan.motif, catalog, document: bilan.document, logContext: `bilan ${bilanId}`, pseudo, source });
+  const applied = applyExtraction(bilan.document, candidates, { notesHash: hash, extractedAt: new Date().toISOString() });
+
+  let updated;
+  try {
+    updated = await prisma.bilanKine.update({ where: { ...where, updatedAt: bilan.updatedAt }, data: { document: applied.document }, include: { patient: { select: PATIENT_SELECT } } });
+  } catch (err) {
+    if (err && err.code === 'P2025') throw new DraftError('STALE_DRAFT', 409, 'Ce bilan a été modifié pendant l’analyse, recharge-le', { updatedAt: bilan.updatedAt });
+    throw err;
+  }
+  logger.info(`Extraction bilan ${bilanId} (${source}) : ${applied.filled} remplie(s), ${applied.pending} à vérifier, ${rejected} écartée(s)`);
+  return { bilan: updated, cached: false, filled: applied.filled, pending: applied.pending, rejected };
 }
 
 module.exports = {
