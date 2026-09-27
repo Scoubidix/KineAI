@@ -11,7 +11,7 @@ const { getCatalog } = require('./bilanRenderService');
 const { normalizeLabel, validateDocument, MEASUREMENTS_MAX, QUOTE_MAX } = require('./bilanDocument');
 const { DraftError, PATIENT_SELECT, loadIdentity, loadNotesSource } = require('./bilanDraftService');
 const { createPseudonymizer } = require('./pseudonymService');
-const { normalizeText, proofText, nameForms, evidenceReasons, selfCorrected, spokenNumbers } = require('./bilanEvidence');
+const { normalizeText, proofText, nameForms, evidenceReasons, selfCorrected, spokenNumbers, oneIndex } = require('./bilanEvidence');
 
 const CANDIDATES_MAX = 100;
 const LABEL_MAX = 200;
@@ -44,9 +44,9 @@ function quoteSupportsNumber(quote, value) {
     }
     return false;
   }
-  // « un / une » : déterminants la plupart du temps, mais seule preuve possible de la valeur 1
-  // dans une dictée (« eva un au repos ») : acceptés uniquement pour cette valeur.
-  if (abs === 1 && /\b(?:un|une)\b/.test(q)) return true;
+  // « un / une » : déterminants la plupart du temps (« une douleur », « un peu ») ; la valeur 1
+  // seulement devant une unité, une préposition ou en fin de citation (« eva au repos un »)
+  if (abs === 1 && oneIndex(q) >= 0) return true;
   return spokenNumbers(q).some((n) => n.value === abs);
 }
 

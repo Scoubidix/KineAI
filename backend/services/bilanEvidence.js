@@ -105,7 +105,16 @@ function spokenNumbers(text) {
   }
   return out;
 }
-const UN_RE = /(?<![a-z0-9])(?:un|une)(?![a-z0-9])/;
+// « un / une » valent 1 seulement suivis d'une unité (« une seconde », « un sur dix »),
+// d'une préposition (« eva un au repos » : un article n'est jamais suivi de « au / à »), d'une
+// ponctuation ou de la fin du texte (« eva au repos un ») ; sinon ce sont des articles (« une
+// douleur », « un peu »).
+const ONE_RE = /(?<![a-z0-9])(?:un|une)(?=\s*(?:$|[,;.:°]|\/\s*10|(?:degres?|sur|secondes?|sec|s|cm|centimetres?|mm|m|metres?|kg|kilos?|fois|minutes?|min|au|aux|a)(?![a-z0-9])))/;
+/** Position d'un « un / une » qui vaut 1 (texte normalisé), -1 sinon. */
+function oneIndex(text) {
+  const m = ONE_RE.exec(String(text ?? ''));
+  return m ? m.index : -1;
+}
 
 // Positions de la valeur chiffrée : ses chiffres, ou à défaut (dictée sans chiffre) sa valeur dite
 // en lettres
@@ -119,22 +128,10 @@ function numberPositions(text, value) {
   if (/\d/.test(t)) return [];
   const spoken = spokenNumbers(text).filter((n) => n.value === abs).map((n) => n.index);
   if (spoken.length) return spoken;
-  const un = abs === 1 ? UN_RE.exec(text) : null;
-  return un ? [un.index] : [];
+  const one = abs === 1 ? oneIndex(text) : -1;
+  return one >= 0 ? [one] : [];
 }
 
-// Nom dispersé (« EVA 4 repos ») : entre ses mots et la valeur, aucun autre nombre que la valeur
-// (« EVA 4 au repos 7 effort » ne prouve pas eva_effort=4). Dénominateur « /10 » et chiffres des
-// mots du nom exceptés.
-function onlyValueBetween(text, name, at, abs) {
-  const start = Math.min(name.start, at);
-  const end = Math.max(name.end, at + 1);
-  const inName = (i) => name.parts.some((p) => i >= p.start && i < p.end);
-  const digits = [...text.matchAll(/(?<![\d.,/])\d+(?:[.,]\d+)?/g)].map((m) => ({ index: m.index, value: parseFloat(m[0].replace(',', '.')) }));
-  return [...digits, ...spokenNumbers(text)]
-    .filter((n) => n.index >= start && n.index < end && !inName(n.index))
-    .every((n) => n.value === abs);
-}
 
 const SIDE_RE = /(?<![a-z0-9])(?:(des deux cotes|deux cotes|ddc|bilateral|bilaterale|bilaterales|bilateraux|d et g|g et d|d\/g|g\/d)|(droite|droites|droit|droits|dte|dt|d)|(gauche|gauches|gche|g))(?![a-z0-9])/g;
 function sideMarkers(text) {
@@ -147,25 +144,32 @@ function sideMarkers(text) {
 // Portée du nom : de lui à la fin de sa proposition, prolongée des propositions qui commencent
 // par un côté (« Flexion D 140°, G 140° ») ; elle s'arrête au nom suivant (« …, abduction D 90° »)
 const SIDE_START_RE = new RegExp(`^(?:a )?${SIDE_RE.source}`);
+// Proposition « liste » : rien que des côtés, des valeurs, des unités (« 3 s à G », « D 110°, G 95° »)
+const LIST_TOKEN_RE = new RegExp(`(?<![a-z0-9])(?:degres?|cm|mm|m|s|sec|secondes?|kg|kilos?|metres?|centimetres?|min|minutes?|a|et|${NUMBER_WORDS})(?![a-z0-9])|\\d+(?:[.,]\\d+)?|[°%/:,.]`, 'g');
+const listOnly = (s) => s.replace(new RegExp(SIDE_RE.source, 'g'), ' ').replace(LIST_TOKEN_RE, ' ').trim() === '';
 function nameScopeEnd(text, name) {
   const cs = clauses(text);
   let i = cs.findIndex((c) => name.start >= c.start && name.start <= c.end);
-  while (i + 1 < cs.length && SIDE_START_RE.test(text.slice(cs[i + 1].start, cs[i + 1].end).trim())) i += 1;
+  const continues = (c) => {
+    const part = text.slice(c.start, c.end).trim();
+    return SIDE_START_RE.test(part) || (listOnly(part) && sideMarkers(part).length > 0);
+  };
+  while (i + 1 < cs.length && continues(cs[i + 1])) i += 1;
   return cs[i].end;
 }
 
 /**
- * Occurrences de la valeur rattachées au nom : celles de sa portée ; à défaut la première après
- * le nom, puis la première de la citation (valeur écrite avant le nom).
+ * Occurrences de la valeur rattachées au nom : celles de sa portée ; à défaut la plus proche
+ * écrite avant le nom (« 110° de flexion »). Jamais au-delà de la portée (« Flexion genou D 95,
+ * hanche D 110 » : 110 n'est pas la flexion du genou).
  */
 function numberAnchors(text, value, name) {
   const all = numberPositions(text, value);
   if (!name) return all.slice(0, 1);
-  const after = all.filter((p) => p >= name.start);
   const end = nameScopeEnd(text, name);
-  const scoped = after.filter((p) => p < end);
+  const scoped = all.filter((p) => p >= name.start && p < end);
   if (scoped.length) return scoped;
-  return (after.length ? after : all).slice(0, 1);
+  return all.filter((p) => p < name.start).slice(-1);
 }
 
 // Côté écrit pour la valeur : le marqueur le plus proche avant elle dans sa proposition, sinon le
@@ -177,6 +181,31 @@ function sideAt(text, anchor) {
   if (before.length) return before[before.length - 1].side;
   const after = marks.find((m) => m.index >= anchor);
   return after ? after.side : null;
+}
+
+/**
+ * Entre le nom et la valeur, aucun autre nombre que la valeur (« EVA repos 4 effort 7 » ne prouve
+ * pas eva_repos=7 ; « EVA 4 au repos 7 effort » pas eva_effort=4). Dénominateur « /10 » et
+ * chiffres des mots du nom exceptés. Seule exception, le raccourci bilatéral « Flexion genou D
+ * 110°, G 95° » : entre le nom et la valeur rien que des côtés, des valeurs et des unités, et
+ * chaque autre valeur rattachée à l'autre côté.
+ */
+function onlyValueBetween(text, name, at, abs) {
+  const start = Math.min(name.start, at);
+  const end = Math.max(name.end, at + 1);
+  const parts = name.parts || [name];
+  const inName = (i) => parts.some((p) => i >= p.start && i < p.end);
+  const digits = [...text.matchAll(/(?<![\d.,/])\d+(?:[.,]\d+)?/g)].map((m) => ({ index: m.index, value: parseFloat(m[0].replace(',', '.')) }));
+  const others = [...digits, ...spokenNumbers(text)]
+    .filter((n) => n.index >= start && n.index < end && !inName(n.index) && n.value !== abs);
+  if (!others.length) return true;
+  const gap = at >= name.end ? text.slice(name.end, at) : text.slice(at, name.start);
+  const own = sideAt(text, at);
+  if (!listOnly(gap) || (own !== 'D' && own !== 'G')) return false;
+  return others.every((n) => {
+    const s = sideAt(text, n.index);
+    return (s === 'D' || s === 'G') && s !== own;
+  });
 }
 
 // Résultat d'un test : négatif si un marqueur négatif est dans la proposition du nom, positif
@@ -214,7 +243,7 @@ function evidenceReasons({ quote, forms, fieldType, value, side, lateralized, co
   const reasons = [];
   let name = findName(text, forms);
   let at = fieldType === 'NUMERIC' && typeof value === 'number' ? numberAnchors(text, value, name) : [];
-  if (name && name.parts && at.length) {
+  if (name && at.length) {
     const clean = at.filter((a) => onlyValueBetween(text, name, a, Math.abs(value)));
     if (clean.length) at = clean;
     else { name = null; at = numberAnchors(text, value, null); }
@@ -268,4 +297,4 @@ function selfCorrected(notesProof, quote) {
   return false;
 }
 
-module.exports = { REASONS, LOW_CONFIDENCE, normalizeText, proofText, nameForms, findName, evidenceReasons, selfCorrected, spokenNumbers };
+module.exports = { REASONS, LOW_CONFIDENCE, normalizeText, proofText, nameForms, findName, evidenceReasons, selfCorrected, spokenNumbers, oneIndex };

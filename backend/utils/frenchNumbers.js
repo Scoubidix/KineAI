@@ -43,6 +43,10 @@ function parseSub100(tokens) {
     value = TENS[tokens[i]]; i += 1; allowLink = true;
   } else if (UNITS[tokens[i]] !== undefined) {
     value = UNITS[tokens[i]]; i += 1;
+    // Deux unités accolées (« deux trois » = « deux ou trois ») ne s'additionnent jamais : seul
+    // « dix » prend une unité (« dix-sept », « dix-huit », « dix-neuf »)
+    const rest = tokens.slice(i);
+    if (rest.length && !(value === 10 && rest.length === 1 && ['sept', 'huit', 'neuf'].includes(rest[0]))) return null;
   } else {
     return null;
   }
