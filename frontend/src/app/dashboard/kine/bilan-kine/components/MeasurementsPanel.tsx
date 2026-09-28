@@ -24,12 +24,14 @@ import {
   Side,
   Presentation,
   BilanTemplate,
+  ReviewCandidate,
 } from '@/types/bilan';
 import InlineMeasureSearch from './InlineMeasureSearch';
 import ApplyTemplateModal from './ApplyTemplateModal';
 import SideSelector from './SideSelector';
 import TestGuideButton from '@/components/bilan/TestGuideButton';
-import { measurementIdentity } from './editor/suggestions';
+import { formatCandidateValue, measurementIdentity } from './editor/suggestions';
+import { REASON_LABELS, type Resolution } from './editor/review';
 
 interface MeasurementsPanelProps {
   measurements: DocumentMeasurement[];
@@ -37,8 +39,13 @@ interface MeasurementsPanelProps {
   disabled?: boolean;
   /** Bilan de suivi : valeur du bilan de référence par identité de mesure, affichée « préc. … » */
   previousValues?: Map<string, CanonicalValue>;
-  /** Citation des notes à l'origine de la valeur (mesures acceptées automatiquement), par identité de mesure */
-  quotes?: Map<string, string>;
+  /** Étape Mesures : lignes à vérifier, rendues dans la catégorie de leur champ (spec 2026-09-26 §3.2) */
+  pending?: ReviewCandidate[];
+  onResolve?: (id: string, r: Resolution) => void;
+  /** Étape Mesures : toucher une citation montre les notes surlignées. Sans elle, la citation est une icône. */
+  onShowQuote?: (quote: string) => void;
+  /** Retrait d'une ligne géré par l'hôte (il mémorise les lignes venues des notes) */
+  onRemove?: (index: number) => void;
   /** Conteneur étroit (tiroir, feuille du bas) : la ligne s'empile au lieu de se couper */
   dense?: boolean;
 }
@@ -65,7 +72,10 @@ export default function MeasurementsPanel({
   onChange,
   disabled = false,
   previousValues,
-  quotes,
+  pending,
+  onResolve,
+  onShowQuote,
+  onRemove,
   dense = false,
 }: MeasurementsPanelProps) {
   const { toast } = useToast();
@@ -141,7 +151,8 @@ export default function MeasurementsPanel({
   };
 
   const handleRemoveAt = (index: number) => {
-    onChange(measurements.filter((_, i) => i !== index));
+    if (onRemove) onRemove(index);
+    else onChange(measurements.filter((_, i) => i !== index));
     // Les index décalent après suppression : on repart d'un état propre plutôt que
     // de remapper les brouillons/hints (aucune ligne n'est en cours de frappe à ce moment).
     setDrafts({});
@@ -247,6 +258,23 @@ export default function MeasurementsPanel({
     });
     return map;
   }, [measurements, fieldsByKey]);
+
+  const pendingItems = useMemo(() => pending ?? [], [pending]);
+  // Lignes à vérifier rangées dans la catégorie de leur champ, comme les mesures
+  const pendingByCategory = useMemo(() => {
+    const map = new Map<string, ReviewCandidate[]>();
+    for (const c of pendingItems) {
+      const cat = c.kind === 'custom' ? CUSTOM_CATEGORY : fieldsByKey.get(c.key ?? '')?.category ?? UNKNOWN_CATEGORY;
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(c);
+    }
+    return map;
+  }, [pendingItems, fieldsByKey]);
+  // Ordre des catégories : celui des mesures, puis celles qui n'ont que des lignes à vérifier
+  const categoryOrder = useMemo(
+    () => [...groups.keys(), ...[...pendingByCategory.keys()].filter((c) => !groups.has(c))],
+    [groups, pendingByCategory],
+  );
 
   const stats = useMemo(() => {
     const cats = new Map<string, { filled: number; total: number }>();
@@ -411,12 +439,16 @@ export default function MeasurementsPanel({
     }
   };
 
-  const renderQuote = (m: DocumentMeasurement) => {
-    const q = quotes?.get(measurementIdentity(m));
-    return q === undefined ? null : (
-      <span title={`D’après tes notes : « ${q} »`} aria-label={`D’après tes notes : ${q}`} className="inline-flex shrink-0 text-muted-foreground"><Quote className="h-3 w-3" /></span>
-    );
-  };
+  // Citation des notes : en toutes lettres sous la mesure à l'étape Mesures (touchée → notes
+  // surlignées), simple icône ailleurs (tiroir, consultation)
+  const quoteLine = (q: string) => (
+    <button type="button" onClick={() => onShowQuote?.(q)} className="mt-1 flex w-full items-start gap-1.5 text-left text-[13px] italic leading-snug text-muted-foreground hover:text-[#3899aa] min-h-7">
+      <Quote className="h-3 w-3 mt-[3px] shrink-0" /><span className="min-w-0 break-words">« {q} »</span>
+    </button>
+  );
+  const renderQuote = (m: DocumentMeasurement) => (!m.quote || onShowQuote ? null : (
+    <span title={`D’après tes notes : « ${m.quote} »`} aria-label={`D’après tes notes : ${m.quote}`} className="inline-flex shrink-0 text-muted-foreground"><Quote className="h-3 w-3" /></span>
+  ));
 
   const formatPrevious = (v: CanonicalValue, unit?: string | null): string => {
     if (typeof v === 'boolean') return v ? 'Positif' : 'Négatif';
@@ -493,21 +525,81 @@ export default function MeasurementsPanel({
             {input}
             {previous}
           </div>
+          {onShowQuote && m.quote && quoteLine(m.quote)}
         </div>
       );
     }
 
     return (
-      <div key={`row-${row.index}`} className="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-muted/40">
-        <span className="flex w-36 shrink-0 items-start gap-1 sm:w-56">
-          <span className={`${labelClass} min-w-0`} title={labelTitle}>{label}</span>
-          {guideButton}
-        </span>
-        {sideSelector}
-        {input}
-        {previous}
-        {renderQuote(m)}
-        {removeButton}
+      <div key={`row-${row.index}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
+        <div className="flex items-start gap-2">
+          <span className="flex w-36 shrink-0 items-start gap-1 sm:w-56">
+            <span className={`${labelClass} min-w-0`} title={labelTitle}>{label}</span>
+            {guideButton}
+          </span>
+          {sideSelector}
+          {input}
+          {previous}
+          {renderQuote(m)}
+          {removeButton}
+        </div>
+        {onShowQuote && m.quote && quoteLine(m.quote)}
+      </div>
+    );
+  };
+
+  /**
+   * Ligne à vérifier, à sa place dans le tableau (spec 2026-09-26 §3.2, modèle « inline error » du
+   * GOV.UK Design System) : la raison en clair, la citation, et des réponses en un geste.
+   */
+  const renderPending = (c: ReviewCandidate) => {
+    const isConflict = c.reasons.includes('conflict');
+    const outOfRange = c.reasons.includes('out_of_range');
+    const needsResult = c.fieldType === 'BOOLEAN' && (c.reasons.includes('result_uncertain') || c.reasons.includes('result_contradicted'));
+    const needsSide = c.lateralized && (c.reasons.includes('side_absent') || c.reasons.includes('side_contradicted'));
+    const label = (c.kind === 'canonical' ? fieldsByKey.get(c.key ?? '')?.label : undefined) ?? c.label;
+    const shown = formatCandidateValue(c);
+    const existing = formatCandidateValue({ value: c.existingValue ?? null, unit: c.unit });
+    const chip = 'h-9 rounded-full px-3.5 text-sm font-medium border bg-white dark:bg-card disabled:opacity-50';
+    const primary = `${chip} border-[#3899aa] text-[#3899aa]`;
+    const neutral = `${chip} border-border`;
+    const keep = (r: { side?: Side | 'DG'; value?: CanonicalValue } = {}) => onResolve?.(c.id, { kind: 'keep', ...r });
+    const dismiss = () => onResolve?.(c.id, { kind: 'dismiss' });
+    return (
+      <div key={`pending-${c.id}`} id={`pending-${c.id}`} className="rounded-md border-l-[3px] border-amber-500 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-2">
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-sm font-medium break-words">{label}{c.side && !needsSide ? ` ${c.side}` : ''}</span>
+          {!isConflict && <span className="text-sm font-semibold tabular-nums shrink-0">{shown}</span>}
+        </div>
+        <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
+          {isConflict
+            ? <>Tu avais saisi <b>{existing}</b>, tes notes disent <b>{shown}</b>.{outOfRange ? ' Valeur inhabituelle.' : ''}</>
+            : c.reasons.map((r) => REASON_LABELS[r]).join(' · ')}
+        </p>
+        {onShowQuote ? quoteLine(c.quote) : null}
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {isConflict ? (
+            <>
+              {/* Valeur des notes hors bornes : elle ne peut pas remplacer la valeur saisie */}
+              {!outOfRange && <button type="button" className={primary} onClick={() => keep()} disabled={disabled}>Prendre {shown}</button>}
+              <button type="button" className={outOfRange ? primary : neutral} onClick={dismiss} disabled={disabled}>Garder {existing}</button>
+            </>
+          ) : needsResult ? (
+            <>
+              <button type="button" className={primary} onClick={() => keep({ value: true })} disabled={disabled}>Positif</button>
+              <button type="button" className={primary} onClick={() => keep({ value: false })} disabled={disabled}>Négatif</button>
+            </>
+          ) : needsSide ? (
+            <>
+              <button type="button" className={primary} onClick={() => keep({ side: 'D' })} disabled={disabled}>Droit</button>
+              <button type="button" className={primary} onClick={() => keep({ side: 'G' })} disabled={disabled}>Gauche</button>
+              <button type="button" className={neutral} onClick={() => keep({ side: 'DG' })} disabled={disabled}>Les deux</button>
+            </>
+          ) : (
+            <button type="button" className={primary} onClick={() => keep()} disabled={disabled}>Garder</button>
+          )}
+          {!isConflict && <button type="button" className="h-9 px-2 text-sm text-muted-foreground disabled:opacity-50" onClick={dismiss} disabled={disabled}>Ne pas reprendre</button>}
+        </div>
       </div>
     );
   };
@@ -515,10 +607,12 @@ export default function MeasurementsPanel({
   const hasMeasures = stats.globalTotal > 0;
   const progressPercent =
     stats.globalTotal === 0 ? 0 : Math.round((stats.globalFilled / stats.globalTotal) * 100);
+  const pendingCount = pendingItems.length;
+  const showTable = hasMeasures || pendingCount > 0;
 
   // Mode compact : 1 seule catégorie ET ≤ 4 mesures → on saute les headers,
   // rendu identique au comportement initial pour les petits bilans.
-  const isCompactMode = groups.size <= 1 && stats.globalTotal <= 4;
+  const isCompactMode = groups.size <= 1 && stats.globalTotal <= 4 && pendingCount === 0;
 
   return (
     <div className="border border-border/60 rounded-xl bg-white dark:bg-card p-3 space-y-2">
@@ -539,7 +633,7 @@ export default function MeasurementsPanel({
 
       {/* Tableau vide : c'est le seul moment où le template mérite de la place. Une fois des
           mesures saisies, il redevient une icône à côté du champ d'ajout. */}
-      {!hasMeasures && (
+      {!showTable && (
         <div className="flex flex-col items-center gap-2 py-6 text-center">
           <Activity className="h-5 w-5 text-[#3899aa]/50" />
           <p className="text-xs text-muted-foreground">Cherche un test ci-dessus, ou pars d’une liste toute prête.</p>
@@ -549,7 +643,7 @@ export default function MeasurementsPanel({
         </div>
       )}
 
-      {hasMeasures && (
+      {showTable && (
         <>
           <div className="flex items-center gap-2 px-2 py-1">
             <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -601,9 +695,11 @@ export default function MeasurementsPanel({
             </div>
           ) : (
             <div className="space-y-2">
-              {Array.from(groups.entries()).map(([category, rows]) => {
+              {categoryOrder.map((category) => {
+                const rows = groups.get(category) ?? [];
+                const catPending = pendingByCategory.get(category) ?? [];
                 const s = stats.cats.get(category) ?? { filled: 0, total: rows.length };
-                const isCollapsed = collapsedCategories.has(category);
+                const isCollapsed = collapsedCategories.has(category) && catPending.length === 0;
                 const isComplete = s.total > 0 && s.filled === s.total;
 
                 return (
@@ -625,6 +721,7 @@ export default function MeasurementsPanel({
                       />
                       <span className="text-sm font-medium text-foreground flex-1 truncate">{category}</span>
                       <div className="flex items-center gap-1.5 shrink-0">
+                        {catPending.length > 0 && <span className="rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">{catPending.length} à vérifier</span>}
                         {isComplete && <CheckCircle2 className="h-3.5 w-3.5 text-[#3899aa]" />}
                         <span
                           className={`text-[11px] tabular-nums ${
@@ -642,7 +739,7 @@ export default function MeasurementsPanel({
                       }`}
                     >
                       <div className="overflow-hidden">
-                        <div className="space-y-0.5 p-1">{rows.map(renderRow)}</div>
+                        <div className="space-y-0.5 p-1">{catPending.map(renderPending)}{rows.map(renderRow)}</div>
                       </div>
                     </div>
                   </div>

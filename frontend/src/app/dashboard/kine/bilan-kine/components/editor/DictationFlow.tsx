@@ -56,7 +56,7 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
   const { state } = dictation;
 
   // Une seule ouverture du document : le sondage peut repasser par DONE, et `onDone` échoue parfois
-  // (réseau) — l'écran « Bilan rédigé » propose alors de réessayer, sans jamais revenir au micro.
+  // (réseau) — l'écran « Notes prêtes » propose alors de réessayer, sans jamais revenir au micro.
   const doneRef = useRef(false);
   useEffect(() => {
     if (state.phase !== 'done' || !state.job || doneRef.current) return;
@@ -83,8 +83,8 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
     }
   };
 
-  // Le serveur écrit le bilan en fin de traitement (notes, document) : toute saisie pendant
-  // cette fenêtre serait écrasée par son retour, donc le panneau s'y verrouille.
+  // Le serveur écrit les notes en fin de traitement : toute saisie pendant cette fenêtre serait
+  // écrasée par son retour, donc le panneau s'y verrouille.
   const measuresLocked = saveState === 'stale' || state.phase === 'processing' || state.generating;
 
   // Bilan de référence : le même bloc que dans l'éditeur (lignes du bilan précédent ajoutées
@@ -115,7 +115,7 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
         <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 py-10 text-center">
           <div className="text-5xl font-semibold tabular-nums text-[#3899aa]" aria-hidden>100 %</div>
           <Progress value={100} className="w-full max-w-md h-2" />
-          <p className="text-sm text-muted-foreground" role="status">Bilan rédigé</p>
+          <p className="text-sm text-muted-foreground" role="status">Notes prêtes</p>
           <Button variant="outline" onClick={() => { if (state.job) { doneRef.current = true; onDone(state.job); } }}>
             <RotateCcw className="h-4 w-4 mr-2" />Réessayer l’ouverture
           </Button>

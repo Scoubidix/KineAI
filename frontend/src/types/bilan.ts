@@ -38,8 +38,8 @@ export interface BilanSection {
 }
 
 export type DocumentMeasurement =
-  | { kind: 'canonical'; key: string; value: CanonicalValue; side?: Side; presentation: Presentation; origin: Origin }
-  | { kind: 'custom'; label: string; value: string; presentation: Presentation; origin: Origin };
+  | { kind: 'canonical'; key: string; value: CanonicalValue; side?: Side; presentation: Presentation; origin: Origin; quote?: string }
+  | { kind: 'custom'; label: string; value: string; presentation: Presentation; origin: Origin; quote?: string };
 
 export interface BilanDocument {
   schemaVersion: 1;
@@ -48,6 +48,8 @@ export interface BilanDocument {
   comparison?: { previousBilanIds: number[] };
   /** Empreinte des mesures en prose à la dernière écriture de l'examen (spec 2026-09-23 §6) */
   proseBasis?: string[];
+  /** Vérification des mesures (spec 2026-09-26 §5) */
+  review?: BilanReview;
 }
 
 export const emptyBilanDocument = (): BilanDocument => ({
@@ -109,7 +111,6 @@ export type BilanJobStatus = 'RECORDING' | 'TRANSCRIBING' | 'CORRECTING' | 'COMP
 
 export type BilanJobKind = 'DICTATION' | 'SESSION';
 
-/** Ce que renvoyait « Rédiger avec l'IA » en direct, conservé par le serveur pour rouvrir le tiroir « à vérifier » */
 /**
  * Un remplacement appliqué par la passe de correction : ce que Whisper avait écrit, ce que le
  * kiné lit. Jamais montré — il ne doit pas savoir qu'un correcteur passe derrière lui. Sert à
@@ -117,11 +118,9 @@ export type BilanJobKind = 'DICTATION' | 'SESSION';
  */
 export interface DictationChange { from: string; to: string }
 
+/** Résultat d'un traitement de dictée ou de séance : les notes sont écrites, la rédaction part de l'étape Mesures */
 export interface BilanJobResult {
-  accepted: { id: string; quote: string }[];
-  pending: ExtractionCandidate[];
-  rejected: number;
-  warnings: SectionWarnings;
+  /** Remplacements du correcteur, pour reconnaître un signalement qui porte sur sa sortie */
   corrections?: DictationChange[];
 }
 
@@ -150,8 +149,11 @@ export type CanonicalFieldType = 'NUMERIC' | 'BOOLEAN' | 'TEXT' | 'ENUM';
 
 // ==================== IA (plan 3) ====================
 
-/** Candidat renvoyé par POST /api/bilans/:id/extract, déjà normalisé côté serveur (jamais écrit sans validation). */
-export interface ExtractionCandidate {
+/** Raison pour laquelle une ligne proposée n'est pas remplie d'office (spec 2026-09-26 §2). Miroir de `REASONS` (backend/services/bilanEvidence.js). */
+export type ExtractionReason = 'name_absent' | 'value_absent' | 'result_contradicted' | 'result_uncertain' | 'side_absent' | 'side_contradicted' | 'conflict' | 'out_of_range' | 'low_confidence';
+
+/** Ligne à vérifier à l'étape Mesures, gardée dans `document.review.pending` */
+export interface ReviewCandidate {
   /** Même identité que les mesures : `c:<key>:<side|''>` ou `x:<label normalisé>` */
   id: string;
   kind: 'canonical' | 'custom';
@@ -163,29 +165,30 @@ export interface ExtractionCandidate {
   value: CanonicalValue;
   side: Side | null;
   presentation: Presentation;
-  /** Extrait exact des notes qui justifie la valeur */
+  /** Extrait exact des notes */
   quote: string;
   confidence: number;
-  status: 'new' | 'conflict';
+  reasons: ExtractionReason[];
+  /** Valeur déjà saisie quand `reasons` contient `conflict` */
   existingValue?: CanonicalValue;
-  warning?: 'out_of_range';
 }
 
-export interface ExtractionResult { candidates: ExtractionCandidate[]; rejected: number }
+export interface BilanReview {
+  /** Empreinte des notes analysées : inchangées → pas de nouvelle analyse */
+  notesHash: string;
+  extractedAt: string;
+  pending: ReviewCandidate[];
+  /** Lignes retirées par le kiné : une nouvelle analyse ne les repropose pas (même identité, même citation) */
+  dismissed: { id: string; quote: string }[];
+}
+
+/** POST /extract : bilan réécrit (null si notes inchangées depuis la dernière analyse) */
+export interface ExtractResult { bilan: BilanRecord | null; cached: boolean; filled: number; pending: number; rejected: number }
 
 export type SectionWarning = 'unverified_number' | 'table_duplicate' | 'measures_changed';
 export type SectionWarnings = Partial<Record<BilanSectionKey, SectionWarning>>;
 
 export interface ComposeResult { bilan: BilanRecord; warnings: SectionWarnings }
-
-/** Réponse de « Rédiger avec l'IA » : bilan rédigé, mesures acceptées (avec leur citation) et candidats en suspens */
-export interface ComposeFromNotesResult {
-  bilan: BilanRecord;
-  warnings: SectionWarnings;
-  accepted: { id: string; quote: string }[];
-  pending: ExtractionCandidate[];
-  rejected: number;
-}
 
 /** Appel IA en cours dans l'éditeur : extraction, rédaction complète (depuis les notes ou non), ou régénération d'une section */
 export type AiBusy = null | 'extract' | 'compose' | 'compose_from_notes' | BilanSectionKey;

@@ -1,10 +1,10 @@
 // Barre de progression du traitement (spec dictée §5.2, spec séance §5) : la transcription est mesurée,
-// le reste estimé dans le temps. Mêmes bornes pour une dictée et une séance : depuis la suppression du
-// compte rendu (2026-09-12), les deux enchaînent transcription → correction → rédaction.
+// le reste estimé dans le temps. Mêmes bornes pour une dictée et une séance : les deux enchaînent
+// transcription → correction ; la rédaction part ensuite de l'étape Mesures (2026-09-26).
 import type { BilanJobStatus, BilanJobView } from '@/types/bilan';
 
 type Stage = 'TRANSCRIBING' | 'CORRECTING' | 'COMPOSING';
-export const STAGE_BOUNDS: Record<Stage, [number, number]> = { TRANSCRIBING: [0, 0.7], CORRECTING: [0.7, 0.75], COMPOSING: [0.75, 1] };
+export const STAGE_BOUNDS: Record<Stage, [number, number]> = { TRANSCRIBING: [0, 0.9], CORRECTING: [0.9, 1], COMPOSING: [0.9, 1] };
 // Durées attendues des étapes non mesurables (à ajuster après mesure en usage)
 export const EXPECTED_MS: Record<Exclude<Stage, 'TRANSCRIBING'>, number> = { CORRECTING: 6_000, COMPOSING: 40_000 };
 
@@ -31,9 +31,9 @@ export function stageLabel(job: BilanJobView | null): string {
   switch (job.status) {
     case 'TRANSCRIBING': return job.segmentsTotal ? `Transcription… ${Math.min(job.segmentsDone, job.segmentsTotal)} sur ${job.segmentsTotal}` : 'Transcription…';
     case 'CORRECTING': return 'Correction des termes…';
-    case 'COMPOSING': return 'Rédaction du bilan…';
-    case 'DONE': return 'Bilan rédigé';
-    case 'FAILED': return 'La rédaction n’a pas abouti';
+    case 'COMPOSING': return 'Finalisation…';
+    case 'DONE': return 'Notes prêtes';
+    case 'FAILED': return 'Le traitement n’a pas abouti';
     default: return '';
   }
 }

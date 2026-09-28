@@ -3,7 +3,6 @@
 import React, { useRef, useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ArrowRight, PanelRightOpen, Sparkles, Loader2 } from 'lucide-react';
 import type { BilanPatch, BilanRecord } from '@/types/bilan';
 import DictationBar from './DictationBar';
@@ -31,20 +30,17 @@ const PLACEHOLDER = `Note tes observations en vrac...
 Ex : maçon, lombalgie chronique depuis 3 mois suite port de charge. ATCD : hernie discale L4-L5 opérée 2018. Douleur bas du dos irradiant fesse droite, EVA 5/10 repos 7/10 effort. Flexion lombaire limitée 40°, Lasègue négatif, paravertébraux contracturés...`;
 
 export interface CaptureStepProps extends StepProps {
-  /** « Rédiger avec l'IA » : extraction + acceptation + rédaction, puis étape Document */
-  onCompose: () => void;
-  composing: boolean;
+  /** « Rédiger le bilan » : l'extraction seule, puis l'étape Mesures (spec 2026-09-26 §1) */
+  onExtract: () => void;
+  extracting: boolean;
   dictation: ReturnType<typeof useDictation>;
 }
 
-// Étape 1 : la source seule (notes écrites aujourd'hui, dictée et transcription demain).
-// Les mesures se saisissent ou se corrigent dans le tiroir, disponible ici comme à l'étape Document.
-export default function CaptureStep({ record, update, disabled, onNext, onCompose, composing, dictation, onOpenMeasures, measuresOpen }: CaptureStepProps) {
+// Étape 1 : les notes (écrites, dictées ou transcrites). « Rédiger le bilan » lance l'analyse,
+// puis l'étape Mesures.
+export default function CaptureStep({ record, update, disabled, onNext, onExtract, extracting, dictation, onOpenMeasures, measuresOpen }: CaptureStepProps) {
   const notesLength = (record.rawNotes ?? '').length;
   const hasNotes = (record.rawNotes ?? '').trim().length > 0;
-  const anyText = (record.document?.sections ?? []).some((s) => s.text.trim() !== '');
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const handleComposeClick = () => { if (anyText) setConfirmOpen(true); else onCompose(); };
   const { toast } = useToast();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Dernière position de caret connue : le clic sur « Dicter » (mousedown neutralisé) garde en général
@@ -100,7 +96,9 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
   };
   const caretPos = () => { const el = textareaRef.current; return el && document.activeElement === el ? el.selectionStart : (lastCaretRef.current ?? (record.rawNotes ?? '').length); };
   const dictating = dictation.state.phase !== 'idle';
-  const hint = dictation.state.phase === 'correcting'
+  const hint = extracting
+    ? 'Recherche des tests et mesures dans tes notes…'
+    : dictation.state.phase === 'correcting'
     ? 'Correction des termes en cours…'
     : dictating
     ? 'Transcription en cours…'
@@ -142,29 +140,14 @@ export default function CaptureStep({ record, update, disabled, onNext, onCompos
         <span className="text-[11px] text-muted-foreground hidden sm:inline">{hint}</span>
         <div className="flex items-center gap-2 ml-auto">
           {hasNotes ? (
-            <>
-              <Button variant="ghost" size="sm" onClick={onNext} disabled={disabled || dictating} className="h-9">Rédiger moi-même</Button>
-              <Button onClick={handleComposeClick} disabled={disabled || composing || dictating} className="btn-teal rounded-full px-5 h-9">
-                {composing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}Rédiger avec l’IA<ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </>
+            <Button onClick={onExtract} disabled={disabled || extracting || dictating} className="btn-teal rounded-full px-5 h-9">
+              {extracting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}Rédiger le bilan<ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
           ) : (
-            <Button onClick={onNext} disabled={disabled || dictating} className="btn-teal rounded-full px-5 h-9">Continuer sans note<ArrowRight className="h-4 w-4 ml-1" /></Button>
+            <Button onClick={onNext} disabled={disabled || dictating} className="btn-teal rounded-full px-5 h-9">Continuer<ArrowRight className="h-4 w-4 ml-1" /></Button>
           )}
         </div>
       </div>
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remplacer les sections déjà rédigées ?</AlertDialogTitle>
-            <AlertDialogDescription>La rédaction IA écrit les 7 sections à partir de tes notes et de tes mesures. Les textes actuels seront écrasés.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setConfirmOpen(false); onCompose(); }} className="btn-teal">Rédiger</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

@@ -7,56 +7,42 @@ import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useBilanAutosave } from '@/hooks/useBilanAutosave';
-import { getBilan, getJob, abandonJob, attachPatient, composeBilan, composeBilanFromNotes, ApiError, StaleDraftError } from '@/utils/bilanApi';
-import { emptyBilanDocument, isProseOutdated, type AiBusy, type BilanJobKind, type BilanJobResult, type BilanJobView, type BilanRecord, type BilanSectionKey, type DictationChange, type ExtractionCandidate, type PatientSummary, type BilanType, type SectionWarnings } from '@/types/bilan';
+import { getBilan, getJob, abandonJob, attachPatient, composeBilan, composeBilanFromNotes, extractBilan, ApiError, StaleDraftError } from '@/utils/bilanApi';
+import { isProseOutdated, type AiBusy, type BilanJobKind, type BilanJobResult, type BilanJobView, type BilanRecord, type BilanSectionKey, type DictationChange, type PatientSummary, type BilanType, type SectionWarnings } from '@/types/bilan';
 import BilanEditorAlerts from '../components/editor/BilanEditorAlerts';
 import BilanSettingsLine from '../components/editor/BilanSettingsLine';
 import CaptureStep from '../components/editor/CaptureStep';
 import DictationFlow from '../components/editor/DictationFlow';
 import DocumentStep from '../components/editor/DocumentStep';
-import MeasuresDrawer, { DRAWER_SUGGESTIONS_ID } from '../components/editor/MeasuresDrawer';
+import EditorStepper from '../components/editor/EditorStepper';
+import MeasuresDrawer from '../components/editor/MeasuresDrawer';
+import MeasuresStep from '../components/editor/MeasuresStep';
 import { useDictation } from '../components/editor/useDictation';
 import { useMinWidth } from '../components/editor/useMinWidth';
 import { BILANS_REALISES_HREF } from '../components/bilansRealises';
 
-export type EditorStep = 'capture' | 'document';
-const isStep = (s: string | null): s is EditorStep => s === 'capture' || s === 'document';
+export type EditorStep = 'capture' | 'verification' | 'document';
+const isStep = (s: string | null): s is EditorStep => s === 'capture' || s === 'verification' || s === 'document';
 
-/** État IA repris du traitement serveur (dictée) pour rouvrir l'éditeur comme après « Rédiger avec l'IA » */
+/** Ce que le traitement serveur (dictée, séance) transmet à l'éditeur une fois les notes écrites */
 export interface InitialAi {
-  candidates: ExtractionCandidate[];
-  rejected: number;
-  quotes: Map<string, string>;
-  lastRun: { extracted: number; pending: number } | null;
-  warnings: SectionWarnings;
-  /** Remplacements faits par le correcteur pendant le traitement de séance (jamais affichés) */
+  /** Remplacements faits par le correcteur pendant le traitement (jamais affichés) */
   corrections: DictationChange[];
 }
 
-const toInitialAi = (r: BilanJobResult): InitialAi => ({
-  candidates: [], // extraction débranchée (spec 2026-09-23) : ni suggestions, ni tiroir forcé ouvert
-  rejected: r.rejected,
-  quotes: new Map(r.accepted.map((a) => [a.id, a.quote])),
-  lastRun: null, // plus de bandeau « mesures extraites »
-  warnings: r.warnings,
-  corrections: r.corrections ?? [],
-});
+const toInitialAi = (r: BilanJobResult): InitialAi => ({ corrections: r.corrections ?? [] });
 
-// Éditeur de bilan V1 : un état (useBilanAutosave), deux étapes, tiroir Mesures
-function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSession }: { initial: BilanRecord; initialStep: EditorStep; initialAi?: InitialAi; forceDrawerOpen?: boolean; fromSession?: boolean }) {
+// Éditeur de bilan : un état (useBilanAutosave), trois étapes Notes → Mesures → Document (spec
+// 2026-09-26), tiroir Mesures aux étapes Notes et Document
+function BilanEditor({ initial, initialStep, initialAi }: { initial: BilanRecord; initialStep: EditorStep; initialAi?: InitialAi }) {
   const router = useRouter();
   const { toast } = useToast();
-  const { record, update, flush, saveState, savedAt, pending, errorMessage, reload, replaceRecord } = useBilanAutosave(initial);
+  const { record, update, flush, saveState, errorMessage, reload, replaceRecord } = useBilanAutosave(initial);
   const [step, setStep] = useState<EditorStep>(initialStep);
   const locked = saveState === 'stale';
 
-  // État IA, non persisté (spec §9.2) : candidats d'extraction, appel en cours, avertissements de rédaction
-  // Suggestions d'extraction : plus alimentées (extraction débranchée, spec 2026-09-23). `null` et non
-  // `[]` : une liste vide afficherait le panneau « 0 suggestion ». Câblage gardé pour le rebranchement.
-  const [candidates, setCandidates] = useState<ExtractionCandidate[] | null>(null);
-  const [rejectedCount, setRejectedCount] = useState(initialAi?.rejected ?? 0);
   const [aiBusy, setAiBusy] = useState<AiBusy>(null);
-  const [warnings, setWarnings] = useState<SectionWarnings>(initialAi?.warnings ?? {});
+  const [warnings, setWarnings] = useState<SectionWarnings>({});
   // Garde de réentrance : `aiBusy` n'est posé qu'après le flush, une fenêtre où un double clic
   // lancerait deux appels IA (closure périmée). Le ref, lui, est synchrone.
   const aiLockRef = useRef(false);
@@ -66,15 +52,11 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
   // Tiroir Mesures : état mémorisé par navigateur ; sans valeur, ouvert sur grand écran (≥ 1280)
   const [drawerOpen, setDrawerOpen] = useState(false);
   useEffect(() => {
-    // Sortie de dictée avec des suggestions à vérifier : le tiroir s'ouvre quoi qu'en dise le stockage
-    if (forceDrawerOpen) { setDrawerOpen(true); return; }
     try {
       const v = localStorage.getItem('bilan.drawer.open');
       setDrawerOpen(v === null ? window.matchMedia('(min-width: 1280px)').matches : v === '1');
     } catch { /* stockage indisponible : replié */ }
-  }, [forceDrawerOpen]);
-  // Ouvre le tiroir sans toucher à la préférence mémorisée : le kiné qui le referme toujours
-  // le retrouvera replié au bilan suivant. Une génération doit juste le lui remettre sous les yeux.
+  }, []);
   const revealDrawer = () => setDrawerOpen(true);
   const setDrawer = (open: boolean) => {
     setDrawerOpen(open);
@@ -93,21 +75,34 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
     initialChanges: initialAi?.corrections,
   });
 
-  const openSuggestions = () => {
-    setDrawer(true);
-    // Double rAF : le nœud du tiroir n'existe qu'après le commit React de l'ouverture (commit après l'état, puis défilement)
-    requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(DRAWER_SUGGESTIONS_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' })));
-  };
-
-  // Citations des mesures acceptées automatiquement à la dernière rédaction (session)
-  const [quotes, setQuotes] = useState<Map<string, string>>(initialAi?.quotes ?? new Map());
-  // Bandeau de la page Document : résultat de la dernière rédaction (session)
-  const [lastRun, setLastRun] = useState<{ extracted: number; pending: number } | null>(initialAi?.lastRun ?? null);
   // Type du bilan au moment de la dernière rédaction. Le changer après coup ne casse rien (les
   // sections sont les mêmes pour les trois types), mais le texte a été écrit sous un autre angle :
   // on le signale, on ne réécrit rien. État de session.
-  const [composedType, setComposedType] = useState<BilanType | null>(initialAi ? initial.type : null);
+  const [composedType, setComposedType] = useState<BilanType | null>(null);
 
+  const handleAiError = (e: unknown, title: string) => {
+    if (e instanceof StaleDraftError) { toast({ title: 'Bilan modifié ailleurs', description: 'Rechargement de la dernière version…' }); void reload(); return; }
+    if (e instanceof ApiError && e.status === 429) { toast({ title: 'Trop de demandes', description: 'Patiente une minute avant de relancer l’IA', variant: 'destructive' }); return; }
+    if (e instanceof ApiError && e.code === 'PLAN_REQUIRED') { toast({ title: 'Plan requis', description: 'L’IA du bilan est disponible dès le plan Pratique', variant: 'destructive' }); return; }
+    toast({ title, description: (e as Error).message, variant: 'destructive' });
+  };
+
+  // « Rédiger le bilan » depuis les notes : l'extraction seule (lignes prouvées au tableau, les
+  // autres à vérifier), puis l'étape Mesures. Notes inchangées : le serveur ne rappelle rien.
+  const handleExtract = async () => {
+    if (aiLockRef.current) return;
+    aiLockRef.current = true;
+    if (!(await flush())) { toast(FLUSH_PENDING); aiLockRef.current = false; return; }
+    setAiBusy('extract');
+    try {
+      const r = await extractBilan(record.id);
+      if (r.bilan) replaceRecord(r.bilan);
+      await goTo('verification');
+    } catch (e) { handleAiError(e, 'Analyse impossible'); }
+    finally { setAiBusy(null); aiLockRef.current = false; }
+  };
+
+  // « Rédiger le bilan » depuis l'étape Mesures : le rédacteur, sur le tableau validé
   const handleComposeFromNotes = async () => {
     if (aiLockRef.current) return;
     aiLockRef.current = true;
@@ -117,35 +112,13 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
       const r = await composeBilanFromNotes(record.id);
       replaceRecord(r.bilan);
       setWarnings(r.warnings);
-      setRejectedCount(r.rejected);
-      setQuotes(new Map(r.accepted.map((a) => [a.id, a.quote])));
       setComposedType(r.bilan.type);
       await goTo('document');
-    } catch (e) {
-      // Rédaction en échec après l'écriture des mesures : rien n'est perdu, on montre le tableau
-      if (e instanceof ApiError && e.code === 'COMPOSE_FAILED' && e.body.measurementsSaved === true) {
-        toast({ title: 'Mesures ajoutées, rédaction impossible', description: 'Tes mesures sont dans le tableau. Relance « Rédiger avec l’IA » dans un instant.', variant: 'destructive' });
-        // Le bandeau et les suggestions de la précédente tentative ne décrivent plus ce bilan
-        setLastRun(null);
-        setCandidates(null);
-        try { await reload(); } catch (err) { handleAiError(err, 'Rechargement impossible'); return; }
-        await goTo('document');
-        return;
-      }
-      if (e instanceof ApiError && e.code === 'EXTRACTION_FAILED') { handleAiError(e, 'Analyse impossible'); return; }
-      handleAiError(e, 'Rédaction impossible');
-    } finally { setAiBusy(null); aiLockRef.current = false; }
+    } catch (e) { handleAiError(e, 'Rédaction impossible'); }
+    finally { setAiBusy(null); aiLockRef.current = false; }
   };
 
-  const handleAiError = (e: unknown, title: string) => {
-    if (e instanceof StaleDraftError) { toast({ title: 'Bilan modifié ailleurs', description: 'Rechargement de la dernière version…' }); void reload(); return; }
-    if (e instanceof ApiError && e.status === 429) { toast({ title: 'Trop de demandes', description: 'Patiente une minute avant de relancer l’IA', variant: 'destructive' }); return; }
-    if (e instanceof ApiError && e.code === 'PLAN_REQUIRED') { toast({ title: 'Plan requis', description: 'L’IA du bilan est disponible dès le plan Pratique', variant: 'destructive' }); return; }
-    toast({ title, description: (e as Error).message, variant: 'destructive' });
-  };
-
-  // Extraction : flush d'abord (le serveur lit les notes en base), puis ouverture du tiroir Mesures
-  // Rédaction : flush, appel, puis l'état local est remplacé par le bilan renvoyé (sections écrites, statut GENERE)
+  // Reprise depuis la page Document : toutes les sections, ou une seule
   const handleCompose = async (sections?: BilanSectionKey[]): Promise<boolean> => {
     if (aiLockRef.current) return false;
     aiLockRef.current = true;
@@ -206,6 +179,8 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
   // tient au rechargement (spec 2026-09-23 §6). Un avertissement de rédaction déjà posé passe devant.
   const shownWarnings: SectionWarnings = !warnings.examen && record.document && isProseOutdated(record.document) ? { ...warnings, examen: 'measures_changed' } : warnings;
 
+  const busy = locked || aiBusy !== null;
+
   return (
     <TooltipProvider>
       <div className="flex flex-col min-h-full">
@@ -215,24 +190,28 @@ function BilanEditor({ initial, initialStep, initialAi, forceDrawerOpen, fromSes
           onReload={() => { void reload(); }}
           onRetry={() => { void flush(); }}
         />
-        {/* Type et patient se règlent ici, en phrase, comme à l'accueil du module — et restent
-            visibles aux deux étapes. Pas de stepper : les boutons de bas de page font la navigation. */}
-        <div className="px-3 sm:px-4 py-2 border-b border-border/40">
+        {/* Type, patient et motif se règlent ici, en phrase, comme à l'accueil du module. Dessous,
+            l'indicateur d'étapes permet de revenir à n'importe laquelle (stepper non linéaire). */}
+        <div className="px-3 sm:px-4 py-2 border-b border-border/40 flex flex-col gap-2">
           <BilanSettingsLine
             record={record}
             onBack={() => { void handleBack(); }}
             onTypeChange={(t: BilanType) => update({ type: t })}
             onPatientChange={handlePatientChange}
             onMotifChange={(motif) => update({ motif })}
-            disabled={locked || aiBusy !== null || dictating}
+            disabled={busy || dictating}
           />
+          {/* Notes → Mesures passe par l'analyse, comme le bouton du bas : sans elle, le tableau
+              serait périmé si les notes ont changé (notes inchangées : servi par le cache serveur) */}
+          <EditorStepper step={step} onSelect={(s) => { void (step === 'capture' && s === 'verification' && (record.rawNotes ?? '').trim() ? handleExtract() : goTo(s)); }} disabled={busy || dictating} />
         </div>
         <div className="flex-1 min-h-0 flex">
-          <div className="flex-1 min-w-0 pb-12 lg:pb-0">
-            {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onNext={() => goTo('document')} onCompose={() => { void handleComposeFromNotes(); }} composing={aiBusy === 'compose_from_notes'} dictation={dictation} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} />}
-            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={locked || aiBusy !== null} onBack={() => goTo('capture')} onCompose={handleCompose} aiBusy={aiBusy} warnings={shownWarnings} onSectionEdited={clearWarning} lastRun={lastRun} onVerify={openSuggestions} onDismissRun={() => setLastRun(null)} wide={wide} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} fromSession={fromSession} composedType={composedType} />}
+          <div className={`flex-1 min-w-0 ${step === 'verification' ? '' : 'pb-12 lg:pb-0'}`}>
+            {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={busy} onNext={() => { void goTo('verification'); }} onExtract={() => { void handleExtract(); }} extracting={aiBusy === 'extract'} dictation={dictation} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} />}
+            {step === 'verification' && <MeasuresStep record={record} update={update} disabled={busy} wide={wide} onBack={() => { void goTo('capture'); }} onCompose={() => { void handleComposeFromNotes(); }} onSkip={() => { void goTo('document'); }} composing={aiBusy === 'compose_from_notes'} />}
+            {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={busy} onBack={() => { void goTo('verification'); }} onCompose={handleCompose} aiBusy={aiBusy} warnings={shownWarnings} onSectionEdited={clearWarning} wide={wide} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} composedType={composedType} />}
           </div>
-          <MeasuresDrawer record={record} update={update} disabled={locked || aiBusy !== null} candidates={candidates} rejectedCount={rejectedCount} onCandidatesChange={setCandidates} aiBusy={aiBusy} open={drawerOpen} onOpenChange={setDrawer} wide={wide} quotes={quotes} />
+          {step !== 'verification' && <MeasuresDrawer record={record} update={update} disabled={busy} open={drawerOpen} onOpenChange={setDrawer} wide={wide} />}
         </div>
       </div>
     </TooltipProvider>
@@ -248,7 +227,7 @@ export default function BilanEditorPage() {
 
   const bilanId = Number(params.bilanId);
   const stepParam = searchParams.get('step');
-  const initialStep: EditorStep = stepParam === 'verification' ? 'document' : isStep(stepParam) ? stepParam : 'capture';
+  const initialStep: EditorStep = isStep(stepParam) ? stepParam : 'capture';
   const modeParam = searchParams.get('mode');
   // Traitement serveur (dictée) : sert d'aiguillage à l'ouverture, puis d'état IA initial une fois terminé
   const [job, setJob] = useState<BilanJobView | null>(null);
@@ -285,7 +264,7 @@ export default function BilanEditorPage() {
     return () => { cancelled = true; };
   }, [bilanId, router, toast]);
 
-  // Fin du flux : le serveur a écrit les notes et le document, on relit le bilan et on ouvre le document
+  // Fin du flux : le serveur a écrit les notes ; on relit le bilan et on ouvre l'étape Notes
   const handleDone = useCallback(async (j: BilanJobView) => {
     try {
       const fresh = await getBilan(bilanId);
@@ -294,7 +273,7 @@ export default function BilanEditorPage() {
       setFlow('editor');
       const url = new URL(window.location.href);
       url.searchParams.delete('mode');
-      url.searchParams.set('step', 'verification');
+      url.searchParams.set('step', 'capture');
       window.history.replaceState(null, '', url.toString());
     } catch (e) {
       toast({ title: 'Rechargement impossible', description: (e as Error).message, variant: 'destructive' });
@@ -346,11 +325,9 @@ export default function BilanEditorPage() {
     return <DictationFlow key={`flow-${state.bilan.id}`} bilan={state.bilan} kind={flowKind} initialJob={job} onDone={handleDone} onWrite={handleWrite} />;
   }
   const initialAi = job?.status === 'DONE' && job.result ? toInitialAi(job.result) : undefined;
-  // Bilan déjà rédigé : on ouvre sur le document, pas sur les notes — soit parce que le traitement
-  // de dictée vient d'aboutir (initialAi), soit parce que le document a déjà été composé (statut
-  // GENERE, posé à la première composition). Le statut n'est consulté qu'à l'ouverture (flow
-  // « auto ») : après « Rédiger moi-même », le kiné veut ses notes même sur un bilan déjà généré.
-  const composed = initialAi !== undefined || (flow === 'auto' && state.bilan.status === 'GENERE');
-  const step: EditorStep = composed && (flow === 'editor' || stepParam === null) ? 'document' : initialStep;
-  return <BilanEditor key={`${state.bilan.id}-${flow}`} initial={state.bilan} initialStep={step} initialAi={initialAi} forceDrawerOpen={Boolean(initialAi && initialAi.candidates.length > 0)} fromSession={job?.kind === 'SESSION'} />;
+  // Bilan déjà rédigé rouvert depuis la liste : on arrive sur le document. Une fin de dictée ou de
+  // séance (flow « editor ») ouvre les notes : la rédaction part de l'étape Mesures.
+  const composed = flow === 'auto' && state.bilan.status === 'GENERE';
+  const step: EditorStep = composed && stepParam === null ? 'document' : initialStep;
+  return <BilanEditor key={`${state.bilan.id}-${flow}`} initial={state.bilan} initialStep={step} initialAi={initialAi} />;
 }

@@ -1,5 +1,5 @@
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import type { BilanJobKind, BilanJobView, BilanListItem, BilanPatch, BilanRecord, BilanSectionKey, BilanStatus, BilanType, ComposeFromNotesResult, ComposeResult, DictationChange, ExtractionResult } from '@/types/bilan';
+import type { BilanJobKind, BilanJobView, BilanListItem, BilanPatch, BilanRecord, BilanSectionKey, BilanStatus, BilanType, ComposeResult, DictationChange, ExtractResult } from '@/types/bilan';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -93,10 +93,10 @@ export async function deleteBilan(id: number): Promise<'hard' | 'soft'> {
   return r.deleted;
 }
 
-/** Analyse des notes : candidats cités, rien n'est écrit dans le bilan. */
-export async function extractBilan(id: number): Promise<ExtractionResult> {
-  const r = await call<ExtractionResult>(`/${id}/extract`, jsonInit('POST'));
-  return { candidates: r.candidates, rejected: r.rejected };
+/** « Rédiger le bilan » depuis les notes : analyse, lignes prouvées écrites au tableau, lignes à vérifier gardées dans le document. */
+export async function extractBilan(id: number): Promise<ExtractResult> {
+  const r = await call<ExtractResult>(`/${id}/extract`, jsonInit('POST'));
+  return { bilan: r.bilan ?? null, cached: r.cached === true, filled: r.filled ?? 0, pending: r.pending ?? 0, rejected: r.rejected ?? 0 };
 }
 
 /** Rédaction IA : toutes les sections (défaut) ou celles demandées. Renvoie le bilan mis à jour. */
@@ -105,10 +105,10 @@ export async function composeBilan(id: number, sections?: BilanSectionKey[]): Pr
   return { bilan: r.bilan, warnings: r.warnings ?? {} };
 }
 
-/** « Rédiger avec l'IA » : extraction, acceptation automatique, rédaction des 7 sections, en un appel. */
-export async function composeBilanFromNotes(id: number): Promise<ComposeFromNotesResult> {
-  const r = await call<ComposeFromNotesResult>(`/${id}/compose-from-notes`, jsonInit('POST'));
-  return { bilan: r.bilan, warnings: r.warnings ?? {}, accepted: r.accepted ?? [], pending: r.pending ?? [], rejected: r.rejected ?? 0 };
+/** « Rédiger le bilan » depuis l'étape Mesures : les 7 sections, sur le tableau validé. */
+export async function composeBilanFromNotes(id: number): Promise<ComposeResult> {
+  const r = await call<ComposeResult>(`/${id}/compose-from-notes`, jsonInit('POST'));
+  return { bilan: r.bilan, warnings: r.warnings ?? {} };
 }
 
 /** Le worker de dictée est-il configuré et prêt ? (résultat mis en cache 30 s côté serveur) */

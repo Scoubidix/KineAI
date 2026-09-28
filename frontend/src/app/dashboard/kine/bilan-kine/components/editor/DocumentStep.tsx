@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ArrowLeft, AlertTriangle, Copy, Mail, Download, Check, PanelRightOpen, UserPlus, Loader2, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Copy, Mail, Download, Check, PanelRightOpen, UserPlus, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import DocumentSheet from './DocumentSheet';
 import { DRAWER_ACTIONS_ID } from './MeasuresDrawer';
@@ -26,16 +26,11 @@ export interface DocumentStepProps {
   aiBusy: AiBusy;
   warnings: SectionWarnings;
   onSectionEdited: (key: BilanSectionKey) => void;
-  lastRun: { extracted: number; pending: number } | null;
-  onVerify: () => void;
   /** Ouvre le panneau des mesures (fermé, il n'a plus de rail : sa commande est dans la barre) */
   onOpenMeasures: () => void;
   measuresOpen: boolean;
-  onDismissRun: () => void;
   /** ≥ 1024 px : pied de page classique. Sinon, les actions se fondent dans la barre repliée du tiroir. */
   wide: boolean;
-  /** Bilan issu d'une séance : les notes sont la transcription, le bouton doit le dire */
-  fromSession?: boolean;
   /** Type du bilan à la dernière rédaction : s'il diffère du type courant, le texte est décalé */
   composedType?: BilanType | null;
 }
@@ -44,7 +39,7 @@ const FLUSH_PENDING_TOAST = { title: 'Sauvegarde en attente, réessaie dans un i
 // Sentinelle interne : un flush non abouti annule l'export sans être une erreur à afficher telle quelle
 const FLUSH_ABORT = '__flush_pending__';
 
-export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited, lastRun, onVerify, onDismissRun, wide, onOpenMeasures, measuresOpen, fromSession, composedType }: DocumentStepProps) {
+export default function DocumentStep({ record, update, flush, replaceRecord, disabled, onBack, onCompose, aiBusy, warnings, onSectionEdited, wide, onOpenMeasures, measuresOpen, composedType }: DocumentStepProps) {
   const { toast } = useToast();
   const doc = record.document ?? emptyBilanDocument();
   const [evolution, setEvolution] = useState(false);
@@ -148,7 +143,7 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
   const toolbar = (
     <div className="mx-auto w-full max-w-[794px] grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-1">
       <div className="flex items-center">
-        <Button variant="ghost" size="sm" onClick={onBack} className="h-9 text-sm"><ArrowLeft className="h-4 w-4 mr-1" />{fromSession ? 'Transcription' : 'Notes'}</Button>
+        <Button variant="ghost" size="sm" onClick={onBack} className="h-9 text-sm"><ArrowLeft className="h-4 w-4 mr-1" />Mesures</Button>
       </div>
       {measuresOpen ? <span /> : (
         <Button variant="outline" size="sm" onClick={onOpenMeasures} className="h-9 text-sm rounded-full border-[#3899aa]/50 text-[#3899aa] hover:bg-[#3899aa]/10">
@@ -173,20 +168,6 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
       <Button size="sm" onClick={() => { void onCompose(); }} disabled={disabled || !hasNotes || aiBusy !== null} aria-label="Régénérer tout le bilan sous le bon type" className="btn-teal h-7 text-xs rounded-full">
         {aiBusy === 'compose' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}Régénérer
       </Button>
-    </div>
-  );
-
-  // Bandeau de résultat de la dernière rédaction IA : nombre de mesures extraites, à vérifier ou non
-  const plural = (n: number, s: string) => `${n} ${s}${n > 1 ? 's' : ''}`;
-  const banner = lastRun && (
-    <div role="status" className="mx-auto w-full max-w-[794px] flex items-center gap-2 rounded-lg border border-[#3899aa]/40 bg-[#3899aa]/5 px-3 py-2 text-xs">
-      <Sparkles className="h-3.5 w-3.5 text-[#3899aa] shrink-0" />
-      <span className="flex-1">
-        {lastRun.extracted === 0 ? 'Aucune mesure reconnue dans les notes' : `${plural(lastRun.extracted, 'mesure')} extraite${lastRun.extracted > 1 ? 's' : ''}${lastRun.pending > 0 ? `, ${lastRun.pending} à vérifier` : ''}`}
-      </span>
-      {lastRun.pending > 0
-        ? <Button size="sm" onClick={onVerify} className="btn-teal h-7 text-xs rounded-full">Vérifier</Button>
-        : <button type="button" onClick={onDismissRun} aria-label="Fermer" className="p-0.5 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
     </div>
   );
 
@@ -229,7 +210,7 @@ export default function DocumentStep({ record, update, flush, replaceRecord, dis
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 px-3 sm:px-4 py-3">
-        <div className="flex flex-col gap-3 bg-muted/30 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4">{toolbar}{typeBanner}{banner}{sheet}</div>
+        <div className="flex flex-col gap-3 bg-muted/30 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4">{toolbar}{typeBanner}{sheet}</div>
       </div>
       {actionsHost ? createPortal(actions, actionsHost) : (
         <div className="sticky bottom-12 lg:bottom-0 px-3 sm:px-4 py-2">
