@@ -104,8 +104,8 @@
     <h1>Contrat de Sous-traitance</h1>
     <p style="font-size: 1.1em; color: #4b5563;">Data Processing Agreement (DPA) — Article 28 du RGPD</p>
     <div class="version-info">
-        <strong>Version 1.2</strong><br>
-        Dernière mise à jour : 15 juillet 2026<br>
+        <strong>Version 1.3</strong><br>
+        Dernière mise à jour : 28 septembre 2026<br>
         Lien permanent : <a href="https://app.monassistantkine.fr/legal/dpa.html">https://app.monassistantkine.fr/legal/dpa.html</a>
     </div>
 </div>
@@ -323,6 +323,12 @@ DPO désigné auprès de la CNIL : Valentin JEAN — monassistantkine@gmail.com<
             <td>DPA signé, données non utilisées pour l'entraînement des modèles</td>
         </tr>
         <tr>
+            <td><strong>OpenRouter</strong></td>
+            <td>Correction des dictées et repérage des mesures du bilan — données pseudonymisées uniquement</td>
+            <td>États-Unis (fournisseurs d'inférence hors UE possibles)</td>
+            <td>DPA OpenRouter, fournisseurs à zéro rétention exclusivement, données non utilisées pour l'entraînement des modèles</td>
+        </tr>
+        <tr>
             <td><strong>Stripe</strong></td>
             <td>Traitement des paiements par carte bancaire</td>
             <td>Irlande (Union Européenne)</td>
@@ -350,7 +356,7 @@ DPO désigné auprès de la CNIL : Valentin JEAN — monassistantkine@gmail.com<
 </table>
 
 <div class="highlight-box">
-    <strong>Transferts hors UE :</strong> Les données pseudonymisées transmises à OpenAI (États-Unis) sont protégées par le EU-US Data Privacy Framework et les Clauses Contractuelles Types (CCT). Les données ne sont pas utilisées pour l'entraînement des modèles et ne sont pas stockées au-delà du traitement de la requête. Mistral AI est hébergé dans l'Union Européenne (pas de transfert hors UE). Vercel n'a accès à aucune donnée patient (hébergement statique uniquement).
+    <strong>Transferts hors UE :</strong> Les données pseudonymisées transmises à OpenAI (États-Unis) sont protégées par le EU-US Data Privacy Framework et les Clauses Contractuelles Types (CCT). Les données ne sont pas utilisées pour l'entraînement des modèles et ne sont pas stockées au-delà du traitement de la requête. Mistral AI est hébergé dans l'Union Européenne (pas de transfert hors UE). Les données pseudonymisées transmises à OpenRouter ne sont acheminées que vers des fournisseurs d'inférence à zéro rétention, qui ne les utilisent pas pour l'entraînement ; le modèle utilisé (DeepSeek, modèle à poids ouverts) est exécuté par ces fournisseurs et aucune donnée n'est transmise à la société DeepSeek. Vercel n'a accès à aucune donnée patient (hébergement statique uniquement).
 </div>
 
 <h3>6.2 Obligations relatives aux sous-traitants ultérieurs</h3>
@@ -376,7 +382,7 @@ DPO désigné auprès de la CNIL : Valentin JEAN — monassistantkine@gmail.com<
 <h3>7.1 Localisation principale</h3>
 <p>Les données patients sont stockées en <strong>France</strong>, sur l'infrastructure Clever Cloud, certifiée Hébergeur de Données de Santé (HDS).</p>
 
-<h3>7.2 Transferts vers les États-Unis</h3>
+<h3>7.2 Transferts hors Union Européenne</h3>
 <p>La génération par intelligence artificielle réalisée via Mistral AI est hébergée dans l'Union Européenne et ne constitue pas un transfert hors UE.</p>
 <p>Des transferts de données pseudonymisées sont effectués vers les États-Unis uniquement pour la génération par intelligence artificielle (OpenAI). Ces transferts sont encadrés par :</p>
 <ul>
@@ -384,6 +390,13 @@ DPO désigné auprès de la CNIL : Valentin JEAN — monassistantkine@gmail.com<
     <li>Les <strong>Clauses Contractuelles Types</strong> (CCT) de la Commission Européenne</li>
     <li>La <strong>pseudonymisation préalable</strong> des données (aucune donnée directement identifiante n'est transmise)</li>
     <li>La <strong>non-utilisation des données pour l'entraînement</strong> des modèles et l'absence de stockage au-delà du traitement</li>
+</ul>
+<p>La correction des dictées et le repérage des mesures du bilan sont réalisés via OpenRouter (États-Unis), qui achemine les données pseudonymisées vers des fournisseurs d'inférence susceptibles d'être situés hors de l'Union Européenne. Ces traitements sont encadrés par :</p>
+<ul>
+    <li>Le <strong>DPA OpenRouter</strong></li>
+    <li>La <strong>pseudonymisation préalable</strong> des données (aucune donnée directement identifiante n'est transmise)</li>
+    <li>L'acheminement exclusif vers des <strong>fournisseurs à zéro rétention</strong>, qui ne conservent pas les données et ne les utilisent pas pour l'entraînement des modèles</li>
+    <li>Le modèle utilisé (DeepSeek, modèle à poids ouverts) est exécuté par ces fournisseurs : <strong>aucune donnée n'est transmise à la société DeepSeek</strong></li>
 </ul>
 
 <!-- ==================== ARTICLE 8 ==================== -->
@@ -396,7 +409,7 @@ DPO désigné auprès de la CNIL : Valentin JEAN — monassistantkine@gmail.com<
 <h3>8.2 Modalités pratiques</h3>
 <p>L'audit peut prendre la forme de :</p>
 <ul>
-    <li>Mise à disposition des certifications et attestations des sous-traitants ultérieurs (HDS Clever Cloud, ISO 27001, PCI DSS Stripe, DPA OpenAI et Mistral AI)</li>
+    <li>Mise à disposition des certifications et attestations des sous-traitants ultérieurs (HDS Clever Cloud, ISO 27001, PCI DSS Stripe, DPA OpenAI, Mistral AI et OpenRouter)</li>
     <li>Réponse à un questionnaire écrit de conformité, dans un délai de 30 jours</li>
     <li>Audit sur site ou à distance, sur demande motivée du RT, avec un préavis de 30 jours et à la charge du RT</li>
 </ul>

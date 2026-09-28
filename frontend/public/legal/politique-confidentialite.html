@@ -135,8 +135,8 @@
 <div class="header">
     <h1>Politique de Confidentialité</h1>
     <div class="version-info">
-        <strong>Mon Assistant Kiné — Version 3.5</strong><br>
-        Dernière mise à jour : 26 septembre 2026<br>
+        <strong>Mon Assistant Kiné — Version 3.6</strong><br>
+        Dernière mise à jour : 28 septembre 2026<br>
         Lien permanent : <a href="https://app.monassistantkine.fr/legal/politique-confidentialite.html">https://app.monassistantkine.fr/legal/politique-confidentialite.html</a>
     </div>
 </div>
@@ -262,7 +262,7 @@
 <h3>Traitement par Intelligence Artificielle</h3>
 <div class="warning-box">
     <p><strong>Pseudonymisation Rigoureuse</strong></p>
-    <p>Toutes les données patients transmises à nos systèmes d'IA (OpenAI, Mistral AI) font l'objet d'une <strong>pseudonymisation rigoureuse préalable</strong> :</p>
+    <p>Toutes les données patients transmises à nos systèmes d'IA (OpenAI, Mistral AI, OpenRouter) font l'objet d'une <strong>pseudonymisation rigoureuse préalable</strong> :</p>
     <ul>
         <li>Suppression des noms, prénoms, adresses et identifiants directs</li>
         <li>Seules les informations strictement nécessaires sont transmises (âge, pathologie, objectifs)</li>
@@ -316,6 +316,12 @@
             <td><strong>Mistral AI</strong></td>
             <td>Données patients pseudonymisées</td>
             <td>Génération IA</td>
+            <td>Contrat + DPA</td>
+        </tr>
+        <tr>
+            <td><strong>OpenRouter</strong></td>
+            <td>Données patients pseudonymisées (notes et dictées du bilan)</td>
+            <td>Correction des dictées et repérage des mesures du bilan (IA)</td>
             <td>Contrat + DPA</td>
         </tr>
         <tr>
@@ -626,7 +632,7 @@
 <div class="warning-box">
     <p><strong>Localisation des Données</strong></p>
     <p><strong>Principe :</strong> Données hébergées en France — bases de données et serveurs applicatifs sur Clever Cloud (certifié HDS), fichiers utilisateurs sur Google Cloud Storage (région europe-west9, Paris). Le traitement IA réalisé par Mistral AI est hébergé dans l'Union Européenne.</p>
-    <p><strong>Exception :</strong> OpenAI (États-Unis) pour le traitement IA uniquement, avec données pseudonymisées</p>
+    <p><strong>Exception :</strong> OpenAI (États-Unis) et OpenRouter (États-Unis) pour le traitement IA uniquement, avec données pseudonymisées</p>
 </div>
 
 <div class="info-box">
@@ -637,6 +643,7 @@
         <li><strong>EU-US Data Privacy Framework :</strong> Cadre d'adéquation reconnu par la Commission Européenne (10 juillet 2023)</li>
         <li><strong>Minimisation :</strong> Seules les données strictement nécessaires</li>
         <li><strong>Zero data retention :</strong> Rétention des données désactivée sur le compte API OpenAI</li>
+        <li><strong>Zéro rétention et non-entraînement (OpenRouter) :</strong> Les requêtes ne sont acheminées que vers des fournisseurs d'inférence qui ne conservent pas les données et ne les utilisent pas pour l'entraînement. Le modèle utilisé (DeepSeek, modèle à poids ouverts) est exécuté par ces fournisseurs : aucune donnée n'est transmise à la société DeepSeek</li>
     </ul>
     <p class="legal-ref">Le détail des sous-traitants ultérieurs et des garanties est disponible dans le <a href="dpa.html">Contrat de Sous-traitance (DPA)</a>.</p>
 </div>
@@ -688,7 +695,7 @@
 <hr>
 
 <p style="text-align: center; font-size: 0.9em; color: #666; margin-top: 30px;">
-    <em>Politique de confidentialité mise à jour le 15 juillet 2026 — Version 3.4</em><br>
+    <em>Politique de confidentialité mise à jour le 28 septembre 2026 — Version 3.6</em><br>
     <strong>SAS Mon Assistant Kiné - SIRET : 38936059900017</strong>
 </p>
 
