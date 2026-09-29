@@ -87,8 +87,8 @@ function BilanEditor({ initial, initialStep, initialAi }: { initial: BilanRecord
     toast({ title, description: (e as Error).message, variant: 'destructive' });
   };
 
-  // « Rédiger le bilan » depuis les notes : l'extraction seule (lignes prouvées au tableau, les
-  // autres à vérifier), puis l'étape Mesures. Notes inchangées : le serveur ne rappelle rien.
+  // « Analyser mes notes » : l'extraction seule (lignes prouvées au tableau, les autres à
+  // vérifier), puis l'étape Mesures. Notes inchangées : le serveur ne rappelle rien.
   const handleExtract = async () => {
     if (aiLockRef.current) return;
     aiLockRef.current = true;
@@ -208,7 +208,7 @@ function BilanEditor({ initial, initialStep, initialAi }: { initial: BilanRecord
         <div className="flex-1 min-h-0 flex">
           <div className={`flex-1 min-w-0 ${step === 'verification' ? '' : 'pb-12 lg:pb-0'}`}>
             {step === 'capture' && <CaptureStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={busy} onNext={() => { void goTo('verification'); }} onExtract={() => { void handleExtract(); }} extracting={aiBusy === 'extract'} dictation={dictation} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} />}
-            {step === 'verification' && <MeasuresStep record={record} update={update} disabled={busy} wide={wide} onBack={() => { void goTo('capture'); }} onCompose={() => { void handleComposeFromNotes(); }} onSkip={() => { void goTo('document'); }} composing={aiBusy === 'compose_from_notes'} />}
+            {step === 'verification' && <MeasuresStep record={record} update={update} disabled={busy} wide={wide} onCompose={() => { void handleComposeFromNotes(); }} onSkip={() => { void goTo('document'); }} composing={aiBusy === 'compose_from_notes'} />}
             {step === 'document' && <DocumentStep record={record} update={update} flush={flush} replaceRecord={replaceRecord} disabled={busy} onBack={() => { void goTo('verification'); }} onCompose={handleCompose} aiBusy={aiBusy} warnings={shownWarnings} onSectionEdited={clearWarning} wide={wide} onOpenMeasures={revealDrawer} measuresOpen={drawerOpen} composedType={composedType} />}
           </div>
           {step !== 'verification' && <MeasuresDrawer record={record} update={update} disabled={busy} open={drawerOpen} onOpenChange={setDrawer} wide={wide} />}
@@ -233,6 +233,10 @@ export default function BilanEditorPage() {
   const [job, setJob] = useState<BilanJobView | null>(null);
   // Dictée et séance partagent le même flux d'écrans : seul le genre du traitement change
   const [flow, setFlow] = useState<'auto' | 'dictation' | 'editor'>(modeParam === 'session' ? 'dictation' : 'auto');
+  // Étape d'ouverture décidée en fin de traitement (Notes, ou Mesures après une séance analysée)
+  const [openStep, setOpenStep] = useState<EditorStep | null>(null);
+  // Séance terminée, analyse des notes en cours : l'écran de fin de traitement l'annonce
+  const [analysing, setAnalysing] = useState(false);
 
   useEffect(() => {
     if (!Number.isInteger(bilanId) || bilanId <= 0) { setState({ status: 'error', message: 'Identifiant de bilan invalide' }); return; }
@@ -264,16 +268,34 @@ export default function BilanEditorPage() {
     return () => { cancelled = true; };
   }, [bilanId, router, toast]);
 
-  // Fin du flux : le serveur a écrit les notes ; on relit le bilan et on ouvre l'étape Notes
+  // Fin du flux : le serveur a écrit les notes. Après une séance, pas de relecture de la
+  // transcription avant les mesures : l'analyse part aussitôt et l'étape Mesures s'ouvre (les notes
+  // y restent consultables). La dictée, qui s'alterne avec l'écriture, rouvre l'étape Notes. Une
+  // analyse en échec rouvre aussi les notes, d'où « Analyser mes notes » la relance.
   const handleDone = useCallback(async (j: BilanJobView) => {
     try {
-      const fresh = await getBilan(bilanId);
+      let fresh: BilanRecord | null = null;
+      let step: EditorStep = 'capture';
+      if (j.kind === 'SESSION') {
+        setAnalysing(true);
+        try {
+          fresh = (await extractBilan(bilanId)).bilan;
+          step = 'verification';
+        } catch {
+          toast({ title: 'Analyse impossible', description: 'Relance-la depuis tes notes avec « Analyser mes notes »', variant: 'destructive' });
+        } finally {
+          setAnalysing(false);
+        }
+      }
+      // Notes inchangées depuis une analyse précédente : le serveur ne renvoie pas le bilan
+      fresh = fresh ?? await getBilan(bilanId);
       setState({ status: 'ready', bilan: fresh });
       setJob(j);
+      setOpenStep(step);
       setFlow('editor');
       const url = new URL(window.location.href);
       url.searchParams.delete('mode');
-      url.searchParams.set('step', 'capture');
+      url.searchParams.set('step', step);
       window.history.replaceState(null, '', url.toString());
     } catch (e) {
       toast({ title: 'Rechargement impossible', description: (e as Error).message, variant: 'destructive' });
@@ -322,12 +344,12 @@ export default function BilanEditorPage() {
     // retrait du mode se reprennent normalement, même si plus rien n'en crée de nouveaux.
     const flowKind: BilanJobKind = job?.kind ?? 'SESSION';
     // Rappels stables (useCallback) : l'effet de fin de flux de DictationFlow ne doit se déclencher qu'une fois
-    return <DictationFlow key={`flow-${state.bilan.id}`} bilan={state.bilan} kind={flowKind} initialJob={job} onDone={handleDone} onWrite={handleWrite} />;
+    return <DictationFlow key={`flow-${state.bilan.id}`} bilan={state.bilan} kind={flowKind} initialJob={job} onDone={handleDone} onWrite={handleWrite} analysing={analysing} />;
   }
   const initialAi = job?.status === 'DONE' && job.result ? toInitialAi(job.result) : undefined;
-  // Bilan déjà rédigé rouvert depuis la liste : on arrive sur le document. Une fin de dictée ou de
-  // séance (flow « editor ») ouvre les notes : la rédaction part de l'étape Mesures.
+  // Bilan déjà rédigé rouvert depuis la liste : on arrive sur le document. Une fin de dictée
+  // (flow « editor ») ouvre les notes, une fin de séance l'étape Mesures (openStep).
   const composed = flow === 'auto' && state.bilan.status === 'GENERE';
-  const step: EditorStep = composed && stepParam === null ? 'document' : initialStep;
+  const step: EditorStep = openStep ?? (composed && stepParam === null ? 'document' : initialStep);
   return <BilanEditor key={`${state.bilan.id}-${flow}`} initial={state.bilan} initialStep={step} initialAi={initialAi} />;
 }

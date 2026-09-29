@@ -26,6 +26,7 @@ interface InlineMeasureSearchProps {
   permanent?: boolean;
   /** Action posée à droite du champ (l'accès aux templates) */
   trailing?: React.ReactNode;
+  placeholder?: string;
 }
 
 const MAX_RESULTS = 5;
@@ -75,6 +76,7 @@ export default function InlineMeasureSearch({
   onOpenChange,
   permanent = false,
   trailing,
+  placeholder = 'Ajouter un test : EVA, Lasègue, lombaire…',
 }: InlineMeasureSearchProps) {
   const isControlled = controlledOpen !== undefined;
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
@@ -236,8 +238,8 @@ export default function InlineMeasureSearch({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ajouter un test : EVA, Lasègue, lombaire…"
-          className={permanent ? 'pl-8 h-9 text-sm' : 'pl-8 pr-8 h-8 text-sm'}
+          placeholder={placeholder}
+          className={permanent ? 'pl-8 h-9 text-base md:text-sm' : 'pl-8 pr-8 h-8 text-base md:text-sm'}
           disabled={disabled}
         />
         {!permanent && (

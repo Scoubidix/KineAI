@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Loader2, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { emptyBilanDocument, type BilanJobKind, type BilanJobView, type BilanRecord, type DocumentMeasurement, type PatientSummary } from '@/types/bilan';
 import { attachPatient } from '@/utils/bilanApi';
@@ -26,10 +26,12 @@ interface DictationFlowProps {
   initialJob: BilanJobView | null;
   onDone: (job: BilanJobView) => void;
   onWrite: () => void;
+  /** Séance terminée : l'analyse des notes est en cours avant l'ouverture de l'étape Mesures */
+  analysing?: boolean;
 }
 
 // Flux « Dicter → Bilan » : enregistrement, puis attente ; l'éditeur n'apparaît qu'à la fin.
-export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite }: DictationFlowProps) {
+export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite, analysing = false }: DictationFlowProps) {
   const router = useRouter();
   // Même autosave que l'éditeur : un seul chemin d'écriture, débounce et contrôle de version
   // compris. Sans lui, une mesure saisie caractère par caractère partirait en une requête par
@@ -115,10 +117,16 @@ export default function DictationFlow({ bilan, kind, initialJob, onDone, onWrite
         <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 py-10 text-center">
           <div className="text-5xl font-semibold tabular-nums text-[#3899aa]" aria-hidden>100 %</div>
           <Progress value={100} className="w-full max-w-md h-2" />
-          <p className="text-sm text-muted-foreground" role="status">Notes prêtes</p>
-          <Button variant="outline" onClick={() => { if (state.job) { doneRef.current = true; onDone(state.job); } }}>
-            <RotateCcw className="h-4 w-4 mr-2" />Réessayer l’ouverture
-          </Button>
+          {analysing ? (
+            <p className="text-sm text-muted-foreground inline-flex items-center gap-2" role="status"><Loader2 className="h-4 w-4 animate-spin" />Recherche des tests et mesures…</p>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground" role="status">Notes prêtes</p>
+              <Button variant="outline" onClick={() => { if (state.job) { doneRef.current = true; onDone(state.job); } }}>
+                <RotateCcw className="h-4 w-4 mr-2" />Réessayer l’ouverture
+              </Button>
+            </>
+          )}
         </div>
       ) : state.phase === 'processing' || state.phase === 'failed' ? (
         <ProcessingScreen

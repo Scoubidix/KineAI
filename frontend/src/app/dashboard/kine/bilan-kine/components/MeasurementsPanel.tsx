@@ -30,8 +30,9 @@ import InlineMeasureSearch from './InlineMeasureSearch';
 import ApplyTemplateModal from './ApplyTemplateModal';
 import SideSelector from './SideSelector';
 import TestGuideButton from '@/components/bilan/TestGuideButton';
-import { formatCandidateValue, measurementIdentity } from './editor/suggestions';
-import { REASON_LABELS, type Resolution } from './editor/review';
+import { measurementIdentity } from './editor/suggestions';
+import type { Resolution } from './editor/review';
+import PendingCard from './editor/PendingCard';
 
 interface MeasurementsPanelProps {
   measurements: DocumentMeasurement[];
@@ -42,8 +43,10 @@ interface MeasurementsPanelProps {
   /** Étape Mesures : lignes à vérifier, rendues dans la catégorie de leur champ (spec 2026-09-26 §3.2) */
   pending?: ReviewCandidate[];
   onResolve?: (id: string, r: Resolution) => void;
-  /** Étape Mesures : toucher une citation montre les notes surlignées. Sans elle, la citation est une icône. */
+  /** Étape Mesures : l'icône de citation (ou le libellé) montre les notes surlignées. Sans elle, l'icône n'est qu'un repère. */
   onShowQuote?: (quote: string) => void;
+  /** Étape Mesures : pas de barre de progression, le décompte est dans l'en-tête de l'étape */
+  hideProgress?: boolean;
   /** Retrait d'une ligne géré par l'hôte (il mémorise les lignes venues des notes) */
   onRemove?: (index: number) => void;
   /** Conteneur étroit (tiroir, feuille du bas) : la ligne s'empile au lieu de se couper */
@@ -77,6 +80,7 @@ export default function MeasurementsPanel({
   onShowQuote,
   onRemove,
   dense = false,
+  hideProgress = false,
 }: MeasurementsPanelProps) {
   const { toast } = useToast();
   const [fields, setFields] = useState<CanonicalField[]>([]);
@@ -375,7 +379,7 @@ export default function MeasurementsPanel({
                 min={rangeMin ?? undefined}
                 max={rangeMax ?? undefined}
                 disabled={disabled}
-                className="h-8 text-sm w-28"
+                className="h-8 text-base md:text-sm w-28"
               />
               {field.unit && <span className="text-xs text-muted-foreground shrink-0">{field.unit}</span>}
             </div>
@@ -415,7 +419,7 @@ export default function MeasurementsPanel({
             value={value === null || value === undefined ? '' : (value as string)}
             onChange={(e) => handleChangeAt(index, e.target.value === '' ? null : e.target.value)}
             disabled={disabled}
-            className="h-8 text-sm flex-1"
+            className="h-8 text-base md:text-sm flex-1"
           />
         );
       case 'ENUM':
@@ -424,7 +428,7 @@ export default function MeasurementsPanel({
             value={value === null || value === undefined ? '' : (value as string)}
             onChange={(e) => handleChangeAt(index, e.target.value === '' ? null : e.target.value)}
             disabled={disabled}
-            className="h-8 text-sm rounded-md border border-input bg-background px-2 flex-1"
+            className="h-8 text-base md:text-sm rounded-md border border-input bg-background px-2 flex-1"
           >
             <option value="">— Choisir —</option>
             {(field.options ?? []).map((opt) => (
@@ -439,16 +443,20 @@ export default function MeasurementsPanel({
     }
   };
 
-  // Citation des notes : en toutes lettres sous la mesure à l'étape Mesures (touchée → notes
-  // surlignées), simple icône ailleurs (tiroir, consultation)
-  const quoteLine = (q: string) => (
-    <button type="button" onClick={() => onShowQuote?.(q)} className="mt-1 flex w-full items-start gap-1.5 text-left text-[13px] italic leading-snug text-muted-foreground hover:text-[#3899aa] min-h-7">
-      <Quote className="h-3 w-3 mt-[3px] shrink-0" /><span className="min-w-0 break-words">« {q} »</span>
-    </button>
-  );
-  const renderQuote = (m: DocumentMeasurement) => (!m.quote || onShowQuote ? null : (
-    <span title={`D’après tes notes : « ${m.quote} »`} aria-label={`D’après tes notes : ${m.quote}`} className="inline-flex shrink-0 text-muted-foreground"><Quote className="h-3 w-3" /></span>
-  ));
+  // Citation des notes : une icône sur la ligne, sans hauteur en plus. À l'étape Mesures elle (comme
+  // le libellé) ouvre les notes surlignées ; ailleurs (tiroir, consultation) c'est un simple repère.
+  const renderQuote = (m: DocumentMeasurement) => {
+    if (!m.quote) return null;
+    if (onShowQuote) {
+      const q = m.quote;
+      return (
+        <button type="button" onClick={() => onShowQuote(q)} aria-label="Voir dans tes notes" title="Voir dans tes notes" className="inline-flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground hover:text-[#3899aa]">
+          <Quote className="h-3.5 w-3.5" />
+        </button>
+      );
+    }
+    return <span title={`D’après tes notes : « ${m.quote} »`} aria-label={`D’après tes notes : ${m.quote}`} className="inline-flex shrink-0 text-muted-foreground"><Quote className="h-3 w-3" /></span>;
+  };
 
   const formatPrevious = (v: CanonicalValue, unit?: string | null): string => {
     if (typeof v === 'boolean') return v ? 'Positif' : 'Négatif';
@@ -500,7 +508,7 @@ export default function MeasurementsPanel({
           onChange={(e) => handleChangeAt(row.index, e.target.value)}
           placeholder="Valeur libre"
           disabled={disabled}
-          className="h-8 text-sm flex-1 min-w-0"
+          className="h-8 text-base md:text-sm flex-1 min-w-0"
         />
       );
     const previous = renderPrevious(m, m.kind === 'canonical' ? field?.unit : undefined);
@@ -509,13 +517,15 @@ export default function MeasurementsPanel({
         <X className="h-3 w-3" />
       </Button>
     );
-    const labelClass = `text-sm font-medium leading-snug break-words hyphens-auto${m.kind === 'custom' ? ' italic text-muted-foreground' : ''}`;
+    const labelClass = `text-sm font-medium leading-snug break-words hyphens-auto${m.kind === 'custom' ? ' italic text-muted-foreground' : ''}${onShowQuote && m.quote ? ' cursor-pointer' : ''}`;
+    // Le libellé d'une ligne venue des notes ouvre aussi les notes (cible plus grande que l'icône)
+    const openNotes = onShowQuote && m.quote ? () => onShowQuote(m.quote!) : undefined;
 
     if (dense) {
       return (
         <div key={`row-${row.index}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
           <div className="flex items-start gap-2">
-            <span className={`${labelClass} flex-1 min-w-0`} title={labelTitle}>{label}</span>
+            <span className={`${labelClass} flex-1 min-w-0`} title={labelTitle} onClick={openNotes}>{label}</span>
             {guideButton}
             {renderQuote(m)}
             {removeButton}
@@ -525,7 +535,6 @@ export default function MeasurementsPanel({
             {input}
             {previous}
           </div>
-          {onShowQuote && m.quote && quoteLine(m.quote)}
         </div>
       );
     }
@@ -534,7 +543,7 @@ export default function MeasurementsPanel({
       <div key={`row-${row.index}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
         <div className="flex items-start gap-2">
           <span className="flex w-36 shrink-0 items-start gap-1 sm:w-56">
-            <span className={`${labelClass} min-w-0`} title={labelTitle}>{label}</span>
+            <span className={`${labelClass} min-w-0`} title={labelTitle} onClick={openNotes}>{label}</span>
             {guideButton}
           </span>
           {sideSelector}
@@ -543,66 +552,14 @@ export default function MeasurementsPanel({
           {renderQuote(m)}
           {removeButton}
         </div>
-        {onShowQuote && m.quote && quoteLine(m.quote)}
       </div>
     );
   };
 
-  /**
-   * Ligne à vérifier, à sa place dans le tableau (spec 2026-09-26 §3.2, modèle « inline error » du
-   * GOV.UK Design System) : la raison en clair, la citation, et des réponses en un geste.
-   */
-  const renderPending = (c: ReviewCandidate) => {
-    const isConflict = c.reasons.includes('conflict');
-    const outOfRange = c.reasons.includes('out_of_range');
-    const needsResult = c.fieldType === 'BOOLEAN' && (c.reasons.includes('result_uncertain') || c.reasons.includes('result_contradicted'));
-    const needsSide = c.lateralized && (c.reasons.includes('side_absent') || c.reasons.includes('side_contradicted'));
-    const label = (c.kind === 'canonical' ? fieldsByKey.get(c.key ?? '')?.label : undefined) ?? c.label;
-    const shown = formatCandidateValue(c);
-    const existing = formatCandidateValue({ value: c.existingValue ?? null, unit: c.unit });
-    const chip = 'h-9 rounded-full px-3.5 text-sm font-medium border bg-white dark:bg-card disabled:opacity-50';
-    const primary = `${chip} border-[#3899aa] text-[#3899aa]`;
-    const neutral = `${chip} border-border`;
-    const keep = (r: { side?: Side | 'DG'; value?: CanonicalValue } = {}) => onResolve?.(c.id, { kind: 'keep', ...r });
-    const dismiss = () => onResolve?.(c.id, { kind: 'dismiss' });
-    return (
-      <div key={`pending-${c.id}`} id={`pending-${c.id}`} className="rounded-md border-l-[3px] border-amber-500 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-2">
-        <div className="flex items-start justify-between gap-2">
-          <span className="text-sm font-medium break-words">{label}{c.side && !needsSide ? ` ${c.side}` : ''}</span>
-          {!isConflict && <span className="text-sm font-semibold tabular-nums shrink-0">{shown}</span>}
-        </div>
-        <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
-          {isConflict
-            ? <>Tu avais saisi <b>{existing}</b>, tes notes disent <b>{shown}</b>.{outOfRange ? ' Valeur inhabituelle.' : ''}</>
-            : c.reasons.map((r) => REASON_LABELS[r]).join(' · ')}
-        </p>
-        {onShowQuote ? quoteLine(c.quote) : null}
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {isConflict ? (
-            <>
-              {/* Valeur des notes hors bornes : elle ne peut pas remplacer la valeur saisie */}
-              {!outOfRange && <button type="button" className={primary} onClick={() => keep()} disabled={disabled}>Prendre {shown}</button>}
-              <button type="button" className={outOfRange ? primary : neutral} onClick={dismiss} disabled={disabled}>Garder {existing}</button>
-            </>
-          ) : needsResult ? (
-            <>
-              <button type="button" className={primary} onClick={() => keep({ value: true })} disabled={disabled}>Positif</button>
-              <button type="button" className={primary} onClick={() => keep({ value: false })} disabled={disabled}>Négatif</button>
-            </>
-          ) : needsSide ? (
-            <>
-              <button type="button" className={primary} onClick={() => keep({ side: 'D' })} disabled={disabled}>Droit</button>
-              <button type="button" className={primary} onClick={() => keep({ side: 'G' })} disabled={disabled}>Gauche</button>
-              <button type="button" className={neutral} onClick={() => keep({ side: 'DG' })} disabled={disabled}>Les deux</button>
-            </>
-          ) : (
-            <button type="button" className={primary} onClick={() => keep()} disabled={disabled}>Garder</button>
-          )}
-          {!isConflict && <button type="button" className="h-9 px-2 text-sm text-muted-foreground disabled:opacity-50" onClick={dismiss} disabled={disabled}>Ne pas reprendre</button>}
-        </div>
-      </div>
-    );
-  };
+  // Ligne à vérifier, à sa place dans le tableau (spec 2026-09-26 §3.2)
+  const renderPending = (c: ReviewCandidate) => (
+    <PendingCard key={`pending-${c.id}`} candidate={c} fields={fields} onResolve={(id, r) => onResolve?.(id, r)} onShowQuote={onShowQuote} disabled={disabled} />
+  );
 
   const hasMeasures = stats.globalTotal > 0;
   const progressPercent =
@@ -645,7 +602,7 @@ export default function MeasurementsPanel({
 
       {showTable && (
         <>
-          <div className="flex items-center gap-2 px-2 py-1">
+          {!hideProgress && <div className="flex items-center gap-2 px-2 py-1">
             <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-[#3899aa] rounded-full transition-all duration-300"
@@ -687,7 +644,7 @@ export default function MeasurementsPanel({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          </div>
+          </div>}
 
           {isCompactMode ? (
             <div className="space-y-1">

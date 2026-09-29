@@ -30,13 +30,13 @@ const PLACEHOLDER = `Note tes observations en vrac...
 Ex : maçon, lombalgie chronique depuis 3 mois suite port de charge. ATCD : hernie discale L4-L5 opérée 2018. Douleur bas du dos irradiant fesse droite, EVA 5/10 repos 7/10 effort. Flexion lombaire limitée 40°, Lasègue négatif, paravertébraux contracturés...`;
 
 export interface CaptureStepProps extends StepProps {
-  /** « Rédiger le bilan » : l'extraction seule, puis l'étape Mesures (spec 2026-09-26 §1) */
+  /** « Analyser mes notes » : l'extraction seule, puis l'étape Mesures (spec 2026-09-26 §1) */
   onExtract: () => void;
   extracting: boolean;
   dictation: ReturnType<typeof useDictation>;
 }
 
-// Étape 1 : les notes (écrites, dictées ou transcrites). « Rédiger le bilan » lance l'analyse,
+// Étape 1 : les notes (écrites, dictées ou transcrites). « Analyser mes notes » lance l'analyse,
 // puis l'étape Mesures.
 export default function CaptureStep({ record, update, disabled, onNext, onExtract, extracting, dictation, onOpenMeasures, measuresOpen }: CaptureStepProps) {
   const notesLength = (record.rawNotes ?? '').length;
@@ -141,7 +141,7 @@ export default function CaptureStep({ record, update, disabled, onNext, onExtrac
         <div className="flex items-center gap-2 ml-auto">
           {hasNotes ? (
             <Button onClick={onExtract} disabled={disabled || extracting || dictating} className="btn-teal rounded-full px-5 h-9">
-              {extracting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}Rédiger le bilan<ArrowRight className="h-4 w-4 ml-1" />
+              {extracting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}Analyser mes notes<ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
             <Button onClick={onNext} disabled={disabled || dictating} className="btn-teal rounded-full px-5 h-9">Continuer<ArrowRight className="h-4 w-4 ml-1" /></Button>
