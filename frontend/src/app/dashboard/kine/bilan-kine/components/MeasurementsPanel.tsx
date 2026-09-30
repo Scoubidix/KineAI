@@ -30,7 +30,7 @@ import InlineMeasureSearch from './InlineMeasureSearch';
 import ApplyTemplateModal from './ApplyTemplateModal';
 import SideSelector from './SideSelector';
 import TestGuideButton from '@/components/bilan/TestGuideButton';
-import { measurementIdentity } from './editor/suggestions';
+import { measurementIdentity, measureRowId } from './editor/suggestions';
 import type { Resolution } from './editor/review';
 import PendingCard from './editor/PendingCard';
 
@@ -293,11 +293,17 @@ export default function MeasurementsPanel({
     }
     return map;
   }, [pendingItems, fieldsByKey]);
-  // Ordre des catégories : celui des mesures, puis celles qui n'ont que des lignes à vérifier
-  const categoryOrder = useMemo(
-    () => [...groups.keys(), ...[...pendingByCategory.keys()].filter((c) => !groups.has(c))],
-    [groups, pendingByCategory],
-  );
+  // Ordre des catégories : celui des mesures, puis celles qui n'ont que des lignes à vérifier. Il
+  // reste stable tant que le panneau est ouvert : une catégorie qui ne portait que des cartes ne
+  // change pas de place quand sa première ligne arrive (rien ne doit sauter pendant la vérification).
+  const categoryOrderRef = useRef<string[]>([]);
+  const categoryOrder = useMemo(() => {
+    const current = [...groups.keys(), ...[...pendingByCategory.keys()].filter((c) => !groups.has(c))];
+    const kept = categoryOrderRef.current.filter((c) => current.includes(c));
+    const next = [...kept, ...current.filter((c) => !kept.includes(c))];
+    categoryOrderRef.current = next;
+    return next;
+  }, [groups, pendingByCategory]);
 
   const stats = useMemo(() => {
     const cats = new Map<string, { filled: number; total: number }>();
@@ -545,7 +551,7 @@ export default function MeasurementsPanel({
 
     if (dense) {
       return (
-        <div key={`row-${row.index}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
+        <div key={`row-${row.index}`} data-measure-row={measurementIdentity(m)} className="px-2 py-1.5 rounded hover:bg-muted/40">
           <div className="flex items-start gap-2">
             <span className={`${labelClass} flex-1 min-w-0`} title={labelTitle} onClick={openNotes}>{label}</span>
             {guideButton}
@@ -562,7 +568,7 @@ export default function MeasurementsPanel({
     }
 
     return (
-      <div key={`row-${row.index}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
+      <div key={`row-${row.index}`} data-measure-row={measurementIdentity(m)} className="px-2 py-1.5 rounded hover:bg-muted/40">
         <div className="flex items-start gap-2">
           <span className="flex min-h-8 w-36 shrink-0 items-center gap-1 sm:w-56">
             <span className={`${labelClass} min-w-0`} title={labelTitle} onClick={openNotes}>{label}</span>
@@ -647,14 +653,14 @@ export default function MeasurementsPanel({
 
     if (dense) {
       return (
-        <div key={`pair-${field.key}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
+        <div key={`pair-${field.key}`} data-measure-row={`c:${field.key}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
           <div className="flex items-start gap-2">{head}{removeButton}</div>
           <div className="mt-1 flex">{cells}</div>
         </div>
       );
     }
     return (
-      <div key={`pair-${field.key}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
+      <div key={`pair-${field.key}`} data-measure-row={`c:${field.key}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
         <div className="flex items-start gap-2">
           <span className="flex min-h-8 w-36 shrink-0 items-center gap-1 sm:w-56">{head}</span>
           {cells}
@@ -665,6 +671,35 @@ export default function MeasurementsPanel({
   };
 
   const renderRows = (rows: RowWithIndex[]) => toDisplay(rows).map((d) => (d.kind === 'pair' ? renderPair(d.pair) : renderRow(d.row)));
+
+  /**
+   * Lignes d'une catégorie avec ses cartes à vérifier, chacune à l'endroit où sa ligne arrivera
+   * (continuité spatiale : la carte devient la ligne sur place) : sous la ligne existante du même
+   * test (autre côté, conflit), sinon en fin de catégorie, là où une nouvelle ligne est ajoutée.
+   */
+  const renderCategory = (rows: RowWithIndex[], cards: ReviewCandidate[]) => {
+    const display = toDisplay(rows);
+    const anchorOf = (d: DisplayRow) => (d.kind === 'pair' ? `c:${d.pair.field.key}` : measurementIdentity(d.row.measurement));
+    const anchors = new Set(display.map(anchorOf));
+    const underRow = new Map<string, ReviewCandidate[]>();
+    const tail: ReviewCandidate[] = [];
+    for (const c of cards) {
+      const a = measureRowId(c);
+      if (anchors.has(a)) underRow.set(a, [...(underRow.get(a) ?? []), c]);
+      else tail.push(c);
+    }
+    return (
+      <>
+        {display.map((d) => (
+          <React.Fragment key={d.kind === 'pair' ? `pair-${d.pair.field.key}` : `row-${d.row.index}`}>
+            {d.kind === 'pair' ? renderPair(d.pair) : renderRow(d.row)}
+            {(underRow.get(anchorOf(d)) ?? []).map(renderPending)}
+          </React.Fragment>
+        ))}
+        {tail.map(renderPending)}
+      </>
+    );
+  };
 
   // Ligne à vérifier, à sa place dans le tableau (spec 2026-09-26 §3.2)
   const renderPending = (c: ReviewCandidate) => (
@@ -806,7 +841,7 @@ export default function MeasurementsPanel({
                       }`}
                     >
                       <div className="overflow-hidden">
-                        <div className="space-y-0.5 p-1">{catPending.map(renderPending)}{renderRows(rows)}</div>
+                        <div className="space-y-0.5 p-1">{renderCategory(rows, catPending)}</div>
                       </div>
                     </div>
                   </div>

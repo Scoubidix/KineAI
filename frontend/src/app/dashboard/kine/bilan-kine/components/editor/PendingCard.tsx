@@ -225,12 +225,16 @@ export default function PendingCard({ candidate: c, fields, onResolve, onShowQuo
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {SIDE_OPTIONS.map((o) => <button key={o.key} type="button" className={outlineBtn} onClick={() => keep({ side: o.key })} disabled={disabled}>{o.label}</button>)}
           </div>
-          <button type="button" className={`${linkBtn} mt-1`} onClick={() => setEditing(true)} disabled={disabled}>Modifier</button>
+          <div className="mt-1 flex items-center gap-4">
+            <button type="button" className={linkBtn} onClick={() => setEditing(true)} disabled={disabled}>Modifier</button>
+            <button type="button" className={`${linkBtn} ml-auto`} onClick={dismiss} disabled={disabled}>Ne pas reprendre</button>
+          </div>
         </>
       ) : (
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <button type="button" className={filledBtn} onClick={() => keep()} disabled={disabled}>Confirmer</button>
           <button type="button" className={outlineBtn} onClick={() => setEditing(true)} disabled={disabled}>Modifier</button>
+          <button type="button" className={`${linkBtn} ml-auto`} onClick={dismiss} disabled={disabled}>Ne pas reprendre</button>
         </div>
       )}
     </div>

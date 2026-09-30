@@ -3,6 +3,13 @@ import type { CanonicalValue, DocumentMeasurement } from '@/types/bilan';
 export const measurementIdentity = (m: DocumentMeasurement): string =>
   m.kind === 'canonical' ? `c:${m.key}:${m.side ?? ''}` : `x:${m.label.trim().toLowerCase()}`;
 
+/**
+ * Ligne du tableau où arrive une mesure (attribut `data-measure-row` de MeasurementsPanel) : un
+ * test latéralisé n'a qu'une ligne pour ses deux côtés, les autres ont l'identité de leur mesure.
+ */
+export const measureRowId = (t: { kind: 'canonical' | 'custom'; key?: string; label: string; lateralized: boolean }): string =>
+  t.kind === 'custom' ? `x:${t.label.trim().toLowerCase()}` : t.lateralized ? `c:${t.key}` : `c:${t.key}:`;
+
 export function formatCandidateValue(c: { value: CanonicalValue; unit: string | null }): string {
   if (typeof c.value === 'boolean') return c.value ? 'Positif' : 'Négatif';
   if (c.value === null) return '—';

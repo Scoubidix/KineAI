@@ -9,6 +9,8 @@ import MeasurementsPanel from '../MeasurementsPanel';
 import HighlightedNotes from './HighlightedNotes';
 import { useMeasuresReference } from './useMeasuresReference';
 import { removeMeasurements, resolvePending, type Resolution } from './review';
+import { closeGap, snapshotCard } from './closeGap';
+import { measureRowId } from './suggestions';
 import { emptyBilanDocument, type BilanPatch, type BilanRecord, type DocumentMeasurement } from '@/types/bilan';
 
 export interface MeasuresStepProps {
@@ -59,8 +61,26 @@ export default function MeasuresStep({ record, update, disabled, wide, onCompose
     const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-pending]'));
     const i = cards.findIndex((el) => el.id === `pending-${id}`);
     const next = (cards[i + 1] ?? (i > 0 ? cards[0] : undefined))?.id;
-    update({ document: resolvePending(doc, id, r) });
-    if (next) setTimeout(() => goToCard(document.getElementById(next)), 0);
+    const c = pending.find((p) => p.id === id);
+    const nextDoc = resolvePending(doc, id, r);
+    // La carte devient sa ligne sur place : la ligne qui reçoit la valeur (ou, pour « Ne pas
+    // reprendre » et un retour en conflit, l'élément qui précédait la carte) referme l'espace
+    const written = (nextDoc.review?.pending.length ?? 0) < pending.length;
+    const rowId = c && r.kind === 'keep' && written ? measureRowId(r.retarget ?? c) : null;
+    const card = document.getElementById(`pending-${id}`);
+    const snap = card ? snapshotCard(card) : null;
+    // Sur ordinateur, à la souris, l'écran ne bouge pas (tout est visible, le saut dérange) ; au
+    // clavier (bouton actionné avec le focus visible), le focus suit toujours la carte suivante
+    const active = document.activeElement;
+    const followNext = !wide || (active instanceof HTMLElement && active.matches(':focus-visible'));
+    update({ document: nextDoc });
+    setTimeout(() => {
+      const row = rowId ? document.querySelector<HTMLElement>(`[data-measure-row="${CSS.escape(rowId)}"]`) : null;
+      const anchor = row ?? snap?.previous ?? null;
+      const settled = snap && anchor ? closeGap(snap, anchor, row !== null) : Promise.resolve();
+      // Le défilement attend que l'espace soit refermé : sinon il viserait une carte qui bouge encore
+      void settled.then(() => { if (next && followNext) goToCard(document.getElementById(next)); });
+    }, 0);
   };
   // « Vérifier » dans la confirmation : la fenêtre rend le focus au bouton qui l'a ouverte, on le
   // redirige vers la carte
