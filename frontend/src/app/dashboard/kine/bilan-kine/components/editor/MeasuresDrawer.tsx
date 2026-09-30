@@ -3,7 +3,7 @@ import React from 'react';
 import MeasurementsPanel from '../MeasurementsPanel';
 import MeasuresPane, { DRAWER_ACTIONS_ID, useDensePane } from './MeasuresPane';
 import { useMeasuresReference } from './useMeasuresReference';
-import { removeMeasurement } from './review';
+import { removeMeasurements } from './review';
 import { emptyBilanDocument, type BilanPatch, type BilanRecord, type DocumentMeasurement } from '@/types/bilan';
 
 /** Ré-exporté depuis le meuble, qui en est désormais propriétaire */
@@ -33,7 +33,7 @@ export default function MeasuresDrawer({ record, update, disabled, open, onOpenC
     <MeasuresPane summary="Tests et mesures" open={open} onOpenChange={onOpenChange} wide={wide}>
       <div className="flex flex-col gap-3 p-3">
         {referenceLine}
-        <MeasurementsPanel measurements={doc.measurements} onChange={setMeasurements} onRemove={(i) => update({ document: removeMeasurement(doc, i) })} disabled={disabled} previousValues={previousValues} dense={dense} />
+        <MeasurementsPanel measurements={doc.measurements} onChange={setMeasurements} onRemove={(indices) => update({ document: removeMeasurements(doc, indices) })} disabled={disabled} previousValues={previousValues} dense={dense} />
       </div>
       {referenceModal}
     </MeasuresPane>

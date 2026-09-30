@@ -8,7 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import MeasurementsPanel from '../MeasurementsPanel';
 import HighlightedNotes from './HighlightedNotes';
 import { useMeasuresReference } from './useMeasuresReference';
-import { removeMeasurement, resolvePending, type Resolution } from './review';
+import { removeMeasurements, resolvePending, type Resolution } from './review';
 import { emptyBilanDocument, type BilanPatch, type BilanRecord, type DocumentMeasurement } from '@/types/bilan';
 
 export interface MeasuresStepProps {
@@ -88,7 +88,7 @@ export default function MeasuresStep({ record, update, disabled, wide, onCompose
           <MeasurementsPanel
             measurements={doc.measurements}
             onChange={setMeasurements}
-            onRemove={(i) => update({ document: removeMeasurement(doc, i) })}
+            onRemove={(indices) => update({ document: removeMeasurements(doc, indices) })}
             pending={pending}
             onResolve={handleResolve}
             onShowQuote={showQuote}

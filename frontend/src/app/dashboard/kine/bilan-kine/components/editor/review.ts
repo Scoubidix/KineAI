@@ -76,11 +76,16 @@ export function resolvePending(doc: BilanDocument, id: string, r: Resolution): B
   return { ...doc, measurements, review: { ...review, pending } };
 }
 
-/** Retire une mesure du tableau ; venue des notes, elle ne sera pas reproposée par une nouvelle analyse. */
-export function removeMeasurement(doc: BilanDocument, index: number): BilanDocument {
-  const m = doc.measurements[index];
-  if (!m) return doc;
-  const measurements = doc.measurements.filter((_, i) => i !== index);
-  if (!m.quote || !doc.review) return { ...doc, measurements };
-  return { ...doc, measurements, review: withDismissed(doc, { id: measurementIdentity(m), quote: m.quote }) };
+/**
+ * Retire des mesures du tableau (une ligne, ou les deux côtés d'un test latéralisé) ; venues des
+ * notes, elles ne seront pas reproposées par une nouvelle analyse.
+ */
+export function removeMeasurements(doc: BilanDocument, indices: number[]): BilanDocument {
+  const gone = doc.measurements.filter((_, i) => indices.includes(i));
+  if (gone.length === 0) return doc;
+  let next: BilanDocument = { ...doc, measurements: doc.measurements.filter((_, i) => !indices.includes(i)) };
+  for (const m of gone) {
+    if (m.quote && next.review) next = { ...next, review: withDismissed(next, { id: measurementIdentity(m), quote: m.quote }) };
+  }
+  return next;
 }

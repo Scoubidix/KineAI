@@ -47,8 +47,8 @@ interface MeasurementsPanelProps {
   onShowQuote?: (quote: string) => void;
   /** Étape Mesures : pas de barre de progression, le décompte est dans l'en-tête de l'étape */
   hideProgress?: boolean;
-  /** Retrait d'une ligne géré par l'hôte (il mémorise les lignes venues des notes) */
-  onRemove?: (index: number) => void;
+  /** Retrait d'une ligne (les deux côtés pour un test latéralisé) géré par l'hôte : il mémorise les lignes venues des notes */
+  onRemove?: (indices: number[]) => void;
   /** Conteneur étroit (tiroir, feuille du bas) : la ligne s'empile au lieu de se couper */
   dense?: boolean;
 }
@@ -70,6 +70,18 @@ interface RowWithIndex {
   field?: CanonicalField; // résolu pour les canoniques
 }
 
+// Test latéralisé : ses côtés D et G sur une seule ligne, en colonnes (forme du tableau du PDF,
+// bilanRenderer/examen.js). Un côté absent est une case vide qu'on remplit directement.
+interface PairRow {
+  field: CanonicalField;
+  D?: RowWithIndex;
+  G?: RowWithIndex;
+}
+type DisplayRow = { kind: 'row'; row: RowWithIndex } | { kind: 'pair'; pair: PairRow };
+// Gauche à gauche, droite à droite : l'ordre de l'écran suit le côté du corps
+const SIDES: Side[] = ['G', 'D'];
+const SIDE_LABELS: Record<Side, string> = { D: 'Droit', G: 'Gauche' };
+
 export default function MeasurementsPanel({
   measurements,
   onChange,
@@ -86,12 +98,13 @@ export default function MeasurementsPanel({
   const [fields, setFields] = useState<CanonicalField[]>([]);
   const [applyTemplateOpen, setApplyTemplateOpen] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
-  // Indices des lignes NUMERIC dont la dernière saisie était hors bornes (message d'aide local)
-  const [rangeHints, setRangeHints] = useState<Map<number, string>>(new Map());
+  // Cases NUMERIC dont la dernière saisie était hors bornes (message d'aide local). Clé de case :
+  // l'index de la mesure, ou `new:<clé>:<côté>` pour la case vide d'un test latéralisé.
+  const [rangeHints, setRangeHints] = useState<Map<string, string>>(new Map());
   // Brouillon local par ligne NUMERIC (texte tel que tapé, tant qu'il n'est pas commis) :
   // permet de taper un nombre dont un préfixe est hors bornes (ex. "35" dans un champ 20-80,
   // le "3" seul est < 20) sans que l'input contrôlé ne revienne écraser la frappe en cours.
-  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -121,11 +134,10 @@ export default function MeasurementsPanel({
     [measurements],
   );
   const hasCanonical = (key: string, side?: Side) => addedCanonical.has(`${key}|${side ?? ''}`);
-  // Un champ est "complet" (plus proposable) si non latéralisé et présent, ou latéralisé avec D et G présents.
+  // Un champ est "complet" (plus proposable) dès qu'il a une ligne : un test latéralisé porte ses
+  // deux côtés sur la même ligne, le côté manquant est une case vide.
   const isFieldExhausted = (field: CanonicalField) =>
-    field.lateralized
-      ? hasCanonical(field.key, 'D') && hasCanonical(field.key, 'G')
-      : hasCanonical(field.key) || hasCanonical(field.key, 'D') || hasCanonical(field.key, 'G');
+    hasCanonical(field.key) || hasCanonical(field.key, 'D') || hasCanonical(field.key, 'G');
 
   const addedCustomLabels = useMemo(
     () =>
@@ -154,9 +166,9 @@ export default function MeasurementsPanel({
     onChange([...measurements, { kind: 'custom', label: trimmed, value: '', presentation: 'table', origin: 'manual' }]);
   };
 
-  const handleRemoveAt = (index: number) => {
-    if (onRemove) onRemove(index);
-    else onChange(measurements.filter((_, i) => i !== index));
+  const handleRemoveAt = (indices: number[]) => {
+    if (onRemove) onRemove(indices);
+    else onChange(measurements.filter((_, i) => !indices.includes(i)));
     // Les index décalent après suppression : on repart d'un état propre plutôt que
     // de remapper les brouillons/hints (aucune ligne n'est en cours de frappe à ce moment).
     setDrafts({});
@@ -173,6 +185,13 @@ export default function MeasurementsPanel({
         return { ...m, value: (value ?? '') as string, origin: 'manual' };
       }),
     );
+  };
+
+  // Case vide d'un test latéralisé : la première saisie crée la mesure de ce côté
+  const handleAddSide = (field: CanonicalField, side: Side, value: CanonicalValue) => {
+    if (value === null || hasCanonical(field.key, side)) return;
+    const presentation: Presentation = field.presentation === 'NARRATIVE' ? 'narrative' : 'table';
+    onChange([...measurements, { kind: 'canonical', key: field.key, value, side, presentation, origin: 'manual' }]);
   };
 
   const handleSideAt = (index: number, side: Side | undefined) => {
@@ -314,11 +333,14 @@ export default function MeasurementsPanel({
   const renderCanonicalInput = (
     field: CanonicalField,
     value: CanonicalValue,
-    index: number,
+    cell: string,
+    commit: (v: CanonicalValue) => void,
+    // Case d'une colonne D/G : le champ prend la largeur de la case au lieu d'une largeur fixe
+    fluid = false,
   ) => {
     switch (field.type) {
       case 'NUMERIC': {
-        const hint = rangeHints.get(index);
+        const hint = rangeHints.get(cell);
         const { rangeMin, rangeMax } = field;
         const outOfRangeHint = () =>
           rangeMin !== null && rangeMax !== null
@@ -326,20 +348,20 @@ export default function MeasurementsPanel({
             : rangeMin !== null
             ? `Supérieur à ${rangeMin}`
             : `Inférieur à ${rangeMax}`;
-        const clearHint = () => setRangeHints((prev) => { if (!prev.has(index)) return prev; const next = new Map(prev); next.delete(index); return next; });
-        const clearDraft = () => setDrafts((prev) => { if (!(index in prev)) return prev; const next = { ...prev }; delete next[index]; return next; });
-        const draft = drafts[index];
+        const clearHint = () => setRangeHints((prev) => { if (!prev.has(cell)) return prev; const next = new Map(prev); next.delete(cell); return next; });
+        const clearDraft = () => setDrafts((prev) => { if (!(cell in prev)) return prev; const next = { ...prev }; delete next[cell]; return next; });
+        const draft = drafts[cell];
         const displayValue = draft ?? (value === null || value === undefined ? '' : String(value as number));
         return (
-          <div className="flex flex-col gap-0.5 flex-1">
-            <div className="flex items-center gap-1.5">
+          <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
               <Input
                 type="number"
                 value={displayValue}
                 onChange={(e) => {
                   const raw = e.target.value;
                   if (raw === '') {
-                    handleChangeAt(index, null);
+                    commit(null);
                     clearHint();
                     clearDraft();
                     return;
@@ -347,30 +369,30 @@ export default function MeasurementsPanel({
                   const n = Number(raw);
                   if (Number.isNaN(n)) {
                     // Brouillon gardé tel quel (ex. "-" en cours de frappe), pas de commit
-                    setDrafts((prev) => ({ ...prev, [index]: raw }));
+                    setDrafts((prev) => ({ ...prev, [cell]: raw }));
                     return;
                   }
                   const outOfRange = (rangeMin !== null && n < rangeMin) || (rangeMax !== null && n > rangeMax);
                   if (outOfRange) {
                     // Hors bornes : le brouillon reste affiché (la frappe continue), on ne persiste pas
-                    setDrafts((prev) => ({ ...prev, [index]: raw }));
-                    setRangeHints((prev) => new Map(prev).set(index, outOfRangeHint()));
+                    setDrafts((prev) => ({ ...prev, [cell]: raw }));
+                    setRangeHints((prev) => new Map(prev).set(cell, outOfRangeHint()));
                     return;
                   }
                   clearHint();
                   clearDraft();
-                  handleChangeAt(index, n);
+                  commit(n);
                 }}
                 onBlur={() => {
-                  if (!(index in drafts)) return;
-                  const raw = drafts[index];
+                  if (!(cell in drafts)) return;
+                  const raw = drafts[cell];
                   const n = Number(raw);
                   const valid = raw !== '' && !Number.isNaN(n) && !((rangeMin !== null && n < rangeMin) || (rangeMax !== null && n > rangeMax));
                   if (valid) {
                     // Cas défensif : un brouillon valide n'a normalement pas survécu à l'onChange
                     // (déjà commis et effacé) — on le commet par sécurité et on efface le hint.
                     clearHint();
-                    handleChangeAt(index, n);
+                    commit(n);
                   }
                   // Sinon : brouillon hors bornes ou NaN abandonné, le champ revient à la
                   // dernière valeur commise, le hint reste visible pour expliquer pourquoi.
@@ -379,7 +401,7 @@ export default function MeasurementsPanel({
                 min={rangeMin ?? undefined}
                 max={rangeMax ?? undefined}
                 disabled={disabled}
-                className="h-8 text-base md:text-sm w-28"
+                className={`h-8 text-base md:text-sm ${fluid ? 'w-full min-w-0' : 'w-28'}`}
               />
               {field.unit && <span className="text-xs text-muted-foreground shrink-0">{field.unit}</span>}
             </div>
@@ -389,12 +411,12 @@ export default function MeasurementsPanel({
       }
       case 'BOOLEAN':
         return (
-          <div className="flex items-center gap-1 flex-1">
+          <div className="flex items-center gap-1 flex-1 min-w-0">
             <button
               type="button"
-              onClick={() => handleChangeAt(index, false)}
+              onClick={() => commit(false)}
               disabled={disabled}
-              className={`px-3 py-1 rounded-l text-xs font-medium transition-colors ${
+              className={`${fluid ? 'flex-1 min-w-0 px-1' : 'px-3'} py-1 rounded-l text-xs font-medium transition-colors ${
                 value === false ? 'bg-[#3899aa] text-white' : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
@@ -402,9 +424,9 @@ export default function MeasurementsPanel({
             </button>
             <button
               type="button"
-              onClick={() => handleChangeAt(index, true)}
+              onClick={() => commit(true)}
               disabled={disabled}
-              className={`px-3 py-1 rounded-r text-xs font-medium transition-colors ${
+              className={`${fluid ? 'flex-1 min-w-0 px-1' : 'px-3'} py-1 rounded-r text-xs font-medium transition-colors ${
                 value === true ? 'bg-[#3899aa] text-white' : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
             >
@@ -417,18 +439,18 @@ export default function MeasurementsPanel({
           <Input
             type="text"
             value={value === null || value === undefined ? '' : (value as string)}
-            onChange={(e) => handleChangeAt(index, e.target.value === '' ? null : e.target.value)}
+            onChange={(e) => commit(e.target.value === '' ? null : e.target.value)}
             disabled={disabled}
-            className="h-8 text-base md:text-sm flex-1"
+            className="h-8 text-base md:text-sm flex-1 min-w-0"
           />
         );
       case 'ENUM':
         return (
           <select
             value={value === null || value === undefined ? '' : (value as string)}
-            onChange={(e) => handleChangeAt(index, e.target.value === '' ? null : e.target.value)}
+            onChange={(e) => commit(e.target.value === '' ? null : e.target.value)}
             disabled={disabled}
-            className="h-8 text-base md:text-sm rounded-md border border-input bg-background px-2 flex-1"
+            className="h-8 text-base md:text-sm rounded-md border border-input bg-background px-2 flex-1 min-w-0"
           >
             <option value="">— Choisir —</option>
             {(field.options ?? []).map((opt) => (
@@ -485,7 +507,7 @@ export default function MeasurementsPanel({
       return (
         <div key={`row-${row.index}`} className="flex items-center gap-2 px-2 py-1 rounded bg-amber-500/5 border border-amber-500/20">
           <span className="text-sm flex-1 min-w-0 text-muted-foreground italic break-words">Champ inconnu : {m.key}</span>
-          <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveAt(row.index)} className="h-6 w-6 p-0 shrink-0">
+          <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveAt([row.index])} className="h-6 w-6 p-0 shrink-0">
             <X className="h-3 w-3" />
           </Button>
         </div>
@@ -500,7 +522,7 @@ export default function MeasurementsPanel({
       ? <SideSelector value={m.side} onChange={(s) => handleSideAt(row.index, s)} disabled={disabled} />
       : null;
     const input = m.kind === 'canonical' && field
-      ? renderCanonicalInput(field, m.value, row.index)
+      ? renderCanonicalInput(field, m.value, String(row.index), (v) => handleChangeAt(row.index, v))
       : (
         <Input
           type="text"
@@ -513,7 +535,7 @@ export default function MeasurementsPanel({
       );
     const previous = renderPrevious(m, m.kind === 'canonical' ? field?.unit : undefined);
     const removeButton = (
-      <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveAt(row.index)} disabled={disabled} className="h-6 w-6 p-0 shrink-0">
+      <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveAt([row.index])} disabled={disabled} className="h-6 w-6 p-0 shrink-0">
         <X className="h-3 w-3" />
       </Button>
     );
@@ -542,7 +564,7 @@ export default function MeasurementsPanel({
     return (
       <div key={`row-${row.index}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
         <div className="flex items-start gap-2">
-          <span className="flex w-36 shrink-0 items-start gap-1 sm:w-56">
+          <span className="flex min-h-8 w-36 shrink-0 items-center gap-1 sm:w-56">
             <span className={`${labelClass} min-w-0`} title={labelTitle} onClick={openNotes}>{label}</span>
             {guideButton}
           </span>
@@ -555,6 +577,94 @@ export default function MeasurementsPanel({
       </div>
     );
   };
+
+  // Lignes d'une catégorie, les deux côtés d'un test latéralisé réunis à la place du premier
+  // rencontré. Un latéralisé sans côté précisé (anciens bilans) reste une ligne seule, avec son
+  // sélecteur de côté pour le ranger.
+  const toDisplay = (rows: RowWithIndex[]): DisplayRow[] => {
+    const out: DisplayRow[] = [];
+    const pairs = new Map<string, PairRow>();
+    for (const row of rows) {
+      const m = row.measurement;
+      if (m.kind === 'canonical' && row.field?.lateralized && m.side) {
+        let pair = pairs.get(m.key);
+        if (!pair) { pair = { field: row.field }; pairs.set(m.key, pair); out.push({ kind: 'pair', pair }); }
+        // Même côté en double (ne devrait pas exister) : la seconde ligne reste visible, à part
+        if (pair[m.side]) out.push({ kind: 'row', row });
+        else pair[m.side] = row;
+        continue;
+      }
+      out.push({ kind: 'row', row });
+    }
+    return out;
+  };
+
+  /**
+   * Test latéralisé : libellé, puis une case par côté. Une case vide se remplit directement (la
+   * première saisie crée la mesure de ce côté) ; la croix retire les deux côtés. La lettre G/D
+   * est dans chaque case : un en-tête de colonnes ne se lit plus dès qu'une ligne non latéralisée
+   * s'intercale.
+   */
+  const renderPair = (pair: PairRow) => {
+    const { field } = pair;
+    const rows = SIDES.map((s) => pair[s]).filter((r): r is RowWithIndex => r !== undefined);
+    const quoted = rows.find((r) => r.measurement.quote)?.measurement;
+    const openNotes = onShowQuote && quoted?.quote ? () => onShowQuote(quoted.quote!) : undefined;
+    const labelTitle = field.description ? `${field.label} — ${field.description}` : field.label;
+    const head = (
+      <>
+        <span className={`text-sm font-medium leading-snug break-words hyphens-auto min-w-0${dense ? ' flex-1' : ''}${openNotes ? ' cursor-pointer' : ''}`} title={labelTitle} onClick={openNotes}>{field.label}</span>
+        {field.hasGuide && <TestGuideButton fieldKey={field.key} label={field.label} />}
+        {quoted && renderQuote(quoted)}
+      </>
+    );
+    const removeButton = (
+      <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveAt(rows.map((r) => r.index))} disabled={disabled} aria-label={`Retirer ${field.label}`} className="h-6 w-6 p-0 shrink-0">
+        <X className="h-3 w-3" />
+      </Button>
+    );
+    const cells = (
+      <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
+        {SIDES.map((s) => {
+          const row = pair[s];
+          const m = row?.measurement;
+          const value = m && m.kind === 'canonical' ? m.value : null;
+          // Case vide : une mesure fictive, pour retrouver la valeur du bilan de référence
+          const virtual: DocumentMeasurement = m ?? { kind: 'canonical', key: field.key, side: s, value: null, presentation: 'table', origin: 'manual' };
+          const commit = (v: CanonicalValue) => (row ? handleChangeAt(row.index, v) : handleAddSide(field, s, v));
+          return (
+            <div key={s} className="flex min-w-0 flex-col gap-0.5">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="w-3 shrink-0 text-xs font-semibold text-muted-foreground" title={SIDE_LABELS[s]}>{s}</span>
+                {renderCanonicalInput(field, value, row ? String(row.index) : `new:${field.key}:${s}`, commit, true)}
+              </div>
+              {renderPrevious(virtual, field.unit)}
+            </div>
+          );
+        })}
+      </div>
+    );
+
+    if (dense) {
+      return (
+        <div key={`pair-${field.key}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
+          <div className="flex items-start gap-2">{head}{removeButton}</div>
+          <div className="mt-1 flex">{cells}</div>
+        </div>
+      );
+    }
+    return (
+      <div key={`pair-${field.key}`} className="px-2 py-1.5 rounded hover:bg-muted/40">
+        <div className="flex items-start gap-2">
+          <span className="flex min-h-8 w-36 shrink-0 items-center gap-1 sm:w-56">{head}</span>
+          {cells}
+          {removeButton}
+        </div>
+      </div>
+    );
+  };
+
+  const renderRows = (rows: RowWithIndex[]) => toDisplay(rows).map((d) => (d.kind === 'pair' ? renderPair(d.pair) : renderRow(d.row)));
 
   // Ligne à vérifier, à sa place dans le tableau (spec 2026-09-26 §3.2)
   const renderPending = (c: ReviewCandidate) => (
@@ -648,7 +758,7 @@ export default function MeasurementsPanel({
 
           {isCompactMode ? (
             <div className="space-y-1">
-              {Array.from(groups.values())[0]?.map(renderRow)}
+              {renderRows(Array.from(groups.values())[0] ?? [])}
             </div>
           ) : (
             <div className="space-y-2">
@@ -696,7 +806,7 @@ export default function MeasurementsPanel({
                       }`}
                     >
                       <div className="overflow-hidden">
-                        <div className="space-y-0.5 p-1">{catPending.map(renderPending)}{rows.map(renderRow)}</div>
+                        <div className="space-y-0.5 p-1">{catPending.map(renderPending)}{renderRows(rows)}</div>
                       </div>
                     </div>
                   </div>

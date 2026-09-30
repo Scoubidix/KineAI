@@ -20,8 +20,8 @@ type SideChoice = Side | 'DG';
 
 const SIDE_WORDS: Record<Side, string> = { D: 'à droite', G: 'à gauche' };
 const SIDE_OPTIONS: { key: SideChoice; label: string }[] = [
-  { key: 'D', label: 'Droit' },
   { key: 'G', label: 'Gauche' },
+  { key: 'D', label: 'Droit' },
   { key: 'DG', label: 'Les deux' },
 ];
 const NO_LABELS = new Set<string>();
