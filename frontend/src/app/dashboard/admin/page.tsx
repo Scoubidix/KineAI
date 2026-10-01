@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SubTabsList, SubTabsTrigger } from '@/components/ui/sub-tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { RefreshCw, ShieldCheck, UserPlus, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, Layers, Zap, ImagePlus, X, Pencil, Trash2, Sparkles, Dumbbell, Map as MapIcon, Mic, BookOpen } from 'lucide-react';
+import { RefreshCw, ShieldCheck, UserPlus, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, Layers, Zap, ImagePlus, X, Pencil, Trash2, Sparkles, Dumbbell, Map as MapIcon, Mic, BookOpen, Newspaper } from 'lucide-react';
 import BilanFieldsTab from './components/BilanFieldsTab';
 import BilanTemplatesTab from './components/BilanTemplatesTab';
 import BilanGuidesTab from './components/BilanGuidesTab';
@@ -87,6 +87,13 @@ function isBilanViewKey(value: string | null): value is BilanViewKey {
 // Anciens onglets devenus sous-onglets de « Bilans » : les liens existants restent valides
 const LEGACY_BILAN_TABS: Record<string, BilanViewKey> = { 'bilan-fields': 'champs', 'bilan-templates': 'templates' };
 
+const NOUVEAUTE_VIEWS = ['nouveautes', 'news'] as const;
+type NouveauteViewKey = (typeof NOUVEAUTE_VIEWS)[number];
+
+function isNouveauteViewKey(value: string | null): value is NouveauteViewKey {
+  return value !== null && (NOUVEAUTE_VIEWS as readonly string[]).includes(value);
+}
+
 function AdminDashboardPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -101,16 +108,18 @@ function AdminDashboardPageContent() {
   const [bilanView, setBilanView] = useState<BilanViewKey>(
     legacyBilanView ?? (isBilanViewKey(requestedVue) ? requestedVue : 'champs')
   );
+  const [nouveauteView, setNouveauteView] = useState<NouveauteViewKey>(isNouveauteViewKey(requestedVue) ? requestedVue : 'nouveautes');
 
   // L'onglet actif vit dans l'URL : rechargement et lien direct retrouvent la même vue.
-  // « vue » porte le sous-onglet des onglets qui en ont (Statistiques, Bilans).
+  // « vue » porte le sous-onglet des onglets qui en ont (Statistiques, Bilans, Nouveautés & News).
   const syncUrl = (tab: TabKey, vue: string | null) => {
     const params = new URLSearchParams();
     params.set('tab', tab);
     if (vue) params.set('vue', vue);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
-  const vueOf = (tab: TabKey): string | null => (tab === 'dashboard' ? statsView : tab === 'bilans' ? bilanView : null);
+  const vueOf = (tab: TabKey): string | null =>
+    tab === 'dashboard' ? statsView : tab === 'bilans' ? bilanView : tab === 'nouveautes' ? nouveauteView : null;
 
   const handleTabChange = (tab: string) => {
     if (!isTabKey(tab)) return;
@@ -126,6 +135,11 @@ function AdminDashboardPageContent() {
     if (!isBilanViewKey(vue)) return;
     setBilanView(vue);
     syncUrl('bilans', vue);
+  };
+  const handleNouveauteViewChange = (vue: string) => {
+    if (!isNouveauteViewKey(vue)) return;
+    setNouveauteView(vue);
+    syncUrl('nouveautes', vue);
   };
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -419,7 +433,7 @@ function AdminDashboardPageContent() {
               </TabsTrigger>
               <TabsTrigger value="nouveautes" className="gap-1.5">
                 <Sparkles className="h-3.5 w-3.5" />
-                Nouveautés
+                Nouveautés & News
               </TabsTrigger>
               <TabsTrigger value="exercices-publics" className="gap-1.5">
                 <Dumbbell className="h-3.5 w-3.5" />
@@ -798,8 +812,25 @@ function AdminDashboardPageContent() {
               </Tabs>
             </TabsContent>
 
-            <TabsContent value="nouveautes" className="space-y-4 mt-4">
-              <NouveautesTab />
+            <TabsContent value="nouveautes" className="mt-4">
+              <Tabs value={nouveauteView} onValueChange={handleNouveauteViewChange}>
+                <SubTabsList>
+                  <SubTabsTrigger value="nouveautes">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Nouveautés
+                  </SubTabsTrigger>
+                  <SubTabsTrigger value="news">
+                    <Newspaper className="h-3.5 w-3.5" />
+                    News de la semaine
+                  </SubTabsTrigger>
+                </SubTabsList>
+                <TabsContent value="nouveautes" className="space-y-4 mt-6">
+                  <NouveautesTab canal="NOUVEAUTE" />
+                </TabsContent>
+                <TabsContent value="news" className="space-y-4 mt-6">
+                  <NouveautesTab canal="NEWS" />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
 
             <TabsContent value="exercices-publics" className="mt-4">

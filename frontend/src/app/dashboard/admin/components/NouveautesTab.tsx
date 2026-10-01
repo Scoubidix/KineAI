@@ -26,6 +26,36 @@ import { Plus, Pencil, Trash2, Loader2, RefreshCw, ImagePlus, Image as ImageIcon
 type Categorie = 'NOUVEAUTE' | 'AMELIORATION' | 'OFFRE';
 type Plan = 'FREE' | 'DECLIC' | 'PRATIQUE' | 'PIONNIER' | 'EXPERT';
 
+export type Canal = 'NOUVEAUTE' | 'NEWS';
+
+// Libellés propres à chaque canal ; le formulaire est le même
+const COPY: Record<Canal, { title: string; subtitle: string; empty: string; one: string; newOne: string; created: string; updated: string; deleted: string }> = {
+  NOUVEAUTE: {
+    title: 'Nouveautés',
+    subtitle: 'Annonces produit affichées dans l’app (icône ✨).',
+    empty: 'Aucune nouveauté. Clique sur « Nouvelle » pour en créer une.',
+    one: 'la nouveauté', newOne: 'Nouvelle nouveauté',
+    created: 'Nouveauté créée', updated: 'Nouveauté mise à jour', deleted: 'Nouveauté supprimée',
+  },
+  NEWS: {
+    title: 'News de la semaine',
+    subtitle: 'Page « News de la semaine » de la section Communauté, visible par tous les kinés.',
+    empty: 'Aucune news. Clique sur « Nouvelle » pour en programmer une.',
+    one: 'la news', newOne: 'Nouvelle news',
+    created: 'News créée', updated: 'News mise à jour', deleted: 'News supprimée',
+  },
+};
+
+// « Publiée le » en date + heure locales (input datetime-local) ; envoyé en ISO, donc converti
+// dans le navigateur : le serveur (UTC) ne réinterprète pas « 08:00 » en 08:00 UTC
+const pad = (n: number) => String(n).padStart(2, '0');
+const toLocalInput = (iso: string): string => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+const formatPublication = (iso: string): string =>
+  new Date(iso).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
 interface UploadedImage {
   path: string;
   url: string;
@@ -55,7 +85,7 @@ interface FormState {
   ctaLabel: string;
   ctaHref: string;
   ciblePlans: Plan[];
-  publishedAt: string; // yyyy-mm-dd
+  publishedAt: string; // yyyy-MM-ddTHH:mm (heure locale)
   expiresAt: string; // yyyy-mm-dd ou ''
   isActive: boolean;
 }
@@ -83,14 +113,16 @@ const EMPTY_FORM: FormState = {
   ctaLabel: '',
   ctaHref: '',
   ciblePlans: [],
-  publishedAt: new Date().toISOString().slice(0, 10),
+  publishedAt: '',
   expiresAt: '',
   isActive: true,
 };
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
-export default function NouveautesTab() {
+export default function NouveautesTab({ canal = 'NOUVEAUTE' }: { canal?: Canal }) {
+  const copy = COPY[canal];
+  const isNews = canal === 'NEWS';
   const { toast } = useToast();
   const [items, setItems] = useState<AdminNouveaute[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,11 +136,11 @@ export default function NouveautesTab() {
   const load = async () => {
     try {
       setLoading(true);
-      const res = await fetchWithAuth(`${API}/api/admin/nouveautes`);
+      const res = await fetchWithAuth(`${API}/api/admin/nouveautes?canal=${canal}`);
       const data = await res.json();
       if (data.success) setItems(data.nouveautes);
     } catch {
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Chargement des nouveautés impossible' });
+      toast({ variant: 'destructive', title: 'Erreur', description: `Chargement de ${copy.title.toLowerCase()} impossible` });
     } finally {
       setLoading(false);
     }
@@ -117,10 +149,10 @@ export default function NouveautesTab() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [canal]);
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, publishedAt: toLocalInput(new Date().toISOString()) });
     setDialogOpen(true);
   };
 
@@ -134,7 +166,7 @@ export default function NouveautesTab() {
       ctaLabel: n.ctaLabel ?? '',
       ctaHref: n.ctaHref ?? '',
       ciblePlans: n.ciblePlans ?? [],
-      publishedAt: toDateInput(n.publishedAt),
+      publishedAt: toLocalInput(n.publishedAt),
       expiresAt: toDateInput(n.expiresAt),
       isActive: n.isActive,
     });
@@ -184,13 +216,14 @@ export default function NouveautesTab() {
         titre: form.titre.trim(),
         description: form.description.trim(),
         imagePaths: form.images.map((img) => img.path),
-        categorie: form.categorie,
         ctaLabel: form.ctaLabel.trim() || null,
         ctaHref: form.ctaHref.trim() || null,
-        ciblePlans: form.ciblePlans,
-        publishedAt: form.publishedAt || null,
-        expiresAt: form.expiresAt || null,
+        publishedAt: form.publishedAt ? new Date(form.publishedAt).toISOString() : null,
         isActive: form.isActive,
+        // Catégorie, ciblage et expiration n'existent que pour les nouveautés
+        ...(isNews ? {} : { categorie: form.categorie, ciblePlans: form.ciblePlans, expiresAt: form.expiresAt || null }),
+        // Le canal se fixe à la création, jamais ensuite
+        ...(form.id ? {} : { canal }),
       };
       const url = form.id
         ? `${API}/api/admin/nouveautes/${form.id}`
@@ -201,7 +234,7 @@ export default function NouveautesTab() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: form.id ? 'Nouveauté mise à jour' : 'Nouveauté créée' });
+        toast({ title: form.id ? copy.updated : copy.created });
         setDialogOpen(false);
         load();
       } else {
@@ -220,7 +253,7 @@ export default function NouveautesTab() {
       const res = await fetchWithAuth(`${API}/api/admin/nouveautes/${deleteTarget.id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'Nouveauté supprimée' });
+        toast({ title: copy.deleted });
         setItems((prev) => prev.filter((n) => n.id !== deleteTarget.id));
       }
     } catch {
@@ -234,8 +267,8 @@ export default function NouveautesTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-primary">Nouveautés</h2>
-          <p className="text-sm text-muted-foreground">Gère les annonces produit affichées dans l&apos;app (icône ✨).</p>
+          <h2 className="text-lg font-semibold text-primary">{copy.title}</h2>
+          <p className="text-sm text-muted-foreground">{copy.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
@@ -254,7 +287,7 @@ export default function NouveautesTab() {
       ) : items.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Aucune nouveauté. Clique sur « Nouvelle » pour en créer une.
+            {copy.empty}
           </CardContent>
         </Card>
       ) : (
@@ -281,15 +314,20 @@ export default function NouveautesTab() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${CATEGORIE_BADGE[n.categorie]}`}>
-                      {CATEGORIES.find((c) => c.value === n.categorie)?.label}
-                    </span>
+                    {!isNews && (
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${CATEGORIE_BADGE[n.categorie]}`}>
+                        {CATEGORIES.find((c) => c.value === n.categorie)?.label}
+                      </span>
+                    )}
+                    {new Date(n.publishedAt) > new Date() && (
+                      <Badge className="bg-amber-100 text-[10px] text-amber-800 hover:bg-amber-100">Programmée · {formatPublication(n.publishedAt)}</Badge>
+                    )}
                     {!n.isActive && <Badge variant="secondary" className="text-[10px]">Inactive</Badge>}
                   </div>
                   <p className="mt-1 truncate text-sm font-medium">{n.titre}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    Cible : {n.ciblePlans.length ? n.ciblePlans.join(', ') : 'Tous'} · Publiée le{' '}
-                    {new Date(n.publishedAt).toLocaleDateString('fr-FR')}
+                    {!isNews && <>Cible : {n.ciblePlans.length ? n.ciblePlans.join(', ') : 'Tous'} · </>}
+                    Publiée le {formatPublication(n.publishedAt)}
                   </p>
                 </div>
                 <div className="flex flex-shrink-0 gap-1">
@@ -310,7 +348,7 @@ export default function NouveautesTab() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{form.id ? 'Modifier la nouveauté' : 'Nouvelle nouveauté'}</DialogTitle>
+            <DialogTitle>{form.id ? `Modifier ${copy.one}` : copy.newOne}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
@@ -374,19 +412,21 @@ export default function NouveautesTab() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="n-cat">Catégorie</Label>
-                <select
-                  id="n-cat"
-                  value={form.categorie}
-                  onChange={(e) => setForm({ ...form, categorie: e.target.value as Categorie })}
-                  className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
-              </div>
+              {!isNews && (
+                <div>
+                  <Label htmlFor="n-cat">Catégorie</Label>
+                  <select
+                    id="n-cat"
+                    value={form.categorie}
+                    onChange={(e) => setForm({ ...form, categorie: e.target.value as Categorie })}
+                    className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="flex items-end gap-2 pb-1">
                 <Switch id="n-active" checked={form.isActive} onCheckedChange={(v) => setForm({ ...form, isActive: v })} />
                 <Label htmlFor="n-active">Active</Label>
@@ -404,36 +444,41 @@ export default function NouveautesTab() {
               </div>
             </div>
 
-            <div>
-              <Label>Cible par plan (aucun coché = visible par tous)</Label>
-              <div className="mt-1.5 flex flex-wrap gap-2">
-                {ALL_PLANS.map((plan) => {
-                  const active = form.ciblePlans.includes(plan);
-                  return (
-                    <button
-                      key={plan}
-                      type="button"
-                      onClick={() => togglePlan(plan)}
-                      className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                        active ? 'border-[#3899aa] bg-[#3899aa] text-white' : 'border-border text-muted-foreground hover:bg-muted'
-                      }`}
-                    >
-                      {plan}
-                    </button>
-                  );
-                })}
+            {!isNews && (
+              <div>
+                <Label>Cible par plan (aucun coché = visible par tous)</Label>
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  {ALL_PLANS.map((plan) => {
+                    const active = form.ciblePlans.includes(plan);
+                    return (
+                      <button
+                        key={plan}
+                        type="button"
+                        onClick={() => togglePlan(plan)}
+                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                          active ? 'border-[#3899aa] bg-[#3899aa] text-white' : 'border-border text-muted-foreground hover:bg-muted'
+                        }`}
+                      >
+                        {plan}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="n-pub">Date de publication</Label>
-                <Input id="n-pub" type="date" value={form.publishedAt} onChange={(e) => setForm({ ...form, publishedAt: e.target.value })} />
+                <Label htmlFor="n-pub">Publication (date et heure)</Label>
+                <Input id="n-pub" type="datetime-local" value={form.publishedAt} onChange={(e) => setForm({ ...form, publishedAt: e.target.value })} />
+                <p className="mt-1 text-[11px] text-muted-foreground">Dans le futur : programmée, invisible jusque-là.</p>
               </div>
-              <div>
-                <Label htmlFor="n-exp">Expiration (optionnel)</Label>
-                <Input id="n-exp" type="date" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} />
-              </div>
+              {!isNews && (
+                <div>
+                  <Label htmlFor="n-exp">Expiration (optionnel)</Label>
+                  <Input id="n-exp" type="date" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -451,9 +496,9 @@ export default function NouveautesTab() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cette nouveauté ?</AlertDialogTitle>
+            <AlertDialogTitle>Supprimer {copy.one} ?</AlertDialogTitle>
             <AlertDialogDescription>
-              « {deleteTarget?.titre} » sera définitivement supprimée (et son image). Action irréversible.
+              « {deleteTarget?.titre} » sera définitivement supprimée, images comprises. Action irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
