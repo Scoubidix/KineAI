@@ -11,9 +11,16 @@ Le fichier généré alimente deux catalogues d'une application pour kinésithé
   liste ordonnée de champs, pour aider le kiné à démarrer un bilan (ex. « Épaule — Bilan
   initial » qui contient une dizaine de tests d'épaule).
 
-À chaque déploiement, l'application lit ce JSON et **remplace intégralement** les deux
-catalogues par son contenu (voir « Règle d'or » plus bas). Le JSON est donc **la source de
-vérité unique**.
+**Depuis le 1er octobre 2026, la source de vérité est l'admin** (onglet « Champs canoniques »,
+et les templates publics), en production. Ce fichier n'est plus qu'une **photo** du catalogue :
+
+- au démarrage, le serveur l'applique **uniquement si le catalogue est vide** (base neuve, base
+  locale remise à zéro). Il n'écrase jamais rien ;
+- il sert aussi aux harnais `eval:*`, qui tournent sans base.
+
+Pour le mettre à jour : bouton **« Exporter »** de l'onglet « Champs canoniques » de l'admin de
+prod, puis remplacer `backend/data/bilanSeed.json` par le fichier téléchargé et commiter.
+Le reste de ce guide décrit le format, qui n'a pas changé.
 
 ---
 
@@ -21,15 +28,12 @@ vérité unique**.
 
 ```jsonc
 {
-  "version": 1,          // entier ≥ 1 — À INCRÉMENTER à chaque nouvelle livraison du fichier
   "fields": [ ... ],     // liste des tests/mesures
   "templates": [ ... ]   // liste des templates (modèles de bilan)
 }
 ```
 
-- `version` : commence à `1`. **Chaque fois** que tu livres une nouvelle version du fichier,
-  incrémente ce nombre (1 → 2 → 3…). C'est ce qui déclenche la ré-application côté serveur.
-  Si tu ne l'incrémentes pas, le serveur ignore le nouveau fichier.
+- `version` : n'existe plus (ignoré s'il est présent). Le fichier n'amorce qu'un catalogue vide.
 
 ---
 
@@ -244,7 +248,6 @@ Réutilise ces catégories existantes (`Douleur`, `Amplitudes`, `Epaule`, `Force
 
 ```json
 {
-  "version": 1,
   "fields": [
     { "key": "eva_repos", "label": "EVA au repos", "type": "NUMERIC", "unit": "/10", "rangeMin": 0, "rangeMax": 10, "category": "Douleur", "order": 1 }
   ],
@@ -262,7 +265,6 @@ Réutilise ces catégories existantes (`Douleur`, `Amplitudes`, `Epaule`, `Force
 
 ## 7. Checklist finale avant livraison
 
-- [ ] `version` présent, entier ≥ 1 (incrémenté si ce n'est pas la toute première livraison).
 - [ ] **Les 45 keys existantes (section 4bis) sont toutes conservées à l'identique** — y compris `ij_dynalmo` et `test_laseuge` (coquilles figées, non corrigées).
 - [ ] Toutes les `key` sont en `snake_case`, uniques, sans accent.
 - [ ] Chaque champ a `key`, `label`, `type`, `category`, `order`.

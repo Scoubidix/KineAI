@@ -31,10 +31,6 @@ function validateSeed(data) {
   const errors = [];
   if (!data || typeof data !== 'object') return ['Racine JSON invalide'];
 
-  if (!Number.isInteger(data.version) || data.version < 1) {
-    errors.push('version doit être un entier ≥ 1');
-  }
-
   if (!Array.isArray(data.fields)) errors.push('fields doit être un tableau');
   if (!Array.isArray(data.templates)) errors.push('templates doit être un tableau');
   if (errors.length) return errors;
@@ -107,38 +103,39 @@ function validateSeed(data) {
 }
 
 /**
- * Applique le seed si la version du JSON dépasse celle déjà appliquée.
- * Best-effort : ne throw jamais pour un JSON absent/invalide/à jour.
+ * Amorce le catalogue (champs + templates publics) quand il est VIDE : base neuve, base locale
+ * remise à zéro. Le catalogue se gère ensuite dans l'admin, seule source de vérité : ce fichier
+ * n'écrase jamais rien (il effaçait et recréait tout à chaque montée de version, admin compris).
+ * Best-effort : ne throw jamais pour un JSON absent/invalide ou un catalogue déjà présent.
  * @param {{ prisma?: object, data?: object }} [opts] injection pour les tests
  */
 async function runBilanSeed({ prisma, data } = {}) {
   prisma = prisma || prismaService.getInstance();
-  data = data !== undefined ? data : loadSeedFile();
 
-  if (!data) {
-    logger.warn('Seed bilan : fichier absent ou illisible, ignoré');
+  const existing = await prisma.bilanCanonicalField.count();
+  if (existing > 0) {
+    logger.info(`Seed bilan : catalogue déjà présent (${existing} champs, géré dans l'admin), ignoré`);
     return;
   }
 
+  data = data !== undefined ? data : loadSeedFile();
+  if (!data) {
+    logger.warn('Seed bilan : catalogue vide et fichier absent ou illisible, rien à amorcer');
+    return;
+  }
   const errors = validateSeed(data);
   if (errors.length) {
     logger.error(`Seed bilan : JSON invalide (${errors.length} erreurs), ignoré`, errors);
     return;
   }
 
-  const state = await prisma.bilanSeedState.findFirst();
-  const applied = state ? state.version : 0;
-  if (data.version <= applied) {
-    logger.info(`Seed bilan : déjà à jour (v${applied})`);
-    return;
-  }
-
+  // Templates publics déjà là (champs effacés à la main) : on ne les double pas
+  const withTemplates = (await prisma.bilanTemplate.count({ where: { isPublic: true, kineId: null } })) === 0;
   await prisma.$transaction(async (tx) => {
-    await tx.bilanCanonicalField.deleteMany({});
-    await tx.bilanTemplate.deleteMany({ where: { isPublic: true, kineId: null } });
     await tx.bilanCanonicalField.createMany({
       data: data.fields.map((f) => ({ ...f, description: f.description ?? null })),
     });
+    if (!withTemplates) return;
     for (const t of data.templates) {
       await tx.bilanTemplate.create({
         data: {
@@ -151,18 +148,44 @@ async function runBilanSeed({ prisma, data } = {}) {
         },
       });
     }
-    if (state) {
-      await tx.bilanSeedState.update({ where: { id: state.id }, data: { version: data.version } });
-    } else {
-      await tx.bilanSeedState.create({ data: { version: data.version } });
-    }
   });
 
-  logger.info(
-    `Seed bilan : appliqué v${applied} → v${data.version} (${data.fields.length} champs, ${data.templates.length} templates)`
-  );
+  logger.info(`Seed bilan : catalogue amorcé (${data.fields.length} champs${withTemplates ? `, ${data.templates.length} templates` : ''})`);
   // require paresseux : évite un import circulaire au chargement du module
   require('./bilanRenderService').invalidateCatalogCache();
 }
 
-module.exports = { loadSeedFile, validateSeed, runBilanSeed, DEFAULT_SEED_PATH };
+// Attributs optionnels d'un champ : omis de l'export quand ils sont vides, comme dans le fichier
+const OPTIONAL_FIELD_ATTRS = ['unit', 'rangeMin', 'rangeMax', 'options'];
+
+/**
+ * Photo du catalogue géré dans l'admin, au format de bilanSeed.json : elle remplace le fichier du
+ * repo (amorçage d'une base vide, harnais eval:* qui tournent sans base). Champs désactivés
+ * compris (isActive: false), templates publics actifs seulement.
+ * @param {{ prisma?: object }} [opts] injection pour les tests
+ */
+async function exportCatalog({ prisma } = {}) {
+  prisma = prisma || prismaService.getInstance();
+  const [rows, templates] = await Promise.all([
+    prisma.bilanCanonicalField.findMany({ orderBy: [{ category: 'asc' }, { order: 'asc' }, { id: 'asc' }] }),
+    prisma.bilanTemplate.findMany({
+      where: { isPublic: true, kineId: null, isActive: true },
+      orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      select: { name: true, description: true, category: true, items: true },
+    }),
+  ]);
+  const fields = rows.map((f) => {
+    const out = { key: f.key, label: f.label, type: f.type, category: f.category, order: f.order };
+    for (const a of OPTIONAL_FIELD_ATTRS) if (f[a] !== null && f[a] !== undefined) out[a] = f[a];
+    Object.assign(out, { aliases: f.aliases, lateralized: f.lateralized, presentation: f.presentation });
+    if (f.description) out.description = f.description;
+    if (f.isActive === false) out.isActive = false;
+    return out;
+  });
+  return {
+    fields,
+    templates: templates.map((t) => ({ name: t.name, ...(t.description ? { description: t.description } : {}), category: t.category, items: t.items })),
+  };
+}
+
+module.exports = { loadSeedFile, validateSeed, runBilanSeed, exportCatalog, DEFAULT_SEED_PATH };

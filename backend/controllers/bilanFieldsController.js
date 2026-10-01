@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const { sanitizeId } = require('../utils/logSanitizer');
 const { invalidateCatalogCache } = require('../services/bilanRenderService');
 const bilanGuideService = require('../services/bilanGuideService');
+const { exportCatalog } = require('../services/bilanSeedService');
 
 const VALID_TYPES = ['NUMERIC', 'BOOLEAN', 'TEXT', 'ENUM'];
 
@@ -26,6 +27,22 @@ exports.getActiveFields = async (req, res) => {
   } catch (err) {
     logger.error('Erreur récupération champs canoniques :', err);
     res.status(500).json({ success: false, error: 'Erreur récupération champs', code: 'INTERNAL_ERROR' });
+  }
+};
+
+/**
+ * GET /api/admin/bilan-fields/export
+ * Télécharge le catalogue géré dans l'admin au format de backend/data/bilanSeed.json (photo qui
+ * remplace le fichier du repo : amorçage d'une base vide, harnais d'évaluation).
+ */
+exports.adminExportCatalog = async (req, res) => {
+  try {
+    const catalog = await exportCatalog();
+    res.setHeader('Content-Disposition', 'attachment; filename="bilanSeed.json"');
+    res.json(catalog);
+  } catch (err) {
+    logger.error('Erreur export du catalogue bilan :', err);
+    res.status(500).json({ success: false, error: 'Erreur export du catalogue', code: 'INTERNAL_ERROR' });
   }
 };
 

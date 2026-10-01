@@ -32,7 +32,7 @@ interface InlineMeasureSearchProps {
 const MAX_RESULTS = 5;
 
 // Normalisation : minuscule + suppression des accents → recherche tolérante.
-const normalize = (s: string): string =>
+export const normalize = (s: string): string =>
   s
     .toLowerCase()
     .normalize('NFD')
@@ -40,8 +40,9 @@ const normalize = (s: string): string =>
     .trim();
 
 // Score de pertinence : début de mot > inclusion dans label > catégorie/unit.
-// Plus le score est élevé, plus le résultat est pertinent.
-const scoreField = (field: CanonicalField, q: string): number => {
+// Plus le score est élevé, plus le résultat est pertinent. Partagé avec le filtre de l'admin
+// (onglet Champs canoniques) : l'admin trouve un test exactement comme le kiné le trouve.
+export const scoreField = (field: Pick<CanonicalField, 'label' | 'key' | 'category' | 'unit' | 'aliases'>, q: string): number => {
   if (!q) return 1;
   const label = normalize(field.label);
   const key = normalize(field.key);

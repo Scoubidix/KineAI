@@ -10,6 +10,7 @@ router.get('/bilan-fields', authenticate, bilanFieldsController.getActiveFields)
 
 // CRUD admin (lecture complète + écriture)
 router.get('/admin/bilan-fields', authenticate, requireAdmin, bilanFieldsController.adminGetAllFields);
+router.get('/admin/bilan-fields/export', authenticate, requireAdmin, bilanFieldsController.adminExportCatalog);
 router.post('/admin/bilan-fields', authenticate, requireAdmin, bilanFieldsController.adminCreateField);
 router.put('/admin/bilan-fields/:id', authenticate, requireAdmin, bilanFieldsController.adminUpdateField);
 router.delete('/admin/bilan-fields/:id', authenticate, requireAdmin, bilanFieldsController.adminDeleteField);

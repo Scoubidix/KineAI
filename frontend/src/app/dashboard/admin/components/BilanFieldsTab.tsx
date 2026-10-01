@@ -22,7 +22,8 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, Loader2, X, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, X, RefreshCw, Download, Search } from 'lucide-react';
+import { normalize, scoreField } from '@/app/dashboard/kine/bilan-kine/components/InlineMeasureSearch';
 import { CanonicalFieldType } from '@/types/bilan';
 
 interface AdminBilanField {
@@ -247,15 +248,43 @@ export default function BilanFieldsTab() {
     setAliasDraft('');
   };
 
+  // Filtre en direct (désactivés compris) : savoir si un test existe déjà avant de le créer.
+  // Mêmes règles de correspondance que la recherche du bilan (libellé, alias, clé, catégorie).
+  const [search, setSearch] = useState('');
+  const query = normalize(search);
+  const shown = query ? fields.filter((f) => scoreField(f, query) > 0) : fields;
+
   // Regroupement par catégorie pour affichage
   const fieldsByCategory: Record<string, AdminBilanField[]> = {};
-  for (const f of fields) {
+  for (const f of shown) {
     if (!fieldsByCategory[f.category]) fieldsByCategory[f.category] = [];
     fieldsByCategory[f.category].push(f);
   }
   for (const cat of Object.keys(fieldsByCategory)) {
     fieldsByCategory[cat].sort((a, b) => a.order - b.order || a.id - b.id);
   }
+
+  // Photo du catalogue au format de backend/data/bilanSeed.json : on la commite à la place du fichier
+  // du repo (amorçage d'une base vide, harnais d'évaluation). L'admin reste la seule vérité.
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/bilan-fields/export`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const catalog = await res.json();
+      const url = URL.createObjectURL(new Blob([JSON.stringify(catalog, null, 2) + '\n'], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'bilanSeed.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast({ title: 'Export impossible', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -274,6 +303,10 @@ export default function BilanFieldsTab() {
                 <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
                 Rafraîchir
               </Button>
+              <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting} className="h-9" title="Télécharger le catalogue au format bilanSeed.json">
+                {exporting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1.5" />}
+                Exporter
+              </Button>
               <Button size="sm" onClick={openCreate} className="btn-teal h-9">
                 <Plus className="h-3.5 w-3.5 mr-1.5" />
                 Ajouter un champ
@@ -282,6 +315,22 @@ export default function BilanFieldsTab() {
           </div>
         </CardHeader>
         <CardContent>
+          {fields.length > 0 && (
+            <div className="mb-4 flex items-center gap-3">
+              <div className="relative max-w-md flex-1">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Rechercher un test : EVA, Lasègue, lombaire…"
+                  aria-label="Rechercher un champ"
+                  className="h-9 pl-8"
+                />
+              </div>
+              {query && <span className="text-xs text-muted-foreground" aria-live="polite">{shown.length} sur {fields.length}</span>}
+            </div>
+          )}
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-5 h-5 animate-spin text-[#3899aa]" />
@@ -289,6 +338,10 @@ export default function BilanFieldsTab() {
           ) : fields.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">
               Aucun champ canonique configuré
+            </p>
+          ) : shown.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              Aucun champ ne correspond à « {search.trim()} » : tu peux le créer avec « Ajouter un champ ».
             </p>
           ) : (
             <div className="space-y-5">

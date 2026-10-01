@@ -1174,7 +1174,7 @@ model KineActivityEvent {
 }
 
 /// État du seed des champs & templates de bilan (une seule ligne).
-/// Mémorise la dernière version de backend/data/bilanSeed.json appliquée.
+/// Plus écrite depuis le 1er oct. 2026 : le seed n'amorce qu'un catalogue vide, l'admin fait foi.
 model BilanSeedState {
   id        Int      @id @default(autoincrement())
   version   Int      @default(0)
