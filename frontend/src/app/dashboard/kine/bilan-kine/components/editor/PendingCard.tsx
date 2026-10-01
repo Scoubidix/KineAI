@@ -111,7 +111,10 @@ export default function PendingCard({ candidate: c, fields, onResolve, onShowQuo
   const retarget = (next: Retarget) => {
     // Un test d'un autre type ne garde pas la valeur (« 95 » n'a pas de sens pour un Lasègue)
     const nextType = next.kind === 'custom' ? 'TEXT' : next.fieldType;
-    if (nextType !== type) { setText(''); setChoice(null); }
+    // Ni une option que le nouveau test à choix ne propose pas (le document serait refusé)
+    const nextOptions = fieldsByKey.get(next.key ?? '')?.options ?? [];
+    const optionLost = nextType === 'ENUM' && !(typeof choice === 'string' && nextOptions.includes(choice));
+    if (nextType !== type || optionLost) { setText(''); setChoice(null); }
     if (next.lateralized && !target.lateralized) setSide(null);
     setTarget(next);
     setChangingTest(false);
