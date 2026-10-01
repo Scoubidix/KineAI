@@ -418,6 +418,14 @@ enum NouveauteCategorie {
   @@map("nouveaute_categorie")
 }
 
+/// Où un contenu est publié : bouton « Nouveautés » de l'en-tête, ou page « News de la semaine »
+enum NouveauteCanal {
+  NOUVEAUTE // Annonces produit (bouton de l'en-tête)
+  NEWS // News de la semaine (section Communauté)
+
+  @@map("nouveaute_canal")
+}
+
 /// Contenu global partagé d'une nouveauté (géré depuis l'admin).
 /// L'état lu/non-lu vit dans NouveauteVue (par kiné), pas ici.
 model Nouveaute {
@@ -432,12 +440,13 @@ model Nouveaute {
   publishedAt DateTime           @default(now())
   expiresAt   DateTime? // Masquée automatiquement au-delà
   isActive    Boolean            @default(true)
+  canal       NouveauteCanal     @default(NOUVEAUTE) // jamais modifié après création
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
   vues NouveauteVue[]
 
-  @@index([isActive, publishedAt])
+  @@index([canal, isActive, publishedAt])
   @@map("nouveautes")
 }
 
