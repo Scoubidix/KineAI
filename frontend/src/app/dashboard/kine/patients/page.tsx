@@ -8,9 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import PatientFormDialog from '@/components/patients/PatientFormDialog';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { matchesAllTokens } from '@/utils/textSearch';
@@ -38,20 +37,14 @@ export default function PatientsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [patientToDelete, setPatientToDelete] = useState<UserProfileData | null>(null);
-  const [consentChecked, setConsentChecked] = useState(false);
-  const [form, setForm] = useState<UserProfileData>({
-    firstName: '',
-    lastName: '',
-    birthDate: '',
-    phone: '',
-    email: '',
-    goals: '',
-  });
+  // Patient en cours de modification (null : création)
+  const [editing, setEditing] = useState<UserProfileData | null>(null);
 
   // Ouverture auto de la modal de création si redirigé depuis l'accueil (?new=1)
   const searchParams = useSearchParams();
   useEffect(() => {
     if (searchParams.get('new') === '1') {
+      setEditing(null);
       setDialogOpen(true);
       const params = new URLSearchParams(searchParams.toString());
       params.delete('new');
@@ -68,40 +61,6 @@ export default function PatientsPage() {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
-  };
-
-  // Saisie de la date de naissance en texte JJ/MM/AAAA (pas de calendrier natif).
-  // Insertion automatique des « / » au fil de la frappe.
-  const formatBirthDateInput = (raw: string): string => {
-    const digits = raw.replace(/\D/g, '').slice(0, 8); // JJMMAAAA
-    if (digits.length >= 5) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-    if (digits.length >= 3) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    return digits;
-  };
-
-  // JJ/MM/AAAA → AAAA-MM-JJ (ISO). Renvoie '' si la date n'est pas une date calendaire valide.
-  const frToIso = (value: string): string => {
-    const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
-    if (!m) return '';
-    const [, dd, mm, yyyy] = m;
-    const d = Number(dd), mo = Number(mm), y = Number(yyyy);
-    const date = new Date(y, mo - 1, d);
-    if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return '';
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
-  // ISO / date backend → JJ/MM/AAAA pour pré-remplir le champ en édition.
-  const isoToFr = (value: string): string => {
-    if (!value) return '';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '';
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    return `${day}/${month}/${date.getFullYear()}`;
-  };
-
-  const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, birthDate: formatBirthDateInput(e.target.value) });
   };
 
   // Fonction pour trier les patients : ceux avec programme en cours d'abord, puis ordre alphabétique
@@ -163,51 +122,18 @@ export default function PatientsPage() {
     return () => unsubscribe();
   }, []);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handleAddOrUpdatePatient = async () => {
-    const user = getAuth().currentUser;
-    if (!user) return;
-
-    const patientData = {
-      ...form,
-      birthDate: frToIso(form.birthDate), // JJ/MM/AAAA → ISO attendu par le backend
-      kineId: user.uid,
-    };
-
-    try {
-      const method = form.id ? 'PUT' : 'POST';
-      const url = form.id ? `${apiUrl}/patients/${form.id}` : `${apiUrl}/patients`;
-      const res = await fetchWithAuth(url, {
-        method,
-        body: JSON.stringify(patientData),
-      });
-
-      if (!res.ok) throw new Error("Erreur enregistrement patient");
-
-      const updatedPatient = await res.json();
-      let updatedList;
-      if (form.id) {
-        updatedList = patients.map(p => (p.id === form.id ? { ...updatedPatient, hasActiveProgram: p.hasActiveProgram } : p));
-      } else {
-        updatedList = [...patients, { ...updatedPatient, hasActiveProgram: false }];
-      }
-      
-      const sortedList = sortPatients(updatedList);
-      setPatients(sortedList);
-      setFilteredPatients(sortedList);
-      setForm({ firstName: '', lastName: '', birthDate: '', phone: '', email: '', goals: '' });
-      setDialogOpen(false);
-    } catch (err) {
-      console.error('Erreur enregistrement patient SQL :', err);
-    }
+  // Patient enregistré par la modale : mis à jour en place, ou ajouté (sans programme actif)
+  const handlePatientSaved = (saved: UserProfileData) => {
+    const updatedList = editing
+      ? patients.map(p => (p.id === editing.id ? { ...saved, hasActiveProgram: p.hasActiveProgram } : p))
+      : [...patients, { ...saved, hasActiveProgram: false }];
+    const sortedList = sortPatients(updatedList);
+    setPatients(sortedList);
+    setFilteredPatients(sortedList);
   };
 
   const handleEditPatient = (patient: UserProfileData) => {
-    // email peut être null en base : on coerce en '' pour l'input contrôlé
-    setForm({ ...patient, email: patient.email ?? '', birthDate: isoToFr(patient.birthDate) });
+    setEditing(patient);
     setDialogOpen(true);
   };
 
@@ -248,196 +174,15 @@ export default function PatientsPage() {
               onChange={handleSearchChange}
             />
           </div>
-          <Dialog open={dialogOpen} onOpenChange={(open) => {
-            setDialogOpen(open);
-            // Réinitialiser le formulaire quand le modal se ferme
-            if (!open) {
-              setForm({ firstName: '', lastName: '', birthDate: '', phone: '', email: '', goals: '' });
-              setConsentChecked(false);
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button className="btn-teal flex items-center gap-2 w-full sm:w-auto">
-                <Plus className="h-4 w-4" /> {form.id ? 'Modifier' : 'Créer'} un patient
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[95vh] overflow-y-auto top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%]" onOpenAutoFocus={(e) => e.preventDefault()}>
-              <DialogHeader className="bg-gradient-to-r from-[#4db3c5] to-[#1f5c6a] -mx-6 -mt-6 px-6 py-4 rounded-t-lg">
-                <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
-                  {form.id ? 'Modifier le patient' : 'Créer un nouveau patient'}
-                </DialogTitle>
-              </DialogHeader>
-              
-              <div className="space-y-4 sm:space-y-6 py-4">
-                {/* Section Informations personnelles */}
-                <div className="space-y-3 sm:space-y-4">
-                  <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <div className="w-1 h-5 sm:h-6 bg-blue-500 rounded-full"></div>
-                    Informations personnelles
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Prénom *
-                      </Label>
-                      <Input 
-                        id="firstName"
-                        name="firstName" 
-                        value={form.firstName} 
-                        onChange={handleInputChange}
-                        placeholder="Nicolas"
-                        className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Nom de famille *
-                      </Label>
-                      <Input 
-                        id="lastName"
-                        name="lastName" 
-                        value={form.lastName} 
-                        onChange={handleInputChange}
-                        placeholder="Dupont"
-                        className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="birthDate" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Date de naissance *
-                      </Label>
-                      <Input
-                        id="birthDate"
-                        type="text"
-                        inputMode="numeric"
-                        name="birthDate"
-                        value={form.birthDate}
-                        onChange={handleBirthDateChange}
-                        placeholder="JJ/MM/AAAA"
-                        maxLength={10}
-                        className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Téléphone
-                      </Label>
-                      <Input
-                        id="phone"
-                        name="phone"
-                        value={form.phone}
-                        onChange={handleInputChange}
-                        placeholder="06 12 34 56 78"
-                        className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Adresse email
-                    </Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      name="email"
-                      value={form.email}
-                      onChange={handleInputChange}
-                      placeholder="exemple@email.com"
-                      className="text-sm sm:text-base transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Section Informations médicales */}
-                <div className="space-y-3 sm:space-y-4">
-                  <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <div className="w-1 h-5 sm:h-6 bg-green-500 rounded-full"></div>
-                    Informations médicales
-                  </h3>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="goals" className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Objectifs de traitement
-                    </Label>
-                    <textarea
-                      id="goals"
-                      name="goals"
-                      value={form.goals}
-                      onChange={(e) => setForm({ ...form, goals: e.target.value })}
-                      placeholder="Décris les objectifs thérapeutiques, pathologies, zones à traiter..."
-                      className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-all duration-200 resize-none"
-                      rows={3}
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Ces informations aideront à personnaliser les programmes d'exercices
-                    </p>
-                  </div>
-                </div>
-
-                {/* Section validation */}
-                <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
-                  {/* Checkbox consentement RGPD */}
-                  {!form.id && (
-                    <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                      <input
-                        type="checkbox"
-                        id="consent-checkbox"
-                        checked={consentChecked}
-                        onChange={(e) => setConsentChecked(e.target.checked)}
-                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
-                      />
-                      <label htmlFor="consent-checkbox" className="flex-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                        J'ai remis au patient le{' '}
-                        <a
-                          href="/legal/consentement-patient.html"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          Formulaire de consentement patient
-                        </a>
-                        {' '}(signature obligatoire)
-                      </label>
-                    </div>
-                  )}
-
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setDialogOpen(false);
-                        // Le formulaire sera automatiquement réinitialisé par onOpenChange
-                      }}
-                      className="flex-1 sm:flex-none text-sm sm:text-base"
-                    >
-                      Annuler
-                    </Button>
-                    <Button
-                      onClick={handleAddOrUpdatePatient}
-                      className="btn-teal flex-1 text-sm sm:text-base"
-                      disabled={!form.firstName || !form.lastName || !frToIso(form.birthDate) || (!form.id && !consentChecked)}
-                    >
-                      {form.id ? 'Mettre à jour' : 'Créer le patient'}
-                    </Button>
-                  </div>
-
-                  <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                    * Champs obligatoires
-                  </p>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button className="btn-teal flex items-center gap-2 w-full sm:w-auto" onClick={() => { setEditing(null); setDialogOpen(true); }}>
+            <Plus className="h-4 w-4" /> Créer un patient
+          </Button>
+          <PatientFormDialog
+            open={dialogOpen}
+            onOpenChange={setDialogOpen}
+            initial={editing}
+            onSaved={(saved) => handlePatientSaved(saved as UserProfileData)}
+          />
         </div>
 
         <Card className="card-hover">

@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { matchesAllTokens } from '@/utils/textSearch';
-import { Search, User, X, Loader2, ChevronDown } from 'lucide-react';
+import { Search, User, X, Loader2, ChevronDown, Plus } from 'lucide-react';
+import PatientFormDialog, { type PatientFormData } from '@/components/patients/PatientFormDialog';
 import type { PatientSummary } from '@/types/bilan';
 
 interface PatientComboboxProps {
@@ -25,12 +26,16 @@ interface PatientComboboxProps {
   clearable?: boolean;
 }
 
-// Recherche et sélection d'un patient actif du kiné (liste chargée à la première ouverture)
+// Recherche et sélection d'un patient actif du kiné (liste chargée à la première ouverture).
+// Combobox à autocomplétion (WAI-ARIA) : rien n'est listé avant la première lettre ; l'action
+// « Créer un patient » ferme la liste et ouvre la modale de création, pré-remplie avec la saisie.
 export default function PatientCombobox({ value, onChange, disabled, placeholder = 'Rechercher un patient…', variant = 'field', clearable = true }: PatientComboboxProps) {
   const [open, setOpen] = useState(false);
   const [patients, setPatients] = useState<PatientSummary[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createInitial, setCreateInitial] = useState<Partial<PatientFormData> | null>(null);
 
   useEffect(() => {
     if (!open || patients !== null) return;
@@ -52,15 +57,32 @@ export default function PatientCombobox({ value, onChange, disabled, placeholder
     return () => { cancelled = true; };
   }, [open, patients]);
 
-  const filtered = (patients ?? []).filter((p) => matchesAllTokens(`${p.firstName} ${p.lastName}`, search)).slice(0, 30);
+  const typed = search.trim() !== '';
+  const filtered = typed ? (patients ?? []).filter((p) => matchesAllTokens(`${p.firstName} ${p.lastName}`, search)).slice(0, 30) : [];
+
+  // « Créer un patient » : la saisie pré-remplit la modale (premier mot = prénom, le reste = nom)
+  const startCreate = () => {
+    const [firstName = '', ...rest] = search.trim().split(/\s+/);
+    setCreateInitial(typed ? { firstName, lastName: rest.join(' ') } : null);
+    setOpen(false);
+    setSearch('');
+    setCreateOpen(true);
+  };
+  // Patient créé : ajouté à la liste en mémoire et sélectionné aussitôt (rattaché au bilan par l'hôte)
+  const handleCreated = (saved: PatientFormData & { id: string | number }) => {
+    const created: PatientSummary = { id: Number(saved.id), firstName: saved.firstName, lastName: saved.lastName, birthDate: saved.birthDate };
+    setPatients((prev) => (prev ? [...prev, created] : prev));
+    onChange(created);
+  };
+  const createDialog = <PatientFormDialog open={createOpen} onOpenChange={setCreateOpen} initial={createInitial} onSaved={handleCreated} />;
 
   // Liste de sélection, commune aux deux variantes
   const listContent = (
     <PopoverContent align="start" className={variant === 'inline' ? 'w-72 p-2' : 'w-[var(--radix-popover-trigger-width)] p-2'}>
-      <Input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nom ou prénom" className="h-8 mb-2" />
+      <Input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher" aria-label="Rechercher un patient" className="h-8 mb-2" />
       <div className="max-h-56 overflow-y-auto space-y-0.5">
-        {loading && <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-[#3899aa]" /></div>}
-        {!loading && filtered.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">Aucun patient</p>}
+        {typed && loading && <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-[#3899aa]" /></div>}
+        {typed && !loading && filtered.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">Aucun patient</p>}
         {filtered.map((p) => (
           <button key={p.id} type="button" onClick={() => { onChange(p); setOpen(false); setSearch(''); }} className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#3899aa]/10 text-left text-sm">
             <span className="w-7 h-7 rounded-full bg-[#3899aa]/10 text-[#3899aa] text-xs font-medium flex items-center justify-center shrink-0">{p.firstName[0]}{p.lastName[0]}</span>
@@ -68,6 +90,9 @@ export default function PatientCombobox({ value, onChange, disabled, placeholder
           </button>
         ))}
       </div>
+      <button type="button" onClick={startCreate} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#3899aa]/10 text-left text-sm font-medium text-[#3899aa]${typed ? ' mt-1 border-t border-border/60 pt-2' : ''}`}>
+        <Plus className="h-4 w-4 shrink-0" />Créer un patient
+      </button>
     </PopoverContent>
   );
 
@@ -75,6 +100,7 @@ export default function PatientCombobox({ value, onChange, disabled, placeholder
   // signale qu'il est réglable ; avec patient, les initiales prennent la place du pointillé.
   if (variant === 'inline') {
     return (
+      <>
       <Popover open={open} onOpenChange={setOpen}>
         <span className="inline-flex items-center gap-1">
           <PopoverTrigger asChild>
@@ -107,6 +133,8 @@ export default function PatientCombobox({ value, onChange, disabled, placeholder
         </span>
         {listContent}
       </Popover>
+      {createDialog}
+      </>
     );
   }
 
@@ -125,6 +153,7 @@ export default function PatientCombobox({ value, onChange, disabled, placeholder
   }
 
   return (
+    <>
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button type="button" disabled={disabled} className="flex items-center gap-2 h-9 w-full px-3 rounded-md border border-input bg-background text-sm text-muted-foreground text-left">
@@ -134,5 +163,7 @@ export default function PatientCombobox({ value, onChange, disabled, placeholder
       </PopoverTrigger>
       {listContent}
     </Popover>
+    {createDialog}
+    </>
   );
 }
