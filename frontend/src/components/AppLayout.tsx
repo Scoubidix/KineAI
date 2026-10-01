@@ -1365,6 +1365,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     {
       label: 'Communauté',
       items: [
+        { href: '/dashboard/kine/news', label: 'News de la semaine', icon: Newspaper, emoji: '📰', highlight: false },
         { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, emoji: '🎁', highlight: false },
         { href: '/dashboard/kine/roadmap', label: 'Roadmap', icon: MapIcon, emoji: '🗺️', highlight: false },
         // Reserve aux membres du plan Pionnier (et aux admins) : masque pour les autres
