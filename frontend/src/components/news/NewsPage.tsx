@@ -63,6 +63,10 @@ export default function NewsPage() {
       const page = await fetchNewsPage(items[items.length - 1]);
       setItems((prev) => [...prev, ...page.items]);
       setHasMore(page.hasMore);
+      // Une news non vue peut arriver sur une page suivante ; les badges déjà affichés restent visibles
+      if (page.items.some((n) => !n.vue)) {
+        fetchWithAuth(`${API}/api/news/mark-seen`, { method: 'POST' }).catch(() => {});
+      }
     } catch {
       setError(true);
     } finally {

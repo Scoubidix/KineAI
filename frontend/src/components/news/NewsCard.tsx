@@ -8,16 +8,35 @@ import type { NewsItem } from './types';
 
 const GRADIENT = 'from-[#3899aa] to-[#2a7a8a]';
 
-/** « Semaine du 6 octobre » : le lundi de la semaine de publication (heure du navigateur, en France) */
+/** Lit l'année/mois/jour/jour-de-semaine d'une date en heure de Paris, indépendamment du fuseau local */
+function getParisDateParts(d: Date): { year: number; month: number; day: number; weekday: number } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Paris',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  const weekdayMap: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+  return {
+    year: Number(get('year')),
+    month: Number(get('month')),
+    day: Number(get('day')),
+    weekday: weekdayMap[get('weekday')] ?? 1,
+  };
+}
+
+/** « Semaine du 6 octobre » : le lundi de la semaine de publication, calculé en heure de Paris */
 export function weekLabel(iso: string): string {
-  const d = new Date(iso);
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return `Semaine du ${monday.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`;
+  const { year, month, day, weekday } = getParisDateParts(new Date(iso));
+  // Date UTC « neutre » représentant le jour calendaire parisien, pour l'arithmétique de dates
+  const mondayUtc = new Date(Date.UTC(year, month - 1, day - (weekday - 1)));
+  return `Semaine du ${mondayUtc.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'UTC' })}`;
 }
 
 const dayLabel = (iso: string): string =>
-  new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
 
 function NewBadge() {
   return <span className="rounded-full bg-[#3899aa]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3899aa]">Nouveau</span>;

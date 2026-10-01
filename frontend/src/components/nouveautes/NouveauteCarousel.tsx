@@ -19,6 +19,8 @@ export default function NouveauteCarousel({
 }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  // Arrêt définitif de la rotation auto dès qu'un point de navigation est cliqué (WCAG 2.2.2 Pause/Stop/Hide)
+  const [stopped, setStopped] = useState(false);
   const [zoomed, setZoomed] = useState<string | null>(null);
   const count = imageUrls.length;
 
@@ -27,10 +29,12 @@ export default function NouveauteCarousel({
   }, [count]);
 
   useEffect(() => {
-    if (count <= 1 || paused) return;
+    if (count <= 1 || paused || stopped) return;
+    // Pas de rotation auto si l'utilisateur préfère les animations réduites
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const id = setInterval(() => setIndex((i) => (i + 1) % count), 4000);
     return () => clearInterval(id);
-  }, [count, paused]);
+  }, [count, paused, stopped]);
 
   if (count === 0) {
     return (
@@ -70,7 +74,10 @@ export default function NouveauteCarousel({
               <button
                 key={i}
                 type="button"
-                onClick={() => setIndex(i)}
+                onClick={() => {
+                  setIndex(i);
+                  setStopped(true);
+                }}
                 aria-label={`Image ${i + 1}`}
                 className={`h-1.5 rounded-full bg-white transition-all ${
                   i === index ? 'w-4 opacity-100' : 'w-1.5 opacity-60'
