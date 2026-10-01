@@ -1365,13 +1365,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
     {
       label: 'Communauté',
       items: [
-        { href: '/dashboard/kine/news', label: 'News de la semaine', icon: Newspaper, emoji: '📰', highlight: false },
-        { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, emoji: '🎁', highlight: false },
-        { href: '/dashboard/kine/roadmap', label: 'Roadmap', icon: MapIcon, emoji: '🗺️', highlight: false },
         // Reserve aux membres du plan Pionnier (et aux admins) : masque pour les autres
         ...(pionniersAccess
           ? [{ href: '/dashboard/kine/groupe-pionniers', label: 'Groupe Pionniers', icon: MessagesSquare, emoji: '💬', highlight: false }]
           : []),
+        { href: '/dashboard/kine/news', label: 'News de la semaine', icon: Newspaper, emoji: '📰', highlight: false },
+        { href: '/dashboard/kine/roadmap', label: 'Roadmap', icon: MapIcon, emoji: '🗺️', highlight: false },
+        { href: '/dashboard/kine/parrainage', label: 'Parrainage', icon: Gift, emoji: '🎁', highlight: false },
       ],
     },
   ];
@@ -1818,17 +1818,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
                             </li>
                           )}
                         </ul>
-                        {headerSubscription.planType === 'PIONNIER' && (
-                          <a
-                            href="https://www.facebook.com/groups/1405794777496956/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-3 flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[#3899aa]/10 text-xs text-[#3899aa] hover:bg-[#3899aa]/20 font-semibold transition-colors"
-                          >
-                            <MessageCircle className="h-3.5 w-3.5 shrink-0" />
-                            Groupe de discussion Pionniers
-                          </a>
-                        )}
                       </div>
                       {canUpgrade && (
                         <div className="border-t p-3">

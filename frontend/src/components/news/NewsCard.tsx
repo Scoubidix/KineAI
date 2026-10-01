@@ -8,33 +8,6 @@ import type { NewsItem } from './types';
 
 const GRADIENT = 'from-[#3899aa] to-[#2a7a8a]';
 
-/** Lit l'année/mois/jour/jour-de-semaine d'une date en heure de Paris, indépendamment du fuseau local */
-function getParisDateParts(d: Date): { year: number; month: number; day: number; weekday: number } {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Europe/Paris',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-  }).formatToParts(d);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
-  const weekdayMap: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
-  return {
-    year: Number(get('year')),
-    month: Number(get('month')),
-    day: Number(get('day')),
-    weekday: weekdayMap[get('weekday')] ?? 1,
-  };
-}
-
-/** « Semaine du 6 octobre » : le lundi de la semaine de publication, calculé en heure de Paris */
-export function weekLabel(iso: string): string {
-  const { year, month, day, weekday } = getParisDateParts(new Date(iso));
-  // Date UTC « neutre » représentant le jour calendaire parisien, pour l'arithmétique de dates
-  const mondayUtc = new Date(Date.UTC(year, month - 1, day - (weekday - 1)));
-  return `Semaine du ${mondayUtc.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'UTC' })}`;
-}
-
 const dayLabel = (iso: string): string =>
   new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
 
@@ -60,11 +33,10 @@ export function NewsFeatured({ n }: { n: NewsItem }) {
         <NouveauteCarousel imageUrls={n.imageUrls} gradient={GRADIENT} Icon={Newspaper} />
       </div>
       <div>
-        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2">
           {!n.vue && <NewBadge />}
-          <time dateTime={n.publishedAt}>{weekLabel(n.publishedAt)}</time>
+          <h2 className="text-xl font-semibold leading-tight text-foreground">{n.titre}</h2>
         </div>
-        <h2 className="mt-2 text-xl font-semibold leading-tight text-foreground">{n.titre}</h2>
         <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-foreground/90">{n.description}</p>
         <Cta n={n} />
       </div>

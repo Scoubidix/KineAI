@@ -83,7 +83,6 @@ export default function NewsPage() {
           <Newspaper className="h-6 w-6" />
           News de la semaine
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">Ce qui se passe chez Mon Assistant Kiné, chaque semaine.</p>
       </header>
 
       {loading ? (
