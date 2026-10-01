@@ -564,6 +564,9 @@ app.use('/api/notifications', notificationRoutes);
 // Routes nouveautés (annonces produit) — kiné (lecture) + admin (gestion)
 app.use('/api/nouveautes', require('./routes/nouveautes'));
 
+// Routes News de la semaine (même table, canal NEWS) — kiné
+app.use('/api/news', require('./routes/news'));
+
 // Routes roadmap publique (cards + boîte à idées) — kiné
 app.use('/api/roadmap', require('./routes/roadmap'));
 

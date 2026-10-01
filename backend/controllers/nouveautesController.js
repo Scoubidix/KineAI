@@ -12,6 +12,8 @@ const logger = require('../utils/logger');
 
 const VALID_PLANS = ['FREE', 'DECLIC', 'PRATIQUE', 'PIONNIER', 'EXPERT'];
 const VALID_CATEGORIES = ['NOUVEAUTE', 'AMELIORATION', 'OFFRE'];
+const VALID_CANAUX = ['NOUVEAUTE', 'NEWS'];
+const NEWS_PAGE_MAX = 20;
 
 /** Charge le kiné (champs nécessaires au plan effectif + date de création). */
 async function loadKine(uid) {
@@ -60,10 +62,47 @@ async function markSeen(req, res) {
   }
 }
 
+// ===================== KINÉ — NEWS =====================
+
+async function getNews(req, res) {
+  try {
+    const kine = await loadKine(req.uid);
+    if (!kine) return res.status(404).json({ success: false, error: 'Kiné non trouvé' });
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), NEWS_PAGE_MAX);
+    let before = null;
+    let beforeId = null;
+    if (req.query.before) {
+      before = new Date(req.query.before);
+      if (Number.isNaN(before.getTime())) {
+        return res.status(400).json({ success: false, error: 'Curseur invalide', code: 'VALIDATION' });
+      }
+      const id = parseInt(req.query.beforeId, 10);
+      beforeId = Number.isNaN(id) ? null : id;
+    }
+    const page = await nouveauteService.getNewsPage(kine, { before, beforeId, limit });
+    res.json({ success: true, ...page });
+  } catch (error) {
+    logger.error('Erreur getNews:', error);
+    res.status(500).json({ success: false, error: 'Erreur lors de la récupération des news', code: 'NEWS_ERROR' });
+  }
+}
+
+async function markNewsSeen(req, res) {
+  try {
+    const kine = await loadKine(req.uid);
+    if (!kine) return res.status(404).json({ success: false, error: 'Kiné non trouvé' });
+    const result = await nouveauteService.markSeen(kine, new Date(), 'NEWS');
+    res.json({ success: true, ...result });
+  } catch (error) {
+    logger.error('Erreur markSeen news:', error);
+    res.status(500).json({ success: false, error: 'Erreur lors du marquage', code: 'NEWS_SEEN_ERROR' });
+  }
+}
+
 // ===================== ADMIN =====================
 
-/** Nettoie/valide le corps d'une nouveauté (create/update). */
-function parseBody(body) {
+/** Nettoie/valide le corps d'une nouveauté (create/update). `canal` : celui du contenu, jamais lu dans le corps. */
+function parseBody(body, canal = 'NOUVEAUTE') {
   const data = {};
   if (typeof body.titre === 'string') data.titre = body.titre.trim();
   if (typeof body.description === 'string') data.description = body.description.trim();
@@ -86,12 +125,22 @@ function parseBody(body) {
   if (body.publishedAt !== undefined && body.publishedAt) data.publishedAt = new Date(body.publishedAt);
   if (body.expiresAt !== undefined) data.expiresAt = body.expiresAt ? new Date(body.expiresAt) : null;
   if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
+  // News : pour tous, sans expiration ni catégorie (spec 2026-10-01 §1)
+  if (canal === 'NEWS') {
+    data.ciblePlans = [];
+    data.expiresAt = null;
+    delete data.categorie;
+  }
   return data;
 }
 
 async function adminList(req, res) {
+  const canal = req.query.canal ?? 'NOUVEAUTE';
+  if (!VALID_CANAUX.includes(canal)) {
+    return res.status(400).json({ success: false, error: 'Canal invalide', code: 'VALIDATION' });
+  }
   try {
-    const nouveautes = await nouveauteService.listAllForAdmin();
+    const nouveautes = await nouveauteService.listAllForAdmin(canal);
     res.json({ success: true, nouveautes });
   } catch (error) {
     logger.error('Erreur adminList nouveautés:', error);
@@ -101,7 +150,11 @@ async function adminList(req, res) {
 
 async function adminCreate(req, res) {
   try {
-    const data = parseBody(req.body);
+    const canal = req.body.canal ?? 'NOUVEAUTE';
+    if (!VALID_CANAUX.includes(canal)) {
+      return res.status(400).json({ success: false, error: 'Canal invalide', code: 'VALIDATION' });
+    }
+    const data = { ...parseBody(req.body, canal), canal };
     if (!data.titre || !data.description) {
       return res.status(400).json({ success: false, error: 'Titre et description obligatoires', code: 'VALIDATION' });
     }
@@ -120,7 +173,8 @@ async function adminUpdate(req, res) {
     const existing = await nouveauteService.getById(id);
     if (!existing) return res.status(404).json({ success: false, error: 'Nouveauté non trouvée' });
 
-    const data = parseBody(req.body);
+    // Le canal d'un contenu existant ne change jamais : il n'est pas lu dans le corps
+    const data = parseBody(req.body, existing.canal);
     // Supprimer de GCS les images retirées du carrousel
     if (data.imagePaths !== undefined) {
       const removed = (existing.imagePaths || []).filter((p) => !data.imagePaths.includes(p));
@@ -178,6 +232,8 @@ module.exports = {
   getNouveautes,
   getUnreadCount,
   markSeen,
+  getNews,
+  markNewsSeen,
   adminList,
   adminCreate,
   adminUpdate,
