@@ -58,6 +58,7 @@ export default function NewsPage() {
 
   const loadMore = async () => {
     setLoadingMore(true);
+    setError(false);
     try {
       const page = await fetchNewsPage(items[items.length - 1]);
       setItems((prev) => [...prev, ...page.items]);
@@ -106,6 +107,11 @@ export default function NewsPage() {
               </h2>
               {archive.map((n) => <NewsArchiveItem key={n.id} n={n} />)}
             </section>
+          )}
+          {error && (
+            <p role="alert" className="text-center text-sm text-destructive">
+              Impossible de charger la suite. Réessaie dans un instant.
+            </p>
           )}
           {hasMore && (
             <div className="flex justify-center">
