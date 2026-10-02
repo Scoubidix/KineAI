@@ -321,15 +321,13 @@ export default function KineHomePage() {
 
         {/* Dernière news : une ligne d'aperçu, le détail sur la page News */}
         {latestNews && (
-          <Link href="/dashboard/kine/news" className="card-hover flex items-center gap-3 rounded-xl p-4">
-            <div className="w-10 h-10 shrink-0 rounded-lg flex items-center justify-center text-xl bg-[#3899aa]/10">📰</div>
-            <p className="min-w-0 flex-1 text-sm line-clamp-2 sm:line-clamp-1">
+          <Link href="/dashboard/kine/news" className="card-hover block rounded-xl p-4">
+            <p className="text-sm line-clamp-2 sm:line-clamp-1">
               {!latestNews.vue && (
                 <span className="mr-1.5 rounded-full bg-[#3899aa]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3899aa]">Nouveau</span>
               )}
               <span className="text-foreground/90">{latestNews.description}</span>
             </p>
-            <span className="shrink-0 text-sm font-medium text-[#3899aa]">Voir plus →</span>
           </Link>
         )}
 
