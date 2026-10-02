@@ -2,7 +2,7 @@
 
 /**
  * Page « News de la semaine » — modèle « mise en avant + archive » des pages d'actualités :
- * la plus récente en grand, les précédentes en liste compacte dépliable, chargées par 10.
+ * la plus récente en entier, les précédentes en liste compacte dépliable, chargées par 10.
  * Pas de pastille de menu : le badge « Nouveau » sur la page suffit (décision du 2026-10-01).
  */
 
@@ -77,7 +77,7 @@ export default function NewsPage() {
   const [featured, ...archive] = items;
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-8 p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-[720px] space-y-8 p-4 sm:p-6">
       <header>
         <h1 className="flex items-center gap-2 text-xl font-bold text-[#3899aa] sm:text-2xl">
           <Newspaper className="h-6 w-6" />
@@ -86,13 +86,9 @@ export default function NewsPage() {
       </header>
 
       {loading ? (
-        <div className="grid gap-5 lg:grid-cols-2">
-          <Skeleton className="aspect-video w-full rounded-xl" />
-          <div className="space-y-3">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-6 w-3/4" />
-            <Skeleton className="h-24 w-full" />
-          </div>
+        <div className="space-y-3">
+          <Skeleton className="h-6 w-3/4" />
+          <Skeleton className="h-24 w-full" />
         </div>
       ) : error && items.length === 0 ? (
         <p className="flex items-center gap-2 text-sm text-destructive">
@@ -104,7 +100,7 @@ export default function NewsPage() {
         <>
           <NewsFeatured n={featured} />
           {archive.length > 0 && (
-            <section aria-labelledby="news-archive" className="mx-auto max-w-[720px]">
+            <section aria-labelledby="news-archive">
               <h2 id="news-archive" className="border-b border-border pb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Précédemment
               </h2>

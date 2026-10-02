@@ -2,11 +2,8 @@
 
 import React, { useId, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, ChevronDown, Newspaper } from 'lucide-react';
-import NouveauteCarousel from '@/components/nouveautes/NouveauteCarousel';
+import { ArrowRight, ChevronDown } from 'lucide-react';
 import type { NewsItem } from './types';
-
-const GRADIENT = 'from-[#3899aa] to-[#2a7a8a]';
 
 const dayLabel = (iso: string): string =>
   new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
@@ -25,27 +22,23 @@ function Cta({ n }: { n: NewsItem }) {
   );
 }
 
-/** La news de la semaine : image et texte côte à côte sur ordinateur, empilés sur téléphone */
+/** La news de la semaine : texte seul, l'image masquait la news (surtout sur téléphone) */
 export function NewsFeatured({ n }: { n: NewsItem }) {
   return (
-    <article className="grid gap-5 lg:grid-cols-2 lg:items-start">
-      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-muted">
-        <NouveauteCarousel imageUrls={n.imageUrls} gradient={GRADIENT} Icon={Newspaper} />
+    <article>
+      <div className="flex flex-wrap items-center gap-2">
+        {!n.vue && <NewBadge />}
+        <h2 className="text-xl font-semibold leading-tight text-foreground">{n.titre}</h2>
       </div>
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          {!n.vue && <NewBadge />}
-          <h2 className="text-xl font-semibold leading-tight text-foreground">{n.titre}</h2>
-        </div>
-        <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-foreground/90">{n.description}</p>
-        <Cta n={n} />
-      </div>
+      <time dateTime={n.publishedAt} className="mt-1 block text-sm text-muted-foreground">{dayLabel(n.publishedAt)}</time>
+      <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-foreground/90">{n.description}</p>
+      <Cta n={n} />
     </article>
   );
 }
 
 /**
- * Une news de l'archive : vignette, titre, date, deux lignes ; « Lire la suite » la déplie sur
+ * Une news de l'archive : titre, date, deux lignes ; « Lire la suite » la déplie sur
  * place (motif disclosure WAI-ARIA) pour garder sa position dans la liste.
  */
 export function NewsArchiveItem({ n }: { n: NewsItem }) {
@@ -53,35 +46,14 @@ export function NewsArchiveItem({ n }: { n: NewsItem }) {
   const bodyId = useId();
   return (
     <article className="border-b border-border/60 py-4 last:border-b-0">
-      <div className="flex gap-3">
-        {!open && (
-          <div className="relative aspect-[4/3] w-24 shrink-0 overflow-hidden rounded-md bg-muted">
-            {n.imageUrls[0] ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={n.imageUrls[0]} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${GRADIENT}`}>
-                <Newspaper className="h-6 w-6 text-white/90" />
-              </div>
-            )}
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <h3 className="font-semibold leading-snug text-foreground">{n.titre}</h3>
-          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {!n.vue && <NewBadge />}
-            <time dateTime={n.publishedAt}>{dayLabel(n.publishedAt)}</time>
-          </div>
-          {!open && <p className="mt-1.5 line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">{n.description}</p>}
-        </div>
+      <h3 className="font-semibold leading-snug text-foreground">{n.titre}</h3>
+      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        {!n.vue && <NewBadge />}
+        <time dateTime={n.publishedAt}>{dayLabel(n.publishedAt)}</time>
       </div>
+      {!open && <p className="mt-1.5 line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">{n.description}</p>}
       {open && (
-        <div id={bodyId} className="mt-3 space-y-3">
-          {n.imageUrls.length > 0 && (
-            <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-muted">
-              <NouveauteCarousel imageUrls={n.imageUrls} gradient={GRADIENT} Icon={Newspaper} />
-            </div>
-          )}
+        <div id={bodyId} className="mt-3">
           <p className="whitespace-pre-line text-[15px] leading-relaxed text-foreground/90">{n.description}</p>
           <Cta n={n} />
         </div>
