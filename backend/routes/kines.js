@@ -60,7 +60,7 @@ router.post('/', signupLimiter, authenticate, validate(createKineSchema), create
 // GET /kine/profile - Récupérer le profil du kiné connecté (nécessite auth)
 router.get('/profile', authenticate, getKineProfile);
 
-// GET /kine/dashboard-stats - Stats du hero (temps gagné, bilans, programmes)
+// GET /kine/dashboard-stats - Stats du hero (programmes en cours aujourd'hui)
 router.get('/dashboard-stats', authenticate, getDashboardStats);
 
 // PUT /kine/profile - Modifier le profil du kiné connecté (nécessite auth)

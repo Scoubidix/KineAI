@@ -10,7 +10,6 @@ const { normalizeFirstName, normalizeLastName } = require('../utils/nameNormaliz
 const LEGAL_VERSIONS = require('../config/legalVersions');
 const stripeService = require('../services/StripeService');
 const { upsertSignupContact } = require('../services/brevoTrialService');
-const { sumMinutes } = require('../config/timeSaved');
 const fs = require('fs');
 
 // Bornes [lundi 00:00, dimanche 23:59:59.999] de la semaine (Europe/Paris) contenant `ref`.
@@ -721,7 +720,7 @@ const deleteKineAvatar = async (req, res) => {
 
 /**
  * GET /kine/dashboard-stats
- * Stats du hero : temps gagné (semaine + delta), bilans générés (total), programmes actifs.
+ * Stats du hero : programmes en cours aujourd'hui.
  */
 const getDashboardStats = async (req, res) => {
   const uid = req.uid;
@@ -732,58 +731,23 @@ const getDashboardStats = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Kiné non trouvé.' });
     }
 
-    const now = new Date();
-    const thisWeek = getParisWeekBounds(now);
-    const lastWeekRef = new Date(Date.UTC(thisWeek.start.getUTCFullYear(), thisWeek.start.getUTCMonth(), thisWeek.start.getUTCDate() - 7));
-    const lastWeek = getParisWeekBounds(lastWeekRef);
-
     // Bornes du jour (Europe/Paris → UTC) pour « programmes en cours aujourd'hui »
-    const nowParis = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
+    const nowParis = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
     const todayStart = new Date(Date.UTC(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate(), 0, 0, 0, 0));
     const todayEnd = new Date(Date.UTC(nowParis.getFullYear(), nowParis.getMonth(), nowParis.getDate(), 23, 59, 59, 999));
 
-    const [thisWeekGrouped, lastWeekGrouped, bilansGeneratedTotal, iaSearchesTotal, programmesActiveToday] = await Promise.all([
-      prisma.kineActivityEvent.groupBy({
-        by: ['type'],
-        where: { kineId: kine.id, createdAt: { gte: thisWeek.start, lte: thisWeek.end } },
-        _count: { _all: true },
-      }),
-      prisma.kineActivityEvent.groupBy({
-        by: ['type'],
-        where: { kineId: kine.id, createdAt: { gte: lastWeek.start, lte: lastWeek.end } },
-        _count: { _all: true },
-      }),
-      prisma.kineActivityEvent.count({ where: { kineId: kine.id, type: 'BILAN_GENERATED' } }),
-      // Total recherches IA — journal d'événements découplé de l'historique conversations
-      // (supprimer ses conversations ne décrémente PAS ce compteur)
-      prisma.kineActivityEvent.count({ where: { kineId: kine.id, type: 'IA_SEARCH' } }),
-      // « En cours aujourd'hui » : actif, non archivé, et couvrant la date du jour
-      prisma.programme.count({
-        where: {
-          isActive: true,
-          isArchived: false,
-          dateDebut: { lte: todayEnd },
-          dateFin: { gte: todayStart },
-          patient: { kineId: kine.id, isActive: true },
-        },
-      }),
-    ]);
-
-    const thisWeekMinutes = sumMinutes(thisWeekGrouped);
-    const lastWeekMinutes = sumMinutes(lastWeekGrouped);
-
-    res.json({
-      success: true,
-      timeSaved: {
-        thisWeekMinutes,
-        lastWeekMinutes,
-        deltaMinutes: thisWeekMinutes - lastWeekMinutes,
-        formatted: { hours: Math.floor(thisWeekMinutes / 60), minutes: thisWeekMinutes % 60 },
+    // « En cours aujourd'hui » : actif, non archivé, et couvrant la date du jour
+    const programmesActiveToday = await prisma.programme.count({
+      where: {
+        isActive: true,
+        isArchived: false,
+        dateDebut: { lte: todayEnd },
+        dateFin: { gte: todayStart },
+        patient: { kineId: kine.id, isActive: true },
       },
-      bilansGeneratedTotal,
-      iaSearchesTotal,
-      programmesActiveToday,
     });
+
+    res.json({ success: true, programmesActiveToday });
   } catch (err) {
     logger.error('❌ Erreur dashboard-stats:', err.message);
     res.status(500).json({ success: false, error: 'Erreur serveur.' });

@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import NouveauContratModal from '@/app/dashboard/kine/contrats/components/NouveauContratModal';
+import type { NewsItem, NewsPageResponse } from '@/components/news/types';
 
 // Interfaces pour les types de données
 interface KineData {
@@ -71,14 +72,6 @@ interface PatientsSessionsData {
 
 interface DashboardStats {
   success: boolean;
-  timeSaved: {
-    thisWeekMinutes: number;
-    lastWeekMinutes: number;
-    deltaMinutes: number;
-    formatted: { hours: number; minutes: number };
-  };
-  bilansGeneratedTotal: number;
-  iaSearchesTotal: number;
   programmesActiveToday: number;
 }
 
@@ -111,6 +104,7 @@ export default function KineHomePage() {
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [weekAdherence, setWeekAdherence] = useState<WeekAdherence | null>(null);
   const [kine, setKine] = useState<KineData | null>(null);
+  const [latestNews, setLatestNews] = useState<NewsItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingAdherence, setLoadingAdherence] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -175,6 +169,7 @@ export default function KineHomePage() {
           fetchAdherenceData(selectedDate, token),
           fetchDashboardStats(),
           fetchWeekAdherence(selectedDate),
+          fetchLatestNews(),
         ]);
       }
     } catch (error) {
@@ -256,6 +251,18 @@ export default function KineHomePage() {
     }
   };
 
+  const fetchLatestNews = async () => {
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/news?limit=1`);
+      if (res.ok) {
+        const page: NewsPageResponse = await res.json();
+        setLatestNews(page.items[0] ?? null);
+      }
+    } catch (e) {
+      console.error('Erreur dernière news:', e);
+    }
+  };
+
   // Chargement en cours
   if (loading) {
     return (
@@ -302,28 +309,6 @@ export default function KineHomePage() {
           <h1 className="text-2xl md:text-3xl font-bold mb-5">{kine.firstName} 👋</h1>
           <div className="flex flex-wrap gap-x-8 gap-y-4">
             <div>
-              <div className="text-2xl md:text-3xl font-bold leading-none">
-                {dashboardStats
-                  ? `${dashboardStats.timeSaved.formatted.hours}h ${String(dashboardStats.timeSaved.formatted.minutes).padStart(2, '0')}`
-                  : '—'}
-              </div>
-              <div className="text-xs opacity-70 mt-1">gagnées cette semaine</div>
-              {dashboardStats && dashboardStats.timeSaved.deltaMinutes !== 0 && (
-                <span className="inline-block mt-1 text-[11px] font-semibold rounded-full px-2 py-0.5 bg-white/15">
-                  {dashboardStats.timeSaved.deltaMinutes > 0 ? '↑ +' : '↓ '}
-                  {Math.abs(dashboardStats.timeSaved.deltaMinutes)} min vs sem. dern.
-                </span>
-              )}
-            </div>
-            <div>
-              <div className="text-2xl md:text-3xl font-bold leading-none">{dashboardStats?.bilansGeneratedTotal ?? '—'}</div>
-              <div className="text-xs opacity-70 mt-1">bilans générés par l'IA</div>
-            </div>
-            <div>
-              <div className="text-2xl md:text-3xl font-bold leading-none">{dashboardStats?.iaSearchesTotal ?? '—'}</div>
-              <div className="text-xs opacity-70 mt-1">recherches au Copilote IA</div>
-            </div>
-            <div>
               <div className="text-2xl md:text-3xl font-bold leading-none">{dashboardStats?.programmesActiveToday ?? '—'}</div>
               <div className="text-xs opacity-70 mt-1">programmes en cours aujourd'hui</div>
             </div>
@@ -333,6 +318,21 @@ export default function KineHomePage() {
             </div>
           </div>
         </div>
+
+        {/* Dernière news : une ligne d'aperçu, le détail sur la page News */}
+        {latestNews && (
+          <Link href="/dashboard/kine/news" className="card-hover flex items-center gap-3 rounded-xl p-4">
+            <div className="w-10 h-10 shrink-0 rounded-lg flex items-center justify-center text-xl bg-[#3899aa]/10">📰</div>
+            <p className="min-w-0 flex-1 text-sm line-clamp-2 sm:line-clamp-1">
+              {!latestNews.vue && (
+                <span className="mr-1.5 rounded-full bg-[#3899aa]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3899aa]">Nouveau</span>
+              )}
+              <span className="font-semibold text-foreground">{latestNews.titre}</span>
+              <span className="text-muted-foreground"> : {latestNews.description}</span>
+            </p>
+            <span className="shrink-0 text-sm font-medium text-[#3899aa]">Voir plus →</span>
+          </Link>
+        )}
 
         {/* Actions rapides */}
         <div>
