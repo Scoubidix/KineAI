@@ -87,7 +87,6 @@ export default function NewsPage() {
 
       {loading ? (
         <div className="space-y-3">
-          <Skeleton className="h-6 w-3/4" />
           <Skeleton className="h-24 w-full" />
         </div>
       ) : error && items.length === 0 ? (

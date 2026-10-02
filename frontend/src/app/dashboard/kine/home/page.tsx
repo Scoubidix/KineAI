@@ -327,8 +327,7 @@ export default function KineHomePage() {
               {!latestNews.vue && (
                 <span className="mr-1.5 rounded-full bg-[#3899aa]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3899aa]">Nouveau</span>
               )}
-              <span className="font-semibold text-foreground">{latestNews.titre}</span>
-              <span className="text-muted-foreground"> : {latestNews.description}</span>
+              <span className="text-foreground/90">{latestNews.description}</span>
             </p>
             <span className="shrink-0 text-sm font-medium text-[#3899aa]">Voir plus →</span>
           </Link>

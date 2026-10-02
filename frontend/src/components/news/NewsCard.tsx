@@ -22,23 +22,20 @@ function Cta({ n }: { n: NewsItem }) {
   );
 }
 
-/** La news de la semaine : texte seul, l'image masquait la news (surtout sur téléphone) */
+/** La news de la semaine : texte seul (ni image ni titre), date en dessous */
 export function NewsFeatured({ n }: { n: NewsItem }) {
   return (
     <article>
-      <div className="flex flex-wrap items-center gap-2">
-        {!n.vue && <NewBadge />}
-        <h2 className="text-xl font-semibold leading-tight text-foreground">{n.titre}</h2>
-      </div>
-      <time dateTime={n.publishedAt} className="mt-1 block text-sm text-muted-foreground">{dayLabel(n.publishedAt)}</time>
-      <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-foreground/90">{n.description}</p>
+      {!n.vue && <div className="mb-2"><NewBadge /></div>}
+      <p className="whitespace-pre-line text-[15px] leading-relaxed text-foreground/90">{n.description}</p>
       <Cta n={n} />
+      <time dateTime={n.publishedAt} className="mt-3 block text-sm text-muted-foreground">{dayLabel(n.publishedAt)}</time>
     </article>
   );
 }
 
 /**
- * Une news de l'archive : titre, date, deux lignes ; « Lire la suite » la déplie sur
+ * Une news de l'archive : deux lignes de texte puis la date ; « Lire la suite » la déplie sur
  * place (motif disclosure WAI-ARIA) pour garder sa position dans la liste.
  */
 export function NewsArchiveItem({ n }: { n: NewsItem }) {
@@ -46,24 +43,23 @@ export function NewsArchiveItem({ n }: { n: NewsItem }) {
   const bodyId = useId();
   return (
     <article className="border-b border-border/60 py-4 last:border-b-0">
-      <h3 className="font-semibold leading-snug text-foreground">{n.titre}</h3>
-      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        {!n.vue && <NewBadge />}
-        <time dateTime={n.publishedAt}>{dayLabel(n.publishedAt)}</time>
-      </div>
-      {!open && <p className="mt-1.5 line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">{n.description}</p>}
+      {!open && <p className="line-clamp-2 whitespace-pre-line text-sm text-foreground/90">{n.description}</p>}
       {open && (
-        <div id={bodyId} className="mt-3">
+        <div id={bodyId}>
           <p className="whitespace-pre-line text-[15px] leading-relaxed text-foreground/90">{n.description}</p>
           <Cta n={n} />
         </div>
       )}
+      <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        {!n.vue && <NewBadge />}
+        <time dateTime={n.publishedAt}>{dayLabel(n.publishedAt)}</time>
+      </div>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-controls={bodyId}
-        className="mt-2 inline-flex min-h-8 items-center gap-1 text-sm font-medium text-[#3899aa] hover:underline"
+        className="mt-1 inline-flex min-h-8 items-center gap-1 text-sm font-medium text-[#3899aa] hover:underline"
       >
         {open ? 'Réduire' : 'Lire la suite'}
         <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
