@@ -22,7 +22,7 @@ import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
 import { formatStart, parseYouTubeUrl, youtubeWatchUrl } from '@/utils/youtube';
 import TestGuideContent from '@/components/bilan/TestGuideContent';
-import YouTubeFacade from '@/components/bilan/YouTubeFacade';
+import YouTubeFacade, { YouTubeCookieNotice } from '@/components/bilan/YouTubeFacade';
 import type { AdminBilanGuide, AdminBilanGuideRow } from '@/types/bilan';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -110,8 +110,9 @@ export default function BilanGuideEditorDialog({ row, onClose, onSaved }: BilanG
               </div>
             </TabsContent>
             <TabsContent value="preview" className="mt-3 space-y-4 rounded-md border p-4">
-              {content.trim() ? <TestGuideContent content={content} /> : <p className="text-sm text-muted-foreground">Aucune description : pas de bouton ⓘ côté kiné.</p>}
               {video && <YouTubeFacade videoId={video.id} start={video.start} title={row?.label ?? ''} />}
+              {content.trim() ? <TestGuideContent content={content} /> : <p className="text-sm text-muted-foreground">Aucune description : pas de bouton ⓘ côté kiné.</p>}
+              {video && <YouTubeCookieNotice />}
             </TabsContent>
           </Tabs>
 

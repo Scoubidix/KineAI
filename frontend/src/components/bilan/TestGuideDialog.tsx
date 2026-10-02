@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import type { TestGuide } from '@/types/bilan';
 import TestGuideContent from './TestGuideContent';
-import YouTubeFacade from './YouTubeFacade';
+import YouTubeFacade, { YouTubeCookieNotice } from './YouTubeFacade';
 
 interface TestGuideDialogProps {
   fieldKey: string;
@@ -54,10 +54,10 @@ export default function TestGuideDialog({ fieldKey, label, open, onOpenChange, c
 
         {(status === 'loading' || status === 'idle') && (
           <div className="space-y-2" aria-busy="true" aria-label="Chargement de la fiche">
+            <div className="aspect-video w-full animate-pulse rounded-lg bg-muted" />
             <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
             <div className="h-4 w-full animate-pulse rounded bg-muted" />
             <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
-            <div className="aspect-video w-full animate-pulse rounded-lg bg-muted" />
           </div>
         )}
 
@@ -70,8 +70,9 @@ export default function TestGuideDialog({ fieldKey, label, open, onOpenChange, c
 
         {status === 'ready' && guide && (
           <div className="space-y-4">
-            <TestGuideContent content={guide.content} />
             {guide.youtubeId && <YouTubeFacade videoId={guide.youtubeId} start={guide.youtubeStart} title={label} />}
+            <TestGuideContent content={guide.content} />
+            {guide.youtubeId && <YouTubeCookieNotice />}
           </div>
         )}
       </DialogContent>
