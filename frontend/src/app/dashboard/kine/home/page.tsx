@@ -97,6 +97,12 @@ const getInitials = (name?: string): string => {
 const AVATAR_COLORS = ['#3899aa', '#f59e0b', '#8b5cf6', '#22c55e'];
 const avatarColor = (id: number): string => AVATAR_COLORS[id % AVATAR_COLORS.length];
 
+// « Lundi 7 septembre » : jour de publication de la news, en heure de Paris
+const newsDayLabel = (iso: string): string => {
+  const label = new Date(iso).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+};
+
 export default function KineHomePage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [adherenceData, setAdherenceData] = useState<AdherenceData | null>(null);
@@ -321,14 +327,20 @@ export default function KineHomePage() {
 
         {/* Dernière news : une ligne d'aperçu, le détail sur la page News */}
         {latestNews && (
-          <Link href="/dashboard/kine/news" className="card-hover block rounded-xl p-4">
-            <p className="text-sm line-clamp-2 sm:line-clamp-1">
-              {!latestNews.vue && (
-                <span className="mr-1.5 rounded-full bg-[#3899aa]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3899aa]">Nouveau</span>
-              )}
-              <span className="text-foreground/90">{latestNews.description}</span>
-            </p>
-          </Link>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">News de la semaine</p>
+            <Link href="/dashboard/kine/news" className="card-hover block rounded-xl p-4">
+              <time dateTime={latestNews.publishedAt} className="mb-1 block text-xs text-muted-foreground">
+                {newsDayLabel(latestNews.publishedAt)}
+              </time>
+              <p className="text-sm line-clamp-2 sm:line-clamp-1">
+                {!latestNews.vue && (
+                  <span className="mr-1.5 rounded-full bg-[#3899aa]/10 px-2 py-0.5 text-[11px] font-semibold text-[#3899aa]">Nouveau</span>
+                )}
+                <span className="text-foreground/90">{latestNews.description}</span>
+              </p>
+            </Link>
+          </div>
         )}
 
         {/* Actions rapides */}
