@@ -79,8 +79,10 @@ export default function LegacyDemoLinksCard() {
             </>
           )}
           <p className="text-xs text-muted-foreground pt-1">
-            Au GO : retirer storage.googleapis.com (CSP, sw.ts, DEMO_LINK d&apos;openaiService), vérifier avec
-            rclone check, garder le bucket quelques semaines, puis le supprimer.
+            Au GO, et uniquement une fois la migration vers Cellar terminée (la bibliothèque, les posters,
+            Pionniers et News lisent encore GCS directement) : retirer storage.googleapis.com (CSP, sw.ts,
+            DEMO_LINK d&apos;openaiService), vérifier avec rclone check, garder le bucket quelques semaines,
+            puis le supprimer.
           </p>
         </div>
       )}
