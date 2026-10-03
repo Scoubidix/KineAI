@@ -25,6 +25,22 @@ router.get('/stats', authenticate, requireAdmin, async (req, res) => {
 });
 
 /**
+ * GET /admin/dashboard/legacy-demo-links
+ * Go/no-go du ménage GCS : programmes encore accessibles dont un message porte
+ * un ancien lien de démo GCS v2, et la dateFin la plus tardive. Temporaire.
+ */
+router.get('/legacy-demo-links', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const legacyDemoLinksService = require('../services/legacyDemoLinksService');
+    const data = await legacyDemoLinksService.getLegacyDemoLinksStatus();
+    res.json({ success: true, data });
+  } catch (error) {
+    logger.error('Erreur suivi des anciens liens de démo GCS', { error: error.message });
+    res.status(500).json({ success: false, error: 'Erreur lors du suivi des anciens liens de démo', code: 'LEGACY_DEMO_LINKS_ERROR' });
+  }
+});
+
+/**
  * GET /admin/dashboard/token-usage
  * Consommation tokens IA du chat unifié : aujourd'hui (en cours), hier,
  * moyenne 10 jours, détail par plan, coûts estimés (tarif blended Medium 3.5)

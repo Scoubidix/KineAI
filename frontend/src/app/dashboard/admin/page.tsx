@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SubTabsList, SubTabsTrigger } from '@/components/ui/sub-tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import { RefreshCw, ShieldCheck, UserPlus, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, Layers, Zap, ImagePlus, X, Pencil, Trash2, Sparkles, Dumbbell, Map as MapIcon, Mic, BookOpen, Newspaper } from 'lucide-react';
+import { RefreshCw, ShieldCheck, UserPlus, MessageSquare, Send, Loader2, CheckCircle, ChevronDown, ChevronUp, MailCheck, Mail, FileText, Layers, Zap, ImagePlus, X, Pencil, Trash2, Sparkles, Dumbbell, Map as MapIcon, Mic, BookOpen, Newspaper, HardDrive } from 'lucide-react';
 import BilanFieldsTab from './components/BilanFieldsTab';
 import BilanTemplatesTab from './components/BilanTemplatesTab';
 import BilanGuidesTab from './components/BilanGuidesTab';
@@ -22,6 +22,7 @@ import RoadmapTab from './components/RoadmapTab';
 import DictationTermsTab from './components/DictationTermsTab';
 import StatsGlobalesTab, { type DashboardStats } from './components/StatsGlobalesTab';
 import AsrWorkerTab from './components/AsrWorkerTab';
+import LegacyDemoLinksCard from './components/LegacyDemoLinksCard';
 import { PLAN_COLORS } from './components/planColors';
 import { Button } from '@/components/ui/button';
 
@@ -66,7 +67,7 @@ const TABS = ['dashboard', 'emails', 'support', 'bilans',
   'nouveautes', 'exercices-publics', 'roadmap', 'dictee'] as const;
 type TabKey = (typeof TABS)[number];
 
-const STATS_VIEWS = ['metriques', 'worker', 'tokens'] as const;
+const STATS_VIEWS = ['metriques', 'worker', 'tokens', 'stockage'] as const;
 type StatsViewKey = (typeof STATS_VIEWS)[number];
 
 function isTabKey(value: string | null): value is TabKey {
@@ -461,6 +462,10 @@ function AdminDashboardPageContent() {
                     <Zap className="h-3.5 w-3.5" />
                     Tokens IA
                   </SubTabsTrigger>
+                  <SubTabsTrigger value="stockage">
+                    <HardDrive className="h-3.5 w-3.5" />
+                    Stockage
+                  </SubTabsTrigger>
                 </SubTabsList>
 
                 <TabsContent value="metriques" className="space-y-6 mt-6">
@@ -471,6 +476,9 @@ function AdminDashboardPageContent() {
                 </TabsContent>
                 <TabsContent value="tokens" className="mt-6">
                   <TokenUsageTab />
+                </TabsContent>
+                <TabsContent value="stockage" className="mt-6">
+                  <LegacyDemoLinksCard />
                 </TabsContent>
               </Tabs>
             </TabsContent>
