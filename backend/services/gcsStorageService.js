@@ -108,6 +108,8 @@ const ALL_FOLDERS = [
  * @param {number} expirationMs - Durée de validité en ms (défaut: 1h)
  * @param {string} version - 'v4' (max 7 j) ou 'v2' (longue durée)
  * @param {string[]} allowedPrefixes - Dossiers autorisés pour ce chemin
+ * @param {number} [accessibleAt] - Instant de départ de la signature (ms). Par
+ *   défaut maintenant ; `expires` est alors compté depuis cet instant.
  * @returns {Promise<string|null>} URL signée temporaire ou null si erreur
  */
 async function generateSignedUrl(
@@ -115,6 +117,7 @@ async function generateSignedUrl(
   expirationMs = DEFAULT_SIGNED_URL_EXPIRATION,
   version = 'v4',
   allowedPrefixes = ALL_FOLDERS,
+  accessibleAt = undefined,
 ) {
   try {
     if (!gifPath) {
@@ -135,10 +138,12 @@ async function generateSignedUrl(
       return null;
     }
 
+    const start = accessibleAt ?? Date.now();
     const [signedUrl] = await file.getSignedUrl({
       version: version,
       action: 'read',
-      expires: Date.now() + expirationMs,
+      expires: start + expirationMs,
+      ...(accessibleAt !== undefined && { accessibleAt }),
     });
 
     return signedUrl;
@@ -218,6 +223,21 @@ async function deleteExerciceMedia(mediaPath) {
 /** Cadrage des signatures de médias d'exercice (cf. generateSignedUrl). */
 const EXERCICE_ONLY = [EXERCICES_FOLDER];
 
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * URL signée v4 d'une démo, demandée par la route de redirection du chat patient
+ * (controllers/mediaController.js). Signée depuis le début de l'heure en cours,
+ * pour 2 h : l'URL est identique pendant toute l'heure, donc le navigateur
+ * ressert le média depuis son cache (`Cache-Control: private, max-age=3600`
+ * posé à l'upload), et elle reste valable au moins une heure quel que soit
+ * l'instant de la requête.
+ */
+async function signDemoMedia(mediaPath, now = Date.now()) {
+  const hourStart = now - (now % HOUR_MS);
+  return generateSignedUrl(mediaPath, 2 * HOUR_MS, 'v4', EXERCICE_ONLY, hourStart);
+}
+
 /**
  * URLs signées des médias d'un ExerciceModele.
  * La vidéo prime : quand elle existe, le GIF legacy n'est plus signé — et il
@@ -250,18 +270,6 @@ async function signExerciceMediaUrls(source, expirationMs = DEFAULT_SIGNED_URL_E
   }
 
   return { gifUrl: null, videoUrl: null, posterUrl: null };
-}
-
-/**
- * URL signée de la démo à montrer au patient : la vidéo si elle existe, sinon le
- * GIF legacy. Le type de média est porté par l'extension de l'URL — c'est ce qui
- * permet au chat patient de choisir entre <video> et <img> sans changer de
- * protocole, et sans migrer les messages déjà en base.
- */
-async function generateDemoSignedUrl(exerciceModele, expirationMs, version = 'v2') {
-  const mediaPath = exerciceModele?.videoPath || exerciceModele?.gifPath;
-  if (!mediaPath) return null;
-  return generateSignedUrl(mediaPath, expirationMs, version, EXERCICE_ONLY);
 }
 
 /**
@@ -706,7 +714,7 @@ module.exports = {
   downloadExerciceMedia,
   generateSignedUrl,
   signExerciceMediaUrls,
-  generateDemoSignedUrl,
+  signDemoMedia,
   deleteExerciceMedia,
   enrichExercicesWithSignedUrls,
   extractFileNameFromPath,

@@ -1,7 +1,7 @@
 const { OpenAI } = require('openai');
 const knowledgeService = require('./knowledgeService');
 const prismaService = require('./prismaService');
-const gcsStorageService = require('./gcsStorageService');
+const { buildDemoLink } = require('./mediaLinkService');
 const logger = require('../utils/logger');
 const { sanitizeUID, sanitizeName } = require('../utils/logSanitizer');
 
@@ -12,39 +12,38 @@ const llmService = require('./llmService');
 // Prompts système des IAs kiné (extraits — voir promptService.js). Ré-exporté plus bas.
 const { getSystemPromptByType } = require('./promptService');
 
-// Fonction pour anonymiser les données patient (async pour génération URLs signées GCS)
-// options.dateFin : si fourni, génère des URLs signées v2 (longue durée) avec placeholders courts pour GPT
+// Fonction pour anonymiser les données patient
+// options.dateFin : si fourni, les liens de démo (expirant à dateFin) sont remplacés
+// par des placeholders courts pour le modèle, substitués après génération
 const anonymizePatientData = async (patient, programmes, options = {}) => {
   const { dateFin } = options;
   const demoUrlMap = {};
   let demoIndex = 0;
 
-  // Traiter les programmes avec génération d'URLs pour les démos
+  // Traiter les programmes avec génération des liens de démo
   const programmesWithSignedUrls = await Promise.all(
     programmes.map(async (prog) => {
       // Traiter les exercices de ce programme
       const exercicesWithUrls = await Promise.all(
         (prog.exercices || []).map(async (ex) => {
           let demoUrl = null;
+          // Lien relatif signé (route /api/media/demo) : l'URL de stockage n'est
+          // signée qu'à l'affichage. Sans dateFin (mode direct), valable 2 h.
+          const demoLink = buildDemoLink({
+            programmeId: prog.id,
+            exerciceModele: ex.exerciceModele,
+            expiresAt: dateFin,
+          });
 
-          if (dateFin) {
-            // Mode placeholder : URL signée v2 (expire à dateFin), le modèle ne
-            // manipule qu'un jeton court, la vraie URL est substituée après.
-            const remaining = new Date(dateFin).getTime() - Date.now();
-            const expirationMs = remaining > 0 ? remaining : 2 * 60 * 60 * 1000;
-            const signedUrl = await gcsStorageService.generateDemoSignedUrl(ex.exerciceModele, expirationMs);
-
-            if (signedUrl) {
-              const placeholder = `https://demo/${demoIndex}`;
-              demoUrlMap[placeholder] = signedUrl;
-              demoUrl = placeholder;
-              demoIndex++;
-            }
-          } else {
-            // Mode direct : URL signée v4 temporaire (2h) — comportement par défaut
-            demoUrl = await gcsStorageService.generateDemoSignedUrl(
-              ex.exerciceModele, 2 * 60 * 60 * 1000, 'v4',
-            );
+          if (demoLink && dateFin) {
+            // Mode placeholder : le modèle ne manipule qu'un jeton court, le vrai
+            // lien est substitué après.
+            const placeholder = `https://demo/${demoIndex}`;
+            demoUrlMap[placeholder] = demoLink;
+            demoUrl = placeholder;
+            demoIndex++;
+          } else if (demoLink) {
+            demoUrl = demoLink;
           }
 
           return {
@@ -193,8 +192,28 @@ EXEMPLE RÉPONSE DOULEUR:
 "Je comprends votre gêne au genou. Si la douleur est supportable, vous pouvez appliquer de la glace et vous reposer. N'hésitez pas à indiquer votre niveau de douleur et la difficulté ressentie en validant vos exercices - cela aidera votre kinésithérapeute à adapter votre programme si nécessaire."`;
 };
 
+// Liens de démo dans les messages : relatifs (route /api/media/demo) ou, dans les
+// messages antérieurs à cette route, URL GCS v2 absolues.
+const DEMO_LINK = String.raw`(?:https:\/\/storage\.googleapis\.com\/|\/api\/media\/demo\/)[^)]+`;
+const DEMO_IMAGE_RE = new RegExp(String.raw`!\[[^\]]*\]\(${DEMO_LINK}\)\n?`, 'g');
+const DEMO_LINK_WITHOUT_BANG_RE = new RegExp(String.raw`(?<!!)\[([^\]]*)\]\((${DEMO_LINK})\)`, 'g');
+
+/** Retire les démos d'un message d'historique (évite que le modèle recopie les liens). */
+const stripDemoImages = (content) => content.replace(DEMO_IMAGE_RE, '');
+
+/** Le modèle oublie parfois le `!` : [Démonstration](lien) → ![Démonstration](lien). */
+const ensureDemoImageSyntax = (message) => message.replace(DEMO_LINK_WITHOUT_BANG_RE, '![$1]($2)');
+
+/**
+ * Remplace les placeholders `https://demo/N` par les vrais liens, en une passe.
+ * `(?!\d)` borne le nombre : un `replaceAll('https://demo/1', …)` remplaçait
+ * aussi le début de `https://demo/10`, cassant les démos dès le 11e exercice.
+ */
+const substituteDemoPlaceholders = (message, demoUrlMap) =>
+  message.replace(/https:\/\/demo\/\d+(?!\d)/g, (placeholder) => demoUrlMap[placeholder] ?? placeholder);
+
 // Fonction principale pour le chat
-// options.dateFin : date de fin du programme pour générer des URLs signées v2 longue durée
+// options.dateFin : date de fin du programme, échéance des liens de démo
 const generateChatResponse = async (patientData, programmes, userMessage, chatHistory = [], options = {}) => {
   try {
     // Validation des données d'entrée
@@ -202,13 +221,13 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
       throw new Error('Données manquantes pour générer la réponse');
     }
 
-    // Anonymiser les données (async pour génération URLs signées GCS)
+    // Anonymiser les données (et préparer les liens de démo)
     const anonymizedData = await anonymizePatientData(patientData, programmes, { dateFin: options.dateFin });
 
     // Générer le prompt système
     const systemPrompt = generateSystemPrompt(anonymizedData);
 
-    // Limiter l'historique et nettoyer les URLs signées GCS (évite que GPT les recopie)
+    // Limiter l'historique et en retirer les démos (évite que GPT recopie les liens)
     const limitedHistory = chatHistory.slice(-10);
 
     // Préparer les messages pour OpenAI
@@ -216,10 +235,7 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
       { role: 'system', content: systemPrompt },
       ...limitedHistory.map(msg => ({
         role: msg.role === 'patient' ? 'user' : 'assistant',
-        content: msg.content.replace(
-          /!\[[^\]]*\]\(https:\/\/storage\.googleapis\.com\/[^)]+\)\n?/g,
-          ''
-        )
+        content: stripDemoImages(msg.content)
       })),
       { role: 'user', content: userMessage }
     ];
@@ -237,13 +253,11 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
 
     let message = response.choices[0].message.content.trim();
 
-    // Remplacer les placeholders de démo par les vraies URLs signées
+    // Remplacer les placeholders de démo par les vrais liens
     if (anonymizedData.demoUrlMap) {
-      for (const [placeholder, url] of Object.entries(anonymizedData.demoUrlMap)) {
-        message = message.replaceAll(placeholder, url);
-      }
+      message = substituteDemoPlaceholders(message, anonymizedData.demoUrlMap);
       // Fix GPT: transformer [Démonstration](url) en ![Démonstration](url) si le ! manque
-      message = message.replace(/(?<!!)\[([^\]]*)\]\((https:\/\/storage\.googleapis\.com\/[^)]+)\)/g, '![$1]($2)');
+      message = ensureDemoImageSyntax(message);
     }
 
     return {
@@ -281,7 +295,7 @@ const generateChatResponse = async (patientData, programmes, userMessage, chatHi
 };
 
 // Fonction pour générer un message d'accueil personnalisé mais anonymisé
-// options.dateFin : date de fin du programme pour générer des URLs signées v2 longue durée
+// options.dateFin : date de fin du programme, échéance des liens de démo
 const generateWelcomeMessage = async (patientData, programmes, options = {}) => {
   try {
     // Validation des données
@@ -372,13 +386,11 @@ IMPORTANT - AFFICHAGE DES DÉMOS :
 
     let message = response.choices[0].message.content.trim();
 
-    // Remplacer les placeholders de démo par les vraies URLs signées
+    // Remplacer les placeholders de démo par les vrais liens
     if (anonymizedData.demoUrlMap) {
-      for (const [placeholder, url] of Object.entries(anonymizedData.demoUrlMap)) {
-        message = message.replaceAll(placeholder, url);
-      }
+      message = substituteDemoPlaceholders(message, anonymizedData.demoUrlMap);
       // Fix GPT: transformer [Démonstration](url) en ![Démonstration](url) si le ! manque
-      message = message.replace(/(?<!!)\[([^\]]*)\]\((https:\/\/storage\.googleapis\.com\/[^)]+)\)/g, '![$1]($2)');
+      message = ensureDemoImageSyntax(message);
     }
 
     return {
@@ -407,7 +419,7 @@ IMPORTANT - AFFICHAGE DES DÉMOS :
           }
           exerciceLine += `\n`;
           fallbackMessage += exerciceLine;
-          // Note: démos non affichées dans le fallback (URLs signées GCS nécessitent async)
+          // Note: démos non affichées dans le fallback
         });
       } else {
         fallbackMessage += '• Exercices de rééducation personnalisés\n';
@@ -731,6 +743,9 @@ module.exports = {
   generateChatResponse,
   generateWelcomeMessage,
   anonymizePatientData,
+  stripDemoImages,
+  ensureDemoImageSyntax,
+  substituteDemoPlaceholders,
   validateMessage,
   cleanChatHistory
 };

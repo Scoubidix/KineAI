@@ -770,6 +770,29 @@ const dictationTermLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter de la route publique de redirection des démos (chat patient).
+ * Un chat affiche une vingtaine de démos au plus : 600 / 15 min par IP laisse de
+ * la marge (rechargements, cabinet derrière une seule IP) tout en bornant les
+ * essais de signatures.
+ */
+const mediaLinkLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => generateSecureKey(req, 'media_link'),
+  handler: (req, res) => {
+    logger.warn(`Rate limit depasse - Lien media - IP: ${sanitizeIP(req.ip)}`);
+    res.status(429).json({
+      success: false,
+      error: 'Trop de requêtes',
+      code: 'RATE_LIMITED',
+      retryAfter: 900
+    });
+  }
+});
+
+/**
  * Middleware pour afficher les informations de rate limiting
  * Utile pour le debugging
  */
@@ -819,5 +842,6 @@ module.exports = {
   pionnierReadLimiter,
   roadmapIdeeLimiter,
   dictationTermLimiter,
+  mediaLinkLimiter,
   rateLimitLogger
 };

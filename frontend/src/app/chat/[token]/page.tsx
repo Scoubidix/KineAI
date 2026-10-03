@@ -24,6 +24,21 @@ const isVideoUrl = (src?: string): boolean => {
 };
 
 /**
+ * Les démos récentes sont des liens RELATIFS vers la route de redirection de
+ * l'API (`/api/media/demo/…`) : le message ne dépend ni du stockage ni du
+ * domaine de l'API. On les résout ici sur l'API ; les anciens liens GCS absolus
+ * ressortent inchangés (`new URL(abs, base)` garde `abs`).
+ */
+const MEDIA_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const resolveMediaUrl = (src: string): string => {
+  try {
+    return new URL(src, MEDIA_BASE_URL).href;
+  } catch {
+    return src;
+  }
+};
+
+/**
  * Force iOS à peindre une première image plutôt qu'un cadre noir : Safari et le
  * navigateur intégré de WhatsApp ignorent `preload`. Le fragment n'est ni envoyé
  * au serveur ni couvert par la signature GCS.
@@ -530,19 +545,21 @@ export default function PatientChatPage() {
   // démonterait/remonterait DemoVideoThumbnail à chaque frappe, annulant son
   // IntersectionObserver avant même qu'il ait pu s'exécuter.
   const renderMarkdownImage = useCallback(
-    ({ src, alt }: { src?: string; alt?: string }) =>
-      src && isVideoUrl(src) ? (
-        <DemoVideoThumbnail src={src} alt={alt} onExpand={setExpandedMedia} />
+    ({ src, alt }: { src?: string; alt?: string }) => {
+      const url = src ? resolveMediaUrl(src) : undefined;
+      return url && isVideoUrl(url) ? (
+        <DemoVideoThumbnail src={url} alt={alt} onExpand={setExpandedMedia} />
       ) : (
         <img
-          src={src}
+          src={url}
           alt={alt || 'Image'}
           className="max-w-[150px] rounded-lg my-2 shadow-sm cursor-pointer hover:opacity-80 transition-opacity"
           loading="lazy"
           style={{ height: 'auto' }}
-          onClick={() => setExpandedMedia(src || null)}
+          onClick={() => setExpandedMedia(url || null)}
         />
-      ),
+      );
+    },
     [],
   );
 

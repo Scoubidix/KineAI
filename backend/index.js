@@ -570,6 +570,9 @@ app.use('/api/news', require('./routes/news'));
 // Routes roadmap publique (cards + boîte à idées) — kiné
 app.use('/api/roadmap', require('./routes/roadmap'));
 
+// 🎬 Démos d'exercices du chat patient : lien signé → 302 vers le stockage (route publique)
+app.use('/api/media', require('./routes/media'));
+
 // Routes système paywall (LIBRES - navigation)
 app.use('/api/kine', subscriptionRoutes);
 app.use('/api/stripe', checkoutRoutes);     // Rate limiting dans le routeur APRÈS authenticate

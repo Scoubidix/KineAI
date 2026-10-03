@@ -24,7 +24,12 @@ const serwist = new Serwist({
     // ~7 Mo réservés au quota par réponse, sans même de RangeRequestsPlugin, et
     // sans jamais de hit puisque chaque URL signée est unique. GCS gère déjà
     // son propre cache-control ; NetworkOnly court-circuite le SW entièrement.
-    { matcher: ({ url }) => url.hostname === 'storage.googleapis.com', handler: new NetworkOnly() },
+    // La redirection des démos du chat patient (`/api/media/…` sur l'API) suit
+    // la même règle : elle mène à ces mêmes vidéos.
+    {
+      matcher: ({ url }) => url.hostname === 'storage.googleapis.com' || url.pathname.startsWith('/api/media/'),
+      handler: new NetworkOnly(),
+    },
     ...defaultCache,
   ],
 });

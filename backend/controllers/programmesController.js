@@ -1,6 +1,7 @@
 const prismaService = require('../services/prismaService');
 const { generateChatUrl } = require('../services/patientTokenService');
 const gcsStorageService = require('../services/gcsStorageService');
+const { buildDemoLink } = require('../services/mediaLinkService');
 const activityService = require('../services/activityService');
 const { checkExercicesAccessibles } = require('../services/exerciceAccessService');
 const logger = require('../utils/logger');
@@ -459,9 +460,6 @@ exports.updateProgramme = async (req, res) => {
 
     // Injecter un message ASSISTANT dans le chat patient pour notifier la mise à jour
     try {
-      const remaining = new Date(programme.dateFin).getTime() - Date.now();
-      const expirationMs = remaining > 0 ? remaining : 2 * 60 * 60 * 1000;
-
       const exerciceLines = await Promise.all(updatedProgramme.exercices.map(async (ex) => {
         const nom = ex.exerciceModele?.nom || 'Exercice';
         let detail = `${ex.series} séries × ${ex.repetitions} répétitions`;
@@ -475,14 +473,14 @@ exports.updateProgramme = async (req, res) => {
           line += `\n  _${ex.consigne}_`;
         }
 
-        // URL signée v2 (expire à dateFin du programme, v4 est plafonné à 7 j
-        // par GCS). Le type de média est porté par l'extension de l'URL : rien
-        // à changer au protocole markdown, ni à migrer dans les messages déjà
-        // en base.
-        const demoUrl = await gcsStorageService.generateDemoSignedUrl(
-          ex.exerciceModele,
-          expirationMs,
-        );
+        // Lien relatif signé par notre backend (route /api/media/demo), valable
+        // jusqu'à dateFin : l'URL de stockage n'est signée qu'à l'affichage. Le
+        // type de média est porté par l'extension du lien, comme avant.
+        const demoUrl = buildDemoLink({
+          programmeId,
+          exerciceModele: ex.exerciceModele,
+          expiresAt: programme.dateFin,
+        });
         if (demoUrl) {
           line += `\n![Démonstration](${demoUrl})`;
         }

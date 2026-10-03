@@ -35,11 +35,14 @@ const csp = [
   // intercepte les images cross-origin et les refait en fetch(), soumis à connect-src)
   `connect-src 'self' ${apiOrigin} ${wsOrigin} *.googleapis.com *.firebaseapp.com storage.googleapis.com https://www.google-analytics.com https://*.analytics.google.com https://*.google-analytics.com https://i.ytimg.com`,
   "worker-src 'self'",
-  // Images : GCS (posters + GIFs legacy) + picsum (placeholder) + data: (SVG inline) + GA4 (pixels) + vignettes YouTube (fiches tests)
-  "img-src 'self' data: blob: picsum.photos storage.googleapis.com www.google.com https://www.google-analytics.com https://i.ytimg.com",
-  // Médias : les vidéos de démonstration sont servies par URL signée GCS. Sans
-  // cette directive, <video> retombe sur default-src 'self' et est bloquée.
-  "media-src 'self' blob: storage.googleapis.com",
+  // Images : GCS (posters + GIFs legacy) + API (redirection 302 des démos du chat patient,
+  // la CSP vérifie aussi l'URL d'arrivée → GCS reste listé) + picsum (placeholder) + data: (SVG inline)
+  // + GA4 (pixels) + vignettes YouTube (fiches tests)
+  `img-src 'self' data: blob: picsum.photos ${apiOrigin} storage.googleapis.com www.google.com https://www.google-analytics.com https://i.ytimg.com`,
+  // Médias : les vidéos de démonstration passent par la redirection de l'API puis
+  // sont servies par URL signée GCS. Sans cette directive, <video> retombe sur
+  // default-src 'self' et est bloquée.
+  `media-src 'self' blob: ${apiOrigin} storage.googleapis.com`,
   // Fonts : next/font auto-heberge au build, gstatic en fallback
   "font-src 'self' fonts.gstatic.com",
   // Frames : meme origine + blob: (preview PDF contrats) + lecteur YouTube confidentialite renforcee (fiches tests, charge au clic)
