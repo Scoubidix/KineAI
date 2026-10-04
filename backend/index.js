@@ -34,6 +34,15 @@ if (process.env.GENERATION_PROVIDER === 'mistral' && !process.env.MISTRAL_API_KE
   process.exit(1);
 }
 
+// Validation du stockage : un STORAGE_PROVIDER mal saisi ou un Cellar incomplet
+// ne doit jamais retomber silencieusement sur un autre fournisseur.
+try {
+  require('./services/storage').readConfig();
+} catch (error) {
+  console.error(`FATAL: ${error.message}`);
+  process.exit(1);
+}
+
 const http = require('http');
 const logger = require('./utils/logger');
 const express = require('express');

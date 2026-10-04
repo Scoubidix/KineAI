@@ -1,16 +1,14 @@
-const { Storage } = require('@google-cloud/storage');
+const { activeStorage } = require('./storage');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
 
 /**
- * Service pour gérer l'upload et la suppression de GIFs sur Google Cloud Storage (HDS)
- * Bucket: monassistantkine (région europe-west9, certifié HDS v2.0)
- * Dossier: exercices/
- *
- * Différences avec Firebase Storage:
- * - Fichiers PRIVÉS par défaut (pas de makePublic)
- * - Accès via URLs signées temporaires (expiration configurable)
- * - Conformité HDS pour données de santé
+ * Service de stockage des fichiers privés (médias d'exercice, avatars, contrats,
+ * pièces jointes, images Pionniers et News). Toute la logique métier vit ici :
+ * dossiers, gardes de préfixe, contrôle des octets magiques, clés, durées de
+ * signature. Les opérations passent par le pilote actif (services/storage,
+ * STORAGE_PROVIDER=gcs|cellar). Nom historique conservé jusqu'au ménage GCS.
+ * Fichiers PRIVÉS (pas de makePublic) : accès par URLs signées temporaires.
  */
 
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'monassistantkine';
@@ -31,17 +29,6 @@ const IMAGE_MAGIC_BYTES = {
   'image/gif': [Buffer.from([0x47, 0x49, 0x46, 0x38])], // "GIF8" (GIF87a / GIF89a)
 };
 
-// Initialisation GCS avec les credentials Firebase existants
-const storage = new Storage({
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  credentials: {
-    client_email: process.env.FIREBASE_CLIENT_EMAIL,
-    private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  }
-});
-
-const bucket = storage.bucket(BUCKET_NAME);
-
 /**
  * Upload un média d'exercice vers GCS (fichier PRIVÉ par défaut).
  * Tous les médias d'exercice — MP4, poster JPEG, GIF legacy — restent sous le
@@ -54,14 +41,10 @@ async function uploadExerciceFile(fileBuffer, fileName, contentType) {
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const filePath = `${EXERCICES_FOLDER}${timestamp}_${sanitizedFileName}`;
 
-    const file = bucket.file(filePath);
-    await file.save(fileBuffer, {
-      metadata: {
-        contentType,
-        cacheControl: 'private, max-age=3600',
-        metadata: { uploadedAt: new Date().toISOString() },
-      },
-      resumable: false,
+    await activeStorage().put(filePath, fileBuffer, {
+      contentType,
+      cacheControl: 'private, max-age=3600',
+      metadata: { uploadedAt: new Date().toISOString() },
     });
 
     // PAS de makePublic() : l'accès se fait via URLs signées temporaires.
@@ -106,7 +89,7 @@ const ALL_FOLDERS = [
  *
  * @param {string} gifPath - Le chemin du fichier (ex: "exercices/123_demo.gif")
  * @param {number} expirationMs - Durée de validité en ms (défaut: 1h)
- * @param {string} version - 'v4' (max 7 j) ou 'v2' (longue durée)
+ * @param {string} version - Conservé pour compatibilité, seule la v4 est utilisée
  * @param {string[]} allowedPrefixes - Dossiers autorisés pour ce chemin
  * @param {number} [accessibleAt] - Instant de départ de la signature (ms). Par
  *   défaut maintenant ; `expires` est alors compté depuis cet instant.
@@ -129,24 +112,16 @@ async function generateSignedUrl(
       return null;
     }
 
-    const file = bucket.file(gifPath);
+    const storage = activeStorage();
 
-    // Vérifier que le fichier existe (optionnel, pour éviter des erreurs)
-    const [exists] = await file.exists();
-    if (!exists) {
-      logger.warn(`Fichier non trouvé sur GCS: ${gifPath}`);
+    // Vérifier que le fichier existe (évite de signer un lien qui répondra 404)
+    if (!(await storage.exists(gifPath))) {
+      logger.warn(`Fichier non trouvé dans le stockage (${storage.name}): ${gifPath}`);
       return null;
     }
 
-    const start = accessibleAt ?? Date.now();
-    const [signedUrl] = await file.getSignedUrl({
-      version: version,
-      action: 'read',
-      expires: start + expirationMs,
-      ...(accessibleAt !== undefined && { accessibleAt }),
-    });
-
-    return signedUrl;
+    // `version` reste accepté pour la compatibilité des appelants : seule la v4 existe.
+    return await storage.signedReadUrl(gifPath, { expiresInMs: expirationMs, signingDate: accessibleAt });
 
   } catch (error) {
     logger.error(`Erreur génération URL signée pour ${gifPath}:`, error);
@@ -181,13 +156,12 @@ async function downloadExerciceMedia(mediaPath, destination) {
     throw new Error('Chemin de fichier non autorisé');
   }
 
-  const file = bucket.file(mediaPath);
-  const [exists] = await file.exists();
-  if (!exists) {
-    throw new Error(`Fichier introuvable sur GCS: ${mediaPath}`);
+  const storage = activeStorage();
+  if (!(await storage.exists(mediaPath))) {
+    throw new Error(`Fichier introuvable dans le stockage: ${mediaPath}`);
   }
 
-  await file.download({ destination });
+  await storage.download(mediaPath, destination);
   logger.info(`Média d'exercice rapatrié depuis GCS: ${mediaPath}`);
 }
 
@@ -204,15 +178,13 @@ async function deleteExerciceMedia(mediaPath) {
       throw new Error('Chemin de fichier non autorisé');
     }
 
-    const file = bucket.file(mediaPath);
-
-    const [exists] = await file.exists();
+    const exists = await activeStorage().exists(mediaPath);
     if (!exists) {
       logger.warn(`Le fichier n'existe pas sur GCS (déjà supprimé?): ${mediaPath}`);
       return;
     }
 
-    await file.delete();
+    await activeStorage().remove(mediaPath);
     logger.info(`Média d'exercice supprimé de GCS: ${mediaPath}`);
   } catch (error) {
     logger.error("Erreur lors de la suppression du média d'exercice sur GCS:", error);
@@ -382,17 +354,10 @@ async function uploadAvatar(fileBuffer, fileName, contentType) {
     const uniqueFileName = `${timestamp}_${sanitizedFileName}`;
     const avatarPath = `${AVATARS_FOLDER}${uniqueFileName}`;
 
-    const file = bucket.file(avatarPath);
-
-    await file.save(fileBuffer, {
-      metadata: {
-        contentType,
-        cacheControl: 'private, max-age=3600',
-        metadata: {
-          uploadedAt: new Date().toISOString(),
-        }
-      },
-      resumable: false,
+    await activeStorage().put(avatarPath, fileBuffer, {
+      contentType,
+      cacheControl: 'private, max-age=3600',
+      metadata: { uploadedAt: new Date().toISOString() },
     });
 
     logger.info(`Avatar uploade sur GCS (prive): ${avatarPath}`);
@@ -422,15 +387,13 @@ async function deleteAvatar(avatarPath) {
       throw new Error('Chemin de fichier non autorise');
     }
 
-    const file = bucket.file(avatarPath);
-
-    const [exists] = await file.exists();
+    const exists = await activeStorage().exists(avatarPath);
     if (!exists) {
       logger.warn(`L'avatar n'existe pas sur GCS (deja supprime?): ${avatarPath}`);
       return;
     }
 
-    await file.delete();
+    await activeStorage().remove(avatarPath);
     logger.info(`Avatar supprime de GCS: ${avatarPath}`);
 
   } catch (error) {
@@ -453,17 +416,10 @@ async function uploadSupportImage(fileBuffer, fileName, contentType) {
     const uniqueFileName = `${timestamp}_${sanitizedFileName}`;
     const imagePath = `${SUPPORT_FOLDER}${uniqueFileName}`;
 
-    const file = bucket.file(imagePath);
-
-    await file.save(fileBuffer, {
-      metadata: {
-        contentType,
-        cacheControl: 'private, max-age=3600',
-        metadata: {
-          uploadedAt: new Date().toISOString(),
-        }
-      },
-      resumable: false,
+    await activeStorage().put(imagePath, fileBuffer, {
+      contentType,
+      cacheControl: 'private, max-age=3600',
+      metadata: { uploadedAt: new Date().toISOString() },
     });
 
     logger.info(`Image support uploadee sur GCS (privee): ${imagePath}`);
@@ -493,15 +449,13 @@ async function deleteSupportImage(imagePath) {
       throw new Error('Chemin de fichier non autorise');
     }
 
-    const file = bucket.file(imagePath);
-
-    const [exists] = await file.exists();
+    const exists = await activeStorage().exists(imagePath);
     if (!exists) {
       logger.warn(`L'image support n'existe pas sur GCS (deja supprimee?): ${imagePath}`);
       return;
     }
 
-    await file.delete();
+    await activeStorage().remove(imagePath);
     logger.info(`Image support supprimee de GCS: ${imagePath}`);
 
   } catch (error) {
@@ -540,13 +494,10 @@ async function uploadPionnierImage(fileBuffer, _fileName, contentType) {
     const extension = PIONNIER_EXTENSIONS[contentType] || 'bin';
     const imagePath = `${PIONNIERS_FOLDER}${timestamp}_${random}.${extension}`;
 
-    await bucket.file(imagePath).save(fileBuffer, {
-      metadata: {
-        contentType,
-        cacheControl: 'private, max-age=3600',
-        metadata: { uploadedAt: new Date().toISOString() }
-      },
-      resumable: false,
+    await activeStorage().put(imagePath, fileBuffer, {
+      contentType,
+      cacheControl: 'private, max-age=3600',
+      metadata: { uploadedAt: new Date().toISOString() },
     });
 
     logger.info(`Image Pionniers uploadee sur GCS (privee): ${imagePath}`);
@@ -576,14 +527,13 @@ async function deletePionnierImage(imagePath) {
       throw new Error('Chemin de fichier non autorise');
     }
 
-    const file = bucket.file(imagePath);
-    const [exists] = await file.exists();
+    const exists = await activeStorage().exists(imagePath);
     if (!exists) {
       logger.warn(`L'image Pionniers n'existe pas sur GCS (deja supprimee?): ${imagePath}`);
       return;
     }
 
-    await file.delete();
+    await activeStorage().remove(imagePath);
     logger.info(`Image Pionniers supprimee de GCS: ${imagePath}`);
 
   } catch (error) {
@@ -601,17 +551,13 @@ async function deletePionnierImage(imagePath) {
 async function uploadContractPdf(fileBuffer, contractId) {
   try {
     const path = `${CONTRACTS_FOLDER}${contractId}/contrat-final.pdf`;
-    const file = bucket.file(path);
-    await file.save(fileBuffer, {
+    await activeStorage().put(path, fileBuffer, {
+      contentType: 'application/pdf',
+      cacheControl: 'private, max-age=3600',
       metadata: {
-        contentType: 'application/pdf',
-        cacheControl: 'private, max-age=3600',
-        metadata: {
-          uploadedAt: new Date().toISOString(),
-          contractId: String(contractId),
-        }
+        uploadedAt: new Date().toISOString(),
+        contractId: String(contractId),
       },
-      resumable: false,
     });
     logger.info(`PDF contrat uploadé sur GCS (privé): ${path}`);
     return path;
@@ -641,13 +587,12 @@ async function deleteContractPdf(path) {
   if (!path.startsWith(CONTRACTS_FOLDER)) {
     throw new Error(`Chemin non autorisé pour suppression contrat: ${path}`);
   }
-  const file = bucket.file(path);
-  const [exists] = await file.exists();
+  const exists = await activeStorage().exists(path);
   if (!exists) {
     logger.warn(`PDF contrat absent (déjà supprimé?): ${path}`);
     return;
   }
-  await file.delete();
+  await activeStorage().remove(path);
   logger.info(`PDF contrat supprimé de GCS: ${path}`);
 }
 
@@ -664,14 +609,10 @@ async function uploadNouveauteImage(fileBuffer, fileName, contentType) {
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const imagePath = `${NOUVEAUTES_FOLDER}${timestamp}_${sanitizedFileName}`;
 
-    const file = bucket.file(imagePath);
-    await file.save(fileBuffer, {
-      metadata: {
-        contentType,
-        cacheControl: 'private, max-age=3600',
-        metadata: { uploadedAt: new Date().toISOString() },
-      },
-      resumable: false,
+    await activeStorage().put(imagePath, fileBuffer, {
+      contentType,
+      cacheControl: 'private, max-age=3600',
+      metadata: { uploadedAt: new Date().toISOString() },
     });
 
     logger.info(`Image nouveaute uploadee sur GCS (privee): ${imagePath}`);
@@ -694,13 +635,12 @@ async function deleteNouveauteImage(imagePath) {
       logger.error('Tentative de suppression hors du dossier nouveautes:', imagePath);
       throw new Error('Chemin de fichier non autorise');
     }
-    const file = bucket.file(imagePath);
-    const [exists] = await file.exists();
+    const exists = await activeStorage().exists(imagePath);
     if (!exists) {
       logger.warn(`Image nouveaute absente (deja supprimee?): ${imagePath}`);
       return;
     }
-    await file.delete();
+    await activeStorage().remove(imagePath);
     logger.info(`Image nouveaute supprimee de GCS: ${imagePath}`);
   } catch (error) {
     logger.error('Erreur suppression image nouveaute sur GCS:', error);

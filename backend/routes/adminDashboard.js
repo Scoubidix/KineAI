@@ -41,6 +41,22 @@ router.get('/legacy-demo-links', authenticate, requireAdmin, async (req, res) =>
 });
 
 /**
+ * GET /admin/dashboard/storage-status
+ * Migration GCS → Cellar : fournisseur actif, comparaison des deux stockages par
+ * dossier, chemins enregistrés en URL complète. Lecture seule. Temporaire.
+ */
+router.get('/storage-status', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const storageStatusService = require('../services/storageStatusService');
+    const data = await storageStatusService.getStorageStatus();
+    res.json({ success: true, data });
+  } catch (error) {
+    logger.error('Erreur comparaison des stockages', { error: error.message });
+    res.status(500).json({ success: false, error: 'Erreur lors de la comparaison des stockages', code: 'STORAGE_STATUS_ERROR' });
+  }
+});
+
+/**
  * GET /admin/dashboard/token-usage
  * Consommation tokens IA du chat unifié : aujourd'hui (en cours), hier,
  * moyenne 10 jours, détail par plan, coûts estimés (tarif blended Medium 3.5)

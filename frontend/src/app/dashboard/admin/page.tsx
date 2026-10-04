@@ -23,6 +23,7 @@ import DictationTermsTab from './components/DictationTermsTab';
 import StatsGlobalesTab, { type DashboardStats } from './components/StatsGlobalesTab';
 import AsrWorkerTab from './components/AsrWorkerTab';
 import LegacyDemoLinksCard from './components/LegacyDemoLinksCard';
+import StorageStatusPanel from './components/StorageStatusPanel';
 import { PLAN_COLORS } from './components/planColors';
 import { Button } from '@/components/ui/button';
 
@@ -477,7 +478,8 @@ function AdminDashboardPageContent() {
                 <TabsContent value="tokens" className="mt-6">
                   <TokenUsageTab />
                 </TabsContent>
-                <TabsContent value="stockage" className="mt-6">
+                <TabsContent value="stockage" className="space-y-6 mt-6">
+                  <StorageStatusPanel />
                   <LegacyDemoLinksCard />
                 </TabsContent>
               </Tabs>

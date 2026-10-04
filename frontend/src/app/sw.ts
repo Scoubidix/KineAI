@@ -25,9 +25,13 @@ const serwist = new Serwist({
     // sans jamais de hit puisque chaque URL signée est unique. GCS gère déjà
     // son propre cache-control ; NetworkOnly court-circuite le SW entièrement.
     // La redirection des démos du chat patient (`/api/media/…` sur l'API) suit
-    // la même règle : elle mène à ces mêmes vidéos.
+    // la même règle : elle mène à ces mêmes vidéos. Même règle pour Cellar
+    // (migration GCS → Cellar).
     {
-      matcher: ({ url }) => url.hostname === 'storage.googleapis.com' || url.pathname.startsWith('/api/media/'),
+      matcher: ({ url }) =>
+        url.hostname === 'storage.googleapis.com'
+        || url.hostname.endsWith('.cellar-c2.services.clever-cloud.com')
+        || url.pathname.startsWith('/api/media/'),
       handler: new NetworkOnly(),
     },
     ...defaultCache,
