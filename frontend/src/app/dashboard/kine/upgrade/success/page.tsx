@@ -82,7 +82,7 @@ function UpgradeSuccessContent() {
     setTimeout(() => setRefreshing(false), 1000);
   };
 
-  // Obtenir les fonctionnalités par plan (source unique : config/plans.js)
+  // Obtenir les fonctionnalités par plan (source unique : config/plans.ts)
   const getPlanFeatures = (planType: string) => {
     const plan = Object.values(plans).find(p => p.type === planType);
     if (!plan) return [];

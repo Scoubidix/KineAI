@@ -1,5 +1,35 @@
-// config/plans.js
+// config/plans.ts
 // Configuration des plans d'abonnement KineAI
+
+import type { PlanType } from '@/types/subscription';
+
+export interface Plan {
+  id: PlanType | null;
+  type: PlanType | null;
+  name: string;
+  price: number;
+  /** Absent du plan gratuit */
+  priceYearly?: number;
+  currency?: string;
+  interval?: string;
+  stripePriceId?: string;
+  isLimited?: boolean;
+  maxSubscriptions?: number;
+  features: {
+    maxProgrammes: number;
+    unlimitedPatients: boolean;
+    chatMultiplier: number;
+    iaBilans: boolean;
+    moduleAdmin: boolean;
+    videoTransmission: boolean;
+  };
+  limits: {
+    programmes: number;
+  };
+  description: string;
+  highlights: string[];
+  badge?: string;
+}
 
 const STRIPE_CONFIG = {
   // Ton ID produit Stripe
@@ -15,9 +45,9 @@ const PLAN_TYPES = {
   PRATIQUE: 'PRATIQUE',
   PIONNIER: 'PIONNIER',
   EXPERT: 'EXPERT'
-};
+} as const;
 
-const PLANS = {
+const PLANS: Record<string, Plan> = {
   [PLAN_TYPES.DECLIC]: {
     id: 'DECLIC',
     type: 'DECLIC',
@@ -160,7 +190,7 @@ const PLANS = {
 };
 
 // Plan par défaut pour les nouveaux utilisateurs (pas d'abonnement)
-const FREE_PLAN = {
+const FREE_PLAN: Plan = {
   id: null,
   type: null,
   name: 'Aucun abonnement',
@@ -189,13 +219,13 @@ const FREE_PLAN = {
 };
 
 // Helper pour récupérer un plan par son type
-const getPlanByType = (planType) => {
+const getPlanByType = (planType: string | null | undefined): Plan => {
   if (!planType) return FREE_PLAN;
   return PLANS[planType] || FREE_PLAN;
 };
 
 // Helper pour le libellé du quota chat IA selon le plan
-const getChatQuotaLabel = (planType) => {
+const getChatQuotaLabel = (planType: string | null | undefined): string => {
   const plan = getPlanByType(planType);
   const multiplier = plan.features.chatMultiplier;
   if (!multiplier) return 'usage découverte';
@@ -204,20 +234,20 @@ const getChatQuotaLabel = (planType) => {
 };
 
 // Helper pour récupérer la limite de programmes
-const getProgrammeLimit = (planType) => {
+const getProgrammeLimit = (planType: string | null | undefined): number => {
   const plan = getPlanByType(planType);
   return plan.features.maxProgrammes;
 };
 
 // Helper pour vérifier si on peut créer un nouveau programme
-const canCreateProgramme = (planType, currentProgrammes) => {
+const canCreateProgramme = (planType: string | null | undefined, currentProgrammes: number): boolean => {
   const limit = getProgrammeLimit(planType);
   if (limit === Infinity || limit === -1) return true;
   return currentProgrammes < limit;
 };
 
 // Helper pour vérifier si un plan est encore disponible
-const isPlanAvailable = async (planType) => {
+const isPlanAvailable = async (planType: string): Promise<boolean> => {
   if (!PLANS[planType]?.isLimited) return true;
   
   // Pour les plans limités, vérifier le nombre d'abonnements actuel
@@ -234,7 +264,7 @@ const isPlanAvailable = async (planType) => {
 };
 
 // Helper pour récupérer le nombre de places restantes
-const getRemainingSlots = async (planType) => {
+const getRemainingSlots = async (planType: string): Promise<number | null> => {
   if (!PLANS[planType]?.isLimited) return null;
   
   try {
@@ -249,10 +279,9 @@ const getRemainingSlots = async (planType) => {
   }
 };
 
-// EXPORTS CommonJS et ES6
 const plans = PLANS;
 
-module.exports = {
+export {
   STRIPE_CONFIG,
   PLAN_TYPES,
   PLANS,
@@ -265,8 +294,3 @@ module.exports = {
   isPlanAvailable,
   getRemainingSlots
 };
-
-// Export ES6 pour compatibilité
-if (typeof exports === 'undefined') {
-  window.KINE_PLANS = module.exports;
-}

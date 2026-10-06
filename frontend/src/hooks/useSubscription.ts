@@ -1,20 +1,21 @@
 import { useState, useEffect } from 'react';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, type User } from 'firebase/auth';
+import type { Subscription, Usage } from '@/types/subscription';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export const useSubscription = () => {
-  const [subscription, setSubscription] = useState(null);
-  const [usage, setUsage] = useState({
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [usage, setUsage] = useState<Usage>({
     activeProgrammes: 0,
     totalProgrammes: 0,
     monthlyMessages: 0,
     totalPatients: 0
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchSubscription = async (user) => {
+  const fetchSubscription = async (user: User | null) => {
     if (!user) {
       setIsLoading(false);
       return;
@@ -45,7 +46,7 @@ export const useSubscription = () => {
 
       setError(null);
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
       console.error('Erreur récupération abonnement:', err);
     } finally {
       setIsLoading(false);
