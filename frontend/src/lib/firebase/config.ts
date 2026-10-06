@@ -1,7 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getFunctions } from 'firebase/functions';
 
 // ✅ Configuration Firebase avec les variables d'environnement
 const firebaseConfig = {
@@ -19,11 +17,9 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // ✅ Initialisation des services Firebase
 const auth = getAuth(app);
-const db = getFirestore(app);
-const functions = getFunctions(app);
 
 // ✅ Export des instances Firebase
-export { app, auth, db, functions };
+export { app, auth };
 
 // Optional: Connexion aux émulateurs en développement
 // if (process.env.NODE_ENV === 'development') {
