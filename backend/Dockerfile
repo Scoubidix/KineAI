@@ -2,7 +2,7 @@ FROM node:22-slim
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .puppeteerrc.cjs ./
 RUN npm ci --omit=dev
 
 COPY prisma ./prisma/

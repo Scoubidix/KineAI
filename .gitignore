@@ -12,6 +12,7 @@ firebase-admin-sdk.json
 
 # ========== DEPENDANCES ==========
 node_modules/
+backend/.cache/
 .pnp
 .pnp.js
 .yarn/install-state.gz
