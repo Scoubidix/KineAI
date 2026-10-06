@@ -37,16 +37,8 @@ interface PublicInfo {
   expiresAt: string;
 }
 
-interface DestProfile {
-  firstName?: string; lastName?: string; email?: string;
-  civilite?: 'M.' | 'MME' | null;
-  birthDate?: string | null;
-  birthPlace?: string | null;
-  departementOrdre?: string | null;
-  numeroOrdinal?: string | null;
-  numeroUrssaf?: string | null;
-  adresseCabinet?: string | null;
-  adresseDomicile?: string | null;
+interface DestProfile extends DestinataireProfileData {
+  email?: string;
 }
 
 interface SessionContext {

@@ -188,6 +188,7 @@ interface ChatResponse {
 interface SessionStatusResponse {
   success: boolean;
   isValidatedToday: boolean;
+  notifyCooldown: boolean;
   validation?: {
     date: string;
     painLevel: number;
