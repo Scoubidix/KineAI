@@ -6,7 +6,7 @@ import { Loader2, ChevronDown, Check } from 'lucide-react';
 import { PaywallModal } from '@/components/PaywallModal';
 import { usePaywall } from '@/hooks/usePaywall';
 import { useToast } from '@/hooks/use-toast';
-import PatientCombobox from './PatientCombobox';
+import PatientCombobox from '@/components/patients/PatientCombobox';
 import { createBilan, ApiError } from '@/utils/bilanApi';
 import { BILAN_TYPE_COLORS, BILAN_TYPE_LABELS, type BilanRecord, type BilanType, type PatientSummary } from '@/types/bilan';
 

@@ -9,7 +9,7 @@ import { ArrowLeft, AlertTriangle, Copy, Mail, Download, Check, PanelRightOpen, 
 import { useToast } from '@/hooks/use-toast';
 import DocumentSheet from './DocumentSheet';
 import { DRAWER_ACTIONS_ID } from './MeasuresDrawer';
-import PatientCombobox from '../PatientCombobox';
+import PatientCombobox from '@/components/patients/PatientCombobox';
 import { attachPatient, finalizeBilan, ApiError } from '@/utils/bilanApi';
 import { fetchBilanRender, downloadBilanPdf, buildBilanClipboard, writeBilanToClipboard, type BilanClipboard } from '@/utils/bilanExport';
 import { emptyBilanDocument, proseSignatures, BILAN_TYPE_LABELS, type AiBusy, type BilanPatch, type BilanRecord, type BilanSectionKey, type BilanType, type PatientSummary, type SectionWarnings } from '@/types/bilan';

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ArrowLeft, Check, ChevronDown } from 'lucide-react';
-import PatientCombobox from '../PatientCombobox';
+import PatientCombobox from '@/components/patients/PatientCombobox';
 import { BILAN_TYPE_COLORS, BILAN_TYPE_LABELS, type BilanRecord, type BilanType, type PatientSummary } from '@/types/bilan';
 
 const TYPES: BilanType[] = ['INITIAL', 'INTERMEDIAIRE', 'FINAL'];

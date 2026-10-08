@@ -23,6 +23,14 @@ import { useToast } from '@/hooks/use-toast';
 import QuickContactModal from '@/components/QuickContactModal';
 import { isMobileFR } from '@/lib/phone';
 import { updatePatientContact } from '@/lib/patientApi';
+import PatientNotesButton from '@/components/patients/PatientNotesButton';
+
+// Boutons de l'en-tête (Bilans, Notes, Anciens programmes), sans icône : 3 colonnes égales sur
+// mobile (libellé sur 2 lignes si besoin), sur une ligne à partir de md.
+const HEADER_BUTTON_CLASS =
+  'h-auto px-1 py-2 text-xs whitespace-normal leading-tight text-center ' +
+  'md:h-9 md:px-4 md:py-0 md:text-sm md:whitespace-nowrap ' +
+  'border-[#3899aa]/30 text-[#3899aa] hover:bg-[#3899aa]/10';
 
 interface PatientData {
   id: number;
@@ -422,7 +430,9 @@ export default function PatientDetailPage() {
                 <div className="rounded-xl p-4">
                   <div className="space-y-2">
                     {/* Avatar + Nom + Age + Infos contact */}
-                    <div className="flex items-center gap-3">
+                    {/* Mobile : identité puis rangée de 3 boutons égaux ; ≥ md : tout sur une ligne */}
+                    <div className="flex flex-col md:flex-row md:items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="relative shrink-0">
                         <div className="w-12 h-12 rounded-full bg-[#3899aa]/10 flex items-center justify-center ring-2 ring-[#3899aa]/30">
                           <User className="w-6 h-6 text-[#3899aa]" />
@@ -460,27 +470,33 @@ export default function PatientDetailPage() {
                         </div>
                       </div>
 
-                      <div className="flex gap-2 shrink-0">
+                    </div>
+
+                      <div className="grid grid-cols-3 gap-2 md:flex md:shrink-0">
                         <Button
                           variant="outline"
                           onClick={() => { setShowBilansModal(true); }}
-                          className="h-9 text-sm gap-2 border-[#3899aa]/30 text-[#3899aa] hover:bg-[#3899aa]/10"
+                          className={HEADER_BUTTON_CLASS}
                         >
-                          <FileText className="w-4 h-4" />
-                          Bilans
-                          {bilans.length > 0 && (
-                            <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs bg-[#3899aa]/10 text-[#3899aa]">
-                              {bilans.length}
-                            </Badge>
-                          )}
+                          <span className="flex items-center gap-1">
+                            Bilans
+                            {bilans.length > 0 && (
+                              <Badge variant="secondary" className="h-5 px-1.5 text-xs bg-[#3899aa]/10 text-[#3899aa]">
+                                {bilans.length}
+                              </Badge>
+                            )}
+                          </span>
                         </Button>
+                        <PatientNotesButton
+                          patient={{ id: patient.id, firstName: patient.firstName, lastName: patient.lastName }}
+                          className={HEADER_BUTTON_CLASS}
+                        />
                         <Button
                           variant="outline"
                           onClick={handleOpenArchivedModal}
-                          className="h-9 text-sm gap-2 border-[#3899aa]/30 text-[#3899aa] hover:bg-[#3899aa]/10"
+                          className={HEADER_BUTTON_CLASS}
                         >
-                          <Archive className="w-4 h-4" />
-                          Anciens Programmes
+                          Anciens programmes
                         </Button>
                       </div>
                     </div>

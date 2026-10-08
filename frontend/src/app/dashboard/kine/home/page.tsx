@@ -18,7 +18,8 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
-import NouveauContratModal from '@/app/dashboard/kine/contrats/components/NouveauContratModal';
+import NoteDialog from '@/components/patients/NoteDialog';
+import { ToastAction } from '@/components/ui/toast';
 import type { NewsItem, NewsPageResponse } from '@/components/news/types';
 
 // Interfaces pour les types de données
@@ -114,7 +115,7 @@ export default function KineHomePage() {
   const [loading, setLoading] = useState(true);
   const [loadingAdherence, setLoadingAdherence] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [contratModalOpen, setContratModalOpen] = useState(false);
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -362,10 +363,10 @@ export default function KineHomePage() {
               <div className="text-sm font-semibold">Nouveau programme</div>
               <div className="text-[11px] text-muted-foreground">Pour un patient</div>
             </button>
-            <button onClick={() => setContratModalOpen(true)} className="card-hover rounded-xl p-4 text-center transition-all">
-              <div className="w-10 h-10 mx-auto mb-2 rounded-lg flex items-center justify-center text-xl bg-[#eff6ff]">📄</div>
-              <div className="text-sm font-semibold">Nouveau contrat</div>
-              <div className="text-[11px] text-muted-foreground">Gratuit & conforme</div>
+            <button onClick={() => setNoteDialogOpen(true)} className="card-hover rounded-xl p-4 text-center transition-all">
+              <div className="w-10 h-10 mx-auto mb-2 rounded-lg flex items-center justify-center text-xl bg-[#eff6ff]">🗒️</div>
+              <div className="text-sm font-semibold">Nouvelle note</div>
+              <div className="text-[11px] text-muted-foreground">Sur un dossier patient</div>
             </button>
           </div>
         </div>
@@ -495,7 +496,18 @@ export default function KineHomePage() {
         </Card>
       </div>
 
-      <NouveauContratModal open={contratModalOpen} onOpenChange={setContratModalOpen} />
+      <NoteDialog
+        open={noteDialogOpen}
+        onOpenChange={setNoteDialogOpen}
+        onSaved={(_note, savedPatient) => toast({
+          title: `Note ajoutée au dossier de ${savedPatient.firstName} ${savedPatient.lastName}`,
+          action: (
+            <ToastAction altText="Voir le dossier" onClick={() => router.push(`/dashboard/kine/patients/${savedPatient.id}`)}>
+              Voir le dossier
+            </ToastAction>
+          ),
+        })}
+      />
     </>
   );
 }
