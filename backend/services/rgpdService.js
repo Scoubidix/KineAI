@@ -44,7 +44,8 @@ class RGPDService {
         chatIaBiblio,
         chatIaClinique,
         chatIaAdministrative,
-        notifications
+        notifications,
+        patientNotes
       ] = await Promise.all([
         // Patients avec leurs programmes et validations
         prisma.patient.findMany({
@@ -109,6 +110,12 @@ class RGPDService {
             programme: { select: { titre: true } }
           },
           orderBy: { createdAt: 'desc' }
+        }),
+
+        // Notes rapides du dossier patient (supprimées comprises : données encore en base)
+        prisma.patientNote.findMany({
+          where: { kineId: kine.id },
+          orderBy: { createdAt: 'desc' }
         })
       ]);
 
@@ -130,7 +137,8 @@ class RGPDService {
             'programmes_exercices', 
             'exercices_modeles',
             'historique_chat_ia',
-            'notifications'
+            'notifications',
+            'notes_patients'
           ]
         },
         
@@ -235,6 +243,16 @@ class RGPDService {
           patient: notif.patient,
           programme: notif.programme,
           metadonnees: notif.metadata
+        })),
+
+        notesPatients: patientNotes.map(note => ({
+          id: note.id,
+          patientId: note.patientId,
+          contenu: note.content,
+          active: note.isActive,
+          dateCreation: note.createdAt,
+          derniereMiseAJour: note.updatedAt,
+          dateSuppression: note.deletedAt
         }))
       };
 
@@ -355,6 +373,7 @@ class RGPDService {
       archive.append(JSON.stringify(data.exercicesModeles, null, 2), { name: 'exercices_modeles.json' });
       archive.append(JSON.stringify(data.historiqueIA, null, 2), { name: 'historique_ia.json' });
       archive.append(JSON.stringify(data.notifications, null, 2), { name: 'notifications.json' });
+      archive.append(JSON.stringify(data.notesPatients ?? [], null, 2), { name: 'notes_patients.json' });
 
       // Ajouter un fichier README explicatif
       const readmeContent = `# Export de vos données RGPD - Mon Assistant Kiné
@@ -384,6 +403,9 @@ Historique complet de vos conversations avec nos assistants IA
 
 ### notifications.json
 Toutes les notifications que vous avez reçues
+
+### notes_patients.json
+Les notes rapides que vous avez écrites sur le dossier de vos patients
 
 ## Informations légales
 - Export généré le: ${new Date().toISOString()}
@@ -577,7 +599,8 @@ Pour toute question concernant vos données: contact@monassistantkine.com
         programmesCount,
         exercicesModelesCount,
         chatIaCount,
-        notificationsCount
+        notificationsCount,
+        patientNotesCount
       ] = await Promise.all([
         prisma.patient.count({ where: { kineId: kine.id } }),
         prisma.programme.count({ where: { patient: { kineId: kine.id } } }),
@@ -588,7 +611,8 @@ Pour toute question concernant vos données: contact@monassistantkine.com
           prisma.chatIaClinique.count({ where: { kineId: kine.id } }),
           prisma.chatIaAdministrative.count({ where: { kineId: kine.id } })
         ]).then(counts => counts.reduce((sum, count) => sum + count, 0)),
-        prisma.notification.count({ where: { kineId: kine.id } })
+        prisma.notification.count({ where: { kineId: kine.id } }),
+        prisma.patientNote.count({ where: { kineId: kine.id } })
       ]);
 
       const deletionDetails = {
@@ -599,6 +623,7 @@ Pour toute question concernant vos données: contact@monassistantkine.com
         exercicesModeles: exercicesModelesCount,
         chatIA: chatIaCount,
         notifications: notificationsCount,
+        notesPatients: patientNotesCount,
         deletedAt: new Date().toISOString()
       };
 
