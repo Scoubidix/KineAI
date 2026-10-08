@@ -64,6 +64,7 @@ model Kine {
   notifications     Notification[]
   nouveauteVues     NouveauteVue[]
   roadmapIdees      RoadmapIdee[]
+  patientNotes      PatientNote[]
   dictationTermReports DictationTermReport[]
 
   // ========== GROUPE PIONNIERS ==========
@@ -162,6 +163,7 @@ model Patient {
   templatesSentHistory TemplateSentHistory[]
   bilans               BilanKine[]
   visioSeances         VisioSeance[]
+  notes                PatientNote[]
 }
 
 model ExerciceModele {
@@ -1397,4 +1399,27 @@ model DictationTermReport {
   @@index([termId])
   @@index([kineId])
   @@map("dictation_term_reports")
+}
+
+// ========== NOTES RAPIDES DU DOSSIER PATIENT ==========
+// Note courte du kiné (séance, mesure, rappel) rattachée à un patient.
+// kineId dénormalisé : l'ownership d'une note se vérifie en une requête.
+model PatientNote {
+  id        Int      @id @default(autoincrement())
+  content   String   @db.VarChar(2000)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ========== SOFT DELETE ==========
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  // ================================
+
+  patientId Int
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  kineId    Int
+  kine      Kine    @relation(fields: [kineId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, isActive, createdAt])
+  @@map("patient_notes")
 }
