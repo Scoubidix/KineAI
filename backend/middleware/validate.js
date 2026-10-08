@@ -242,6 +242,11 @@ const roadmapIdeeSchema = z.object({
   itemId: z.number().int().positive().optional(), // card concernée (optionnelle)
 });
 
+// Note rapide du dossier patient (POST/PUT /patients/:id/notes)
+const patientNoteSchema = z.object({
+  content: z.string().trim().min(1).max(2000),
+});
+
 // Card roadmap créée / modifiée depuis l'admin (POST/PUT /api/admin/roadmap/items)
 const roadmapItemSchema = z.object({
   titre: z.string().trim().min(3).max(120),
@@ -310,6 +315,7 @@ module.exports = {
   ROADMAP_STATUTS,
   ROADMAP_IDEE_STATUTS,
   roadmapIdeeSchema,
+  patientNoteSchema,
   roadmapItemSchema,
   roadmapIdeeStatutSchema,
   bilanGuideSchema,
