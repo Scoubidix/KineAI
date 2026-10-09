@@ -181,6 +181,13 @@ model ExerciceModele {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // ========== SOFT DELETE ==========
+  // Archivé tant que l'historique d'un programme le référence (médias déjà
+  // supprimés), puis effacé définitivement avec la purge des programmes.
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  // ================================
+
   exercicesProgramme ExerciceProgramme[]
   templateItems      ExerciceTemplateItem[]
 }

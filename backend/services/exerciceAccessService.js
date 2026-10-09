@@ -36,10 +36,12 @@ async function checkExercicesAccessibles(kineId, exerciceIds) {
 
   const prisma = prismaService.getInstance();
   // Même règle de visibilité que la bibliothèque (getPrivateExercices) : public,
-  // ou m'appartenant.
+  // ou m'appartenant, et pas archivé (un exercice supprimé ne revient pas dans
+  // un nouveau programme ou template).
   const accessibles = await prisma.exerciceModele.findMany({
     where: {
       id: { in: uniques },
+      isActive: true,
       OR: [{ isPublic: true }, { kineId }],
     },
     select: { id: true },

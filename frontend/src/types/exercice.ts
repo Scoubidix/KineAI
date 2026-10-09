@@ -50,6 +50,13 @@ export interface ExerciceTemplate {
   items: ExerciceTemplateItem[];
 }
 
+// Aperçu avant suppression (GET /exercices/:id/deletion-impact) : les programmes
+// en cours bloquent, les templates perdront l'exercice.
+export interface ExerciceDeletionImpact {
+  programmes: { programme: string; patient: string }[];
+  templatesCount: number;
+}
+
 // Forme d'un exercice en cours d'édition dans le formulaire de template
 export interface TemplateExerciseInput {
   exerciceId: number;

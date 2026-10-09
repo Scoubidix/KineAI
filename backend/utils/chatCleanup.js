@@ -308,11 +308,18 @@ const cleanupOldArchivedProgramsTask = async () => {
         }
       }
 
-      logger.info(`🗑️ Suppression: ${deletedPrograms} programmes et ${messageCount} messages`);
+      // Exercices archivés que plus aucun programme ne référence : leurs médias
+      // sont partis à l'archivage, seule la ligne restait pour l'historique.
+      const purgedExercices = await tx.exerciceModele.deleteMany({
+        where: { isActive: false, exercicesProgramme: { none: {} }, templateItems: { none: {} } },
+      });
+
+      logger.info(`🗑️ Suppression: ${deletedPrograms} programmes, ${messageCount} messages et ${purgedExercices.count} exercices archivés`);
 
       return {
         programs: deletedPrograms,
         messages: messageCount,
+        exercices: purgedExercices.count,
         details: deletedDetails
       };
     });

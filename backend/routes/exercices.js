@@ -82,10 +82,12 @@ router.post('/admin/:id/poster', authenticate, requireAdmin, crudWriteLimiter, e
 router.patch('/admin/:id/publish', authenticate, requireAdmin, exercicesController.publishExercice);
 router.patch('/admin/:id/unpublish', authenticate, requireAdmin, exercicesController.unpublishExercice);
 router.put('/admin/:id', authenticate, requireAdmin, validate(updateExerciceSchema), exercicesController.adminUpdateExercice);
+router.get('/admin/:id/deletion-impact', authenticate, requireAdmin, exercicesController.adminGetDeletionImpact);
 router.delete('/admin/:id', authenticate, requireAdmin, exercicesController.adminDeleteExercice);
 
 router.post('/', authenticate, crudWriteLimiter, validate(createExerciceSchema), exercicesController.createExercice);
 router.put('/:id', authenticate, crudWriteLimiter, validate(updateExerciceSchema), exercicesController.updateExercice);
+router.get('/:id/deletion-impact', authenticate, exercicesController.getDeletionImpact);
 router.delete('/:id', authenticate, crudWriteLimiter, exercicesController.deleteExercice);
 
 // Route pour upload vidéo : transcodage MP4 720p + poster JPEG

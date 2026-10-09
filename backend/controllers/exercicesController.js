@@ -38,7 +38,7 @@ function resolveMediaPaths(existing, body) {
  *   références. À la mise à jour, la ligne porte déjà les NOUVEAUX chemins au
  *   moment de l'appel : on l'exclut par prudence (elle ne référence de toute
  *   façon plus les chemins orphelins passés ici). À la suppression, la ligne
- *   est effacée AVANT cet appel (voir call sites) : elle ne peut plus
+ *   est effacée ou vidée AVANT cet appel (removeExercice) : elle ne peut plus
  *   s'auto-référencer, ce paramètre reste donc à `null`.
  */
 async function deleteOrphanMedia(orphans, exceptExerciceId = null) {
@@ -64,6 +64,95 @@ async function deleteOrphanMedia(orphans, exceptExerciceId = null) {
       logger.warn("Erreur suppression d'un média d'exercice orphelin:", error);
     }
   }
+}
+
+// Programme « en cours » : même règle que l'accès patient (mediaController).
+// Les programmes archivés ou supprimés relèvent de l'historique.
+const PROGRAMME_EN_COURS = { isActive: true, isArchived: false, patient: { isActive: true } };
+
+/**
+ * Ce que la suppression d'un exercice entraînerait : les programmes en cours
+ * qui la bloquent, et le nombre de templates dont il sera retiré.
+ *
+ * @param {object} db - Client Prisma ou transaction
+ * @param {number} exerciceId
+ */
+async function getDeletionImpact(db, exerciceId) {
+  const [programmes, templatesCount] = await Promise.all([
+    db.programme.findMany({
+      where: { ...PROGRAMME_EN_COURS, exercices: { some: { exerciceModeleId: exerciceId } } },
+      select: { titre: true, patient: { select: { firstName: true, lastName: true } } },
+    }),
+    db.exerciceTemplate.count({
+      where: { items: { some: { exerciceModeleId: exerciceId } } },
+    }),
+  ]);
+  return {
+    programmes: programmes.map((p) => ({
+      programme: p.titre,
+      patient: `${p.patient.firstName} ${p.patient.lastName}`,
+    })),
+    templatesCount,
+  };
+}
+
+/**
+ * Retire un exercice de la bibliothèque. Refusé tant qu'un programme en cours
+ * l'utilise. Sinon il quitte les templates, puis :
+ * - jamais utilisé dans un programme → suppression définitive ;
+ * - présent dans l'historique (programmes archivés ou supprimés) → archivé :
+ *   la ligne reste pour que la prescription demeure lisible, les médias
+ *   partent (la démo n'est pas du dossier patient). La ligne est effacée plus
+ *   tard avec la purge des programmes archivés (utils/chatCleanup.js).
+ *
+ * @returns {Promise<object[]>} Les programmes en cours qui bloquent (vide si retiré)
+ */
+async function removeExercice(exercice) {
+  const prisma = prismaService.getInstance();
+  const id = exercice.id;
+
+  const programmesEnCours = await prisma.$transaction(async (tx) => {
+    const { programmes } = await getDeletionImpact(tx, id);
+    if (programmes.length > 0) return programmes;
+
+    await tx.exerciceTemplateItem.deleteMany({ where: { exerciceModeleId: id } });
+    const historique = await tx.exerciceProgramme.count({ where: { exerciceModeleId: id } });
+    if (historique === 0) {
+      await tx.exerciceModele.delete({ where: { id } });
+    } else {
+      await tx.exerciceModele.update({
+        where: { id },
+        data: {
+          isActive: false,
+          deletedAt: new Date(),
+          videoPath: null,
+          posterPath: null,
+          gifPath: null,
+          gifUrl: null,
+        },
+      });
+    }
+    return [];
+  });
+
+  if (programmesEnCours.length > 0) return programmesEnCours;
+
+  // Après l'écriture : la ligne (effacée ou vidée) ne référence plus ses
+  // propres chemins, le comptage de deleteOrphanMedia ne la voit donc pas. Si
+  // l'écriture échoue, aucun média n'est perdu.
+  await deleteOrphanMedia(
+    [exercice.videoPath, exercice.posterPath, exercice.gifPath].filter(Boolean)
+  );
+  return [];
+}
+
+function sendExerciceInUse(res, programmes) {
+  return res.status(409).json({
+    success: false,
+    error: 'Cet exercice est utilisé dans un programme en cours',
+    code: 'EXERCICE_IN_USE',
+    programmes,
+  });
 }
 
 // 🔐 Toutes les routes supposent que req.uid est défini par le middleware authenticate
@@ -97,7 +186,7 @@ exports.getPublicExercices = async (req, res) => {
     const prisma = prismaService.getInstance();
 
     const exercices = await prisma.exerciceModele.findMany({
-      where: { isPublic: true },
+      where: { isPublic: true, isActive: true },
     });
 
     // Appliquer les filtres et le tri
@@ -120,7 +209,7 @@ exports.getAdminPublicExercices = async (req, res) => {
     const prisma = prismaService.getInstance();
 
     const exercices = await prisma.exerciceModele.findMany({
-      where: { isPublic: true },
+      where: { isPublic: true, isActive: true },
       include: { kine: { select: { firstName: true, lastName: true, email: true } } },
     });
 
@@ -173,7 +262,7 @@ exports.publishExercice = async (req, res) => {
     const prisma = prismaService.getInstance();
     const exercice = await prisma.exerciceModele.findUnique({ where: { id: parseInt(id) } });
 
-    if (!exercice) {
+    if (!exercice || !exercice.isActive) {
       return res.status(404).json({ error: 'Exercice introuvable' });
     }
     if (exercice.kineId !== req.kineId) {
@@ -201,7 +290,7 @@ exports.unpublishExercice = async (req, res) => {
     const prisma = prismaService.getInstance();
     const exercice = await prisma.exerciceModele.findUnique({ where: { id: parseInt(id) } });
 
-    if (!exercice || !exercice.isPublic) {
+    if (!exercice || !exercice.isPublic || !exercice.isActive) {
       return res.status(404).json({ error: 'Exercice public introuvable' });
     }
 
@@ -245,7 +334,7 @@ exports.adminRegeneratePoster = async (req, res) => {
     const prisma = prismaService.getInstance();
     const exercice = await prisma.exerciceModele.findUnique({ where: { id: parseInt(id) } });
 
-    if (!exercice || !exercice.isPublic) {
+    if (!exercice || !exercice.isPublic || !exercice.isActive) {
       return res.status(404).json({ error: 'Exercice public introuvable' });
     }
     if (!exercice.videoPath) {
@@ -282,7 +371,7 @@ exports.adminUpdateExercice = async (req, res) => {
     const prisma = prismaService.getInstance();
     const exercice = await prisma.exerciceModele.findUnique({ where: { id: parseInt(id) } });
 
-    if (!exercice || !exercice.isPublic) {
+    if (!exercice || !exercice.isPublic || !exercice.isActive) {
       return res.status(404).json({ error: 'Exercice public introuvable' });
     }
 
@@ -320,39 +409,12 @@ exports.adminDeleteExercice = async (req, res) => {
     const prisma = prismaService.getInstance();
     const exercice = await prisma.exerciceModele.findUnique({ where: { id: parseInt(id) } });
 
-    if (!exercice || !exercice.isPublic) {
+    if (!exercice || !exercice.isPublic || !exercice.isActive) {
       return res.status(404).json({ error: 'Exercice public introuvable' });
     }
 
-    const exercicesEnCours = await prisma.exerciceProgramme.findMany({
-      where: { exerciceModeleId: parseInt(id) },
-      include: {
-        programme: { select: { titre: true, patient: { select: { firstName: true, lastName: true } } } },
-      },
-    });
-
-    if (exercicesEnCours.length > 0) {
-      return res.status(400).json({
-        error: 'Impossible de supprimer cet exercice',
-        message: 'Cet exercice est utilisé dans des programmes actifs',
-        programmes: exercicesEnCours.map((ex) => ({
-          programme: ex.programme.titre,
-          patient: `${ex.programme.patient.firstName} ${ex.programme.patient.lastName}`,
-        })),
-      });
-    }
-
-    // La ligne d'abord : sinon elle référence encore ses propres chemins au
-    // moment du comptage dans deleteOrphanMedia, qui annulerait alors TOUTE
-    // suppression de fichier. Ordre aussi plus sûr en cas d'échec : si le
-    // delete Prisma échoue, aucun média n'est perdu (l'ancien ordre effaçait
-    // les fichiers avant, laissant une ligne avec des chemins pendants si le
-    // delete échouait ensuite).
-    await prisma.exerciceModele.delete({ where: { id: parseInt(id) } });
-
-    await deleteOrphanMedia(
-      [exercice.videoPath, exercice.posterPath, exercice.gifPath].filter(Boolean)
-    );
+    const programmesEnCours = await removeExercice(exercice);
+    if (programmesEnCours.length > 0) return sendExerciceInUse(res, programmesEnCours);
 
     res.status(204).send();
   } catch (err) {
@@ -380,6 +442,7 @@ exports.getPrivateExercices = async (req, res) => {
       where: {
         isPublic: false,
         kineId: kine.id,
+        isActive: true,
       },
     });
 
@@ -414,6 +477,7 @@ exports.getAllTags = async (req, res) => {
     // Récupérer tous les exercices (publics + privés du kiné)
     const exercices = await prisma.exerciceModele.findMany({
       where: {
+        isActive: true,
         OR: [
           { isPublic: true },
           { kineId: kine.id }
@@ -495,7 +559,7 @@ exports.updateExercice = async (req, res) => {
       where: { id: parseInt(id) },
     });
 
-    if (!exercice || exercice.kineId !== kine.id || exercice.isPublic) {
+    if (!exercice || exercice.kineId !== kine.id || exercice.isPublic || !exercice.isActive) {
       return res.status(403).json({ error: "Non autorisé à modifier cet exercice" });
     }
 
@@ -545,49 +609,59 @@ exports.deleteExercice = async (req, res) => {
       where: { id: parseInt(id) },
     });
 
-    if (!exercice || exercice.kineId !== kine.id || exercice.isPublic) {
+    if (!exercice || exercice.kineId !== kine.id || exercice.isPublic || !exercice.isActive) {
       return res.status(403).json({ error: "Non autorisé à supprimer cet exercice" });
     }
 
-    // Vérifier si l'exercice est utilisé dans des programmes
-    const exercicesEnCours = await prisma.exerciceProgramme.findMany({
-      where: { exerciceModeleId: parseInt(id) },
-      include: {
-        programme: {
-          select: { titre: true, patient: { select: { firstName: true, lastName: true } } }
-        }
-      }
-    });
-
-    if (exercicesEnCours.length > 0) {
-      return res.status(400).json({
-        error: "Impossible de supprimer cet exercice",
-        message: "Cet exercice est utilisé dans des programmes actifs",
-        programmes: exercicesEnCours.map(ex => ({
-          programme: ex.programme.titre,
-          patient: `${ex.programme.patient.firstName} ${ex.programme.patient.lastName}`
-        }))
-      });
-    }
-
-    // La ligne d'abord : sinon elle référence encore ses propres chemins au
-    // moment du comptage dans deleteOrphanMedia, qui annulerait alors TOUTE
-    // suppression de fichier. Ordre aussi plus sûr en cas d'échec : si le
-    // delete Prisma échoue, aucun média n'est perdu (l'ancien ordre effaçait
-    // les fichiers avant, laissant une ligne avec des chemins pendants si le
-    // delete échouait ensuite).
-    await prisma.exerciceModele.delete({
-      where: { id: parseInt(id) },
-    });
-
-    await deleteOrphanMedia(
-      [exercice.videoPath, exercice.posterPath, exercice.gifPath].filter(Boolean)
-    );
+    const programmesEnCours = await removeExercice(exercice);
+    if (programmesEnCours.length > 0) return sendExerciceInUse(res, programmesEnCours);
 
     res.status(204).send();
   } catch (err) {
     logger.error("Erreur suppression exercice :", err);
     res.status(500).json({ error: "Erreur suppression exercice" });
+  }
+};
+
+// Aperçu avant suppression, pour la boîte de confirmation : programmes en
+// cours qui bloquent, templates dont l'exercice sera retiré.
+exports.getDeletionImpact = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const prisma = prismaService.getInstance();
+    const kine = await prisma.kine.findUnique({ where: { uid: req.uid } });
+    if (!kine) {
+      return res.status(404).json({ error: "Kiné introuvable avec ce UID Firebase." });
+    }
+
+    const exercice = await prisma.exerciceModele.findUnique({ where: { id: parseInt(id) } });
+
+    if (!exercice || exercice.kineId !== kine.id || exercice.isPublic || !exercice.isActive) {
+      return res.status(403).json({ error: "Non autorisé à supprimer cet exercice" });
+    }
+
+    res.json(await getDeletionImpact(prisma, exercice.id));
+  } catch (err) {
+    logger.error("Erreur aperçu suppression exercice :", err);
+    res.status(500).json({ error: "Erreur aperçu suppression exercice" });
+  }
+};
+
+// ADMIN : même aperçu pour un exo public
+exports.adminGetDeletionImpact = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const prisma = prismaService.getInstance();
+    const exercice = await prisma.exerciceModele.findUnique({ where: { id: parseInt(id) } });
+
+    if (!exercice || !exercice.isPublic || !exercice.isActive) {
+      return res.status(404).json({ error: 'Exercice public introuvable' });
+    }
+
+    res.json(await getDeletionImpact(prisma, exercice.id));
+  } catch (err) {
+    logger.error('Erreur aperçu suppression exercice public :', err);
+    res.status(500).json({ error: 'Erreur aperçu suppression exercice' });
   }
 };
 

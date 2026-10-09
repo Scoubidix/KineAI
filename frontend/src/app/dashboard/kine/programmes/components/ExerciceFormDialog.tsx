@@ -17,11 +17,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Tag } from 'lucide-react';
+import { Loader2, Tag } from 'lucide-react';
 import VideoUpload, { EMPTY_MEDIA, type ExerciceMediaValue } from '@/components/VideoUpload';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
-import type { ExerciceModele } from '@/types/exercice';
+import type { ExerciceDeletionImpact, ExerciceModele } from '@/types/exercice';
 import { parseTags, SUGGESTED_TAGS } from '@/utils/exerciceFiltering';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -267,6 +267,39 @@ export function ExerciceDeleteDialog({
   onDeleted,
 }: ExerciceDeleteDialogProps) {
   const { toast } = useToast();
+  // Chargé à l'ouverture : la confirmation annonce ce que la suppression
+  // entraîne, plutôt que de découvrir un refus après coup.
+  const [impact, setImpact] = useState<ExerciceDeletionImpact | null>(null);
+  const exerciceId = exercice?.id;
+
+  // Dépend de l'id seul : le parent passe un onOpenChange inline, qui
+  // relancerait l'appel à chacun de ses rendus.
+  useEffect(() => {
+    setImpact(null);
+    if (!exerciceId) return;
+    let cancelled = false;
+    fetchWithAuth(`${apiUrl}/exercices/${exerciceId}/deletion-impact`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Erreur ${res.status}`);
+        return res.json();
+      })
+      .then((data: ExerciceDeletionImpact) => {
+        if (!cancelled) setImpact(data);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('Erreur aperçu suppression exercice:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Erreur',
+          description: "Impossible de vérifier l'utilisation de cet exercice.",
+        });
+        onOpenChange(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [exerciceId]);
 
   const handleDelete = async () => {
     if (!exercice) return;
@@ -275,12 +308,12 @@ export function ExerciceDeleteDialog({
       if (res.status === 204) {
         onOpenChange(false);
         onDeleted();
-      } else if (res.status === 400) {
-        // Le backend refuse : l'exercice est référencé par un programme.
+      } else if (res.status === 409) {
+        // Un programme en cours l'a repris entre l'ouverture et la confirmation.
         toast({
           variant: 'destructive',
           title: 'Suppression impossible',
-          description: 'Cet exercice est utilisé dans un programme.',
+          description: 'Cet exercice est utilisé dans un programme en cours.',
         });
         onOpenChange(false);
       } else {
@@ -297,23 +330,66 @@ export function ExerciceDeleteDialog({
     }
   };
 
+  const blocked = !!impact && impact.programmes.length > 0;
+  const templatesCount = impact?.templatesCount ?? 0;
+
   return (
     <AlertDialog open={!!exercice} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            Supprimer &laquo;&nbsp;{exercice?.nom}&nbsp;&raquo; ?
+            {blocked ? 'Suppression impossible' : <>Supprimer &laquo;&nbsp;{exercice?.nom}&nbsp;&raquo; ?</>}
           </AlertDialogTitle>
-          <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2">
+              {!impact ? (
+                <p className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Vérification de l&apos;utilisation de l&apos;exercice…
+                </p>
+              ) : blocked ? (
+                <>
+                  <p>
+                    &laquo;&nbsp;{exercice?.nom}&nbsp;&raquo; est utilisé dans{' '}
+                    {impact.programmes.length > 1 ? 'des programmes en cours' : 'un programme en cours'}&nbsp;:
+                  </p>
+                  <ul className="list-disc pl-5">
+                    {impact.programmes.map((p, i) => (
+                      <li key={i}>
+                        {p.programme} ({p.patient})
+                      </li>
+                    ))}
+                  </ul>
+                  <p>Tu pourras le supprimer une fois ces programmes terminés.</p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    Il disparaîtra de ta bibliothèque. Les anciens programmes de tes patients le
+                    gardent dans leur historique, sans la vidéo de démonstration.
+                  </p>
+                  {templatesCount > 0 && (
+                    <p className="font-medium text-foreground">
+                      Il sera aussi retiré de {templatesCount} template{templatesCount > 1 ? 's' : ''}.
+                    </p>
+                  )}
+                  <p>Cette action est irréversible.</p>
+                </>
+              )}
+            </div>
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Annuler</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleDelete}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            Supprimer
-          </AlertDialogAction>
+          <AlertDialogCancel>{blocked ? 'Fermer' : 'Annuler'}</AlertDialogCancel>
+          {!blocked && (
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={!impact}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Supprimer
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

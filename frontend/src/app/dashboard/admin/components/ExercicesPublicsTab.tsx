@@ -24,6 +24,7 @@ import { ExerciceMedia } from '@/components/ExerciceMedia';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import { useToast } from '@/hooks/use-toast';
 import { matchesSearch } from '@/utils/exerciceFiltering';
+import type { ExerciceDeletionImpact } from '@/types/exercice';
 import { Loader2, Search, Users } from 'lucide-react';
 
 export interface PublicExercice {
@@ -66,6 +67,7 @@ export default function ExercicesPublicsTab() {
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<EditState | null>(null);
   const [legacyGifCount, setLegacyGifCount] = useState<number | null>(null);
+  const [deleteImpact, setDeleteImpact] = useState<{ id: number; impact: ExerciceDeletionImpact | null } | null>(null);
   const [search, setSearch] = useState('');
   // Lecteur du dialogue d'édition : sert à choisir l'image de la miniature.
   const posterVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -159,12 +161,24 @@ export default function ExercicesPublicsTab() {
     }
   };
 
+  // Aperçu chargé à l'ouverture de la confirmation de suppression.
+  const loadDeleteImpact = async (id: number) => {
+    setDeleteImpact({ id, impact: null });
+    const res = await fetchWithAuth(`${API_BASE}/exercices/admin/${id}/deletion-impact`);
+    if (res.ok) {
+      const impact: ExerciceDeletionImpact = await res.json();
+      setDeleteImpact((prev) => (prev?.id === id ? { id, impact } : prev));
+    } else {
+      toast({ title: 'Échec', description: "Impossible de vérifier l'utilisation de l'exercice.", variant: 'destructive' });
+    }
+  };
+
   const handleDelete = async (id: number) => {
     const res = await fetchWithAuth(`${API_BASE}/exercices/admin/${id}`, { method: 'DELETE' });
     if (res.status === 204) {
       toast({ title: 'Exercice supprimé' });
       await loadPublics();
-    } else if (res.status === 400) {
+    } else if (res.status === 409) {
       const err = await res.json();
       const list = (err.programmes || []).map((p: { programme: string; patient: string }) => `${p.programme} (${p.patient})`).join(', ');
       toast({ title: 'Suppression impossible', description: `Utilisé dans : ${list}`, variant: 'destructive' });
@@ -317,21 +331,42 @@ export default function ExercicesPublicsTab() {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
-                    <AlertDialog>
+                    <AlertDialog
+                      onOpenChange={(open) => (open ? void loadDeleteImpact(ex.id) : setDeleteImpact(null))}
+                    >
                       <AlertDialogTrigger asChild>
                         <Button variant="destructive" size="sm" className="flex-1">Supprimer</Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Supprimer « {ex.nom} » ?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Suppression définitive. Elle sera refusée si l'exercice est utilisé dans un programme.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Annuler</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(ex.id)}>Supprimer</AlertDialogAction>
-                        </AlertDialogFooter>
+                        {(() => {
+                          const impact = deleteImpact?.id === ex.id ? deleteImpact.impact : null;
+                          const blocked = !!impact && impact.programmes.length > 0;
+                          const n = impact?.templatesCount ?? 0;
+                          return (
+                            <>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Supprimer « {ex.nom} » ?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  {!impact
+                                    ? "Vérification de l'utilisation de l'exercice…"
+                                    : blocked
+                                      ? `Suppression impossible : utilisé dans un programme en cours (${impact.programmes
+                                          .map((p) => `${p.programme}, ${p.patient}`)
+                                          .join(' ; ')}).`
+                                      : `Il quittera la bibliothèque publique${n > 0 ? ` et sera retiré de ${n} template${n > 1 ? 's' : ''}` : ''}. Les programmes archivés le gardent dans leur historique, sans la vidéo.`}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>{blocked ? 'Fermer' : 'Annuler'}</AlertDialogCancel>
+                                {!blocked && (
+                                  <AlertDialogAction disabled={!impact} onClick={() => handleDelete(ex.id)}>
+                                    Supprimer
+                                  </AlertDialogAction>
+                                )}
+                              </AlertDialogFooter>
+                            </>
+                          );
+                        })()}
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
