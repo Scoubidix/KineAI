@@ -16,26 +16,30 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
-    // Le stockage média (vidéos MP4 + posters GCS) ne doit jamais passer par le
-    // SW : `defaultCache` se termine par une règle NetworkFirst attrape-tout
-    // pour le cross-origin (cache "cross-origin"), qui capterait aussi GCS.
-    // Les vidéos font des Range Requests ; sans `crossorigin`, elles partent en
-    // `no-cors` et le SW les mettrait en cache comme réponses opaques —
-    // ~7 Mo réservés au quota par réponse, sans même de RangeRequestsPlugin, et
-    // sans jamais de hit puisque chaque URL signée est unique. GCS gère déjà
-    // son propre cache-control ; NetworkOnly court-circuite le SW entièrement.
-    // La redirection des démos du chat patient (`/api/media/…` sur l'API) suit
-    // la même règle : elle mène à ces mêmes vidéos. Même règle pour Cellar
-    // (migration GCS → Cellar).
+    // Rien de ce qui vient d'une autre origine n'est mis en cache par le SW.
+    // `defaultCache` se termine par une règle NetworkFirst attrape-tout pour le
+    // cross-origin (cache "cross-origin", 1 h) qui captait :
+    // - l'API (autre origine que le front) : réponses authentifiées (patients,
+    //   bilans) écrites sur le disque malgré `Cache-Control: no-store` (ignoré
+    //   par la Cache API), et resservies hors ligne quel que soit le compte
+    //   connecté, la clé de cache étant l'URL seule ;
+    // - le stockage média (GCS, Cellar, redirection `/api/media/…`) : vidéos
+    //   en Range Requests mises en cache comme réponses opaques (~7 Mo de quota
+    //   chacune), sans jamais de hit puisque chaque URL signée est unique.
+    // NetworkOnly refait la requête en fetch() : chaque domaine appelé doit
+    // figurer dans `connect-src` (CSP, next.config.ts).
     {
-      matcher: ({ url }) =>
-        url.hostname === 'storage.googleapis.com'
-        || url.hostname.endsWith('.cellar-c2.services.clever-cloud.com')
-        || url.pathname.startsWith('/api/media/'),
+      matcher: ({ sameOrigin }) => !sameOrigin,
       handler: new NetworkOnly(),
     },
     ...defaultCache,
   ],
+});
+
+// Purge le cache "cross-origin" rempli par les versions précédentes du SW
+// (réponses API authentifiées).
+self.addEventListener("activate", (event) => {
+  event.waitUntil(caches.delete("cross-origin"));
 });
 
 serwist.addEventListeners();

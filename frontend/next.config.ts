@@ -31,9 +31,10 @@ const csp = [
     : "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com",
   // Styles : 'unsafe-inline' requis par React inline styles + Tailwind
   "style-src 'self' 'unsafe-inline'",
-  // Connexions API : backend + Firebase Auth + GCS + Cellar (migration GCS → Cellar) + GA4 + vignettes
-  // YouTube (le service worker intercepte les images cross-origin et les refait en fetch(), soumis à connect-src)
-  `connect-src 'self' ${apiOrigin} ${wsOrigin} *.googleapis.com *.firebaseapp.com storage.googleapis.com https://*.cellar-c2.services.clever-cloud.com https://www.google-analytics.com https://*.analytics.google.com https://*.google-analytics.com https://i.ytimg.com`,
+  // Connexions API : backend + Firebase Auth + GCS + Cellar (migration GCS → Cellar) + GA4 (script gtag
+  // compris) + vignettes YouTube (le service worker refait en fetch() toute requête cross-origin, script ou
+  // image, donc soumise à connect-src)
+  `connect-src 'self' ${apiOrigin} ${wsOrigin} *.googleapis.com *.firebaseapp.com storage.googleapis.com https://*.cellar-c2.services.clever-cloud.com https://www.googletagmanager.com https://www.google-analytics.com https://*.analytics.google.com https://*.google-analytics.com https://i.ytimg.com`,
   "worker-src 'self'",
   // Images : GCS (posters + GIFs legacy) + Cellar (migration GCS → Cellar) + API (redirection 302 des
   // démos du chat patient, la CSP vérifie aussi l'URL d'arrivée → le stockage reste listé) + picsum
