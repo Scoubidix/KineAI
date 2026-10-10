@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 
-import { AuthGuard } from '@/components/AuthGuard';
 import { useSubscription } from '@/hooks/useSubscription';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -375,7 +374,6 @@ function UpgradeSuccessContent() {
 export default function UpgradeSuccessPage() {
   return (
     <>
-      <AuthGuard role="kine" />
       <Suspense fallback={
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">

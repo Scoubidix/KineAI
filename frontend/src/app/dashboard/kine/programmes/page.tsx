@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AuthGuard } from '@/components/AuthGuard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -308,7 +307,6 @@ export default function ProgrammesPage() {
 
   return (
     <>
-      <AuthGuard role="kine" />
       <div className={`space-y-4 sm:space-y-6 overflow-x-hidden ${selectMode ? 'pb-28' : ''}`}>
         <Tabs value={tab} onValueChange={handleTabChange}>
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
