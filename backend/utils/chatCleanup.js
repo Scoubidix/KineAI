@@ -349,12 +349,20 @@ const startProgramCleanupCron = () => {
     logger.warn('⚠️ Impossible de parser DATABASE_URL pour diagnostic');
   }
 
-  // 🔄 MIGRÉ VERS CLOUD SCHEDULER - Notifications programmes terminés
-  // Cloud Scheduler appelle GET /test-notifications-programs en HTTP (CPU alloué)
-  // → Résout le problème de CPU throttlé avec node-cron sur Cloud Run (facturation par requête)
-  // Ancien cron node-cron désactivé :
-  // cron.schedule('1 0 * * *', ...) → remplacé par Cloud Scheduler job "notifications-programmes-termines"
-  // cron.schedule('9 0 * * *', ...) → backup supprimé (Cloud Scheduler a son propre retry)
+  // PRODUCTION: Notifications programmes terminés - 00h01 (avant l'archivage de 00h10)
+  // Rapatrié de Cloud Scheduler : sur Clever Cloud le processus tourne en continu, node-cron suffit.
+  cron.schedule('1 0 * * *', async () => {
+    logger.info(`🔔 [00h01] Notifications programmes terminés`);
+
+    await executeWithTimeout(
+      'notifications programmes terminés (00h01)',
+      createProgramCompletedNotificationsTask,
+      60000
+    );
+  }, {
+    timezone: "Europe/Paris",
+    scheduled: true
+  });
 
   // PRODUCTION: Archivage programmes - 00h10 + backup 00h18
   cron.schedule('10 0 * * *', async () => {
@@ -439,44 +447,34 @@ const startProgramCleanupCron = () => {
     scheduled: true
   });
 
-  logger.info('✅ PRODUCTION configurée - 8 tâches avec backup automatique + notifications');
-  logger.info('📅 Planning: 00h01+00h09 notifications, 00h10+00h18 archivage, mercredi 01h15+01h23 nettoyage programmes, 02h40 purge brouillons vides, 03h20 purge mesures ASR');
+  // PRODUCTION: Pipeline PubMed (enrichissement studies_v3) - 03h00
+  // Opt-in (PUBMED_PIPELINE_CRON=true, prod seulement) : la base Supabase est partagée entre
+  // environnements, un staging ou un poste local ne doit pas relancer le pipeline (coût OpenAI).
+  // Hors executeWithTimeout : le pipeline dure plusieurs minutes (appels PubMed + OpenAI).
+  const pubmedCronEnabled = process.env.PUBMED_PIPELINE_CRON === 'true';
+  if (pubmedCronEnabled) {
+    cron.schedule('0 3 * * *', async () => {
+      logger.info(`📚 [03h00] Pipeline PubMed`);
+      const { scheduledPipeline } = require('../services/pubmedService');
+      try {
+        await scheduledPipeline();
+      } catch (err) {
+        logger.error('[CRON] Pipeline PubMed erreur:', err.message);
+      }
+    }, {
+      timezone: "Europe/Paris",
+      scheduled: true
+    });
+  }
+
+  logger.info(`✅ PRODUCTION configurée - tâches planifiées (pipeline PubMed ${pubmedCronEnabled ? 'actif' : 'désactivé'})`);
+  logger.info('📅 Planning: 00h01 notifications, 00h10+00h18 archivage, mercredi 01h15+01h23 nettoyage programmes, 02h40 purge brouillons vides, 03h00 pipeline PubMed (si PUBMED_PIPELINE_CRON=true), 03h20 purge mesures ASR');
   logger.info('🔒 Toutes les tâches utilisent le singleton prismaService');
-};
-
-// Fonctions de test manuel
-const manualArchiveTest = async () => {
-  return await executeWithTimeout(
-    'test manuel archivage',
-    archiveFinishedProgramsTask,
-    60000
-  );
-};
-
-const manualCleanupTest = async () => {
-  return await executeWithTimeout(
-    'test manuel nettoyage',
-    cleanupOldArchivedProgramsTask,
-    120000
-  );
-};
-
-
-// 🆕 NOUVEAU: Test manuel notifications
-const manualNotificationsTest = async () => {
-  return await executeWithTimeout(
-    'test manuel notifications programmes',
-    createProgramCompletedNotificationsTask,
-    60000
-  );
 };
 
 module.exports = {
   startProgramCleanupCron,
   archiveFinishedProgramsTask,
   cleanupOldArchivedProgramsTask,
-  createProgramCompletedNotificationsTask,
-  manualArchiveTest,
-  manualCleanupTest,
-  manualNotificationsTest
+  createProgramCompletedNotificationsTask
 };

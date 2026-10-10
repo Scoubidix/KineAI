@@ -655,61 +655,7 @@ app.use('/api/chat/kine', chatKineRoutes);
 // Chat unifié (conversations) : rate limiting dans le routeur APRÈS authenticate
 app.use('/api/chat/kine', conversationsRoutes);
 
-// Middleware auth pour routes cron (Cloud Scheduler via OIDC)
-const { OAuth2Client } = require('google-auth-library');
-const oauthClient = new OAuth2Client();
-
-const cronAuth = async (req, res, next) => {
-  logger.info('🔐 Requête cron reçue');
-  // TODO: remettre une auth par secret partagé après migration Clever Cloud
-  // Auth OIDC Google désactivée car incompatible hors Cloud Run
-  next();
-};
-
-// Routes cron protégées (Cloud Scheduler)
-app.get('/test-archive-finished', cronAuth, async (req, res) => {
-  const { manualArchiveTest } = require('./utils/chatCleanup');
-  try {
-    const result = await manualArchiveTest();
-    res.json({ success: true, result });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get('/test-cleanup-archived', cronAuth, async (req, res) => {
-  const { manualCleanupTest } = require('./utils/chatCleanup');
-  try {
-    const result = await manualCleanupTest();
-    res.json({ success: true, result });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get('/test-notifications-programs', cronAuth, async (req, res) => {
-  const { manualNotificationsTest } = require('./utils/chatCleanup');
-  try {
-    const result = await manualNotificationsTest();
-    res.json({ success: true, result });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// 🔄 CRON : Pipeline PubMed (appelé par GCP Cloud Scheduler avec OIDC)
-app.get('/api/cron/pubmed-pipeline', cronAuth, async (req, res) => {
-  const { scheduledPipeline } = require('./services/pubmedService');
-  res.json({ status: 'started', message: 'Pipeline PubMed lancé en background' });
-
-  try {
-    await scheduledPipeline();
-  } catch (err) {
-    logger.error('[CRON] Pipeline PubMed erreur:', err.message);
-  }
-});
-
-// Démarrage du système d'archivage automatique
+// Tâches planifiées internes (archivage, notifications, nettoyage, PubMed…) : aucune route HTTP
 startProgramCleanupCron();
 
 // Gestion gracieuse de l'arrêt (SIGINT = Ctrl+C local, SIGTERM = Cloud Run)
