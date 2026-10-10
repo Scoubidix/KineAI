@@ -41,6 +41,14 @@ export const fetchWithRetry = async (url: string, init: RequestInit = {}) => {
 };
 
 /**
+ * Vrai si l'erreur vient du réseau (fetch sans réponse, ou Firebase injoignable
+ * pour rafraîchir le token), et non d'un refus d'authentification.
+ */
+export const isNetworkError = (error: unknown) =>
+  error instanceof TypeError
+  || (error instanceof Error && error.message.includes("network-request-failed"));
+
+/**
  * Fait un fetch avec ajout automatique du token Firebase dans l'en-tête Authorization.
  *
  * @param url - L'URL de l'API backend

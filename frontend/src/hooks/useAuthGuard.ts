@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
+import { fetchWithRetry, isNetworkError } from '@/utils/fetchWithAuth';
 
 export function useAuthGuard(requiredRole?: 'kine' | 'patient') {
   const router = useRouter();
@@ -21,7 +22,7 @@ export function useAuthGuard(requiredRole?: 'kine' | 'patient') {
 
       try {
         // Récupérer les données utilisateur depuis PostgreSQL
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile`, {
+        const response = await fetchWithRetry(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -61,6 +62,13 @@ export function useAuthGuard(requiredRole?: 'kine' | 'patient') {
         setStatus('authenticated');
 
       } catch (error) {
+        // Réseau coupé : Firebase a bien un utilisateur, rien ne dit qu'il est
+        // déconnecté. On laisse la page s'afficher (ses appels montreront l'erreur
+        // réseau) ; le backend vérifie de toute façon le token à chaque appel.
+        if (isNetworkError(error)) {
+          setStatus('authenticated');
+          return;
+        }
         router.replace('/login');
       }
     });
