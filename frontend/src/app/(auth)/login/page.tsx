@@ -5,6 +5,7 @@ import { auth } from "@/lib/firebase/config";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { fetchWithRetry } from "@/utils/fetchWithAuth";
 import Link from "next/link";
 import Image from "next/image";
 import { Eye, EyeOff } from "lucide-react";
@@ -27,7 +28,7 @@ export default function LoginPage() {
       const user = userCredential.user;
 
       // 2. Récupérer les données depuis PostgreSQL
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile`, {
+      const response = await fetchWithRetry(`${process.env.NEXT_PUBLIC_API_URL}/kine/profile`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -69,6 +70,9 @@ export default function LoginPage() {
         errorMessage = "Adresse email invalide.";
       } else if (err.message.includes("non trouvé dans la base")) {
         errorMessage = "Votre compte n'est pas encore synchronisé. Contactez le support.";
+      } else if (err instanceof TypeError || err.message.includes("network-request-failed")) {
+        // Aucune réponse (fetch) ou réseau indisponible (Firebase) : pas un problème d'identifiants
+        errorMessage = "Problème de connexion. Réessayez dans un instant.";
       }
 
       toast({

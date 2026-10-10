@@ -17,6 +17,29 @@ const waitForCurrentUser = (auth: Auth): Promise<User | null> => {
   });
 };
 
+// Délais avant chaque nouvelle tentative (backoff) : 1 s, puis 3 s.
+const RETRY_DELAYS_MS = [1000, 3000];
+
+/**
+ * fetch qui relance les GET échoués sur erreur réseau (aucune réponse reçue :
+ * coupure brève, réveil du poste, flux HTTP/2 refusé par le load balancer).
+ * Une réponse HTTP, même 4xx/5xx, est renvoyée telle quelle. POST/PUT/DELETE ne
+ * sont jamais relancés : la 1re requête a pu être traitée, la rejouer créerait un
+ * doublon. Une annulation (AbortError) n'est pas une TypeError : pas de relance.
+ */
+export const fetchWithRetry = async (url: string, init: RequestInit = {}) => {
+  const isGet = (init.method ?? "GET").toUpperCase() === "GET";
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      const delay = RETRY_DELAYS_MS[attempt];
+      if (!isGet || delay === undefined || !(error instanceof TypeError)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+};
+
 /**
  * Fait un fetch avec ajout automatique du token Firebase dans l'en-tête Authorization.
  *
@@ -44,7 +67,7 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
     headers['Content-Type'] = 'application/json';
   }
 
-  return fetch(url, {
+  return fetchWithRetry(url, {
     ...options,
     headers,
   });
