@@ -69,8 +69,9 @@ async function personalizeTemplate({ templateId, patientId, contactId, kineId })
   try {
     const prisma = prismaService.getInstance();
 
-    const template = await prisma.adminTemplate.findUnique({
-      where: { id: templateId }
+    // Ownership : template public ou privé du kiné, patient/contact du kiné uniquement
+    const template = await prisma.adminTemplate.findFirst({
+      where: { id: templateId, OR: [{ isPublic: true }, { kineId }] }
     });
 
     if (!template) {
@@ -82,8 +83,8 @@ async function personalizeTemplate({ templateId, patientId, contactId, kineId })
     let contact = null;
 
     if (patientId) {
-      patient = await prisma.patient.findUnique({
-        where: { id: patientId },
+      patient = await prisma.patient.findFirst({
+        where: { id: patientId, kineId, isActive: true },
         select: {
           id: true, firstName: true, lastName: true,
           email: true, phone: true,
@@ -92,8 +93,8 @@ async function personalizeTemplate({ templateId, patientId, contactId, kineId })
       });
       if (!patient) throw new Error(`Patient ${patientId} introuvable`);
     } else if (contactId) {
-      contact = await prisma.contact.findUnique({
-        where: { id: contactId }
+      contact = await prisma.contact.findFirst({
+        where: { id: contactId, kineId }
       });
       if (!contact) throw new Error(`Contact ${contactId} introuvable`);
     }
@@ -325,30 +326,37 @@ async function saveToHistory({
   try {
     const prisma = prismaService.getInstance();
 
+    // Ownership : template, patient et contact doivent appartenir au kiné (ou template public)
+    if (templateId) {
+      const template = await prisma.adminTemplate.findFirst({
+        where: { id: templateId, OR: [{ isPublic: true }, { kineId }] },
+        select: { id: true }
+      });
+      if (!template) throw new Error(`Template ${templateId} introuvable`);
+    }
+
     // Build recipient info from patient/contact if not provided
     let patientEmail = null;
     let patientPhone = null;
 
     if (patientId) {
-      const patient = await prisma.patient.findUnique({
-        where: { id: patientId },
+      const patient = await prisma.patient.findFirst({
+        where: { id: patientId, kineId, isActive: true },
         select: { email: true, phone: true, firstName: true, lastName: true }
       });
-      if (patient) {
-        patientEmail = method === 'EMAIL' ? patient.email : null;
-        patientPhone = method === 'WHATSAPP' ? patient.phone : null;
-        if (!recipientName) recipientName = `${patient.firstName} ${patient.lastName}`;
-        if (!recipientEmail) recipientEmail = patient.email;
-      }
+      if (!patient) throw new Error(`Patient ${patientId} introuvable`);
+      patientEmail = method === 'EMAIL' ? patient.email : null;
+      patientPhone = method === 'WHATSAPP' ? patient.phone : null;
+      if (!recipientName) recipientName = `${patient.firstName} ${patient.lastName}`;
+      if (!recipientEmail) recipientEmail = patient.email;
     } else if (contactId) {
-      const contact = await prisma.contact.findUnique({
-        where: { id: contactId },
+      const contact = await prisma.contact.findFirst({
+        where: { id: contactId, kineId },
         select: { firstName: true, lastName: true, email: true }
       });
-      if (contact) {
-        if (!recipientName) recipientName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-        if (!recipientEmail) recipientEmail = contact.email;
-      }
+      if (!contact) throw new Error(`Contact ${contactId} introuvable`);
+      if (!recipientName) recipientName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+      if (!recipientEmail) recipientEmail = contact.email;
     }
 
     const history = await prisma.templateSentHistory.create({

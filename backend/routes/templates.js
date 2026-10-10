@@ -194,6 +194,9 @@ router.post('/history', authenticate, requireAssistant('TEMPLATES_ADMIN'), valid
     res.json(result);
   } catch (error) {
     logger.error('Erreur POST /api/templates/history:', error.message);
+    if (error.message.includes('introuvable')) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
     res.status(500).json({ success: false, error: 'Erreur lors de la sauvegarde dans l\'historique' });
   }
 });
