@@ -7,6 +7,8 @@ const admin = require('../firebase/firebase');
 const logger = require('../utils/logger');
 const { sanitizeUID, sanitizeEmail, sanitizeId, sanitizeName } = require('../utils/logSanitizer');
 const pionniersChatService = require('./pionniersChatService');
+const gcsStorageService = require('./gcsStorageService');
+const brevoTrialService = require('./brevoTrialService');
 
 class RGPDService {
   constructor() {
@@ -593,6 +595,25 @@ Pour toute question concernant vos données: contact@monassistantkine.com
 
       logger.warn(`✅ Kiné vérifié: ${sanitizeName(kine.firstName)} ${sanitizeName(kine.lastName)} (Plan: ${kine.planType || 'FREE'})`);
 
+      // Exercices publiés utilisés par d'autres kinés : les supprimer casserait leurs
+      // programmes (et la base le refuse). Décision : blocage + passage par le support.
+      const [sharedInProgrammes, sharedInTemplates] = await Promise.all([
+        prisma.exerciceProgramme.count({
+          where: { exerciceModele: { kineId: kine.id }, programme: { patient: { kineId: { not: kine.id } } } }
+        }),
+        prisma.exerciceTemplateItem.count({
+          where: { exerciceModele: { kineId: kine.id }, template: { kineId: { not: kine.id } } }
+        })
+      ]);
+      if (sharedInProgrammes + sharedInTemplates > 0) {
+        logger.warn(`Suppression bloquée : exercices utilisés par d'autres kinés pour ${sanitizeUID(kineUid)}`);
+        return {
+          success: false,
+          code: 'SHARED_EXERCISES',
+          error: 'Certains de tes exercices sont utilisés par d\'autres kinés dans la bibliothèque partagée. Contacte le support pour finaliser la suppression de ton compte.'
+        };
+      }
+
       // 2. Compter les données qui vont être supprimées
       const [
         patientsCount,
@@ -637,7 +658,26 @@ Pour toute question concernant vos données: contact@monassistantkine.com
         logger.warn(`Purge des images Pionniers echouee pour ${sanitizeUID(kineUid)}: ${err.message}`);
       }
 
-      // 3. Suppression en cascade avec transaction
+      // Fichiers du stockage à purger après la suppression en base (les chemins
+      // disparaissent avec les lignes) : médias d'exercices, PJ support, PDF de contrats.
+      const [exerciceMedia, ticketImages, contractPdfs] = await Promise.all([
+        prisma.exerciceModele.findMany({
+          where: { kineId: kine.id },
+          select: { gifPath: true, videoPath: true, posterPath: true }
+        }),
+        prisma.ticketMessage.findMany({
+          where: { ticket: { kineId: kine.id }, imagePath: { not: null } },
+          select: { imagePath: true }
+        }),
+        prisma.contract.findMany({
+          where: { kineInitiateurId: kine.id, pdfFinalUrl: { not: null } },
+          select: { pdfFinalUrl: true }
+        })
+      ]);
+
+      // 3. Suppression en transaction. Les relations sans cascade (RESTRICT) sont
+      // supprimées explicitement, dans l'ordre : visios → programmes → modèles de séance
+      // → exercices → patients → kiné. Tout le reste part en cascade avec le kiné.
       await prisma.$transaction(async (tx) => {
         // Supprimer les chats IA
         await tx.chatIaBasique.deleteMany({ where: { kineId: kine.id } });
@@ -648,11 +688,20 @@ Pour toute question concernant vos données: contact@monassistantkine.com
         // Supprimer les notifications
         await tx.notification.deleteMany({ where: { kineId: kine.id } });
 
+        // Séances visio (RESTRICT vers kiné et patient)
+        await tx.visioSeance.deleteMany({ where: { kineId: kine.id } });
+
+        // Programmes des patients (RESTRICT vers patient) : exercices de programme,
+        // sessions de chat et validations partent en cascade
+        await tx.programme.deleteMany({ where: { patient: { kineId: kine.id } } });
+
+        // Modèles de séance (leurs items, RESTRICT vers les exercices, partent en cascade)
+        await tx.exerciceTemplate.deleteMany({ where: { kineId: kine.id } });
+
         // Supprimer les exercices modèles
         await tx.exerciceModele.deleteMany({ where: { kineId: kine.id } });
 
-        // Les patients, programmes et leurs données associées seront supprimés automatiquement
-        // grâce aux relations en cascade définies dans le schéma Prisma
+        // Patients : bilans, notes, validations… partent en cascade
         await tx.patient.deleteMany({ where: { kineId: kine.id } });
 
         // Enfin, supprimer le kiné
@@ -685,6 +734,38 @@ Pour toute question concernant vos données: contact@monassistantkine.com
         // On continue même si Firebase échoue
       }
 
+      // 6. Purge du stockage (best-effort, jamais bloquante). Un média d'exercice encore
+      // référencé par un autre exercice est conservé (même garde que deleteOrphanMedia).
+      const files = [];
+      if (kine.avatarPath) files.push([gcsStorageService.deleteAvatar, kine.avatarPath]);
+      for (const p of new Set(exerciceMedia.flatMap((e) => [e.gifPath, e.videoPath, e.posterPath]).filter(Boolean))) {
+        const stillReferenced = await prisma.exerciceModele.count({
+          where: { OR: [{ videoPath: p }, { posterPath: p }, { gifPath: p }] }
+        });
+        if (stillReferenced === 0) files.push([gcsStorageService.deleteExerciceMedia, p]);
+      }
+      for (const t of ticketImages) files.push([gcsStorageService.deleteSupportImage, t.imagePath]);
+      for (const c of contractPdfs) files.push([gcsStorageService.deleteContractPdf, c.pdfFinalUrl]);
+
+      let filesFailed = 0;
+      for (const [remove, filePath] of files) {
+        try {
+          await remove(filePath);
+        } catch (err) {
+          filesFailed++;
+        }
+      }
+      if (filesFailed > 0) {
+        logger.error(`⚠️ RGPD : ${filesFailed}/${files.length} fichier(s) non supprimé(s) du stockage pour ${sanitizeUID(kineUid)}`);
+      }
+
+      // 7. Contact Brevo (listes marketing) : best-effort
+      try {
+        await brevoTrialService.deleteContact(kine.email);
+      } catch (brevoError) {
+        logger.error(`⚠️ RGPD : contact Brevo non supprimé pour ${sanitizeUID(kineUid)} (${brevoError.code || 'Error'})`);
+      }
+
       logger.warn(`🎯 Suppression de compte terminée avec succès pour: ${sanitizeUID(kineUid)}`);
 
       return {
@@ -694,11 +775,10 @@ Pour toute question concernant vos données: contact@monassistantkine.com
       };
 
     } catch (error) {
-      logger.error('❌ Erreur lors de la suppression de compte:', error.message);
-      return { 
-        success: false, 
-        error: 'Erreur lors de la suppression du compte',
-        details: error.message 
+      logger.error('❌ Erreur lors de la suppression de compte:', { name: error.name, code: error.code });
+      return {
+        success: false,
+        error: 'Erreur lors de la suppression du compte'
       };
     }
   }

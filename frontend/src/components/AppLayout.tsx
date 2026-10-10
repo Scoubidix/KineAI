@@ -967,7 +967,7 @@ function SettingsModal({ trigger, open, onOpenChange }: { trigger?: React.ReactN
                           <div>
                             <p className="font-medium text-destructive">Supprimer mon compte</p>
                             <p className="text-sm text-muted-foreground">
-                              Suppression définitive après période de grâce de 7 jours
+                              Suppression immédiate et définitive de toutes tes données
                             </p>
                           </div>
                           <Button 

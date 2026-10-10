@@ -164,8 +164,7 @@ router.post('/delete-account', authenticate, rgpdDeleteLimiter, async (req, res)
       return res.status(400).json({
         success: false,
         error: result.error,
-        code: 'DELETION_ERROR',
-        details: result.details
+        code: result.code || 'DELETION_ERROR'
       });
     }
 

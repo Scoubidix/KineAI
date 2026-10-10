@@ -133,4 +133,40 @@ async function upsertSignupContact({ email, firstName }) {
   });
 }
 
-module.exports = { ERROR_CODES, addToPionnierList, upsertSignupContact };
+/**
+ * Supprime le contact Brevo (toutes listes) — suppression de compte RGPD.
+ * 204 = supprimé, 404 = déjà absent : les deux sont un succès.
+ * @param {string} email
+ * @returns {Promise<void>}
+ */
+async function deleteContact(email) {
+  if (!process.env.BREVO_API_KEY) {
+    throwErr('Configuration Brevo manquante', ERROR_CODES.CONFIG_MISSING);
+  }
+  if (!email) {
+    throwErr('Email requis pour le contact Brevo', ERROR_CODES.VALIDATION);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(`${BREVO_CONTACTS_ENDPOINT}/${encodeURIComponent(email)}?identifierType=email_id`, {
+      method: 'DELETE',
+      headers: { 'accept': 'application/json', 'api-key': process.env.BREVO_API_KEY },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    logger.error('Brevo suppression contact : échec réseau', { name: err.name, message: err.message });
+    throwErr('Échec suppression contact Brevo (réseau)', ERROR_CODES.UNKNOWN);
+  }
+  clearTimeout(timer);
+
+  if (response.status === 204 || response.status === 404) return;
+
+  logger.error('Brevo suppression contact : refusée', { status: response.status });
+  throwErr('Suppression du contact Brevo refusée', ERROR_CODES.UNKNOWN);
+}
+
+module.exports = { ERROR_CODES, addToPionnierList, upsertSignupContact, deleteContact };

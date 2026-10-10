@@ -374,8 +374,8 @@ export function RGPDDeleteModal({
               onCheckedChange={setUnderstands7DaysDelay}
             />
             <Label htmlFor="understands7days" className="text-sm leading-relaxed">
-              Je comprends qu'il y aura un délai de <strong>7 jours</strong> avant la suppression 
-              effective et que je peux annuler pendant cette période
+              Je comprends que la suppression est <strong>immédiate et irréversible</strong> :
+              aucune annulation ne sera possible
             </Label>
           </div>
 
@@ -402,10 +402,10 @@ export function RGPDDeleteModal({
           </h4>
           
           <div className="space-y-1 text-sm text-blue-700">
-            <div>1. Ton compte sera marqué pour suppression</div>
-            <div>2. Délai de grâce de 7 jours avant suppression effective</div>
-            <div>3. Email de confirmation et possibilité d'annulation</div>
-            <div>4. Suppression définitive de toutes les données après 7 jours</div>
+            <div>1. Ton compte et toutes tes données (patients, programmes, bilans, fichiers) sont supprimés immédiatement</div>
+            <div>2. Tu es déconnecté et ton accès est fermé</div>
+            <div>3. Tu es retiré de nos listes d'emails</div>
+            <div>4. Seules tes factures restent conservées par notre prestataire de paiement (obligation comptable)</div>
           </div>
         </CardContent>
       </Card>
@@ -459,7 +459,7 @@ export function RGPDDeleteModal({
         {/* Note légale */}
         <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded border-t">
           <strong>Information légale :</strong> Cette suppression est conforme à l'Article 17 du RGPD 
-          (droit à l'effacement). Un délai de grâce de 7 jours est appliqué pour ta sécurité.
+          (droit à l'effacement). Elle est immédiate et définitive.
         </div>
       </DialogContent>
     </Dialog>
